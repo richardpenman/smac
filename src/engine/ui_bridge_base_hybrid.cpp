@@ -62,19 +62,47 @@ bool ui_shift_pressed() {
     }
     return ((uint16_t)fn(0x10) >> 8) != 0;
 }
-// base_production's popup object exists only inside the original function; the reconstruction
-// does not display it (as tech_achieved's, see ui_bridge_tech_hybrid.cpp), but loads its texts
-// the same way (Popup_start reads them into TextBuffer, engine-visible state).
+// base_production's popup object lives on the original function's stack; here it is a heap
+// Popup (BasePopAlloc) driven through the same calls (its texts land in TextBuffer, engine-visible
+// state; the picture lookup also sets the file search state).
 namespace {
 typedef int32_t(__thiscall* PopupStartFn)(uint8_t*, const char*, const char*, int32_t, int32_t, int32_t, int32_t);
+typedef int32_t(__thiscall* PopInitFn)(uint8_t*, int32_t, int32_t);
+typedef void(__thiscall* PopWidthFn)(uint8_t*, int32_t);
+typedef int32_t(__thiscall* PopStringFn)(uint8_t*, const char*);
+typedef int32_t(__thiscall* PopExecFn)(uint8_t*, int32_t, int32_t);
 const PopupStartFn popup_start = reinterpret_cast<PopupStartFn>(0x406380);
+const PopInitFn basepop_init = reinterpret_cast<PopInitFn>(0x6015B0);
+const PopWidthFn basepop_set_width = reinterpret_cast<PopWidthFn>(0x601B20);
+const PopStringFn basepop_string = reinterpret_cast<PopStringFn>(0x601980);
+const PopExecFn basepop_exec_3 = reinterpret_cast<PopExecFn>(0x602600);
+typedef int32_t(__cdecl* PcxDimsFn)(const char*, int32_t*, int32_t*);
+typedef int32_t(__thiscall* SpriteInitFn)(uint8_t*, const char*, int32_t, int32_t);
+const PcxDimsFn buffer_get_pcx_dimensions = reinterpret_cast<PcxDimsFn>(0x5E2480);
+const SpriteInitFn sprite_init = reinterpret_cast<SpriteInitFn>(0x5E3890);
+uint8_t* production_pop = nullptr;
 }  // namespace
-void ui_production_popup_open(int32_t) {}
-void ui_production_popup_blurb(bool is_project) {
-    uint8_t* pop = BasePopAlloc();
-    popup_start(pop, "BLURBS", StrBuffer, -1, 0, 0x80, 0);
-    if (is_project) popup_start(pop, reinterpret_cast<const char*>(0x9B8AA8), "PRODUCE2", -1, 0, 0x80, 0);
-    BasePop_delete(pop);
+void ui_production_popup_open(int32_t width) {
+    if (production_pop) BasePop_delete(production_pop);
+    production_pop = BasePopAlloc();
+    basepop_init(production_pop, 0, 0);
+    basepop_set_width(production_pop, width);
 }
-void ui_production_popup_exec() {}
+void ui_production_popup_blurb(bool is_project) {
+    uint8_t* pop = production_pop;
+    popup_start(pop, "BLURBS", StrBuffer, -1, 0, 0x80, 0);
+    if (!is_project || ScreenWidth != 800) basepop_string(pop, "^");
+    basepop_string(pop, "^------");
+    basepop_string(pop, "^");
+    if (is_project) popup_start(pop, reinterpret_cast<const char*>(0x9B8AA8), "PRODUCE2", -1, 0, 0x80, 0);
+}
+void ui_production_popup_exec() {
+    uint8_t* pop = production_pop;
+    int32_t w, h;
+    if (!buffer_get_pcx_dimensions("secproj_sm.pcx", &w, &h)) {
+        uint8_t* sprite = pop + 0x2118;  // the Popup's picture Sprite member
+        if (!sprite_init(sprite, "secproj_sm.pcx", w, h)) *reinterpret_cast<uint8_t**>(pop + 0x2144) = sprite;
+    }
+    basepop_exec_3(pop, 0, 0);
+}
 #endif

@@ -30,7 +30,7 @@
 #include "engine/zoc.h"
 #include "platform/win32.h"
 
-#ifdef FC_ORIG_BASE_BUILD  // TEMP test-only: fcompare isolation from base_build
+#ifdef FC_ORIG_BASE_BUILD  // Test builds only (-DFC_ORIG_BASE_BUILD): route base_build to the original, to verify this module apart from base_misc
 #define base_build(a, b, c, d) (((int32_t(__cdecl*)(int32_t, int32_t*, int32_t*, int32_t*))0x4F81A0)(a, b, c, d))
 #endif
 

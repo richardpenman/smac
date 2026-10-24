@@ -161,6 +161,8 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
     int32_t former_count = 0, same_prod = 0, same_prod_foreign = 0, faster_project = 0;
     int32_t projects_region = 0, prototypes = 0, max_pop_other = 0, psigate_count = 0;
     int32_t ascent_count = 0, ascent_human = 0, sea_bases = 0, vendetta_plan7 = 0, punish_count = 0;
+    // Counted by the original but never read afterwards.
+    (void)preserve_count, (void)same_prod_foreign, (void)psigate_count, (void)ascent_count;
     int32_t threat = (plan_region == 0 || plan_region == 2) ? 1 : 0;  // [ebp-0x70]
     int32_t pact_faction = -1;
     for (int32_t i = 1; i < 8; i++) {
@@ -446,7 +448,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
         stack_check(stack, 2, 7, faction_id, -1);
         stack_check(stack, 2, 6, faction_id, -1);
         if (fbit & Units[2].obsolete_factions) {
-            int32_t n = stack_check(stack, 2, 0, faction_id, -1);
+            int32_t n = stack_check(stack, 0, 2, faction_id, -1);  // unit 2 (obsolete) defenders
             if (n < 0) n = 0;
             else if (n > 1) n = 1;
             defense -= n;
@@ -2230,7 +2232,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             own = 0;
         }
         bool gov_ok = !is_human || (cur_base().governor_flags & 0x40000);
-        if (choice[0] <= -70 || own) {
+        if (choice[0] > -70 || own) {
             for (int32_t k = 0; k < 2; k++) {
                 if (!gov_ok) continue;
                 int32_t s = ws;
