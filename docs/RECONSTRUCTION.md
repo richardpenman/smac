@@ -91,6 +91,16 @@ Ghidra prints `game_random`'s scaling as a signed `>>`, but the code uses `shr` 
   even, so the reconstruction uses 0 (see `probe_clock_odd` in probe.cpp).
 * **Short-circuit and loop structure**: keep conditions whose evaluation has side effects (random
   draws, writes) in the original order. Early-exit loops must exit at the same element.
+* **Memory copies and packed data**: the original's `memcpy` is a memmove (it copies overlapping
+  ranges correctly, and the code relies on it, e.g. `base_kill` shifting `Bases` down). Use
+  `crt_memcpy`, never `std::memcpy`, for a copy the original makes. Data the original packs without
+  alignment (text index entries, save records) is read and written with `crt_memcpy`, not through
+  a cast `int32_t*`: unaligned access is undefined behaviour and traps or miscompiles on some
+  targets.
+* **Out-of-bounds indexes the original makes** (`Vehs[-1]`, `Tech[-1]`, one past a table) are read
+  from the memory image explicitly, not through the typed array: the compiler may assume an
+  in-bounds index and drop or reorder the access. (GCC builds add
+  `-fno-aggressive-loop-optimizations` as a backstop; clang has no such option.)
 
 ### Known uninitialised reads in the original (must be emulated)
 
@@ -212,6 +222,24 @@ were never called (empty domains). Details: harness/README.md, "Function compari
 
 **Native verification** (`harness/verify.sh native`) runs `smacx_headless` against the same
 references once the native code path is complete.
+
+**Native checking builds.** Two configure options instrument `smacx_headless` (native only):
+
+```sh
+cmake -S . -B build/asan-native -DSMACX_SANITIZE=ON   # AddressSanitizer + UndefinedBehaviorSanitizer
+cmake -S . -B build/cov-native -DSMACX_COVERAGE=ON    # gcov coverage
+```
+
+* Run any scenarios with the sanitized build (`build/asan-native/smacx_headless
+  harness/scenarios/std8.cmd --outdir work/x`). An `AddressSanitizer` or `runtime error` line is a
+  bug in the reconstruction (an overlapping `std::memcpy`, an unaligned cast, an out-of-bounds
+  native array) unless it is an original out-of-bounds read, which must then go through the memory
+  image as described above. Signed overflow is not reported: `-fwrapv` defines it.
+* After coverage runs, `src/tools/coverage_report.py build/cov-native --missed` lists, per header,
+  the reconstructed functions that native runs never executed. These are verified only by
+  fcompare/hybrid runs, if at all; add a scenario when one matters. Counts accumulate across runs;
+  delete the `*.gcda` files to reset them. A run that stops at a function not yet reconstructed still
+  records its counts.
 
 ## Reporting
 

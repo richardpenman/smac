@@ -563,7 +563,7 @@ void GAMEAPI base_kill(int32_t base_id) {
     }
     bit_set(x, y, 1, 0);
     if (base_id < BaseCount - 1)
-        std::memcpy(&Bases[base_id], &Bases[base_id + 1], (BaseCount - base_id - 1) * sizeof(BASE));
+        crt_memcpy(&Bases[base_id], &Bases[base_id + 1], (uint32_t)((BaseCount - base_id - 1) * sizeof(BASE)));  // overlapping
     int32_t count = BaseCount - 1;
     if (base_id == ComputeBaseID) ComputeBaseID = -1;
     BaseCount = count;

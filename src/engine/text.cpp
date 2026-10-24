@@ -275,9 +275,11 @@ void THISCALL TextIndex_make_index(TextIndex* self, const char* filename) {
         kill_lf(TextBufferGetPtr);
         purge_spaces(TextBufferGetPtr);
         if (*TextBufferGetPtr == '#' && crt_isupper((int8_t)TextBufferGetPtr[1])) {
-            int32_t* entry = (int32_t*)Heap_get(&self->heap, (int32_t)crt_strlen(TextBufferGetPtr + 1) + 5);
-            *entry = (int32_t)(line - data);
-            crt_strcpy((char*)(entry + 1), TextBufferGetPtr + 1);
+            // entries are packed (offset + name), so the offset is usually unaligned
+            char* entry = (char*)Heap_get(&self->heap, (int32_t)crt_strlen(TextBufferGetPtr + 1) + 5);
+            int32_t offset = (int32_t)(line - data);
+            crt_memcpy(entry, &offset, 4);
+            crt_strcpy(entry + 4, TextBufferGetPtr + 1);
             self->count++;
         }
         line = nl + 1;
@@ -296,7 +298,11 @@ int32_t THISCALL TextIndex_search_index(TextIndex* self, const char* filename, c
     char* entry = (char*)self->heap.base;
     for (;;) {
         char* key = entry + 4;
-        if (!crt_stricmp(section, key)) return *(int32_t*)entry;
+        if (!crt_stricmp(section, key)) {
+            int32_t offset;
+            crt_memcpy(&offset, entry, 4);  // unaligned
+            return offset;
+        }
         while (*key) key++;
         entry = key + 1;
         if (!--left) return -1;

@@ -6,12 +6,32 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(SMACX_HYBRID "Build hybrid.dll (32-bit, injected into the original terranx.exe)" OFF)
+option(SMACX_SANITIZE "Native only: build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(SMACX_COVERAGE "Native only: build with gcov coverage (tools/coverage_report.py)" OFF)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
+# -fno-aggressive-loop-optimizations: the original indexes tables out of bounds in places that are
+# preserved on purpose (BUG(original)); without it GCC may assume such loops end early.
 add_compile_options(-Wall -Wextra -Wno-unused-parameter -fwrapv -fno-strict-aliasing)
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-fno-aggressive-loop-optimizations SMACX_HAS_NO_AGGRESSIVE_LOOP_OPT)
+if(SMACX_HAS_NO_AGGRESSIVE_LOOP_OPT)  # GCC only
+  add_compile_options(-fno-aggressive-loop-optimizations)
+endif()
+if(NOT SMACX_HYBRID AND SMACX_SANITIZE)
+  # Overflow checks stay off: -fwrapv makes signed wrapping defined, as in the original.
+  add_compile_options(-fsanitize=address,undefined -fno-sanitize=signed-integer-overflow
+                      -fno-omit-frame-pointer)
+  add_link_options(-fsanitize=address,undefined)
+endif()
+if(NOT SMACX_HYBRID AND SMACX_COVERAGE)
+  add_compile_options(--coverage -O0)
+  add_compile_definitions(SMACX_COVERAGE)
+  add_link_options(--coverage)
+endif()
 
 # --- engine sources and generated bindings ----------------------------------------------------
 file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS src/engine/*.cpp src/platform/*.cpp)
