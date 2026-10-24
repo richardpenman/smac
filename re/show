@@ -1,0 +1,25 @@
+#!/bin/bash
+# Show an original function: decompilation (default) and/or disassembly.
+#   re/show <name|hexaddr> [--asm|--both]
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+Q="$1"; MODE="${2:---c}"
+ROW=$(awk -F'\t' -v q="$Q" 'BEGIN{IGNORECASE=1} NR>1 && ($2==q || $1==sprintf("%08X", strtonum("0x" q)) || $1==toupper(q)) {print; exit}' "$ROOT/re/out/index.tsv" 2>/dev/null)
+if [ -z "$ROW" ]; then
+  ROW=$(python3 - "$ROOT" "$Q" <<'PY'
+import sys,csv
+root,q=sys.argv[1],sys.argv[2]
+for r in csv.DictReader(open(f"{root}/re/out/index.tsv"),delimiter="\t"):
+    try: a=int(q,16)
+    except ValueError: a=None
+    if r["name"].lower()==q.lower() or (a is not None and int(r["addr"],16)==a):
+        print("\t".join(r.values())); break
+PY
+)
+fi
+[ -z "$ROW" ] && { echo "not found: $Q"; exit 1; }
+ADDR=$(echo "$ROW" | cut -f1); FILE=$(echo "$ROW" | cut -f9); SIZE=$(echo "$ROW" | cut -f3)
+if [ "$MODE" != "--asm" ]; then cat "$ROOT/re/$FILE"; echo; fi
+if [ "$MODE" != "--c" ]; then
+  START=$(printf "%x" $((16#$ADDR))); END=$(printf "%x" $((16#$ADDR + SIZE)))
+  awk -v s="$START" -v e="$END" '{a=$1; sub(":","",a)} a!="" && length(a)==6 && a>=s && a<e' "$ROOT/re/out/terranx.asm"
+fi

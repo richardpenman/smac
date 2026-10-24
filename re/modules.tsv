@@ -1,0 +1,45 @@
+# start	end	module	kind	notes   (ranges are approximate original source files; kind: engine|ui|net|sys|crt)
+401000	4C9420	ui	ui	popups, base window, map window, design/diplo/report windows, interface, sound fx, vehdraw
+4C9420	4CF7C0	action	engine	terraforming & unit actions (action_*)
+4CF7C0	4E39D0	console	ui	Console (main game UI controller), AlphaNet
+4E39D0	4F8090	base	engine	base logic (base_*)
+4F8090	500120	base_misc	engine	vector_dist, has_project, base_build
+500120	50B8A0	battle	engine	combat
+50B8A0	50E890	diplo_act	engine	intervention, capture_base, coast helpers
+50E890	51E000	timers	ui	timers, Console key handling
+51E000	51F2E0	net_misc	net	tamper, checksums, wait loop
+51F2E0	52DBA0	turn	engine	random events, turn upkeep, control turn, council
+52DBA0	538F30	net	net	NetDaemon, synch
+538F30	55F930	diplomacy	engine	diplomacy (AI and human dialogs)
+55F930	579770	ai	engine	enemy_* strategy and movement
+579770	57D1F0	goals	engine	goals, sites, monolith, goody boxes
+57D1F0	584D60	design	engine	prototype design, unit naming
+584D60	5882F0	rules	engine	alpha(x).txt parsing
+5882F0	590510	game	ui	setup dialogs, top menu, game init, phrase helpers
+590510	590E90	say	engine	say_* helpers
+590E90	593510	map	engine	map access and messages
+593510	59A1B0	move	engine	hex_cost, zoc, order_veh
+59A1B0	59D980	path	engine	Path class, popm
+59D980	59E980	prefs	sys	preferences
+59E980	5A59B0	probe	engine	probe teams, mind control
+5A59B0	5A66E0	proto	engine	proto cost, make_proto, radius move
+5A66E0	5ABFF0	save	engine	save/load
+5ABFF0	5AE120	score	engine	objectives, score, replay
+5AE120	5B4210	setup	engine	crash landing, time warp, setup_player, setup_game
+5B4210	5B57D0	social	engine	social engineering
+5B57D0	5B9C40	stack	engine	spotting, stacks
+5B9C40	5BED20	tech	engine	technology
+5BED20	5C2020	veh	engine	vehicles
+5C2020	5C89A0	world	engine	world generation
+5C89A0	5C9860	zoc	engine	game_year, zoc
+5C9860	5D4510	multidebug	ui	MultiDebug
+5D4510	5FD4C0	gfx	sys	heap, GraphicWin, Buffer, Sprite, Win, Menu, task loop
+5FD4C0	5FE2A0	text	sys	text file parsing
+5FE2A0	625750	gfx2	sys	palette, filefind, widgets, time, strings, font, texture
+625750	626040	random	sys	random, parse
+626040	627100	log	sys	log, polygon
+627100	6283A0	pop	ui	pop wrappers
+6283A0	62D3A0	util	sys	filemap, utils, HSV/RGB, StringBox, buttons
+62D3A0	634BB0	netlib	net	jackal/Net
+634BB0	644EF2	video	sys	env, video
+644EF2	669000	crt	crt	MSVC runtime

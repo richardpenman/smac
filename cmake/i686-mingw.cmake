@@ -1,0 +1,11 @@
+# Toolchain for the hybrid build (32-bit Windows DLL injected into terranx.exe).
+set(CMAKE_SYSTEM_NAME Windows)
+set(CMAKE_SYSTEM_PROCESSOR i686)
+set(LLVM_MINGW ${CMAKE_CURRENT_LIST_DIR}/../tools/llvm-mingw-20260922-msvcrt-ubuntu-22.04-x86_64)
+set(CMAKE_C_COMPILER ${LLVM_MINGW}/bin/i686-w64-mingw32-clang)
+set(CMAKE_CXX_COMPILER ${LLVM_MINGW}/bin/i686-w64-mingw32-clang++)
+set(CMAKE_RC_COMPILER ${LLVM_MINGW}/bin/i686-w64-mingw32-windres)
+set(CMAKE_FIND_ROOT_PATH ${LLVM_MINGW}/i686-w64-mingw32)
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)

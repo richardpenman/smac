@@ -1,0 +1,70 @@
+addr	standard_name	signature	confidence	note
+00644ef2	free	void free(void*)	high	named mem_free; locks heap (lock 9), HeapFree path; 149 callers; also called by operator delete wrapper
+00644f3a	abs	int abs(int)	high	11 bytes: return x<0?-x:x; ~122 callers
+00645398	atexit	int atexit(void(*)(void))	high	wraps _onexit (0x64531a): returns (onexit!=0)-1; callers are *_atexit_dtor registrations
+006453e0	strlen	size_t strlen(const char*)	high	named _strlen; word-at-a-time 0x7efefeff trick
+00645460	strcpy	char* strcpy(char*,const char*)	high	7-byte stub: push edi; edi=dst; jmp 0x6454d1 (copy tail shared with strcat); Ghidra decompile shows merged body. Returns dst
+00645470	strcat	char* strcat(char*,const char*)	high	scans dst for NUL (aligned dword trick) then falls into the same copy code as strcpy at 0x6454d1. Most used of the two (438 callers); returns dst
+00645550	_chkstk	void _chkstk(void) /*frame size in eax*/	high	probes stack one 0x1000 page at a time; compiler-inserted for big frames; ignore in reconstruction
+0064557f	operator delete	void operator delete(void*)	high	just calls free (mem_free); used by scalar deleting dtors
+0064558a	operator new	void* operator new(size_t)	high	named operator_new; goes through _nh_malloc (0x6470b8)
+00645598	fclose	int fclose(FILE*)	high	locks stream, calls __fclose_lk; if flags&0x40 (_IOSTRG) just zeroes flags; returns EOF(-1) in that case
+00645646	fopen	FILE* fopen(const char*,const char*)	high	thunk to _fsopen (0x645615) with shflag 0x40 (_SH_DENYNO) = standard MSVC fopen
+006456e4	__ehvec_dtor	void __ehvec_dtor(void* p,size_t sz,int n,void(*dtor)(void*))	high	SEH-wrapped array destructor loop (count-1 down to 0); compiler helper for delete[]/array members, not libc
+006457c2	__ehvec_ctor	void __ehvec_ctor(void* p,size_t sz,int n,void(*ctor)(void*),void(*dtor)(void*))	high	SEH-wrapped array constructor loop; compiler helper, not libc
+0064584d	crt_startup_helper	void(void)	medium	only caller is FUN_00644dd2 (CRT startup code just below the crt range); not callable by engine proper
+00645660	strcmp	int strcmp(const char*,const char*)	high	named _strcmp; returns -1/0/1
+006458a0	strrchr	char* strrchr(const char*,int)	high	named _strrchr
+006458c8	_ftol	long _ftol(void) /*st0*/	high	named __ftol; truncating double->int via fnstcw/fldcw (round toward zero); emitted by compiler for (int)double casts, use plain cast
+006458f0	strncmp	int strncmp(const char*,const char*,size_t)	high	named _strncmp
+00645930	memcpy	void* memcpy(void*,const void*,size_t)	medium	code identical to memmove (backward copy when overlapping, as MSVC6 memcpy.asm). Called by realloc and by Sprite_copy/Net_send/palette code (55 callers). Portable memmove would also be safe
+00645c70	memcmp	int memcmp(const void*,const void*,size_t)	high	named _memcmp
+00645d1c	atol	long atol(const char*)	high	skips isspace (ctype mask 0x8, _isctype when MB locale), optional +/-, digits (mask 0x4); no overflow check. Direct caller BasePop_start
+00645da7	atoi	int atoi(const char*)	high	11-byte jump to atol 0x645d1c; callers prefs_get/stoi/pop_ask_number etc.
+00645dd0	strchr	char* strchr(const char*,int)	high	named _strchr
+00645e90	strncpy	char* strncpy(char*,const char*,size_t)	high	named _strncpy; zero-pads to n like the standard
+00646010	srand	void srand(unsigned)	high	stores seed at _getptd()+0x14 (_holdrand); per-thread
+0064601d	rand	int rand(void)	high	named game_rand; MSVC LCG x*214013+2531011, returns (x>>16)&0x7fff, per-thread holdrand
+0064603f	fwrite	size_t fwrite(const void*,size_t,size_t,FILE*)	high	locks stream then _fwrite_lk (0x64606e); args buf,size,count,FILE*
+00646178	fread	size_t fread(void*,size_t,size_t,FILE*)	high	locks stream then _fread_lk (0x6461a7)
+0064628f	toupper	int toupper(int)	high	C locale (DAT_009c057c==0): 'a'..'z' -> -0x20; else lock 0x13 + _toupper_lk (locale-dependent LC_CTYPE)
+006463e4	sin	double sin(double)	high	9-byte stub into math dispatcher 0x64a825; body has fsin
+00646494	cos	double cos(double)	high	stub into 0x64a825; body has fcos
+00646544	sqrt	double sqrt(double)	medium	stub into 0x64a825; negative-arg domain-error path; also called from pow (0x65024e)
+00646664	atan	double atan(double)	high	stub into 0x64a825; fpatan(x,1)
+006466ef	tolower	int tolower(int)	high	C locale: 'A'..'Z' +0x20; else lock 0x13 + _tolower_lk (locale-dependent)
+00646829	_mkdir	int _mkdir(const char*)	high	CreateDirectoryA; on failure _dosmaperr (0x64a9c3) and returns -1
+00646855	fgetc	int fgetc(FILE*)	high	lock; --_cnt<0 ? _filbuf : *_ptr++
+00646886	fputc	int fputc(int,FILE*)	high	lock; --_cnt<0 ? _flsbuf(ch,f) : *_ptr++=ch
+00646950	remove	int remove(const char*)	high	DeleteFileA + _dosmaperr; same as _unlink
+0064697a	isupper	int isupper(int)	high	ctype table mask 0x1 (_UPPER), _isctype when MB locale
+006469a2	isdigit	int isdigit(int)	high	ctype mask 0x4 (_DIGIT)
+006469ca	isleadbyte	int isleadbyte(int)	high	ctype mask 0x80 (_LEADBYTE)
+006469f7	rename	int rename(const char*,const char*)	high	MoveFileA + _dosmaperr; Win32 MoveFile fails if destination exists (same as MSVC)
+00646a25	sprintf	int sprintf(char*,const char*,...)	high	fake FILE with _flag=0x42 (_IOWRT+_IOSTRG), _cnt=0x7fffffff, calls _output (0x64aa48), NUL-terminates; MSVC6 sprintf, unbounded. No snprintf/vsprintf has outside callers
+00646a99	pow	double pow(double,double)	medium	9-byte stub into 0x64a825 taking 2 doubles; used for gamma ramp pow(i/235.0, 1/gamma) in FUN_005c9520
+00646ed0	calloc	void* calloc(size_t,size_t)	high	size=n*m rounded up to 16; small-block heap (0x64814a) or HeapAlloc(HEAP_ZERO_MEMORY); memset 0
+00646f5d	_beginthread	uintptr_t _beginthread(void(*)(void*),unsigned,void*)	high	allocs 0x74-byte _tiddata, CreateThread suspended + ResumeThread; returns handle or -1
+00647067	_endthread	void _endthread(void)	high	gets _tiddata, CloseHandle, frees ptd, ExitThread(0)
+006470a6	malloc	void* malloc(size_t)	high	named _malloc; wraps _nh_malloc 0x6470b8
+00647132	realloc	void* realloc(void*,size_t)	high	NULL ptr -> malloc; size 0 -> free; HeapReAlloc / small-block copy via memcpy. Callers Heap_squeeze/Heap_get
+0064726a	fgets	char* fgets(char*,int,FILE*)	high	locked; reads to newline (stored) or n-1 chars; NULL on EOF with nothing read
+006472cc	rewind	void rewind(FILE*)	high	flush, clear error/eof bits (&~0x30), _lseek(fd,0,0); caller Text_open
+00647330	fseek	int fseek(FILE*,long,int)	high	lock + _fseek_lk (0x64735c)
+006473f0	memchr	void* memchr(const void*,int,size_t)	high	named _memchr
+006474a0	strcspn	size_t strcspn(const char*,const char*)	high	builds 256-bit set from 2nd arg and returns index of first char of 1st arg in set; callers Net_check_for_lobby, FUN_006146a0
+006474e0	memmove	void* memmove(void*,const void*,size_t)	medium	byte-identical code to 0x645930 (MSVC6 keeps separate copies); used by EditBox_on_key_down/click (overlapping buffer shifts), so name memmove
+00647815	fprintf	int fprintf(FILE*,const char*,...)	high	lock; _stbuf/_ftbuf (0x64c03f/0x64c0cc) around _output (0x64aa48); callers Log_say, X_pop log writers
+00647851	floor	double floor(double)	medium	rounds via __frnd with FP control word DAT_006a5e10; used before __ftol in HSV_to_RGB (hue sector) and rect bounds in FUN_006396a0
+00647920	ftell	long ftell(FILE*)	high	lock + _ftell_lk (0x647942: _lseek(fd,0,SEEK_CUR) minus buffered count, text-mode adjust)
+00647ab0	acos	double acos(double)	medium	calls 0x647acd which does fpatan(sqrt((1-x)(1+x)),x)
+00647d04	_lock	void _lock(int)	high	lazily allocates CRITICAL_SECTION for lock id, EnterCriticalSection (CRT internal; reconstruction can ignore)
+00647d65	_unlock	void _unlock(int)	high	LeaveCriticalSection
+006493c6	_close	int _close(int)	high	checks fd<_nhandle and FOPEN flag, lock_fhandle, _close_lk; bad fd -> errno=EBADF(9)
+0064cf73	_open	int _open(const char*,int,int)	high	thunk to _sopen core (0x64cf8a) with shflag 0x40 (_SH_DENYNO)
+0064fc88	_itoa	char* _itoa(int,char*,int)	high	radix 10 and val<0 sets negative flag, calls shared xtoa 0x64fcb5; returns buffer
+0064fd20	_stricmp	int _stricmp(const char*,const char*)	high	folds A-Z to lowercase (C locale fast path DAT_009c057c==0, else lock 0x13 + _tolower_lk); same code as _strcmpi/strcmpi; returns -1/0/1
+0064fdf0	_strnicmp	int _strnicmp(const char*,const char*,size_t)	high	same folding as _stricmp, stops at count; n==0 returns 0; returns -1/0/1
+00650231	pow	double pow(double,double)	medium	C-call wrapper: pushes both doubles + opcode 0x18 and calls 0x65024e (pow impl, calls sqrt 0x646544); used in FUN_006396a0
+006465f0	memset	void* memset(void*,int,size_t)	high	named _memset; fill byte replicated to dword, rep stos; returns dst
+006468d0	strstr	char* strstr(const char*,const char*)	high	named _strstr; empty needle returns haystack

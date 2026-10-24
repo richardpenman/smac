@@ -1,0 +1,18 @@
+# Original game and installers (copyrighted; supply your own copy)
+/orig/
+/game/
+/game-modded/
+/mods/
+# Downloaded third-party tools and reference projects (see README)
+/tools/
+/ref/
+# Generated analysis output (regenerate with Ghidra, see README)
+/re/out/
+/re/ghidra_proj/
+# Data extracted from terranx.exe (regenerate with src/tools/gen_data_image.py)
+/src/data/data_image.bin
+# Build and run output
+/build/
+/work/
+/headless_out/
+__pycache__/
