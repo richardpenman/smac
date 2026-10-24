@@ -62,6 +62,9 @@ void ui_stringlist_add(uint8_t* list, int32_t id, char* text);
 // ---- Console (main game UI controller) ----
 GLOBAL(uint8_t, MainConsole, 0x9156B0);  // Console object (UI)
 ADDR_NATIVE(0x5108A0) int32_t THISCALL Console_focus(uint8_t* console, int32_t x, int32_t y, int32_t faction_id);
+// AI unit upgrade (enemy_strategy): upgrades an obsolete unit, spending credits. Changes game state:
+// declared with ADDR (not reconstructed: hybrid forwards to the original, native aborts).
+ADDR(0x4D06C0) int32_t THISCALL Console_upgrade(uint8_t* console, int32_t veh_id);
 
 // ---- popups ----
 ADDR_NATIVE(0x48C0A0) int32_t GAMEAPI popp(const char* file, const char* label, int32_t flags, const char* pcx,

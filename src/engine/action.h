@@ -77,8 +77,6 @@ ADDR(0x476B70) void GAMEAPI mon_colony_founded(int32_t faction_id, const char* b
 
 // ---- callees of other modules (not reconstructed yet) ---------------------------------------------
 
-// move: executes one step of veh_id in direction dir (mode 3: AI/order step). Non-zero if moved.
-ADDR(0x5947C0) int32_t GAMEAPI order_veh(int32_t veh_id, int32_t dir, int32_t mode);
 // map (multiplayer): sends veh_id's state to the other players.
 ADDR(0x593220) void GAMEAPI synch_veh(int32_t veh_id);
 ADDR(0x592E10) void GAMEAPI message_veh(int32_t type, int32_t veh_id, int32_t a3, int32_t a4);

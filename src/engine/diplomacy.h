@@ -55,3 +55,10 @@ ADDR(0x5398C0) void GAMEAPI diplo_unlock();
 // Major atrocity (planet buster) by faction_id against faction_id_vs (-1 none): sanctions, the
 // council's and every faction's reactions.
 ADDR(0x55F450) void GAMEAPI major_atrocity(int32_t faction_id, int32_t faction_id_vs);
+// Whether faction_id's and faction_id_with's areas in region connect (path search).
+ADDR(0x53A780) int32_t GAMEAPI contiguous(int32_t faction_id, int32_t faction_id_with, int32_t region, int32_t a4);
+// Territory statistics of faction_id against faction_id_with (outputs, see the original).
+ADDR(0x55EB80) int32_t GAMEAPI territory(int32_t faction_id, int32_t faction_id_with, int32_t region, int32_t* out1,
+                                         int32_t* out2);
+// AI factions with a treaty trade technology.
+ADDR(0x55D430) void GAMEAPI enemies_trade_tech(int32_t faction_id, int32_t faction_id_with);

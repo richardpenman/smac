@@ -12,6 +12,7 @@
 #include "engine/goody.h"
 #include "engine/log.h"
 #include "engine/map.h"
+#include "engine/move.h"
 #include "engine/net.h"
 #include "engine/parse.h"
 #include "engine/path.h"

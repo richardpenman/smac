@@ -17,3 +17,7 @@ ADDR(0x50E310) int32_t GAMEAPI transport_base(int32_t base_id);
 ADDR(0x50E3C0) int32_t GAMEAPI naval_base(int32_t base_id);
 // Waits (message pump) for the given number of milliseconds.
 ADDR(0x50DD90) void GAMEAPI clock_wait(int32_t msec);
+// Whether sea region region_sea borders land region region_land (coast table).
+ADDR(0x50DDC0) int32_t GAMEAPI sea_coast(int32_t region_land, int32_t region_sea);
+// Whether a port base can reach the coast of land region region by sea.
+ADDR(0x50E030) int32_t GAMEAPI port_to_coast(int32_t base_id, int32_t region);

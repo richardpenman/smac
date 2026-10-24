@@ -443,9 +443,12 @@ static const FcFunc kFcFuncs[] = {
     {"monolith", FC_MUTATES | FC_VOID, {A(VEH)}},
     {"goody_box", FC_MUTATES, {A(VEH), C(1)}},
     {"study_artifact", FC_MUTATES, {A(VEH)}},
-    /* action_build (faction 0 = viewer: monuments window), action_staple, action_arty,
-     * action_oblit, action_give, mon_colony_founded: their viewer popups hang or crash the
-     * fcompare harness (all vehicles/bases are candidates); verified by the hybrid games only. */
+    /* Not for fcompare (in the table for reference): action_build and mon_colony_founded (faction
+     * 0 is the viewer: the monuments window blocks), action_staple, action_arty, action_oblit,
+     * action_give, action_destroy (viewer messages free heap objects that the image restore brings
+     * back: double free in free()). Verified by the hybrid games. goody_box, study_artifact and probe
+ * can give a technology to faction 0 (the viewer) when called with a native vehicle: the "new
+ * technology" window then blocks; run them only on short ranges (probe: late100 is safe). */
     {"act_of_aggression", FC_MUTATES, {A(FACTION1), A(FACTION1)}},
     {"cause_friction", FC_MUTATES | FC_VOID, {A(FACTION), A(FACTION), R(-3, 5)}},
     /* ---- probe ---- */
@@ -478,6 +481,8 @@ static const struct {
     {0x74C5F0, 0x74DAA8 - 0x74C5F0, "sound Wave objects and current wave id (wave_it; playback timing)"},
     {0x749CF8, 0x74C5F0 - 0x749CF8, "sound effect objects (FX_play, battle sounds; playback timing)"},
     {0x90EA68, 0x90F554 - 0x90EA68, "boom() explosion animation object (flic player state; timing)"},
+    {0x912428, 8 * 0x588, "boom() map-window graphics buffers (Buffer objects)"},
+    {0x7AD2A0, 0x7AE778 - 0x7AD2A0, "InfoWindow status pane (InfoWin_on_redraw state)"},
     {0x7AF190, 4, "status window buffer font word (Buffer_set_font from StatusWin_draw during battle odds; "
                   "value depends on the caller's stack, UI only)"},
     {0x7CFF10, 4, "dword written by the OS (Wine) during the message pump (do_all_non_input; timing)"},
