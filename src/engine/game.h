@@ -5,6 +5,8 @@
 GLOBAL(int32_t, GameNotStarted, 0x68F21C);  // pfGameNotStarted (= GameHalted)
 GLOBAL(int32_t, dword_9469FC, 0x9469FC);   // cleared by WinMain
 
+// New game, Alien Crossfire: unless the viewer plays an alien or the Cult of Planet, removes the
+// computer-controlled aliens and Cult (bases, units, alive bit).
 ADDR(0x588F90) void GAMEAPI alien_start();
 // Creates the save directories, loads labels, the interface (windows, sprites, fonts). Returns 0
 // on success.

@@ -118,3 +118,11 @@ void ui_stringlist_add(uint8_t* list, int32_t id, char* text) {
     reinterpret_cast<int32_t(__thiscall*)(uint8_t*, int32_t)>(0x401100)(list, id);
 }
 #endif
+
+// ---- crash_landing (see ui_bridge.h): not displayed ----
+#ifdef SMACX_HYBRID
+#include "engine/crt.h"
+void ui_crash_landing_drop(int32_t, int32_t, bool) {}
+void ui_crash_landing_close() {}
+void ui_first_base_name(const char* default_name) { crt_strcpy(ParseStrBuffer[0], default_name); }
+#endif

@@ -28,3 +28,13 @@ ADDR(0x539090) int32_t GAMEAPI checksum(const uint8_t* data, int32_t size, int32
 ADDR(0x5390C0) int32_t GAMEAPI checksum_password(const char* password);
 // Sets diplomatic status bits of faction_id toward faction_id_with (and the reverse where mutual).
 ADDR(0x55B870) void GAMEAPI treaty_on(int32_t faction_id, int32_t faction_id_with, uint32_t status);
+// Clears diplomatic status bits between two factions in both directions (with dependent bits:
+// any of 7 also clears 0x1100000, 0x10 also clears 0x8040; 0x20 clears agenda bits 0xC00).
+ADDR(0x55B760) void GAMEAPI treaty_off(int32_t faction_id, int32_t faction_id_with, uint32_t status);
+// Sets agenda bits between two factions in both directions (0x20 first clears agenda bit 0x40).
+ADDR(0x55BA80) void GAMEAPI agenda_on(int32_t faction_id, int32_t faction_id_with, uint32_t agenda);
+// Sets (add != 0) or clears diplomatic status bits of faction_id toward faction_id_with; setting
+// 0x40 (vendetta) also sets diplo_merc toward faction_id_with to 50.
+ADDR(0x55BB30) void GAMEAPI set_treaty(int32_t faction_id, int32_t faction_id_with, uint32_t status, int32_t add);
+// Sets (add != 0) or clears agenda bits of faction_id toward faction_id_with.
+ADDR(0x55BBA0) void GAMEAPI set_agenda(int32_t faction_id, int32_t faction_id_with, uint32_t agenda, int32_t add);

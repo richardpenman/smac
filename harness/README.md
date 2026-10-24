@@ -45,6 +45,7 @@ outdir <dir>          snapshot directory (run_oracle.sh / --outdir override it)
 seed <crt> <game>     reseed MSVC rand() and the game LCG; resets the logic clock
 newgame k=v ...       new game without dialogs; keys: size(0-4) width height ocean erosion orbit
                       clouds natives diff rules(hex) factions=a,b,c,d,e,f,g
+                      random(bit 0: random leader personalities, bit 1: random social agendas)
 load <file.sav>       load a saved game
 save <file.sav>       save (RNG state preserved)
 snapshot <name>       write <name>.state/.rng/.sav now (headless: no .sav before newgame/load)

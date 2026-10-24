@@ -120,6 +120,7 @@ static void cmd_newgame(char* args) {
     int width = 0, height = 0;
     uint32_t rules = 0;
     bool rules_set = false;
+    int random_leaders = 0;  // bit 0: random personalities (GameState 0x800000), bit 1: random agendas
     std::string factions[7];
     for (int i = 0; i < 7; i++) factions[i] = kDefaultFactions[i];
     for (char* tok = std::strtok(args, " \t"); tok; tok = std::strtok(nullptr, " \t")) {
@@ -136,6 +137,7 @@ static void cmd_newgame(char* args) {
         else if (k == "clouds") clouds = std::atoi(v.c_str());
         else if (k == "natives") natives = std::atoi(v.c_str());
         else if (k == "diff") diff = std::atoi(v.c_str());
+        else if (k == "random") random_leaders = std::atoi(v.c_str());
         else if (k == "rules") {
             rules = (uint32_t)std::strtoul(v.c_str(), nullptr, 0);
             rules_set = true;
@@ -168,6 +170,8 @@ static void cmd_newgame(char* args) {
     DiffLevel = diff;
     GameRules = (int32_t)(((uint32_t)GameRules & 0xFFFF0000u) | (rules_set ? rules : default_rules()));
     GameState = (int32_t)((uint32_t)GameState & ~0x1800000u);
+    if (random_leaders & 1) GameState |= STATE_RAND_FAC_LEADER_PERSONALITIES;
+    if (random_leaders & 2) GameState |= STATE_RAND_FAC_LEADER_SOCIAL_AGENDA;
     for (int i = 1; i < 8; i++) {
         std::memset(MFactions[i].filename, 0, sizeof(MFactions[i].filename));
         std::snprintf(MFactions[i].filename, sizeof(MFactions[i].filename), "%s", factions[i - 1].c_str());

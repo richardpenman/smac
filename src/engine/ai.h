@@ -14,3 +14,5 @@ ADDR(0x560D50) int32_t GAMEAPI guard_check(int32_t faction_id, int32_t region);
 // AI: the former order (ORDER_* terraform id) worth doing at (x, y) for base_id's needs, or 0.
 ADDR(0x565320) int32_t GAMEAPI can_terraform(int32_t faction_id, int32_t x, int32_t y, int32_t flag,
                                              int32_t base_id);
+// AI strategy of faction_id for the turn: region plans, goals and production priorities.
+ADDR(0x561080) void GAMEAPI enemy_strategy(int32_t faction_id);

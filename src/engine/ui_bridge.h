@@ -298,3 +298,34 @@ ADDR_NATIVE(0x4C6EA0) int32_t THISCALL Wave_unload(uint8_t* wave);
 ADDR_NATIVE(0x4C6C20) int32_t THISCALL Wave_load(uint8_t* wave, const char* file);
 ADDR_NATIVE(0x4C6920) int32_t THISCALL Wave_play_2(uint8_t* wave);
 ADDR_NATIVE(0x4C6600) void THISCALL Sound_fade_2(uint8_t* wave, int32_t ms);
+
+// ---- setup module (setup_game, eliminate_player) ----
+// Diplomacy offer slots of every faction pair (DiploStateC[i][j][0..3]) cleared (0x441250).
+ADDR_NATIVE(0x441250) void GAMEAPI clear_all_offers();
+// Hotseat/PBEM: every diplomatic message list (DiploMessageLists) emptied (0x440F80; the
+// original deletes the StringStruct entries; the effect is ui_stringlist_clear on each list).
+ADDR_NATIVE(0x440F80) void GAMEAPI clear_hotseat_chat();
+// Council notification state cleared: CouncilVoteState and CouncilProposal (0x4243F0).
+ADDR_NATIVE(0x4243F0) void GAMEAPI clear_council_notify_2();
+// Records "faction_id eliminated killed_id" in faction_id's monuments (first free entry of the
+// six killed-faction events) and shows the monuments window to a non-alien viewer.
+ADDR_NATIVE(0x477A60) void GAMEAPI mon_killed_faction(int32_t faction_id, int32_t killed_id);
+// "his"/"her" (labels 207/208, by the leader's gender) of faction_id in HisHerBuffer; mode 1
+// capitalises the first letter, other non-zero modes the whole word. Returns HisHerBuffer.
+GLOBAL(char[32], HisHerBuffer, 0x945838);
+ADDR_NATIVE(0x58FBC0) char* GAMEAPI get_his_her(int32_t faction_id, int32_t mode);
+// Discards pending keyboard and mouse input.
+ADDR_NATIVE(0x5FD120) void GAMEAPI flush_input();
+// Blitter scale factors (video module), reset to 1 by crash_landing.
+GLOBAL(int32_t, BlitDestScale, 0x696D18);    // piDestScale
+GLOBAL(int32_t, BlitSourceScale, 0x696D1C);  // piSourceScale
+// Not original functions: the UI parts of crash_landing (a function that keeps its windows,
+// buffers and flic players on its stack). drop: the landing sound (preference 0x400) and the
+// 30-frame drop pod animation (alien pod or drop pod with smoke) over the map centred on (x, y),
+// with the map window's option bits 0x8C0 cleared; close: releases the animation canvas and fades
+// the sound. first_base_name: the FIRSTBASE popup that lets the player rename the first base
+// (default_name); the chosen name is left in ParseStrBuffer[0]. Hybrid builds and headless: not
+// displayed (the default name is kept); crash_landing only runs for a human viewer.
+void ui_crash_landing_drop(int32_t x, int32_t y, bool alien);
+void ui_crash_landing_close();
+void ui_first_base_name(const char* default_name);

@@ -112,6 +112,19 @@ The original reads stack memory it never wrote in these places. The oracle makes
    the roles the compiler merged into the slot), marked `BUG(original)`.
 3. Suspect, unproven: `enemy_move` 0x574A8B loads `[ebp-0x38]` into EDI before writing it; check the
    `esi != 7` path to 0x576828 when reconstructing.
+4. **`wants_to_attack` (0x55BC80), array `[ebp-0x130]`** (7 dwords, Ghidra `auStack_138[1..7]`): the
+   loop at 0x55BF6E stores `max(slot, region_total_bases)` per faction without ever initialising the
+   slots, then reduces them by a quarter. Its result reaches `enemy_strategy` (region_flags bit 4
+   via `local_60`). The residue depends on the depth at which the caller runs: fcompare of
+   `time_warp` (whose callee `enemy_strategy` calls it) shows 1-byte `region_flags` differences on
+   a few turns although `time_warp` itself matches. Reconstruct with the slots' canonical value
+   (to be determined with `steptrace`/`slotlog`), marked `BUG(original)`.
+
+Uninitialised heap memory, not stack: `map_init` allocates `MapTiles`/`MapAbstract` without
+clearing them and `map_wipe` leaves tile bytes 6 (`unk_1`) and 7 (`owner`) as they are; tiles no
+base claims keep the allocator's residue (e.g. scenario rival6, "look first": owner bytes 0x01,
+0x03, 0xFF in the oracle). Native `mem_get` returns zeroed blocks, which matches the oracle
+wherever the original's block was fresh (all other scenarios).
 
 Hybrid tool for side-effect-free functions whose dead stack matters: define the body as
 `int32_t GAMEAPI SHADOWABLE(name)(...)` and add `HYBRID_SHADOW_THUNK(...)` (src/engine/hybrid_shadow.h;

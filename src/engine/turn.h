@@ -15,3 +15,6 @@ extern void (*g_harness_before_turn_upkeep)();
 ADDR(0x5230E0) void GAMEAPI interlude(int32_t id, int32_t a2, int32_t a3, int32_t a4);
 // Number of faction_id's subspace generators (built and working); out receives extra counts.
 ADDR(0x5247B0) int32_t GAMEAPI generators(int32_t faction_id, int32_t* out);
+// Council votes of faction_id: its population, +50% with the Empath Guild, doubled with the
+// Clinical Immortality, times its VOTES faction bonus (0 for aliens).
+ADDR(0x52AD30) int32_t GAMEAPI council_votes(int32_t faction_id);

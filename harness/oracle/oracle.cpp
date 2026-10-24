@@ -754,6 +754,7 @@ static int cmd_newgame(char *args) {
     int width = 0, height = 0;
     uint32_t rules = 0;
     int rules_set = 0;
+    int random_leaders = 0; /* bit 0: random personalities (GameState 0x800000), bit 1: random agendas (0x1000000) */
     char factions[7][24];
     for (int i = 0; i < 7; i++) snprintf(factions[i], 24, "%s", kDefaultFactions[i]);
     for (char *tok = strtok(args, " \t"); tok; tok = strtok(NULL, " \t")) {
@@ -770,6 +771,7 @@ static int cmd_newgame(char *args) {
         else if (!strcmp(k, "clouds")) clouds = atoi(v);
         else if (!strcmp(k, "natives")) natives = atoi(v);
         else if (!strcmp(k, "diff")) diff = atoi(v);
+        else if (!strcmp(k, "random")) random_leaders = atoi(v);
         else if (!strcmp(k, "rules")) {
             rules = strtoul(v, NULL, 0);
             rules_set = 1;
@@ -806,6 +808,8 @@ static int cmd_newgame(char *args) {
     DiffLevel = diff;
     GameRules = (GameRules & 0xFFFF0000) | (rules_set ? rules : (uint32_t)o_default_rules());
     GameState &= ~0x1800000u;
+    if (random_leaders & 1) GameState |= 0x800000u;
+    if (random_leaders & 2) GameState |= 0x1000000u;
     for (int i = 1; i < 8; i++) {
         uint8_t *m = MFactions + i * MFACTION_SIZE;
         memset(m + 4, 0, 24);

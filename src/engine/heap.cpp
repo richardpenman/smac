@@ -4,8 +4,11 @@
 #include <cstdio>
 #include <cstdlib>
 
+// Native: zeroed blocks. The original's blocks come from a fresh Windows heap and read as zero
+// where the game never writes them (e.g. the last row of MapAbstract), which savegames and the
+// state comparison see.
 void* GAMEAPI mem_get(uint32_t size) {
-    void* ptr = std::malloc(size ? size : 1);
+    void* ptr = std::calloc(size ? size : 1, 1);
     if (!ptr) {
         std::fprintf(stderr, "FATAL ERROR: out of memory\n");
         std::exit(4);
