@@ -32,5 +32,12 @@ ADDR(0x532E00) void THISCALL NetDaemon_synch(uint8_t* net, int32_t type, int32_t
                                             int32_t a5, int32_t a6, int32_t a7);
 // Multiplayer: sends a data message (type, a2..a5) to the other players.
 ADDR(0x592EE0) void GAMEAPI message_data(int32_t type, int32_t a2, int32_t a3, int32_t a4, int32_t a5, int32_t a6);
+// Multiplayer: sends a base-building message (type, veh_id, base name, a4) to the other players.
+ADDR(0x592E70) void GAMEAPI message_base(int32_t type, int32_t veh_id, const char* name, int32_t a4);
+// Multiplayer: locks the tile (x, y) for a move; 0 if the lock was obtained (always 0 in single player).
+ADDR(0x530920) int32_t THISCALL NetDaemon_add_lock(uint8_t* net, int32_t a1, int32_t x, int32_t y);
+GLOBAL(char[32], NetBaseName, 0x93FC30);  // base name buffer sent by enemy_move's BUILD BASE message
 // Multiplayer: handles one received message; non-zero while messages remain.
 ADDR(0x530320) int32_t THISCALL NetDaemon_receive(uint8_t* net);
+// Multiplayer: performs veh_id's current order through the network daemon (1: unit done).
+ADDR(0x532570) int32_t THISCALL NetDaemon_action(uint8_t* net, int32_t veh_id, int32_t a2);

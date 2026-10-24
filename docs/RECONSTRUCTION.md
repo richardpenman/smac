@@ -128,8 +128,17 @@ The original reads stack memory it never wrote in these places. The oracle makes
    in the transport branch, read at 0x574DD7). Canonical value (poison 0 / 0xFFFFFFFF) behaves as
    "limit <= 0". Reconstruct with this variable initialised to 0 at function entry (shared across
    the roles the compiler merged into the slot), marked `BUG(original)`.
-3. Suspect, unproven: `enemy_move` 0x574A8B loads `[ebp-0x38]` into EDI before writing it; check the
-   `esi != 7` path to 0x576828 when reconstructing.
+   Implemented (src/engine/ai_move.cpp): every local is a field of `EM`, one per frame slot
+   (`EM::s48` here), zeroed at entry; the slot is also written on many paths of the call (garrison
+   want, loop indexes, a base pointer), which the reconstruction reproduces, so only the paths
+   that reach 0x574C5E/0x574DD7 without such a write see the canonical 0.
+3. **`enemy_move`, local `[ebp-0x38]`** (distance temp, `EM::s38`): confirmed. 0x574A8B loads it into
+   EDI; for sea units that are not transports (plan != 7) the value survives (reloaded from the
+   slot) to 0x576828, where a naval escort (group 0x15) with a waypoint order keeps the order
+   (non-zero) or drops it (0). It is unwritten in this call only when no earlier code (naval hunt,
+   escort loop, ...) stored a distance there: canonical 0 (drop the order). The same slot is read
+   uninitialised at 0x56C1C7 (automated former fungus search, human units only: own-base tiles are
+   considered only if it is 0). Both use the zeroed `EM`, marked `BUG(original)`.
 4. **`wants_to_attack` (0x55BC80), array `[ebp-0x130]`** (7 dwords, Ghidra `auStack_138[1..7]`): the
    loop at 0x55BF6E stores `max(slot, region_total_bases)` per faction without ever initialising the
    slots, then reduces them by a quarter. Its result reaches `enemy_strategy` (region_flags bit 4
@@ -150,6 +159,13 @@ The original reads stack memory it never wrote in these places. The oracle makes
    base exists), so AIs then never propose anything but governor elections. Native: the flag
    starts at 1 (`call_council` from `faction_upkeep`). Hybrid: a naked entry thunk reads
    `[esp-0x18]` at entry (turn.cpp). Marked `BUG(original)`.
+
+6. **`alien_move` (0x566810), local `[ebp-0x10]`** (score): the movement scoring keeps a score
+   marker 0x3039 from a previous tile and is read before any write when the unit is no artillery
+   (`if (score != 0x3039) score = 0`). Only an exact residue 0x3039 would matter; the canonical
+   values never are. Reconstructed with the local initialised to 0 (ai.cpp).
+   `enemy_planet_buster` (0x56A8A0) copies the unset `[ebp-0x54]` into another local on its first
+   pass, but that value is overwritten before use (no effect).
 
 Uninitialised heap memory, not stack: `map_init` allocates `MapTiles`/`MapAbstract` without
 clearing them and `map_wipe` leaves tile bytes 6 (`unk_1`) and 7 (`owner`) as they are; tiles no

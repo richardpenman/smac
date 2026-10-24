@@ -247,6 +247,33 @@ static const FcFunc kFcFuncs[] = {
     {"at_site", 0, {A(FACTION), R(-1, 12), XY}},
     {"reset_territory", FC_MUTATES | FC_VOID, {}},
     {"enemy_capabilities", FC_MUTATES | FC_VOID, {A(FACTION)}},
+    /* ---- ai (strategy part 1) ---- */
+    {"go_to", FC_MUTATES | FC_VOID, {A(VEH), R(0, 12), XY}},
+    {"garrison_check", 0, {A(BASE)}},
+    {"defensive_check", 0, {A(BASE)}},
+    {"guard_check", 0, {A(FACTION), R(-1, 70)}},
+    {"set_course", FC_MUTATES | FC_VOID, {A(VEH), R(0, 12), XY}},
+    {"assemble_passengers", FC_MUTATES | FC_VOID, {A(BASE), R(0, 12), R(-2, 20)}},
+    {"can_convoy", 0, {XY}},
+    {"good_sensor", FC_MUTATES, {A(FACTION), XY}}, /* whose_territory: BaseFindDist */
+    {"ocean_access_near_base", 0, {A(FACTION), XY}},
+    {"compute_odds", 0, {R(0, 1000), A(FACTION), A(VEH), A(VEH), R(-2, 5)}},
+    {"alien_base", FC_MUTATES, {A(VEH), XY}}, /* BaseFindDist */
+    {"get_there", 0, {A(VEH), XY}},
+    {"coast_or_border", FC_MUTATES, {XY, XY, A(FACTION)}}, /* whose_territory: BaseFindDist */
+    {"can_terraform", FC_MUTATES, {A(FACTION), XY, A(BOOL), A(BASE_OPT)}}, /* whose_territory: BaseFindDist */
+    {"enemy_diplomacy", FC_MUTATES | FC_VOID, {A(FACTION1)}},
+    {"alien_move", FC_MUTATES, {A(VEH)}},
+    /* enemy_move: AI decision for one unit (moves only through orders; may attack, airdrop,
+     * build, probe or disband). */
+    {"enemy_move", FC_MUTATES, {A(VEH)}},
+    {"enemy_planet_buster", FC_MUTATES, {A(VEH)}},
+    {"enemy_strategy", FC_MUTATES | FC_VOID, {A(FACTION1)}},
+    {"sea_coast", 0, {R(0, 127), R(0, 127)}},
+    {"base_on_sea", 0, {A(BASE), R(0, 127)}},
+    {"port_to_coast", 0, {A(BASE), R(0, 127)}},
+    {"port_to_port", 0, {A(BASE), A(BASE)}},
+    {"air_power", FC_MUTATES, {A(VEH), R(0, 3), A(BOOL), FcArg{FA_BUF, 0, 30}, FcArg{FA_BUF, 0, 30}}},
     {"replay_base", FC_MUTATES | FC_VOID, {R(0, 2), XY, A(FACTION)}},
     {"clear_tamper", FC_MUTATES | FC_VOID, {}},
     {"check_tamper", FC_MUTATES | FC_VOID, {}},
@@ -451,6 +478,9 @@ static const struct {
     {0x74C5F0, 0x74DAA8 - 0x74C5F0, "sound Wave objects and current wave id (wave_it; playback timing)"},
     {0x749CF8, 0x74C5F0 - 0x749CF8, "sound effect objects (FX_play, battle sounds; playback timing)"},
     {0x90EA68, 0x90F554 - 0x90EA68, "boom() explosion animation object (flic player state; timing)"},
+    {0x7AF190, 4, "status window buffer font word (Buffer_set_font from StatusWin_draw during battle odds; "
+                  "value depends on the caller's stack, UI only)"},
+    {0x7CFF10, 4, "dword written by the OS (Wine) during the message pump (do_all_non_input; timing)"},
 };
 
 #undef A
