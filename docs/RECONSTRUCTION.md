@@ -113,6 +113,13 @@ The original reads stack memory it never wrote in these places. The oracle makes
 3. Suspect, unproven: `enemy_move` 0x574A8B loads `[ebp-0x38]` into EDI before writing it; check the
    `esi != 7` path to 0x576828 when reconstructing.
 
+Hybrid tool for side-effect-free functions whose dead stack matters: define the body as
+`int32_t GAMEAPI SHADOWABLE(name)(...)` and add `HYBRID_SHADOW_THUNK(...)` (src/engine/hybrid_shadow.h;
+example: speed/speed_proto/morale_veh in veh.cpp). In hybrid builds the thunk computes the result
+with the reconstruction, then re-runs the original code from the same stack position so the stack
+image is the original's. Native builds are unaffected; native code must emulate the read instead
+(e.g. `SpeedStackResidue`, set by speed()).
+
 Tools for finding more: oracle commands `steptrace`, `slotlog`, `poison rand`, and
 `harness/scripts/uninit_reads.py` (see harness/README.md).
 

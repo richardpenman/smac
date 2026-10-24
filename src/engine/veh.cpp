@@ -1,5 +1,12 @@
 #include "engine/veh.h"
 
+#include "engine/hybrid_shadow.h"
+#ifdef SMACX_HYBRID
+extern "C" int32_t GAMEAPI speed_impl_c(int32_t veh_id, int32_t skip_morale);
+extern "C" int32_t GAMEAPI speed_proto_impl_c(int32_t unit_id);
+extern "C" int32_t GAMEAPI morale_veh_impl_c(int32_t veh_id, int32_t check_drone_riot, int32_t faction_id_vs_native);
+#endif
+
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
@@ -529,7 +536,7 @@ int32_t GAMEAPI can_arty(int32_t unit_id, int32_t sea_triad_retn) {
     return 0;
 }
 
-int32_t GAMEAPI morale_veh(int32_t veh_id, int32_t check_drone_riot, int32_t faction_id_vs_native) {
+int32_t GAMEAPI SHADOWABLE(morale_veh)(int32_t veh_id, int32_t check_drone_riot, int32_t faction_id_vs_native) {
     VEH& veh = Vehs[veh_id];
     uint32_t faction_id = veh.faction_id;
     if (faction_id == 0) return morale_alien(veh_id, faction_id_vs_native);
@@ -596,7 +603,7 @@ int32_t GAMEAPI armor_proto(int32_t unit_id, int32_t veh_id_atk, int32_t is_bomb
     return value;
 }
 
-int32_t GAMEAPI speed_proto(int32_t unit_id) {
+int32_t GAMEAPI SHADOWABLE(speed_proto)(int32_t unit_id) {
     UNIT& u = Units[unit_id];
     int32_t triad = Chassis[u.chassis_id].triad;
     int32_t value = Chassis[u.chassis_id].speed;
@@ -619,12 +626,37 @@ int32_t GAMEAPI speed_proto(int32_t unit_id) {
     return Rules.move_rate_roads * value;
 }
 
-int32_t GAMEAPI speed(int32_t veh_id, int32_t skip_morale) {
+int32_t SpeedStackResidue = 0;
+
+// What the original speed() leaves in the dead stack slot Path_find reads (see SpeedStackResidue):
+// has_abil's saved EDI (unit_id * 0x34, from speed_proto) unless morale_veh then calls something
+// (morale_alien, has_tech, bitmask), whose frame leaves a non-zero value there. speed_proto returns
+// before calling has_abil for unit 19, which leaves older content.
+static void speed_note_stack_residue(int32_t veh_id) {
+    const VEH& veh = Vehs[veh_id];
+    int32_t unit_id = veh.unit_id;
+    bool morale_calls = false;
+    if (veh.faction_id == 0) {
+        morale_calls = true;
+    } else if (Units[unit_id].plan == 11) {
+        for (int32_t tech_id = 0; tech_id < 89 && !morale_calls; tech_id++)
+            if (Tech[tech_id].flags & 2) morale_calls = true;
+    } else if (!(unit_id < 64 && unit_psi_weapon(unit_id))) {
+        morale_calls = veh.home_base_id >= 0;
+    }
+    if (morale_calls)
+        SpeedStackResidue = 1;
+    else if (unit_id != 19)
+        SpeedStackResidue = unit_id * 0x34;
+}
+
+int32_t GAMEAPI SHADOWABLE(speed)(int32_t veh_id, int32_t skip_morale) {
     VEH& veh = Vehs[veh_id];
     int32_t value = speed_proto(veh.unit_id);
     if (veh_triad(veh_id) == 1 && SecretProjects[10] >= 0 &&
         Bases[SecretProjects[10]].faction_id == (int8_t)veh.faction_id)
         value += Rules.move_rate_roads * 2;
+    speed_note_stack_residue(veh_id);
     if (morale_veh(veh_id, 1, 0) == 6 && !skip_morale && (veh.unit_id >= 64 || !unit_psi_weapon(veh.unit_id)))
         value += Rules.move_rate_roads;
     uint8_t damage = veh.damage_taken;
@@ -762,3 +794,14 @@ int32_t GAMEAPI veh_wake(int32_t veh_id) {
     veh.state &= 0xF4FFBDFF;
     return veh_id;
 }
+
+#ifdef SMACX_HYBRID
+// Hybrid: these functions run the original code a second time so that the dead stack they leave
+// is the original's (Path_find reads it uninitialised, see "Known uninitialised reads").
+HYBRID_SHADOW_THUNK(int32_t, speed, (int32_t veh_id, int32_t skip_morale), 2, 0x5C1545,
+                    "push %ebp\n mov %esp, %ebp\n push %ebx\n push %esi")
+HYBRID_SHADOW_THUNK(int32_t, speed_proto, (int32_t unit_id), 1, 0x5C13B7,
+                    "push %ebp\n mov %esp, %ebp\n push %ebx\n mov 8(%ebp), %ebx")
+HYBRID_SHADOW_THUNK(int32_t, morale_veh, (int32_t veh_id, int32_t check_drone_riot, int32_t faction_id_vs_native),
+                    3, 0x5C0E46, "push %ebp\n mov %esp, %ebp\n sub $8, %esp")
+#endif

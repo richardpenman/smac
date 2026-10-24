@@ -73,6 +73,9 @@ def main():
                     for m in re.finditer(r"^[A-Za-z_][\w:<>\s\*&]*?\b(\w+)\s*\([^;{]*\)\s*(?:const\s*)?\{",
                                          clean, re.M):
                         defined.add(m.group(1))
+                    # hybrid shadow thunks: SHADOWABLE(name)(...) { ... } defines name
+                    for m in re.finditer(r"\bSHADOWABLE\((\w+)\)\s*\(", clean):
+                        defined.add(m.group(1))
     os.makedirs(outdir, exist_ok=True)
     native, hybrid, table, status = [], [], [], []
     for name, d in sorted(decls.items(), key=lambda kv: kv[1]["addr"]):

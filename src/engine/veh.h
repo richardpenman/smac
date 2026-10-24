@@ -87,6 +87,11 @@ ADDR(0x5C1290) int32_t GAMEAPI armor_proto(int32_t unit_id, int32_t veh_id_atk, 
 ADDR(0x5C13B0) int32_t GAMEAPI speed_proto(int32_t unit_id);
 // Movement points of a vehicle (projects, elite morale, damage).
 ADDR(0x5C1540) int32_t GAMEAPI speed(int32_t veh_id, int32_t skip_morale);
+// Emulation of an original uninitialised read (not an original global): the dead stack value that
+// speed() leaves where Path_find later reads its uninitialised "start tile in ZOC" flag. Non-zero
+// exactly when the original would leave a non-zero value; set by speed(), read by Path_move.
+// BUG(original); see docs/RECONSTRUCTION.md "Known uninitialised reads".
+extern int32_t SpeedStackResidue;
 // Cargo capacity of a vehicle (native transports: morale + 1).
 ADDR(0x5C1760) int32_t GAMEAPI veh_cargo(int32_t veh_id);
 // Prototype extra cost percentage for a unit's triad (0 for factions without the penalty).
