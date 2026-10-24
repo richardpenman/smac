@@ -120,6 +120,14 @@ The original reads stack memory it never wrote in these places. The oracle makes
    a few turns although `time_warp` itself matches. Reconstruct with the slots' canonical value
    (to be determined with `steptrace`/`slotlog`), marked `BUG(original)`.
 
+5. **`call_council` (0x52C880), local `[ebp-0x14]`** ("aliens alive" flag): written only when
+   proposal 1 (Supreme Leader) is examined (Diplomatic Victory on, not yet passed, caller among
+   the two largest voters). Otherwise it holds the residue of the previous call at that depth: in
+   `faction_upkeep`, `corner_market`'s pushed argument `1` for `mind_control` (whenever a foreign
+   base exists), so AIs then never propose anything but governor elections. Native: the flag
+   starts at 1 (`call_council` from `faction_upkeep`). Hybrid: a naked entry thunk reads
+   `[esp-0x18]` at entry (turn.cpp). Marked `BUG(original)`.
+
 Uninitialised heap memory, not stack: `map_init` allocates `MapTiles`/`MapAbstract` without
 clearing them and `map_wipe` leaves tile bytes 6 (`unk_1`) and 7 (`owner`) as they are; tiles no
 base claims keep the allocator's residue (e.g. scenario rival6, "look first": owner bytes 0x01,

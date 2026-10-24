@@ -178,3 +178,6 @@ ADDR(0x477740) void GAMEAPI mon_first_in_space(int32_t faction_id);
 ADDR(0x477840) void GAMEAPI mon_built_preserve(int32_t faction_id);
 // Transcendence: faction_id's monument records the ascent (by_faction_id: through whom, or -1).
 ADDR(0x4779D0) void GAMEAPI mon_winning_trans(int32_t faction_id, int32_t by_faction_id);
+// Diplomatic/economic victory: faction_id's monument records the unification of Planet (other_id:
+// the partner of a cooperative victory, or -1); shown to a viewer that is not alien.
+ADDR(0x477940) void GAMEAPI mon_winning_unify(int32_t faction_id, int32_t other_id);

@@ -5,6 +5,7 @@
 
 #include "engine/tech.h"
 #include "engine/turn.h"
+#include "engine/ui_bridge.h"
 
 void GAMEAPI treaty_off(int32_t faction_id, int32_t faction_id_with, uint32_t status) {
     if (status & 7) status |= 0x1100000;
@@ -110,4 +111,51 @@ int32_t GAMEAPI climactic_battle() {
         }
     }
     return 0;
+}
+
+int32_t GAMEAPI reputation(int32_t faction_id, int32_t faction_id_with) {
+    int32_t value = Factions[faction_id].integrity_blemishes - Factions[faction_id].diplo_gifts[faction_id_with];
+    if (value < 0) return 0;
+    if (value > 99) return 99;
+    return value;
+}
+
+void GAMEAPI agenda_off(int32_t faction_id, int32_t faction_id_with, uint32_t agenda) {
+    Factions[faction_id].diplo_agenda[faction_id_with] &= ~agenda;
+    Factions[faction_id_with].diplo_agenda[faction_id] &= ~agenda;
+}
+
+void GAMEAPI treaty_on(int32_t faction_id, int32_t faction_id_with, uint32_t status) {
+    uint32_t& mine = Factions[faction_id].diplo_status[faction_id_with];
+    uint32_t& theirs = Factions[faction_id_with].diplo_status[faction_id];
+    bool viewer = faction_id == CurrentPlayerFaction || faction_id_with == CurrentPlayerFaction;
+    if (status & 7) {
+        // A truce, treaty or pact ends the viewer's war music.
+        if (viewer && (mine & DIPLO_VENDETTA)) dword_74DA9C &= ~1;
+        mine &= 0xFFEE7FAF;
+        theirs &= 0xFFEE7FAF;
+    }
+    if (status & 1) status |= 2;
+    if (status & DIPLO_VENDETTA) {
+        if (mine & 7) {
+            Factions[faction_id_with].diplo_combat_count[faction_id] = 0;
+            Factions[faction_id].diplo_combat_count[faction_id_with] = 0;
+        }
+        status |= 0x80000108;
+        mine &= 0xFAEEF378;
+        theirs &= 0xFAEEF378;
+        if (viewer) {
+            dword_74DA9C |= 1;
+            ambience(0xCC);
+        }
+    }
+    if (status & 0x17) {
+        mine &= 0xFF7FFFFF;
+        theirs &= 0xFF7FFFFF;
+    }
+    mine |= status;
+    theirs |= status;
+    if ((faction_id == CurrentPlayerFaction || faction_id_with == CurrentPlayerFaction) && (status & 0x1F) &&
+        MultiWinVisible)
+        GraphicWin_redraw(&MultiWin);
 }

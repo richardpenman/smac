@@ -38,3 +38,20 @@ ADDR(0x55BA80) void GAMEAPI agenda_on(int32_t faction_id, int32_t faction_id_wit
 ADDR(0x55BB30) void GAMEAPI set_treaty(int32_t faction_id, int32_t faction_id_with, uint32_t status, int32_t add);
 // Sets (add != 0) or clears agenda bits of faction_id toward faction_id_with.
 ADDR(0x55BBA0) void GAMEAPI set_agenda(int32_t faction_id, int32_t faction_id_with, uint32_t agenda, int32_t add);
+// Reputation penalty of faction_id toward faction_id_with: integrity blemishes minus the gifts
+// made to faction_id_with, clamped to 0..99.
+ADDR(0x53A100) int32_t GAMEAPI reputation(int32_t faction_id, int32_t faction_id_with);
+// Clears agenda bits between two factions in both directions.
+ADDR(0x55B820) void GAMEAPI agenda_off(int32_t faction_id, int32_t faction_id_with, uint32_t agenda);
+// Ends a pact between two factions (units withdrawn from each other's bases, messages).
+ADDR(0x53C650) void GAMEAPI pact_ends(int32_t faction_id, int32_t faction_id_with);
+// Diplomacy dialog between faction_id (human) and faction_id_with (AI or human); a2 selects the
+// opening. Mostly UI with diplomatic state changes (later package).
+ADDR(0x54FFD0) int32_t GAMEAPI communicate(int32_t faction_id, int32_t faction_id_with, int32_t a3);
+// Multiplayer: takes / releases the global diplomatic lock. diplo_lock returns non-zero when the
+// player gave up waiting.
+ADDR(0x539820) int32_t GAMEAPI diplo_lock(int32_t timeout);
+ADDR(0x5398C0) void GAMEAPI diplo_unlock();
+// Major atrocity (planet buster) by faction_id against faction_id_vs (-1 none): sanctions, the
+// council's and every faction's reactions.
+ADDR(0x55F450) void GAMEAPI major_atrocity(int32_t faction_id, int32_t faction_id_vs);

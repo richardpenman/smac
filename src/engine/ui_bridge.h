@@ -87,6 +87,7 @@ GLOBAL(uint8_t, BaseWin, 0x6A7628);
 GLOBAL(uint8_t, InfoWin, 0x8C5568);
 GLOBAL(uint8_t, WorldWin, 0x8E9F60);
 GLOBAL(uint8_t, MultiWin, 0x7FD648);
+GLOBAL(int32_t, MultiWinVisible, 0x7FE06C);  // MultiWin field: the multiplayer status window is shown
 GLOBAL(int32_t, MapWinOptions, 0x933420);  // display option bits of the map windows
 GLOBAL_NATIVE(uint8_t*, TopMenuWin, 0x945824);
 GLOBAL_NATIVE(uint8_t*, ConsoleVBase, 0x9B8DD0);  // MainConsole adjusted to its virtual base
@@ -329,3 +330,153 @@ GLOBAL(int32_t, BlitSourceScale, 0x696D1C);  // piSourceScale
 void ui_crash_landing_drop(int32_t x, int32_t y, bool alien);
 void ui_crash_landing_close();
 void ui_first_base_name(const char* default_name);
+
+// ---- turn module (turn_upkeep, control_turn, control_game, council, end_of_game) ----
+// Story interlude (text and movie of event id) shown to the viewer once (GameInterludeState bit);
+// a2 is the image address of a text for $STR, mode the popup style. Records the event in
+// GameInterludeState even when the viewer's "no interludes" preference (0x40000) skips the display.
+// Headless: the state effects only.
+ADDR_NATIVE(0x5230E0) void GAMEAPI interlude(int32_t id, int32_t a2, int32_t mode, int32_t a4);
+// Main map window caption (the turn/year line).
+ADDR_NATIVE(0x46FB10) void THISCALL MapWin_main_caption(uint8_t* win);
+// Centers the map window on (x, y) if needed; non-zero if the view changed (redrawn).
+ADDR_NATIVE(0x46B310) int32_t THISCALL MapWin_focus(uint8_t* win, int32_t x, int32_t y);
+// One pass of the message pump (clock_wait).
+ADDR_NATIVE(0x5FCA30) int32_t GAMEAPI do_non_input();
+// Maximum allocation steps (of 10) to economy/labs/psych: 10 in this version.
+ADDR_NATIVE(0x445440) int32_t GAMEAPI energy_limit(int32_t faction_id);
+// The human player's interactive turn (also the observer's "turn complete" pause after a round).
+// Headless: returns at once.
+ADDR_NATIVE(0x514050) int32_t THISCALL Console_human_turn(uint8_t* console);
+// Clears the message list window (MessageWin).
+ADDR_NATIVE(0x4717A0) void THISCALL MessageWin_clear(uint8_t* win);
+// Hotseat council notification of faction_id done: CouncilProposal and CouncilVoteState cleared.
+ADDR_NATIVE(0x4243D0) void GAMEAPI clear_council_notify(int32_t faction_id);
+// Hotseat/PBEM diplomacy between two human players (DiploWin). Headless: nothing.
+ADDR_NATIVE(0x444D90) void GAMEAPI diplo(int32_t faction_id, int32_t faction_id_with);
+// The Planetary Council session (CouncilWin): votes on proposal by faction_id (candidate for the
+// governor elections) and applies the result (council_action). UI code that holds the vote logic:
+// not reconstructed yet (native builds abort when an AI calls the council).
+ADDR(0x428350) void GAMEAPI council(int32_t faction_id, int32_t proposal, int32_t candidate);
+// End of game screens: credits, score report, rating (quayle), hall of fame, replay.
+ADDR_NATIVE(0x428DF0) void GAMEAPI show_credits();
+ADDR_NATIVE(0x4ACB80) void GAMEAPI report_score(int32_t a1);
+ADDR_NATIVE(0x496670) void GAMEAPI quayle(int32_t faction_id);
+ADDR_NATIVE(0x44AE50) void GAMEAPI hall_of_fame(int32_t a1);
+ADDR_NATIVE(0x5ADBF0) void GAMEAPI show_replay();
+// Main menu (new game, load, ...). Non-zero: quit.
+ADDR_NATIVE(0x58E360) int32_t GAMEAPI top_menu(int32_t a1);
+// Multiplayer lobby launch check (command line); non-zero when started from a lobby.
+ADDR_NATIVE(0x62D9E0) int32_t THISCALL Net_check_for_lobby(uint8_t* net, char* cmd_line, uint8_t* a2, int32_t a3, int32_t a4);
+// Sound effects initialisation (FX object Sounds).
+ADDR_NATIVE(0x445CD0) void THISCALL FX_init(uint8_t* sounds);
+ADDR_NATIVE(0x4C6B10) int32_t THISCALL Wave_is_playing(uint8_t* wave);
+// Game desktop (main windows) shown / closed around a game; multiplayer setup; opening screens.
+ADDR_NATIVE(0x58EFF0) void GAMEAPI desktop_close();
+ADDR_NATIVE(0x589B20) void GAMEAPI close_opening();
+ADDR_NATIVE(0x58DB30) int32_t GAMEAPI multiplayer_init(int32_t a1);
+GLOBAL(uint8_t, DesktopWin, 0x937118);  // background GraphicWin behind the game windows
+ADDR_NATIVE(0x5D5250) void THISCALL GraphicWin_fill(uint8_t* win, int32_t color);
+ADDR_NATIVE(0x5ED9D0) void THISCALL Win_show(uint8_t* win, int32_t a1);
+GLOBAL(char[256], ReloadFilePath, 0x9B2078);   // control_game: alternate path for game_reload
+GLOBAL(char[256], ReloadFileSource, 0x93AA0C);
+// Not original functions: the parts of control_game, control_turn and call_council that work on
+// windows, the registry or popup objects on the original's stack.
+// DirectPlay registration complete (HKLM DirectPlay application key "Complete" value).
+bool ui_directplay_registered();
+// Main map window display options (field +0x1DD70) |= bits.
+void ui_main_mapwin_set_options(uint32_t bits);
+// Hotseat/PBEM: hides the previous player's view and asks the next human (faction_id) to take
+// over (SWITCHING popup, password check, optional save and quit). Returns 0 when the player takes
+// the turn, 1 when the game was left (ControlTurnA set). Hybrid builds and headless: not shown
+// (returns 0).
+int32_t ui_hotseat_switch(int32_t faction_id);
+// Hotseat/PBEM: shows the new player's view (centred on a base or unit), the battle summary popup
+// and the message list. Hybrid builds and headless: not shown.
+void ui_hotseat_show(int32_t faction_id);
+// call_council's menu of proposals (a Popup object on its stack). Hybrid builds and headless: not
+// shown; exec returns -1 (cancelled); only human callers show it.
+void ui_council_menu_open(int32_t faction_id);
+void ui_council_menu_add(const char* text, int32_t proposal);
+int32_t ui_council_menu_exec();
+void ui_council_menu_close();
+
+// ---- action module (action_terraform, action_airdrop, action_tectonic, ...) ----
+// Tutorial window (TutWin) and the terrain pictures its terraforming hints show (UI objects).
+GLOBAL(uint8_t, TutWin, 0x8C6E68);
+GLOBAL(uint8_t, ImgMapFarm, 0x79204C);
+GLOBAL(uint8_t, ImgMapSoilEnr, 0x79A794);
+GLOBAL(uint8_t, ImgMapMine, 0x776A50);
+GLOBAL(uint8_t, ImgMapSolar, 0x7991F8);
+// Tutorial hint `label` at (x, y) (veh_id or -1) with an optional picture. Headless: nothing.
+ADDR_NATIVE(0x4BE650) void THISCALL TutWin_tut_map(uint8_t* win, const char* label, int32_t x, int32_t y, int32_t veh_id,
+                                                  uint8_t* image, int32_t a6, int32_t a7, int32_t a8);
+// Base window: redraws when it shows veh_id's location.
+ADDR_NATIVE(0x41A8B0) void THISCALL BaseWin_check_veh(uint8_t* win, int32_t veh_id);
+// Sound effect id at a map location.
+ADDR_NATIVE(0x446960) void THISCALL FX_play_loc(uint8_t* sounds, int32_t id, int32_t x, int32_t y);
+// Moves the map cursor away from (x, y) (unit airdropped while selected).
+ADDR_NATIVE(0x5109B0) void THISCALL Console_cursor_next(uint8_t* console, int32_t x, int32_t y);
+// Report window (ReportWin; shown report kind at +8, 6: military) redraw.
+GLOBAL(uint8_t, ReportWin, 0x885F38);
+GLOBAL(int32_t, ReportWinKind, 0x885F40);
+ADDR_NATIVE(0x4A3FC0) void THISCALL ReportIf_on_redraw(uint8_t* win);
+// Main view field 0x23BF0 (non-zero: animations off / skip the airdrop pause).
+GLOBAL(int32_t, MapWinField23BF0, 0x9392A0);
+// Animates veh_id sliding from (x, y) in direction dir (diplomacy module 0x55A150, an animation
+// routine). Game state effect: unless flags & 0x4000, the vehicle's rotate_angle becomes dir
+// (dir & 7 when dir > 7) in multiplayer games or when flags & 1 is clear. Headless: that effect.
+ADDR_NATIVE(0x55A150) void GAMEAPI veh_scoot(int32_t veh_id, int32_t x, int32_t y, int32_t dir, int32_t flags);
+
+// ---- path / move / goals (path finding debug redraw, unit movement) ----
+// Redraws a map window (Path_find, with the path-debug display option 0x4000 of the main view).
+ADDR_NATIVE(0x46A550) void THISCALL pfncRedrawMap(uint8_t* win, int32_t flag);
+// Stops a sound effect of the FX object (monolith).
+ADDR_NATIVE(0x446A90) void THISCALL FX_stop(uint8_t* sounds, int32_t id);
+// Appends the morale name of veh_id to StrBuffer (say_morale). Headless: appends nothing (the text
+// only feeds messages).
+ADDR_NATIVE(0x4B43C0) void GAMEAPI say_morale_2(int32_t veh_id, int32_t a2);
+// Redraws the tiles around (x, y) on every open map window (radius by has_radar; viewer `a4`).
+ADDR_NATIVE(0x46AF90) void GAMEAPI draw_tile_fixup(int32_t x, int32_t y, int32_t has_radar, int32_t a4);
+
+// ---- battle module (battle_fight_2, planet_busting, interceptor, promote) ----
+// Battle window (BattleWin) and the status/info pane (InfoWin) showing the combatants.
+ADDR_NATIVE(0x45D310) void THISCALL SubInterface_set_iface_mode(uint8_t* win);
+ADDR_NATIVE(0x422C50) void THISCALL BattleWin_clear(uint8_t* win);
+ADDR_NATIVE(0x421B20) void THISCALL BattleWin_pulse_timer(uint8_t* win);
+ADDR_NATIVE(0x421B40) void THISCALL BattleWin_stop_timer(uint8_t* win);
+ADDR_NATIVE(0x4B8830) void THISCALL StatusWin_draw(uint8_t* win, int32_t veh_id_atk, int32_t veh_id_def, int32_t offense,
+                                                   int32_t defense, int32_t flag);
+ADDR_NATIVE(0x4B9EA0) void THISCALL StatusWin_redraw(uint8_t* win);
+ADDR_NATIVE(0x4B8970) void THISCALL StatusWin_reset(uint8_t* win);
+GLOBAL(int32_t, InfoWinBattleShown, 0x8C6B3C);  // InfoWin field: a battle is shown in the pane
+// Base window refresh after a multiplayer battle (BaseWin field; non-zero: refresh).
+GLOBAL(int32_t, BaseWinMultiplayerRefresh, 0x6E8150);
+ADDR_NATIVE(0x415DD0) void THISCALL BaseWin_focus(uint8_t* win);
+// Redraws two tiles (attacker and defender) with their surroundings.
+ADDR_NATIVE(0x46B040) void GAMEAPI draw_tile_fixup_2(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t a5,
+                                                     int32_t a6);
+// Popup of SCRIPT.txt shown to faction_id with the map centred on (x, y). Headless: 0.
+ADDR_NATIVE(0x4055A0) int32_t GAMEAPI POP3(const char* label, int32_t a2, int32_t faction_id, int32_t x, int32_t y);
+// Tutorial hint `bit` due (once per game, recorded in TutorialHintsShown) for a single-player
+// viewer with tutorial hints on. Game state: TutorialHintsShown |= bit when it returns 1.
+GLOBAL(int32_t, TutorialHintsShown, 0x9A64B0);
+ADDR_NATIVE(0x4BA650) int32_t GAMEAPI tut_check2(int32_t bit);
+// Not an original function: planet_busting waits while the sound object at 0x74B5DC plays
+// (vtable slot 0x5C, do_task loop). Headless: returns at once.
+void ui_battle_wait_sound();
+// Not an original function: supply_options' menu (a Popup object on its stack with the items of
+// SUPPLYMENU: 0 cancel, 1 help build, 2.. convoy resources; `items` lines are listed). Returns
+// the choice, 0 if cancelled. Hybrid builds and headless: not shown (returns 0); only the viewer's
+// own supply crawlers ask.
+int32_t ui_supply_menu(int32_t veh_id, int32_t base_id, int32_t items);
+// Engine pitch of the moving unit's sound (order_veh; 0 restores it).
+ADDR_NATIVE(0x446B10) void THISCALL FX_engine_pitch(uint8_t* sounds, int32_t pitch);
+// Not an original function: GetAsyncKeyState(VK_CONTROL) high byte (order_veh: no map centering).
+bool ui_ctrl_pressed();
+// Not original functions: order_veh's menus (a Popup object on its stack). Artifact entering one of
+// the viewer's bases (ARTIFACTMENU: 0 keep, 1 link to the network node, 2 hurry production;
+// `items` lines) and a ship's passengers disembarking (DISEMBARKERS: the chosen vehicle + 1, 0
+// cancelled). Hybrid builds and headless: not shown (return 0).
+int32_t ui_artifact_menu(int32_t veh_id, int32_t base_id, int32_t items);
+int32_t ui_disembark_menu(int32_t veh_id);

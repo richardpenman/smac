@@ -258,7 +258,7 @@ GLOBAL(int32_t, CurrentMissionYear, 0x9A64D8);
 GLOBAL(int32_t, CurrentVehID, 0x9A64DC);
 GLOBAL(int32_t, GameTimeControl, 0x9A64E0);
 GLOBAL(uint8_t[4], FactionStatus, 0x9A64E8);  // [0] human players bitmask, [1] alive factions bitmask
-GLOBAL(int32_t, FactionRankings, 0x9A64EC);
+GLOBAL(int32_t[8], FactionRankings, 0x9A64EC);  // [rank] faction id (0: lowest)
 GLOBAL(int32_t, RankingFactionIDUnk1, 0x9A650C);
 GLOBAL(int32_t, RankingFactionIDUnk2, 0x9A6510);
 GLOBAL(int32_t[64], SecretProjects, 0x9A6514);  // [64] base id of each secret project (-1: not built)
@@ -282,7 +282,7 @@ GLOBAL(int32_t, GameMoreRules, 0x9A681C);
 GLOBAL(int32_t, CurrentFaction, 0x9A6820);  // active faction for turn processing
 GLOBAL(int32_t, ClimateLevel, 0x9A6824);
 GLOBAL_NATIVE(CProposal[11], Proposal, 0x9A6828);  // [11]
-GLOBAL(int16_t[8][8], FactionTurnMight, 0x9A68AC);
+GLOBAL(int16_t[1000][8], FactionTurnMight, 0x9A68AC);  // [turn][faction] ranking score history
 GLOBAL(Continent[128], Continents, 0x9AA730);  // [128]
 GLOBAL_NATIVE(CAbility[29], Ability, 0x9AB538);  // [29]
 GLOBAL(UNIT[512], Units, 0x9AB868);

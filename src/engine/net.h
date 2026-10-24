@@ -19,6 +19,8 @@ GLOBAL(int32_t[44], NetSessionState, 0x93E8C0);
 GLOBAL(uint8_t, NetLock, 0x93E230);  // Lock object (multiplayer)
 // Multiplayer: sends faction_id's social choice to the other players.
 ADDR(0x5933C0) void GAMEAPI synch_soc(int32_t faction_id);
+// Multiplayer: sends a base to the other players (NetDaemon_synch 0x13).
+ADDR(0x593250) void GAMEAPI synch_base(int32_t base_id);
 // Fills a FullChecksum of the game state (NetDaemon object NetState).
 ADDR(0x52F8E0) void THISCALL NetDaemon_game_checksum(uint8_t* net, FullChecksum* out);
 // Multiplayer: sends faction_id's research goal to the other players.

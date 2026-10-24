@@ -63,6 +63,10 @@ enum FcFlags : uint32_t {
     FC_SETBASE = 4,   /* the first argument (FA_BASE) is made the current base (set_base) before the
                          call and not passed; the remaining arguments shift down */
     FC_COMPUTE = 8,   /* with FC_SETBASE: also run the original base_compute(1) before the call */
+    FC_PATHS = 16,    /* THISCALL method of the Paths object (0x945B00): called with ECX = &Paths;
+                         its heap tables are saved/restored around each side and compared; the
+                         dead stack dword at [entry esp - 0x30] (Path_find's uninitialised local)
+                         is set to 0 / non-zero on alternate calls */
 };
 struct FcFunc {
     const char *name;  /* as in the ADDR declaration (and the patch table) */

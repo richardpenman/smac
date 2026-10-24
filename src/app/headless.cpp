@@ -6,7 +6,8 @@
 //   smacx_headless <script.cmd> [--outdir DIR] [--gamedir DIR] [--image FILE]
 //
 // --gamedir is the original game's data directory (default: game); the runner chdirs into it.
-// The boot sequence mirrors control_game (0x52AA30): system_init, game_init(0, 1), prefs_load(0).
+// The game runs as in the original: control_game (0x52AA30) boots and calls the script in place of
+// the main menu (top_menu).
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -194,58 +195,12 @@ static void cmd_newgame(char* args) {
           game_random_state());
 }
 
-int main(int argc, char** argv) {
-    std::string script, gamedir = "game", image = "src/data/data_image.bin";
-    std::string ini = "harness/oracle/runtime/Alpha Centauri.Ini";
-    for (int i = 1; i < argc; i++) {
-        std::string a = argv[i];
-        if (a == "--outdir" && i + 1 < argc) g_outdir = argv[++i];
-        else if (a == "--gamedir" && i + 1 < argc) gamedir = argv[++i];
-        else if (a == "--image" && i + 1 < argc) image = argv[++i];
-        else if (a == "--ini" && i + 1 < argc) ini = argv[++i];
-        else script = a;
-    }
-    if (script.empty()) {
-        std::fprintf(stderr, "usage: smacx_headless <script.cmd> [--outdir DIR] [--gamedir DIR] [--image FILE] [--ini FILE]\n");
-        return 2;
-    }
-    g_outdir = fs::absolute(g_outdir).string();
-    script = fs::absolute(script).string();
-    if (!mem::init(fs::absolute(image).string().c_str())) {
-        std::fprintf(stderr, "cannot load data image %s\n", image.c_str());
-        return 2;
-    }
-    FILE* f = std::fopen(script.c_str(), "r");
-    if (!f) {
-        std::fprintf(stderr, "cannot open %s\n", script.c_str());
-        return 2;
-    }
-    // The preferences file is modified by the game: work on a copy, as the oracle does.
-    fs::create_directories(g_outdir);
-    std::string ini_copy = g_outdir + "/Alpha Centauri.Ini";
-    std::error_code ec;
-    fs::copy_file(ini, ini_copy, fs::copy_options::overwrite_existing, ec);
-    if (ec) {
-        std::fprintf(stderr, "cannot copy preferences %s: %s\n", ini.c_str(), ec.message().c_str());
-        return 2;
-    }
-    fs::current_path(gamedir);
-    engine_static_init(ini_copy.c_str());  // CRT static data + pfncWinMain state
-    engine_set_deterministic(true);
-    g_harness_before_turn_upkeep = before_turn_upkeep;
-
-    // control_game boot sequence
-    if (system_init() || game_init(0, 1)) {
-        logf_("boot failed\nexit=1\n");
-        return 1;
-    }
-    filefind_init("movies\\virtualWorld.wve", 0);
-    prefs_load(0);
-    GamePreferences = AlphaIniPrefs.preferences;
-    prefs_put_2("DisableOpeningMovie", (uint32_t)prefs_get_2("DisableOpeningMovie", 0, 0), 0);
-
+// The command script, run by control_game in place of the main menu (top_menu). Returns 0 to
+// start the game loop ("turns"), 1 to quit.
+static FILE* g_script = nullptr;
+static int32_t run_script() {
     char line[16384];
-    while (std::fgets(line, sizeof(line), f)) {
+    while (std::fgets(line, sizeof(line), g_script)) {
         line[std::strcspn(line, "\r\n")] = 0;
         char* cmd = line + std::strspn(line, " \t");
         if (!*cmd || *cmd == '#') continue;
@@ -287,14 +242,67 @@ int main(int argc, char** argv) {
             CurrentPlayerFaction = g_viewer;
         } else if (!std::strcmp(cmd, "turns")) {
             g_turn_limit = CurrentTurn + std::atoi(args);
-            control_turn();
-            break;
+            return 0;  // into the game loop (desktop_init, control_turn)
         } else if (!std::strcmp(cmd, "quit")) {
             break;
         } else {
             logf_("unknown command %s\n", cmd);
         }
     }
+    return 1;
+}
+
+// control_turn -> turn_upkeep: snapshot (and turn limit) first.
+static int32_t harness_turn_upkeep() {
+    before_turn_upkeep();
+    turn_upkeep();
+    return 0;
+}
+
+int main(int argc, char** argv) {
+    std::string script, gamedir = "game", image = "src/data/data_image.bin";
+    std::string ini = "harness/oracle/runtime/Alpha Centauri.Ini";
+    for (int i = 1; i < argc; i++) {
+        std::string a = argv[i];
+        if (a == "--outdir" && i + 1 < argc) g_outdir = argv[++i];
+        else if (a == "--gamedir" && i + 1 < argc) gamedir = argv[++i];
+        else if (a == "--image" && i + 1 < argc) image = argv[++i];
+        else if (a == "--ini" && i + 1 < argc) ini = argv[++i];
+        else script = a;
+    }
+    if (script.empty()) {
+        std::fprintf(stderr, "usage: smacx_headless <script.cmd> [--outdir DIR] [--gamedir DIR] [--image FILE] [--ini FILE]\n");
+        return 2;
+    }
+    g_outdir = fs::absolute(g_outdir).string();
+    script = fs::absolute(script).string();
+    if (!mem::init(fs::absolute(image).string().c_str())) {
+        std::fprintf(stderr, "cannot load data image %s\n", image.c_str());
+        return 2;
+    }
+    FILE* f = std::fopen(script.c_str(), "r");
+    if (!f) {
+        std::fprintf(stderr, "cannot open %s\n", script.c_str());
+        return 2;
+    }
+    // The preferences file is modified by the game: work on a copy, as the oracle does.
+    fs::create_directories(g_outdir);
+    std::string ini_copy = g_outdir + "/Alpha Centauri.Ini";
+    std::error_code ec;
+    fs::copy_file(ini, ini_copy, fs::copy_options::overwrite_existing, ec);
+    if (ec) {
+        std::fprintf(stderr, "cannot copy preferences %s: %s\n", ini.c_str(), ec.message().c_str());
+        return 2;
+    }
+    fs::current_path(gamedir);
+    engine_static_init(ini_copy.c_str());  // CRT static data + pfncWinMain state
+    engine_set_deterministic(true);
+    g_script = f;
+    g_harness_turn_upkeep = harness_turn_upkeep;
+    g_harness_top_menu = run_script;
+    // pfncWinMain -> control_game: boot (system_init, game_init, preferences), then the script in
+    // place of the main menu; "turns" returns into the game loop.
+    control_game();
     std::fclose(f);
     logf_("exit=0\n");
     return 0;

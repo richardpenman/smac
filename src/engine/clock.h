@@ -13,5 +13,6 @@ uint32_t engine_logic_time();
 uint32_t engine_real_time();
 
 void engine_set_deterministic(bool on);
+bool engine_is_deterministic();
 uint32_t engine_logic_clock_state();
 void engine_set_logic_clock_state(uint32_t value);

@@ -126,6 +126,37 @@ __attribute__((noinline)) void poison() {
     __asm__ volatile("" ::"r"(buf) : "memory");
 }
 
+/* THISCALL call with ECX = self; restores ESP itself (works for any callee argument count).
+ * slot30: written to [callee entry esp - 0x30] just before the call (FC_PATHS). */
+extern "C" uint32_t __cdecl fc_call_this(uint32_t fn, uint32_t self, const uint32_t *args, uint32_t slot30);
+__asm__(".text\n.globl _fc_call_this\n_fc_call_this:\n"
+        "push %ebp\n mov %esp, %ebp\n push %esi\n push %edi\n push %ebx\n mov %esp, %esi\n"
+        "mov 16(%ebp), %edi\n"
+        "push 28(%edi)\n push 24(%edi)\n push 20(%edi)\n push 16(%edi)\n"
+        "push 12(%edi)\n push 8(%edi)\n push 4(%edi)\n push (%edi)\n"
+        "mov 20(%ebp), %eax\n mov %eax, -0x34(%esp)\n"
+        "mov 12(%ebp), %ecx\n mov 8(%ebp), %eax\n call *%eax\n"
+        "mov %esi, %esp\n pop %ebx\n pop %edi\n pop %esi\n pop %ebp\n ret\n");
+
+/* FC_PATHS: the Paths object's heap tables (map costs, queue). */
+struct PathTabs {
+    std::vector<uint8_t> map, xs, ys;
+};
+void paths_take(PathTabs &t) {
+    uint32_t *p = (uint32_t *)0x945B00;
+    size_t n = (size_t)MapAreaTiles;
+    t.map.assign((uint8_t *)p[0], (uint8_t *)p[0] + n * 4);
+    t.xs.assign((uint8_t *)p[1], (uint8_t *)p[1] + n * 2);
+    t.ys.assign((uint8_t *)p[2], (uint8_t *)p[2] + n * 2);
+}
+void paths_put(const PathTabs &t) {
+    uint32_t *p = (uint32_t *)0x945B00;
+    memcpy((void *)p[0], t.map.data(), t.map.size());
+    memcpy((void *)p[1], t.xs.data(), t.xs.size());
+    memcpy((void *)p[2], t.ys.data(), t.ys.size());
+}
+uint32_t g_paths_calls;
+
 /* ---- argument domains ---- */
 typedef uint32_t(__cdecl *Fn8)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 
@@ -202,6 +233,10 @@ bool compare_one(FcState &st, const Call &c, int nargs, const char *where) {
     uint32_t crt0 = oracle_crt_state(), game0 = *(uint32_t *)0x9BB568;
     uint32_t clock0 = engine_logic_clock_state(); /* logic-clock sites (timeGetTime) see the same value */
     if (snap) take(s0);
+    bool paths = f.flags & FC_PATHS;
+    PathTabs pt0, pt[2];
+    uint32_t slot30 = (g_paths_calls++ & 1) ? 0x5C105Au : 0;
+    if (paths) paths_take(pt0);
     for (int side = 0; side < 2; side++) {
         uint32_t a[8];
         for (int i = 0; i < 8; i++) {
@@ -245,8 +280,15 @@ bool compare_one(FcState &st, const Call &c, int nargs, const char *where) {
             for (int i = 0; i < 7; i++) a[i] = a[i + 1];
             a[7] = 0;
         }
+        if (paths) paths_put(pt0);
         poison();
-        ret[side] = fn(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
+        if (paths) {
+            ret[side] = fc_call_this((uint32_t)(uintptr_t)fn, 0x945B00u, a, slot30);
+            paths_take(pt[side]);
+            paths_put(pt0);
+        } else {
+            ret[side] = fn(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
+        }
         if (side == 0 && prev > 0) oracle_patch_set(f.name, 1);
         if (snap) {
             take(after[side]);
@@ -284,6 +326,20 @@ bool compare_one(FcState &st, const Call &c, int nargs, const char *where) {
         }
     }
     if (why.empty() && mut) why = snap_diff(after[0], after[1]);
+    if (why.empty() && paths) {
+        const char *names[3] = {"Paths.mapTable", "Paths.xTable", "Paths.yTable"};
+        const std::vector<uint8_t> *t0[3] = {&pt[0].map, &pt[0].xs, &pt[0].ys};
+        const std::vector<uint8_t> *t1[3] = {&pt[1].map, &pt[1].xs, &pt[1].ys};
+        for (int k = 0; k < 3 && why.empty(); k++)
+            if (*t0[k] != *t1[k]) {
+                size_t i = 0;
+                while (i < t0[k]->size() && (*t0[k])[i] == (*t1[k])[i]) i++;
+                char b[96];
+                snprintf(b, sizeof(b), "%s byte %u orig=%02X recon=%02X", names[k], (unsigned)i, (*t0[k])[i],
+                         (*t1[k])[i]);
+                why = b;
+            }
+    }
     if (why.empty() && !mut && (after[0].crt != after[1].crt || after[0].game != after[1].game))
         why = "random number draws differ";
     st.calls++;

@@ -38,6 +38,14 @@ random stream, and some engine code uses `timeGetTime()` as randomness. The orac
   identical games, so this poisoned behaviour is the canonical one the reconstruction reproduces.
   (The exact read has not been located yet.)
 
+## Reconstructed game loops
+
+`control_game` and `control_turn` are reconstructed; the harness reaches them through hooks
+(`g_harness_*` in `src/engine/turn.h`). `smacx_headless` runs `control_game`, which calls the
+command script in place of the main menu; hybrid.dll sets the same hooks to the oracle's call-site
+hooks (snapshots, fcompare, stack poisoning, observer pause, script), so the patched loops behave
+like the original ones under the oracle.
+
 ## Script commands
 
 ```

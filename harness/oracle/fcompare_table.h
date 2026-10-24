@@ -1,7 +1,7 @@
 /* fcompare argument table: one entry per reconstructed function that fcompare can call.
  *
  * Add an entry for every function you reconstruct (cdecl functions with up to 8 integer or
- * pointer arguments; THISCALL methods are not supported). Arguments are generated from the
+ * pointer arguments; THISCALL methods only for the Paths object, flag FC_PATHS). Arguments are generated from the
  * declared domains (see FcArgKind in fcompare.h); fcompare enumerates all combinations when there
  * are few, otherwise it draws a deterministic sample. Mark functions that write game memory with
  * FC_MUTATES (their memory effects are compared) and functions without a return value with
@@ -17,6 +17,36 @@
 #define XY A(X), A(Y)
 
 static const FcFunc kFcFuncs[] = {
+    /* ---- path (FC_PATHS: THISCALL methods of Paths) / move / goals ---- */
+    {"Path_find", FC_MUTATES | FC_PATHS, {XY, XY, A(UNIT), A(FACTION_OPT), R(0, 0x1FFF), R(-1, 7)}},
+    {"Path_move", FC_MUTATES | FC_PATHS, {A(VEH), A(FACTION)}},
+    {"Path_zoc_path", FC_PATHS, {XY, A(FACTION)}},
+    {"Path_sensors", FC_MUTATES | FC_PATHS, {A(FACTION1), FcArg{FA_BUF, 0, 31}, FcArg{FA_BUF, 0, 31}}},
+    {"Path_territory", FC_MUTATES | FC_VOID | FC_PATHS, {XY, C(0), R(-1, 7)}},
+    {"Path_merge", FC_MUTATES | FC_VOID | FC_PATHS, {R(1, 126), R(1, 126)}},
+    {"Path_continent", FC_MUTATES | FC_VOID | FC_PATHS, {XY, R(1, 126)}},
+    {"Path_continents", FC_MUTATES | FC_VOID | FC_PATHS, {}},
+    {"Path_make_abstract", FC_MUTATES | FC_VOID | FC_PATHS, {}},
+    {"hex_cost", 0, {A(UNIT), A(FACTION_OPT), XY, XY, A(BOOL)}},
+    {"quick_zoc", FC_VOID, {XY, A(FACTION), XY, A(OUT), A(OUT)}},
+    {"rnd", 0, {R(-2, 40)}},
+    {"x_dist", 0, {R(-10, 200), R(-10, 200)}},
+    {"site_at", FC_MUTATES, {XY, A(BOOL)}},
+    {"is_known", 0, {XY, A(FACTION)}},
+    {"base_who", 0, {XY}},
+    {"anything_at", 0, {XY}},
+    {"veh_top", 0, {A(VEH_OPT)}},
+    {"veh_moves", 0, {A(VEH)}},
+    {"proto_power", 0, {A(VEH)}},
+    {"is_port", 0, {A(BASE), A(BOOL)}},
+    {"at_goal", 0, {A(FACTION), R(-1, 10), XY}},
+    {"wipe_goals", FC_MUTATES | FC_VOID, {A(FACTION)}},
+    {"want_monolith", 0, {A(VEH)}},
+    {"monolith_sites", FC_MUTATES | FC_VOID, {XY}},
+    {"valid_tech_leap", 0, {R(0, 88), A(FACTION)}},
+    {"supply_options", FC_MUTATES, {A(VEH), A(BASE)}},
+    /* dir -1..8; flags 0-3 (bit 1: the move is carried out) */
+    {"order_veh", FC_MUTATES, {A(VEH), R(-1, 8), R(0, 3)}},
     /* ---- veh ---- */
     {"do_unity_crash", FC_MUTATES, {XY, A(FACTION1)}},
     {"is_sensor", FC_MUTATES, {XY}}, /* base_find sets BaseFindDist */
@@ -288,12 +318,102 @@ static const FcFunc kFcFuncs[] = {
     {"veh_who", 0, {XY}},
     {"has_treaty", 0, {A(FACTION), A(FACTION), A(INT)}},
     {"drop_range", 0, {A(FACTION)}},
+    /* ---- battle ---- */
+    {"drop_cover_check", FC_VOID, {A(FACTION), XY}},
+    {"planet_buster2", 0, {A(UNIT)}},
+    {"planet_buster", 0, {A(VEH)}},
+    {"morale_alien", 0, {A(VEH_OPT), A(FACTION_OPT)}},
+    {"psi_factor", 0, {R(-3, 40), A(FACTION), A(BOOL), A(BOOL)}},
+    {"defense_value", FC_MUTATES, {A(FACTION), XY, A(VEH), A(VEH_OPT)}}, /* VehBattleDisplayTerrain */
+    {"get_basic_offense", FC_MUTATES, {A(VEH), A(VEH_OPT), R(0, 3), A(BOOL), A(BOOL)}},
+    {"get_basic_defense", FC_MUTATES, {A(VEH), A(VEH_OPT), R(0, 3), A(BOOL)}},
+    {"battle_init", FC_MUTATES | FC_VOID, {}},
+    {"add_bat", FC_MUTATES | FC_VOID, {A(BOOL), R(-2, 2), A(STR)}},
+    {"battle_compute", FC_MUTATES, {A(VEH_OPT), A(VEH), A(OUT), A(OUT), R(0, 0x1F)}},
+    {"best_defender", FC_MUTATES, {A(VEH), A(VEH_OPT), A(BOOL)}},
+    {"battle_kill", FC_MUTATES, {A(VEH), A(OUT), A(OUT), A(OUT), A(VEH_OPT), A(FACTION_OPT)}},
+    {"battle_kill_stack", FC_MUTATES | FC_VOID, {A(VEH), A(OUT), A(OUT), A(OUT), A(VEH_OPT), A(FACTION_OPT)}},
+    {"battle_kill_chaff", FC_MUTATES | FC_VOID, {A(VEH), A(OUT), A(OUT), A(OUT), A(VEH_OPT), A(FACTION_OPT)}},
+    {"promote", FC_MUTATES | FC_VOID, {A(VEH)}},
+    {"invasions", FC_MUTATES | FC_VOID, {A(BASE)}},
+    {"interceptor", FC_MUTATES, {A(FACTION1), A(FACTION1), XY}}, /* viewer 0: scramble animation */
+    {"shoot", FC_MUTATES, {A(FACTION1), A(FACTION1), XY}},      /* viewer 0: popups */
+    /* planet_busting: not compared (only valid for planet busters: boom divides by the strength;
+       reached through battle_fight with a buster) */
+    {"mon_enemy_destroyed", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION)}}, /* viewer 0: window */
+    /* odds only (is_real 0), then real battles in all directions */
+    {"battle_fight_2", FC_MUTATES, {A(VEH), R(0, 7), XY, A(BOOL), C(0), A(OUT)}},
+    {"battle_fight", FC_MUTATES, {A(VEH), R(0, 7), C(0), C(1), A(OUT)}},
     {"has_tech", 0, {A(TECH), A(FACTION_OPT)}},
     {"transport_val", 0, {R(0, 8), BITS(0, 28), R(1, 4)}},
     {"is_coast", 0, {XY, A(BOOL)}},
     {"minerals_at", 0, {XY}},
     {"bonus_at", 0, {XY}},
     {"goody_at", 0, {XY}},
+    /* ---- score ---- */
+    {"get_rating", 0, {A(FACTION), R(-50, 5000)}},
+    {"is_objective", 0, {A(BASE)}},
+    {"num_objectives", 0, {A(FACTION), A(BOOL)}},
+    {"most_objectives", 0, {A(OUT), A(OUT)}},
+    {"transcending", 0, {A(FACTION)}},
+    {"ascending", 0, {}},
+    {"rankings", FC_MUTATES | FC_VOID, {A(BOOL)}},
+    {"compute_score", FC_MUTATES | FC_VOID, {A(FACTION), A(OUT), A(BUF_OPT), A(BOOL)}},
+    /* ---- turn (diplomacy helpers) ---- */
+    {"reputation", 0, {A(FACTION), A(FACTION)}},
+    {"agenda_off", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION1), BITS(0, 31)}},
+    {"treaty_on", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION1), BITS(0, 31)}},
+    /* ---- turn ---- */
+    {"random_events", FC_MUTATES | FC_VOID, {A(BOOL)}},
+    {"alien_fauna", FC_MUTATES | FC_VOID, {}},
+    {"do_fungal_towers", FC_MUTATES | FC_VOID, {}},
+    {"ascent", FC_MUTATES | FC_VOID, {}},
+    {"climactic_changes", FC_MUTATES | FC_VOID, {}},
+    {"generators", 0, {A(FACTION), A(OUT)}},
+    {"mon_winning_unify", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION_OPT)}},
+    {"repair_phase", FC_MUTATES | FC_VOID, {A(FACTION1)}},
+    {"production_phase", FC_MUTATES | FC_VOID, {A(FACTION1)}},
+    /* allocate_energy: not here; it reads the current base without a check (crashes after a load
+     * before any set_base); verified through faction_upkeep. */
+    {"faction_upkeep", FC_MUTATES | FC_VOID, {A(FACTION1)}},
+    {"eligible", 0, {A(FACTION)}},
+    {"wants_prop", 0, {A(FACTION1), R(0, 11), A(FACTION)}},
+    {"council_get_vote", 0, {A(FACTION1), R(0, 10), A(FACTION)}},
+    {"council_action", FC_MUTATES | FC_VOID, {R(0, 10), A(FACTION1)}},
+    {"can_call_council", 0, {A(FACTION1), A(BOOL)}},
+    /* ---- action (unit orders; any vehicle, the functions do not check the unit type) ---- */
+    {"terraform_cost", FC_MUTATES, {XY, A(FACTION1)}}, /* base_find sets BaseFindDist */
+    {"road_rate", 0, {XY}},
+    {"contribution", 0, {A(VEH), R(0, 19)}},
+    {"action_terraform", FC_MUTATES, {A(VEH), R(0, 18), A(BOOL)}},
+    {"action_build", FC_MUTATES, {A(VEH), C(0)}},
+    {"action_staple", FC_MUTATES | FC_VOID, {A(BASE)}},
+    {"action_destroy", FC_MUTATES | FC_VOID, {A(VEH), R(-1, 0x40), XY}},
+    {"action_go_to", FC_MUTATES | FC_VOID, {A(VEH)}},
+    {"action_road_to", FC_MUTATES | FC_VOID, {A(VEH)}},
+    {"action", FC_MUTATES, {A(VEH)}},
+    {"action_home", FC_MUTATES, {A(VEH), R(-1, 4)}},
+    {"action_airdrop", FC_MUTATES, {A(VEH), XY, R(0, 3)}},
+    {"action_feature", FC_VOID, {}},
+    {"action_arty", FC_MUTATES | FC_VOID, {A(VEH), XY}},
+    {"action_destruct", FC_MUTATES | FC_VOID, {A(VEH)}},
+    {"action_oblit", FC_MUTATES | FC_VOID, {A(VEH), A(BASE)}},
+    {"valid_patrol", 0, {A(VEH), XY}},
+    {"action_patrol", FC_MUTATES | FC_VOID, {A(VEH), XY}},
+    {"shoot_it", FC_MUTATES, {A(FACTION1), A(FACTION), XY, A(BOOL)}},
+    {"action_tectonic", FC_MUTATES | FC_VOID, {A(VEH), XY}},
+    {"fungal_tile", FC_MUTATES | FC_VOID, {XY}},
+    {"action_fungal", FC_MUTATES | FC_VOID, {A(VEH), XY}},
+    {"action_give", FC_MUTATES | FC_VOID, {A(VEH), A(FACTION)}},
+    {"action_gate", FC_MUTATES | FC_VOID, {A(VEH), A(BASE)}},
+    {"action_sat_attack", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION1), R(0, 4), A(BASE)}},
+    {"mon_colony_founded", FC_MUTATES | FC_VOID, {A(FACTION), A(STR)}},
+    /* ---- supply pods, monoliths, artifacts (goody.cpp) ---- */
+    {"tut_check", FC_MUTATES, {BITS(0, 15)}},
+    {"want_monolith", 0, {A(VEH)}},
+    {"monolith", FC_MUTATES | FC_VOID, {A(VEH)}},
+    {"goody_box", FC_MUTATES, {A(VEH), C(1)}},
+    {"study_artifact", FC_MUTATES, {A(VEH)}},
 };
 
 /* Image ranges that fcompare does not compare (UI objects and buffers that legitimately differ,
@@ -307,6 +427,8 @@ static const struct {
     {0x93FAE8, 0x93FC24 - 0x93FAE8, "FontLists"},
     {0x9BE600, 0x9C1000 - 0x9BE600, "graphics/blitter state (video module)"},
     {0x74C5F0, 0x74DAA8 - 0x74C5F0, "sound Wave objects and current wave id (wave_it; playback timing)"},
+    {0x749CF8, 0x74C5F0 - 0x749CF8, "sound effect objects (FX_play, battle sounds; playback timing)"},
+    {0x90EA68, 0x90F554 - 0x90EA68, "boom() explosion animation object (flic player state; timing)"},
 };
 
 #undef A

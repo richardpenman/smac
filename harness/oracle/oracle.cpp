@@ -27,6 +27,14 @@
 #include "engine/clock.h"
 #include "engine/hybrid_patch.h"
 #include "fcompare.h"
+/* Harness hooks of the reconstructed control_game/control_turn (engine/turn.h): they make those
+ * call the oracle's hooks below where the original's call sites are patched. */
+extern int (*g_harness_turn_upkeep)();
+extern int (*g_harness_faction_upkeep)(int);
+extern int (*g_harness_enemy_turn)(int);
+extern int (*g_harness_human_turn)();
+extern int (*g_harness_observer_pause)();
+extern int (*g_harness_top_menu)();
 #endif
 
 /* ---- original functions ---- */
@@ -969,6 +977,12 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
             patch_bytes(IAT_timeGetTime, (const uint8_t *)&hook, 4);
         }
 #ifdef ORACLE_WITH_ENGINE
+        g_harness_turn_upkeep = hook_turn_upkeep;
+        g_harness_faction_upkeep = hook_faction_upkeep;
+        g_harness_enemy_turn = hook_enemy_turn;
+        g_harness_human_turn = hook_human_turn;
+        g_harness_observer_pause = hook_observer_pause;
+        g_harness_top_menu = oracle_top_menu;
         engine_set_deterministic(true);
         patches_init();
         /* oracle.patch: patch spec applied before the game boots, so reconstructed boot code

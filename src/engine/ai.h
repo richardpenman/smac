@@ -3,6 +3,8 @@
 #include "engine/globals.h"
 
 ADDR(0x579510) void GAMEAPI enemy_turn(int32_t faction_id);
+// AI diplomacy of faction_id for the turn (treaties, demands, alliances).
+ADDR(0x55F930) void GAMEAPI enemy_diplomacy(int32_t faction_id);
 // Refreshes the faction's best/enemy-best weapon, armor and speed values.
 ADDR(0x560DD0) void GAMEAPI enemy_capabilities(int32_t faction_id);
 // Number of defenders a base wants (AI garrison goal).
