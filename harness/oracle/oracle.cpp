@@ -35,6 +35,10 @@ extern int (*g_harness_enemy_turn)(int);
 extern int (*g_harness_human_turn)();
 extern int (*g_harness_observer_pause)();
 extern int (*g_harness_top_menu)();
+/* Reconstructed enemy_turn -> enemy_veh and enemy_veh's message pump (engine/ai.h). */
+extern int (*g_harness_enemy_veh)(int);
+extern void (*g_harness_enemy_veh_pump)();
+static void hook_enemy_veh_pump_void();
 #endif
 
 /* ---- original functions ---- */
@@ -683,6 +687,10 @@ static int __cdecl hook_enemy_veh_pump() {
     return r;
 }
 
+#ifdef ORACLE_WITH_ENGINE
+static void hook_enemy_veh_pump_void() { hook_enemy_veh_pump(); }
+#endif
+
 /* trace 3 <turn>: dump state before every enemy_veh call on that turn */
 static int g_trace_turn = -1, g_trace_seq = 0;
 ORIG(f_int, o_enemy_veh, 0x579240);
@@ -983,6 +991,8 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         g_harness_human_turn = hook_human_turn;
         g_harness_observer_pause = hook_observer_pause;
         g_harness_top_menu = oracle_top_menu;
+        g_harness_enemy_veh = hook_enemy_veh;
+        g_harness_enemy_veh_pump = hook_enemy_veh_pump_void;
         engine_set_deterministic(true);
         patches_init();
         /* oracle.patch: patch spec applied before the game boots, so reconstructed boot code

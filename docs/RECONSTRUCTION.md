@@ -160,7 +160,7 @@ The original reads stack memory it never wrote in these places. The oracle makes
    starts at 1 (`call_council` from `faction_upkeep`). Hybrid: a naked entry thunk reads
    `[esp-0x18]` at entry (turn.cpp). Marked `BUG(original)`.
 
-6. **`alien_move` (0x566810), local `[ebp-0x10]`** (score): the movement scoring keeps a score
+7. **`alien_move` (0x566810), local `[ebp-0x10]`** (score): the movement scoring keeps a score
    marker 0x3039 from a previous tile and is read before any write when the unit is no artillery
    (`if (score != 0x3039) score = 0`). Only an exact residue 0x3039 would matter; the canonical
    values never are. Reconstructed with the local initialised to 0 (ai.cpp).

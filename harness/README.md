@@ -41,7 +41,9 @@ random stream, and some engine code uses `timeGetTime()` as randomness. The orac
 ## Reconstructed game loops
 
 `control_game` and `control_turn` are reconstructed; the harness reaches them through hooks
-(`g_harness_*` in `src/engine/turn.h`). `smacx_headless` runs `control_game`, which calls the
+(`g_harness_*` in `src/engine/turn.h`). The reconstructed `enemy_turn`/`enemy_veh` call `g_harness_enemy_veh` and
+`g_harness_enemy_veh_pump` (`src/engine/ai.h`) at the call sites the oracle patches in the original
+(enemy_turn -> enemy_veh, and enemy_veh's message pump), so stack poisoning happens there too. `smacx_headless` runs `control_game`, which calls the
 command script in place of the main menu; hybrid.dll sets the same hooks to the oracle's call-site
 hooks (snapshots, fcompare, stack poisoning, observer pause, script), so the patched loops behave
 like the original ones under the oracle.
