@@ -133,7 +133,7 @@ The original reads stack memory it never wrote in these places. The oracle makes
    messages depend on it; the reconstruction uses 0 there. Also `[ebp-0x90..-0x80]` (ZOCMSG
    tutorial coordinates) stay unset when `quick_zoc` finds nothing (UI only).
 
-5. **`call_council` (0x52C880), local `[ebp-0x14]`** ("aliens alive" flag): written only when
+6. **`call_council` (0x52C880), local `[ebp-0x14]`** ("aliens alive" flag): written only when
    proposal 1 (Supreme Leader) is examined (Diplomatic Victory on, not yet passed, caller among
    the two largest voters). Otherwise it holds the residue of the previous call at that depth: in
    `faction_upkeep`, `corner_market`'s pushed argument `1` for `mind_control` (whenever a foreign
