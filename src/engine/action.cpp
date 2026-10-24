@@ -593,6 +593,7 @@ void net_synch_unlock(int32_t veh_id) {
 }  // namespace
 
 void GAMEAPI action_go_to(int32_t veh_id) {
+    // as the original: the multiplayer daemon may renumber veh_id through this pointer
     if (MultiplayerActive && !ControlTurnC) NetVehIDPtr = &veh_id;
     VEH& v = Vehs[veh_id];
     int32_t dir;
@@ -640,6 +641,7 @@ void GAMEAPI action_go_to(int32_t veh_id) {
 }
 
 void GAMEAPI action_road_to(int32_t veh_id) {
+    // as the original: the multiplayer daemon may renumber veh_id through this pointer
     if (MultiplayerActive && !ControlTurnC) NetVehIDPtr = &veh_id;
     VEH& v = Vehs[veh_id];
     int32_t faction_id = v.faction_id;
@@ -1629,4 +1631,22 @@ void GAMEAPI mon_colony_founded(int32_t faction_id, const char* base_name) {
     std::strncpy(Monuments[faction_id].base_name, base_name, 24);
     Monuments[faction_id].latest_event_id = 0;
     if (faction_id == CurrentPlayerFaction) monument(1);
+}
+
+// ---- small callees of other modules (diplo_act 0x50C2E0, diplomacy 0x53A030) ------------------------------
+
+int32_t GAMEAPI act_of_aggression(int32_t faction_id, int32_t faction_id_with) {
+    int32_t had_treaty = (Factions[faction_id_with].diplo_status[faction_id] & 7) != 0;
+    if (had_treaty) double_cross(faction_id, faction_id_with, -1);
+    treaty_on(faction_id, faction_id_with, 0x8010);
+    return had_treaty;
+}
+
+void GAMEAPI cause_friction(int32_t faction_id, int32_t faction_id_with, int32_t amount) {
+    int32_t& f = Factions[faction_id].diplo_friction[faction_id_with];
+    int32_t v = f + amount;
+    if (v < 0) v = 0;
+    else if (v > 20) v = 20;
+    f = v;
+    if (DiploFrictionFactionID == faction_id && DiploFrictionFactionIDWith == faction_id_with) DiploFriction += amount;
 }

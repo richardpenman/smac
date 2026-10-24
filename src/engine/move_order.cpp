@@ -61,19 +61,20 @@ void say_title(int32_t n, int32_t faction_id) {
     parse_says(n, MFactions[faction_id].title_leader, -1, -1);
 }
 const char* ability_name(uint32_t flag) { return Ability[abil_index(flag)].name; }
+// The original's Popup object on order_veh's stack, constructed first and destroyed on return.
+struct StackPopup {
+    alignas(8) uint8_t obj[0x5410];
+    StackPopup() { Popup_ctor(obj); }
+    ~StackPopup() { Popup_dtor(obj); }
+};
 void net_synch_veh(int32_t veh_id) {
     synch_veh(veh_id);
     NetDaemon_await_synch(&NetState);
 }
 }  // namespace
-#ifdef OV_DEBUG
-#include <cstdio>
-#define OV_TRACE(a) do { if (FILE* f_ = std::fopen("ov_trace.txt", "a")) { std::fprintf(f_, "%X ", a); std::fclose(f_); } } while (0)
-#else
-#define OV_TRACE(a) do { } while (0)
-#endif
 
 int32_t GAMEAPI order_veh(int32_t veh_id, int32_t dir, int32_t flags) {
+    StackPopup popup;
     int32_t result = 0;       // [ebp-0x58]: the vehicle moved (or acted) and may continue
     int32_t unload = 0;       // [ebp-0x68]: land unit boarding a transport at sea (no base)
     int32_t fought = 0;       // [ebp-0x74]: won a battle and moves on
@@ -86,9 +87,6 @@ int32_t GAMEAPI order_veh(int32_t veh_id, int32_t dir, int32_t flags) {
     int32_t& scroll = delayed;  // same slot in the movement part: the map follows the unit
     int32_t triad;            // [ebp-0x4c]
     VehAttackFlags = flags;
-#ifdef OV_DEBUG
-    if (FILE* f_ = std::fopen("ov_trace.txt", "a")) { std::fprintf(f_, "\nCALL %d %d %d: ", veh_id, dir, flags); std::fclose(f_); }
-#endif
     if (flags & 1)
         MapWinField23BE4 = 0;
     else
@@ -113,7 +111,6 @@ int32_t GAMEAPI order_veh(int32_t veh_id, int32_t dir, int32_t flags) {
     int32_t tmp, tmp2;
 
 L_5949b3:  // (re)start, also with a disembarking passenger as veh_id
-    OV_TRACE(0x5949b3);
     delayed = (Vehs[veh_id].state & 0x4200) ? 1 : 0;
     triad = veh_chassis_triad(veh_id);
     if (!(FactionStatus[0] & fbit) && Vehs[veh_id].order == 0x18) {
@@ -200,7 +197,6 @@ L_5949b3:  // (re)start, also with a disembarking passenger as veh_id
             }
         }
     L_594f3c:
-    OV_TRACE(0x594f3c);
         if (base_id >= 0) {
             if (stack_id >= 0 && stack_check(stack_id, 2, 11, -1, -1)) goto L_595083;
             if (FactionStatus[0] & fbit) goto L_5965a3;
@@ -219,7 +215,6 @@ L_5949b3:  // (re)start, also with a disembarking passenger as veh_id
         if (stack_id >= 0) tgt_faction = Vehs[stack_id].faction_id;
     }
 L_595083:
-    OV_TRACE(0x595083);
     if (triad == 0 && tgt_sea) {
         // Land unit onto a sea tile.
         if (faction_id == tgt_faction) {
@@ -324,10 +319,8 @@ L_595083:
     }
 
 L_59512c:  // a unit on the target tile?
-    OV_TRACE(0x59512c);
     if (stack_id < 0) goto L_596052;
 L_595137: {
-    OV_TRACE(0x595137);
         visible = stack_id * 0x34;
         const VEH& tgt = Vehs[stack_id];
         if (!(tgt.flags & 0x400)) {
@@ -350,14 +343,12 @@ L_595137: {
             goto L_596e0b;  // only fighters attack air units
     }
 L_595734:
-    OV_TRACE(0x595734);
     if (Vehs[veh_id].unit_id != 14) {  // Sealurk
         if (!veh_sea) goto L_5957d7;
         if (!tgt_sea && triad == 1 && !can_arty(Vehs[veh_id].unit_id, 1) && veh_offense(veh_id) != 0) goto L_596e85;
     }
     if (veh_sea && triad == 0 && !has_abil(Vehs[veh_id].unit_id, 8) && veh_unit(veh_id).plan != 11) goto L_596ec0;
 L_5957d7:
-    OV_TRACE(0x5957d7);
     if (Weapon[veh_unit(veh_id).weapon_id].mode == 11 && stack_check(stack_id, 2, 11, -1, -1)) goto L_595a8f;
     if (veh_offense(veh_id) == 0) goto L_596f75;
     if (veh_unit(stack_id).plan == 11 && stack_check(stack_id, 1, -1, -1, -1) == 1 && !MultiplayerActive) {
@@ -389,9 +380,7 @@ L_5957d7:
         }
     }
 L_595a8f:
-    OV_TRACE(0x595a8f);
 L_595a92:
-    OV_TRACE(0x595a92);
     // Attacking with less than a full move.
     if (moves_left(veh_id) < Rules.move_rate_roads && Vehs[veh_id].unit_id != 15 && Vehs[veh_id].unit_id != 8) {
         if (faction_id == CurrentPlayerFaction && !delayed && (VehAttackFlags & 1)) {
@@ -433,7 +422,6 @@ L_595a92:
         if (f.SE_planet_base <= 0) goto L_5971ce;
         if (f.units_active[Vehs[stack_id].unit_id]) goto L_5971ce;
     L_595e1b:
-    OV_TRACE(0x595e1b);
         if (stack_id >= 0) {
             for (int32_t v = top_of(stack_id); v >= 0; v = Vehs[v].next_veh_id_stack) {
                 Vehs[v].faction_id = (uint8_t)faction_id;
@@ -477,17 +465,14 @@ L_595a92:
         goto L_596052;
     }
 L_5971ce:  // no capture: the natives fight
-    OV_TRACE(0x5971ce);
     Vehs[stack_id].flags |= 0x2000;
     if (faction_id == CurrentPlayerFaction) NetMsg_pop(&NetMsg, "WORMNOCAPTURE", 5000, 0, nullptr);
     log_say_2("No Capture", 0, 0, 0);
     goto L_59724d;
 L_597216:
-    OV_TRACE(0x597216);
     log_say_2("Agitated", 0, 0, 0);
     if (faction_id == CurrentPlayerFaction) NetMsg_pop(&NetMsg, "WORMSAGITATED", 5000, 0, nullptr);
 L_59724d:  // attack
-    OV_TRACE(0x59724d);
     attacked = 1;
     tmp = battle_fight(veh_id, dir, 0, 1, nullptr);
     if (tmp == 0) goto L_599b1a;
@@ -503,12 +488,10 @@ L_59724d:  // attack
     goody = 0;
     goto L_598cb9;
 L_59729d:  // attack, not moving on (VehAttackFlags bit 1 clear)
-    OV_TRACE(0x59729d);
     result = battle_fight(veh_id, dir, 0, 1, nullptr) == 0;
     goto L_599b1a;
 
 L_596052:  // movement checks
-    OV_TRACE(0x596052);
     if (veh_sea) {
         if (tgt_sea) goto L_597345;
         if (triad == 0 && stack_id < 0 && !has_abil(Vehs[veh_id].unit_id, 8) &&
@@ -552,17 +535,14 @@ L_596052:  // movement checks
         goto L_5949b3;
     }
 L_5972bd:
-    OV_TRACE(0x5972bd);
     if (faction_id != CurrentPlayerFaction || !(VehAttackFlags & 1)) goto L_599b1a;
     parse_say(0, ability_name(8), -1, -1);
     NetMsg_pop(&NetMsg, "AMPHIBBASE2", 5000, 0, nullptr);
     goto L_599b1a;
 
 L_597345:  // entering a base?
-    OV_TRACE(0x597345);
     if (base_id < 0) goto L_597564;
 L_597350:
-    OV_TRACE(0x597350);
     if (tgt_faction == faction_id || (dstat(faction_id, tgt_faction) & 1)) goto L_597564;
     // An enemy base: only some units may take it.
     if (triad == 2) {
@@ -600,7 +580,6 @@ L_597350:
         }
     }
 L_597564:
-    OV_TRACE(0x597564);
     if (faction_id == CurrentPlayerFaction && (FactionStatus[0] & fbit) && (VehAttackFlags & 1) &&
         Vehs[veh_id].order == 0x18 && !(Vehs[veh_id].waypoint_x[0] == tx && Vehs[veh_id].waypoint_y[0] == ty) &&
         veh_chassis_triad(veh_id) != 2 && !(Vehs[veh_id].state & 0x4200) && goody_at(tx, ty) &&
@@ -609,7 +588,6 @@ L_597564:
         goto L_599b1a;
     }
 L_59763b: {  // the move itself
-    OV_TRACE(0x59763b);
         if (moves_left(veh_id) == 0) goto L_599b1a;
         int32_t cost = hex_cost(Vehs[veh_id].unit_id, faction_id, x, y, tx, ty, 0);
         uint8_t spent = Vehs[veh_id].moves_spent;
@@ -678,7 +656,6 @@ L_59763b: {  // the move itself
         goto L_599b1a;
 
     L_597b24_move:
-    OV_TRACE(0x597b24);
         result = 1;
         if (!(VehAttackFlags & 2)) goto L_599b1a;
         Vehs[veh_id].moves_spent = (uint8_t)(spent + cost);
@@ -784,10 +761,8 @@ L_59763b: {  // the move itself
         }
         goto L_5980a8;
     L_59814a:
-    OV_TRACE(0x59814a);
         scroll = 0;
     L_5980a8:
-    OV_TRACE(0x5980a8);
         stack_veh(veh_id, 1);
         if (scroll) {
             if (faction_id == CurrentPlayerFaction)
@@ -975,7 +950,6 @@ L_59763b: {  // the move itself
         if (triad == 0 && veh_sea && !tgt_sea) Factions[faction_id].region_total_combat_units[tgt_region]++;
     }
 L_598cb9:  // after the move (or a won battle)
-    OV_TRACE(0x598cb9);
     if (veh_offense(veh_id) == 0) veh_demote(veh_id);
     if (faction_id == 0) {
         const MAP* sq = map_tile(tx, ty);
@@ -1004,7 +978,6 @@ L_598cb9:  // after the move (or a won battle)
             if (!zoc_veh(tx, ty, faction_id)) goto L_599121;
         }
     L_598f9e:
-    OV_TRACE(0x598f9e);
         if (veh_chassis_range(veh_id) == 0) goto L_599154;
         if (FactionStatus[0] & fbit) {
             const VEH& v = Vehs[veh_id];
@@ -1015,7 +988,6 @@ L_598cb9:  // after the move (or a won battle)
         }
         action_home(veh_id, 1);
     L_599037:
-    OV_TRACE(0x599037);
         if (moves_left(veh_id) > 0) goto L_599154;
         if (Vehs[veh_id].movement_turns + 1 >= veh_chassis_range(veh_id)) {
             // Out of fuel.
@@ -1057,18 +1029,15 @@ L_598cb9:  // after the move (or a won battle)
             action_home(veh_id, 0);
         }
     L_59943e:
-    OV_TRACE(0x59943e);
         Vehs[veh_id].movement_turns++;
         goto L_599154;
     L_599121:  // refuel
-    OV_TRACE(0x599121);
         Vehs[veh_id].movement_turns = 0;
         veh_skip(veh_id);
         veh_demote(veh_id);
         draw_tile(Vehs[veh_id].x, Vehs[veh_id].y, 2);
     }
 L_599154: {
-    OV_TRACE(0x599154);
         const MAP* sq = map_tile(tx, ty);
         if ((sq->items & 0x2000) && triad != 2) {  // monolith
             bool use = true;
@@ -1198,7 +1167,6 @@ L_599154: {
     goto L_599b1a;
 
 L_5962f2:  // no direction (dir 8): end of the unit's move
-    OV_TRACE(0x5962f2);
     if (veh_chassis_triad(veh_id) == 2 && veh_chassis_range(veh_id) && (VehAttackFlags & 1) &&
         faction_id == CurrentPlayerFaction) {
         const MAP* sq = map_tile(tx, ty);
@@ -1227,7 +1195,6 @@ L_5962f2:  // no direction (dir 8): end of the unit's move
     goto L_598cb9;
 
 L_5965a3:  // probe team enters a base
-    OV_TRACE(0x5965a3);
     if (tgt_faction == CurrentPlayerFaction) {
         Console_focus(&MainConsole, x, y, faction_id);
         if (!MultiplayerActive) clock_wait(400);
@@ -1241,16 +1208,13 @@ L_5965a3:  // probe team enters a base
     net_synch_veh(veh_id);
     return 1;
 L_5966e0:
-    OV_TRACE(0x5966e0);
     net_synch_veh(veh_id);
     return 1;
 L_596b1f:
-    OV_TRACE(0x596b1f);
     net_synch_veh(veh_id);
     return 1;
 
 L_596884:  // transports full
-    OV_TRACE(0x596884);
     tmp = stack_check(stack_id, 2, 7, -1, -1);
     if (!tmp) goto L_599b1a;
     if (faction_id == CurrentPlayerFaction && (VehAttackFlags & 1)) {
@@ -1260,7 +1224,6 @@ L_596884:  // transports full
     goto L_599b1a;
 
 L_5968f2:  // zone of control
-    OV_TRACE(0x5968f2);
     if (faction_id != CurrentPlayerFaction || delayed || !(VehAttackFlags & 1)) goto L_599b1a;
     FX_play(&Sounds, 13);
     if (faction_id == CurrentPlayerFaction) {
@@ -1291,7 +1254,6 @@ L_5968f2:  // zone of control
     goto L_599b1a;
 
 L_596bd9:  // native life spawned in front of the unit
-    OV_TRACE(0x596bd9);
     Vehs[veh_id].order = 0;
     spot_stack(stack_id, faction_id);
     draw_tile(tx, ty, 2);
@@ -1304,7 +1266,6 @@ L_596bd9:  // native life spawned in front of the unit
     goto L_599b1a;
 
 L_596c9f:  // unseen units in the way
-    OV_TRACE(0x596c9f);
     Vehs[veh_id].order = 0;
     spot_stack(stack_id, faction_id);
     draw_tile(tx, ty, 2);
@@ -1315,7 +1276,6 @@ L_596c9f:  // unseen units in the way
     NetMsg_pop(&NetMsg, tgt_faction ? "SPOTTED" : "SPOTTED0", 5000, 0, nullptr);
     goto L_599b1a;
 L_596d5d:
-    OV_TRACE(0x596d5d);
     Vehs[veh_id].order = 0;
     spot_stack(stack_id, faction_id);
     draw_tile(tx, ty, 2);
@@ -1326,7 +1286,6 @@ L_596d5d:
     goto L_599b1a;
 
 L_596e0b:
-    OV_TRACE(0x596e0b);
     if (faction_id == CurrentPlayerFaction && (VehAttackFlags & 1)) {
         parse_say(0, ability_name(0x20), -1, -1);
         NetMsg_pop(&NetMsg, "FIGHTERRULE", 5000, 0, nullptr);
@@ -1334,26 +1293,22 @@ L_596e0b:
     if (Vehs[veh_id].state & 0x4200) veh_skip(veh_id);
     goto L_599b1a;
 L_596e85:
-    OV_TRACE(0x596e85);
     if (faction_id == CurrentPlayerFaction && (VehAttackFlags & 1))
         NetMsg_pop(&NetMsg, "PSIBOMB", 5000, 0, nullptr);
     goto L_599b1a;
 L_596ec0:
-    OV_TRACE(0x596ec0);
     tmp = abil_index(8);
     if (faction_id != CurrentPlayerFaction || !(VehAttackFlags & 1)) goto L_599b1a;
     parse_say(0, Ability[tmp].name, -1, -1);
     NetMsg_pop(&NetMsg, tile_base_owner(map_tile(x, y)) >= 0 ? "AMPHIBBASE" : "NOTAMPHIB", 5000, 0, nullptr);
     goto L_599b1a;
 L_596f75:
-    OV_TRACE(0x596f75);
     if (!(VehAttackFlags & 1) || faction_id != CurrentPlayerFaction) goto L_599b1a;
     FX_play(&Sounds, 0x33);
     NetMsg_pop(&NetMsg, "NONCOMBATANT", 5000, 0, nullptr);
     goto L_599b1a;
 
 L_596fbc: {  // enemy probe team captured: sent back to its biggest base
-    OV_TRACE(0x596fbc);
         if (faction_id == CurrentPlayerFaction || tgt_faction == CurrentPlayerFaction) {
             Console_focus(&MainConsole, x, y, faction_id);
             stack_veh(veh_id, 1);
@@ -1390,7 +1345,6 @@ L_596fbc: {  // enemy probe team captured: sent back to its biggest base
     }  // scope of the target-tile locals
 
 L_599b1a:  // end
-    OV_TRACE(0x599b1a);
     if (VehCount != veh_count) goto L_return0;
     if (!result) {
         VEH& v = Vehs[veh_id];
@@ -1398,7 +1352,7 @@ L_599b1a:  // end
         v.order = 0;
         if (!human || (v.state & 0x4200)) {
             v.iter_count++;
-            if (v.iter_count >= 0x18 || !human) {
+            if (v.iter_count >= 0x18 || human) {
                 v.iter_count = 0;
                 veh_skip(veh_id);
             }

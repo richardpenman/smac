@@ -85,6 +85,10 @@ Ghidra prints `game_random`'s scaling as a signed `>>`, but the code uses `shr` 
 * **Wall clock**: where the original reads `timeGetTime()` as a randomness source (base_terraform,
   drone_riot, alien_fauna, probe, save_daemon, world_climate, world_borehole) call
   `engine_logic_time()` (`engine/clock.h`); for delays/animation use `engine_real_time()`.
+  Other `timeGetTime()` reads inside engine functions get the harness's fast-forward clock (+1000
+  per read, `harness/oracle/fast_clock_sites.h`); where such a value is used as randomness (probe:
+  `timeGetTime() & 1` for Algorithmic Enhancement / Hunter-Seeker luck) its canonical value is
+  even, so the reconstruction uses 0 (see `probe_clock_odd` in probe.cpp).
 * **Short-circuit and loop structure**: keep conditions whose evaluation has side effects (random
   draws, writes) in the original order. Early-exit loops must exit at the same element.
 
@@ -106,6 +110,10 @@ The original reads stack memory it never wrote in these places. The oracle makes
    * Hybrid: a reconstructed `Path_find` needs a naked entry thunk capturing `*(uint32_t*)(esp-0x30)`;
      reconstructed `speed`/`speed_proto`/`morale_veh` need a thunk writing the residue to
      `[entry_esp-0x48]` (the existing `has_abil` thunk works because it pushes EDI as the original).
+   * Implemented (src/engine/path.cpp): `path_find_core(..., start_zoc)` holds the body; native
+     `Path_find` passes 0, `Path_move` passes `SpeedStackResidue != 0`; the hybrid `Path_find` is a
+     naked thunk storing `[esp-0x30]` in `PathFindEntryResidue`. fcompare (flag `FC_PATHS`) writes
+     0 / 0x5C105A into that slot on alternate calls, so both values are compared.
 2. **`enemy_move` (0x56B5B0), local `[ebp-0x48]`** (Ghidra `local_4c`, passenger keep-sentried limit
    in the transport branch, read at 0x574DD7). Canonical value (poison 0 / 0xFFFFFFFF) behaves as
    "limit <= 0". Reconstruct with this variable initialised to 0 at function entry (shared across
@@ -119,6 +127,11 @@ The original reads stack memory it never wrote in these places. The oracle makes
    `time_warp` (whose callee `enemy_strategy` calls it) shows 1-byte `region_flags` differences on
    a few turns although `time_warp` itself matches. Reconstruct with the slots' canonical value
    (to be determined with `steptrace`/`slotlog`), marked `BUG(original)`.
+5. **`order_veh` (0x5947C0), `[ebp-0x24]`** ("move shown to the viewer"): the slot also holds the
+   target stack offset (`stack_id * 0x34`) and the native-spawn chance; the dir 8 path reaches the
+   post-move code without setting it. Only display timing (`clock_wait`), `boom` and viewer
+   messages depend on it; the reconstruction uses 0 there. Also `[ebp-0x90..-0x80]` (ZOCMSG
+   tutorial coordinates) stay unset when `quick_zoc` finds nothing (UI only).
 
 5. **`call_council` (0x52C880), local `[ebp-0x14]`** ("aliens alive" flag): written only when
    proposal 1 (Supreme Leader) is examined (Diplomatic Victory on, not yet passed, caller among

@@ -93,11 +93,13 @@ ADDR(0x531700) int32_t THISCALL NetDaemon_maybe_lock(uint8_t* net, int32_t* veh_
 ADDR(0x531780) int32_t THISCALL NetDaemon_order_veh(uint8_t* net, int32_t veh_id, int32_t dir, int32_t a3);
 // diplo_act
 ADDR(0x50BCC0) void GAMEAPI double_cross(int32_t faction_id, int32_t faction_id_with, int32_t a3);
+// Breaks any treaty with faction_id_with (double cross) and declares vendetta; 1 if a treaty was broken.
 ADDR(0x50C2E0) int32_t GAMEAPI act_of_aggression(int32_t faction_id, int32_t faction_id_with);
 ADDR(0x50C510) void GAMEAPI capture_base(int32_t base_id, int32_t faction_id, int32_t is_probe);
 ADDR(0x50DE50) int32_t GAMEAPI base_on_sea(int32_t base_id, int32_t region);
 ADDR(0x50E160) int32_t GAMEAPI port_to_port(int32_t base_id, int32_t base_id_2);
 // diplomacy
+// Adds amount to faction_id's friction with faction_id_with (0..20).
 ADDR(0x53A030) void GAMEAPI cause_friction(int32_t faction_id, int32_t faction_id_with, int32_t amount);
 ADDR(0x55EEE0) void GAMEAPI atrocity(int32_t faction_id, int32_t faction_id_vs, int32_t type, int32_t a4);
 ADDR(0x55F770) int32_t GAMEAPI break_treaty(int32_t faction_id, int32_t faction_id_with, int32_t a3);

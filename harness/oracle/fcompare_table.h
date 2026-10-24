@@ -45,8 +45,10 @@ static const FcFunc kFcFuncs[] = {
     {"monolith_sites", FC_MUTATES | FC_VOID, {XY}},
     {"valid_tech_leap", 0, {R(0, 88), A(FACTION)}},
     {"supply_options", FC_MUTATES, {A(VEH), A(BASE)}},
-    /* dir -1..8; flags 0-3 (bit 1: the move is carried out) */
-    {"order_veh", FC_MUTATES, {A(VEH), R(-1, 8), R(0, 3)}},
+    /* order_veh: not here. Moves into enemy units fight real battles (battle_fight), whose heap
+     * objects (UI animation buffers referenced from the image) are freed by the first side and freed
+     * again by the second after the image restore (crash in mem_free). Verified by the hybrid
+     * scenarios; without battles (T0-T9 of tiny20) 1000 calls matched except UI counters. */
     /* ---- veh ---- */
     {"do_unity_crash", FC_MUTATES, {XY, A(FACTION1)}},
     {"is_sensor", FC_MUTATES, {XY}}, /* base_find sets BaseFindDist */
@@ -414,6 +416,26 @@ static const FcFunc kFcFuncs[] = {
     {"monolith", FC_MUTATES | FC_VOID, {A(VEH)}},
     {"goody_box", FC_MUTATES, {A(VEH), C(1)}},
     {"study_artifact", FC_MUTATES, {A(VEH)}},
+    /* action_build (faction 0 = viewer: monuments window), action_staple, action_arty,
+     * action_oblit, action_give, mon_colony_founded: their viewer popups hang or crash the
+     * fcompare harness (all vehicles/bases are candidates); verified by the hybrid games only. */
+    {"act_of_aggression", FC_MUTATES, {A(FACTION1), A(FACTION1)}},
+    {"cause_friction", FC_MUTATES | FC_VOID, {A(FACTION), A(FACTION), R(-3, 5)}},
+    /* ---- probe ---- */
+    {"vulnerable", 0, {A(FACTION), XY}},
+    {"mind_control", 0, {A(BASE), A(FACTION1), A(BOOL)}},
+    {"corner_market", 0, {A(FACTION1)}},
+    {"success_rates", FC_MUTATES, {R(1, 3), R(0, 7), R(-1, 3), A(BASE_OPT)}}, /* text buffers */
+    {"vector_dist_2", 0, {XY, XY}},
+    {"steal_energy", 0, {A(BASE)}},
+    {"spying", 0, {A(FACTION)}},
+    {"get_pact_hood", FC_MUTATES, {A(FACTION), A(FACTION)}},
+    {"steal_tech", FC_MUTATES, {A(FACTION1), A(FACTION1), A(BOOL)}},
+    {"net_treaty_on", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION1), BITS(0, 26), C(0)}},
+    {"net_treaty_off", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION1), BITS(0, 26), C(0)}},
+    {"net_set_treaty", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION1), BITS(0, 26), A(BOOL), C(0)}},
+    /* probe: with the current VehAttackFlags (0 at the hooks: test only, the AI choice). */
+    {"probe", FC_MUTATES, {A(VEH), A(BASE_OPT), A(VEH), A(BOOL)}},
 };
 
 /* Image ranges that fcompare does not compare (UI objects and buffers that legitimately differ,

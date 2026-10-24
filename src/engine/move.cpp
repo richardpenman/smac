@@ -93,6 +93,12 @@ void GAMEAPI quick_zoc(int32_t x, int32_t y, int32_t faction_id, int32_t x2, int
 }
 
 int32_t GAMEAPI supply_options(int32_t veh_id, int32_t base_id) {
+    // The original's Popup object on its stack (constructed first, destroyed on return).
+    struct StackPopup {
+        alignas(8) uint8_t obj[0x5394];
+        StackPopup() { Popup_ctor(obj); }
+        ~StackPopup() { Popup_dtor(obj); }
+    } popup;
     VEH& veh = Vehs[veh_id];
     int32_t faction_id = veh.faction_id;
     // Only human players are asked.

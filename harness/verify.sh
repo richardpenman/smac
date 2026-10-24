@@ -12,7 +12,8 @@
 # at every turn the selected functions are called on the live state as original and as
 # reconstruction and compared (see harness/README.md). FCOMPARE_OPTS adds options to the command,
 # e.g. "hooks=turn,enemy limit=5000,200". Prints per-function mismatches and PASS/FAIL.
-# Env: HYBRID_BUILD / NATIVE_BUILD select build directories (default build/hybrid, build/native).
+# Env: HYBRID_BUILD / NATIVE_BUILD select build directories (default build/hybrid, build/native);
+# ORACLE_TIMEOUT (default 1800) limits each oracle/hybrid run in seconds.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MODE="$1"; shift
@@ -50,11 +51,11 @@ for s in $SCEN; do
   REF="$ROOT/work/ref/$s"
   if [ ! -f "$REF/oracle.log" ] || ! grep -q "exit=0" "$REF/oracle.log"; then
     echo "[$s] creating oracle reference..."
-    rm -rf "$REF"; "$ROOT/harness/run_oracle.sh" "$CMD" "$REF" 1800 >/dev/null
+    rm -rf "$REF"; "$ROOT/harness/run_oracle.sh" "$CMD" "$REF" "${ORACLE_TIMEOUT:-1800}" >/dev/null
   fi
   OUT="$(mktemp -d "$ROOT/work/verify.XXXXXX")"
   if [ "$MODE" = hybrid ]; then
-    PATCH_SPEC="$SPEC" ORACLE_DLL=hybrid "$ROOT/harness/run_oracle.sh" "$CMD" "$OUT" 1800 >/dev/null
+    PATCH_SPEC="$SPEC" ORACLE_DLL=hybrid "$ROOT/harness/run_oracle.sh" "$CMD" "$OUT" "${ORACLE_TIMEOUT:-1800}" >/dev/null
   else
     BIN="${NATIVE_BUILD:-$ROOT/build/native}/smacx_headless"
     (cd "$ROOT" && "$BIN" "$CMD" --outdir "$OUT" > "$OUT/headless.log" 2>&1)

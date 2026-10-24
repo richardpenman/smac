@@ -424,8 +424,8 @@ ADDR_NATIVE(0x4A3FC0) void THISCALL ReportIf_on_redraw(uint8_t* win);
 // Main view field 0x23BF0 (non-zero: animations off / skip the airdrop pause).
 GLOBAL(int32_t, MapWinField23BF0, 0x9392A0);
 // Animates veh_id sliding from (x, y) in direction dir (diplomacy module 0x55A150, an animation
-// routine). Game state effect: unless flags & 0x4000, the vehicle's rotate_angle becomes dir
-// (dir & 7 when dir > 7) in multiplayer games or when flags & 1 is clear. Headless: that effect.
+// routine). Game state effect: the vehicle's rotate_angle becomes dir (dir % 8 when dir > 7), set
+// by vehdraw_turn_start (directly with flags 0x4000). Headless: that effect.
 ADDR_NATIVE(0x55A150) void GAMEAPI veh_scoot(int32_t veh_id, int32_t x, int32_t y, int32_t dir, int32_t flags);
 
 // ---- path / move / goals (path finding debug redraw, unit movement) ----
@@ -480,3 +480,33 @@ bool ui_ctrl_pressed();
 // cancelled). Hybrid builds and headless: not shown (return 0).
 int32_t ui_artifact_menu(int32_t veh_id, int32_t base_id, int32_t items);
 int32_t ui_disembark_menu(int32_t veh_id);
+
+// ---- probe module (probe teams) ----
+// Popup of SCRIPT.txt with a picture (faction portrait); returns the choice.
+ADDR_NATIVE(0x5BF5D0) int32_t GAMEAPI X_pops(const char* label, const char* pcx, int32_t a3);
+// Shows the intelligence report on faction_id (ReportWin). Headless: nothing.
+ADDR_NATIVE(0x4ACBD0) void GAMEAPI report_intel(int32_t faction_id);
+// "him"/"her" of faction_id's leader in HisHerBuffer (mode as get_his_her). Returns HisHerBuffer.
+ADDR_NATIVE(0x58FC50) char* GAMEAPI get_him_her(int32_t faction_id, int32_t mode);
+// Not original functions: the probe menus the original builds on a Popup object on its stack,
+// shown only to a human player (VehAttackFlags bit 0). Hybrid builds and headless: not shown,
+// each returns its "cancelled" value (documented per function).
+// Action menu (PROBEMENU items whose bit is set in `items`): choice, -1 cancelled.
+int32_t ui_probe_menu(int32_t faction_id_tgt, uint32_t items, bool alien);
+// Sabotage target menu (VIRUS: facilities of base_id, 98 planet buster, 0 production, 99 abort):
+// choice, -1 cancelled.
+int32_t ui_probe_sabotage_menu(int32_t base_id, bool planet_buster, const char* production);
+// Two-part confirmation menus (THOUGHTCONTROL/THOUGHTMENU, SUBVERT/SUBVERTMENU; show_menu false:
+// the cost is not affordable): choice, 0 cancelled.
+int32_t ui_probe_confirm_menu(const char* label, const char* menu, bool show_menu);
+// FRAMEMENU: faction to frame (0 none), offered among factions known to faction_id.
+int32_t ui_probe_frame_menu(int32_t faction_id, int32_t faction_id_tgt);
+// FREEWHO: captured leader to free among faction_id_tgt's killed-faction monuments, -1 cancelled.
+int32_t ui_probe_free_menu(int32_t faction_id_tgt, bool alien);
+// Excuse popups (EXCUSE, PACTEXCUSE, NETEXCUSE) after a probe was caught (busted_action > 0:
+// the "BUSTED<n>" header): choice, 0 declined.
+int32_t ui_probe_excuse(const char* label, int32_t busted_action, bool alien);
+// Popup object (0x5410 bytes) constructed on the stack of order_veh/supply_options for their menus;
+// while it exists, the UI refers to it (MainInfc). Headless: no-ops.
+ADDR_NATIVE(0x4048A0) void THISCALL Popup_ctor(uint8_t* popup);
+ADDR_NATIVE(0x406C00) void THISCALL Popup_dtor(uint8_t* popup);
