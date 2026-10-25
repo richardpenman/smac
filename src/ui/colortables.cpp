@@ -6,6 +6,7 @@
 #include <string>
 
 #include "engine/globals.h"
+#include "ui/vehdraw.h"
 
 void GAMEAPI RGB_to_HSV(const uint8_t* rgb, Hsv* out) {
     if (!out || !rgb) return;
@@ -103,6 +104,7 @@ void GAMEAPI colortables_init() {
     // Only the tables the map uses so far; the others (0x6FEB7C, 0x6F0F7C, 0x6F117C, 0x6F1A7C,
     // 0x6F127C.., 0x6F1B7C..) are not reconstructed yet.
     Palette_create_table(&GamePalette, ShadowTable, 0, 0x100, -0x2B);
+    vehdraw_color_tables_init();
 }
 
 void GAMEAPI colortables_init_faction(int32_t faction_id) {
@@ -114,6 +116,9 @@ void GAMEAPI colortables_init_faction(int32_t faction_id) {
     uint8_t p = (uint8_t)Buffer_get_pixel(&canvas, 0xA1, 0x2F5);
     if (p == *mem::host(0x696D14)) return;
     int32_t pct = ((uint32_t)(uint8_t)(p - 10) * 100) / 0xFF;
-    // (0x1B3, 0x2E9) gives the unit colouring base colour (tables at 0x79A7EC, not yet used).
+    // (0x1B3, 0x2E9): the base colour of the faction's units; transparent: no tables at all.
+    uint8_t unit = (uint8_t)Buffer_get_pixel(&canvas, 0x1B3, 0x2E9);
+    if (unit == *mem::host(0x696D14)) return;
     Palette_create_table_from_color(&GamePalette, color, FactionColorTable[faction_id], 10, 0xEC, 100 - pct, pct);
+    vehdraw_faction_colors(faction_id, unit);
 }

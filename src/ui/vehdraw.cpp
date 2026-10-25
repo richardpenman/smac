@@ -13,6 +13,10 @@
 #include "ui/colortables.h"
 #include "ui/mapwin.h"
 #include "ui/sprites.h"
+#include "ui/voxel.h"
+#include "ui/x87.h"
+#include "engine/text.h"
+#include "engine/tech.h"
 
 int8_t VehSpriteOffsets[19][8][8];
 
@@ -157,9 +161,840 @@ int32_t GAMEAPI pick_top_veh(int32_t veh_id) {
     return veh_id;
 }
 
-void GAMEAPI vehdraw_draw(Buffer*, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t) {
-    // The 3D unit models (voxel models through the gfx2 software renderer) are not
-    // reconstructed yet.
+// ---- unit models ----------------------------------------------------------------------------------
+
+namespace {
+
+GLOBAL(float[3], VehLightDir, 0x687AD8);    // VEH_LIGHT_DIR_MAP, normalised
+GLOBAL(float[3], VehModelOffset, 0x687AE8);  // offset of the infantry parts (-400, 200, 0)
+GLOBAL(float, CameraYaw, 0x8E9F40);          // compute_camera
+GLOBAL(int32_t, VehAnimFrame, 0x8E9F50);     // animation frame of the animated parts
+GLOBAL(int32_t, VehScootX, 0x68E564);        // position of the unit being moved (-1: none)
+GLOBAL(int32_t, VehScootY, 0x68E568);
+GLOBAL(int32_t, VehScootID, 0x68E56C);
+
+float fbits(uint32_t u) {
+    float f;
+    std::memcpy(&f, &u, 4);
+    return f;
+}
+float* fptr(uint32_t addr) { return reinterpret_cast<float*>(mem::host(addr)); }
+const uint8_t* table(uint32_t addr) { return mem::host(addr); }
+uint32_t faction_colors(int32_t f) { return 0x79A7EC + (uint32_t)f * 0x1800; }
+bool alien(int32_t f) { return reinterpret_cast<const uint8_t*>(&MFactions[f])[0x508] & 0x80; }
+int32_t frame15() { return VehAnimFrame % 15; }
+
+void add(VoxelScene* sc, uint32_t h, int32_t frame = 0) { Scene_add(sc, caviar_handle(h), frame); }
+void addc(VoxelScene* sc, uint32_t h, uint32_t colors, int32_t frame = 0) {
+    Scene_add_colors(sc, caviar_handle(h), table(colors), frame);
+}
+void addo(VoxelScene* sc, uint32_t h, uint32_t offset, int32_t frame) {
+    Scene_add_offset(sc, caviar_handle(h), fptr(offset), frame);
+}
+void addco(VoxelScene* sc, uint32_t h, uint32_t colors, uint32_t offset, int32_t frame) {
+    Scene_add_colors_offset(sc, caviar_handle(h), table(colors), fptr(offset), frame);
+}
+// add with the colour table when there is one.
+void add_or_c(VoxelScene* sc, uint32_t h, uint32_t colors) {
+    if (colors) addc(sc, h, colors);
+    else add(sc, h);
+}
+
+// The design workshop's window (0x71F2B0) is visible (pfncWinIsVisible): never on the map.
+bool design_window_visible() { return false; }
+
+// The models of load_voxels: handle address (0: a temporary handle, whose first object's motion
+// from frame 0 to frame 1 is stored at `vec`), file.
+struct VoxelFile {
+    uint32_t addr;
+    const char* file;
+};
+const VoxelFile kVoxelFiles[] = {
+        {0x7ACCA0, "ssf.cvr"},
+        {0x79A6A0, "sdp.cvr"},
+        {0x787E48, "sas.cvr"},
+        {0x799228, "scd.cvr"},
+        {0x7ACC90, "scj.cvr"},
+        {0x77A578, "sags.cvr"},
+        {0x79A6B0, "sft.cvr"},
+        {0x7765B0, "vhr.cvr"},
+        {0x78A5E0, "sht.cvr"},
+        {0x78A300, "srb.cvr"},
+        {0x7AC030, "asas.cvr"},
+        {0x7ACCC0, "reslaser.cvr"},
+        {0x7A7900, "resbolt.cvr"},
+        {0x7ACC10, "funload.cvr"},
+        {0x788028, "tecload.cvr"},
+        {0x7AD130, "SP-SOPORIFIC.cvr"},
+        {0x799E38, "SP-DISSWAVE.cvr"},
+        {0x7792A0, "SP-MARINED.cvr"},
+        {0x75AEF0, "SP-NANOO.cvr"},
+        {0x7AD040, "AA01.cvr"},
+        {0x75AFC0, "AA-Rover.cvr"},
+        {0x779288, "AA-WING0.cvr"},
+        {0x779294, "AA-WING.cvr"},
+        {0x78A610, "ACP00.cvr"},
+        {0x78A61C, "ACP01.cvr"},
+        {0x78A628, "ACP02.cvr"},
+        {0x78A634, "ACP03.cvr"},
+        {0x789A50, "AA.cvr"},
+        {0x78A510, "SSFA.CVR"},
+        {0x79A640, "SFTA.CVR"},
+        {0x7871C0, "vw00.cvr"},
+        {0x79A700, "viptawal.cvr"},
+        {0x7AB3F0, "viptasgn.cvr"},
+        {0x7795A0, "viptapsi.cvr"},
+        {0x799628, "viptr00.cvr"},
+        {0x799634, "viptr01.cvr"},
+        {0x799640, "viptr02.cvr"},
+        {0x79964C, "viptr03.cvr"},
+        {0x7791D0, "vipta00.cvr"},
+        {0x7791DC, "vipta01.cvr"},
+        {0x78A500, "ptmod.cvr"},
+        {0x7592D0, "vpt.cvr"},
+        {0x75AF00, "a.cvr"},
+        {0x78A490, "apwall.cvr"},
+        {0x7ACCB0, "apsid.cvr"},
+        {0x7AD120, "asgen.cvr"},
+        {0x779230, "VB.CVR"},
+        {0x78E968, "VBP.CVR"},
+        {0x75AED0, "VGMC.CVR"},
+        {0x76EBE0, "VGMCP.CVR"},
+        {0x75B848, "VLIGHTS.CVR"},
+        {0x7AD0E0, "VA01.cvr"},
+        {0x76E560, "VR00.cvr"},
+        {0x76E56C, "VR01.cvr"},
+        {0x76E578, "VR02.cvr"},
+        {0x76E584, "VR03.cvr"},
+        {0x779560, "VHR.CVR"},
+        {0x75ADB8, "VRCP00.cvr"},
+        {0x75ADC4, "VRCP01.cvr"},
+        {0x75ADD0, "VRCP02.cvr"},
+        {0x75ADDC, "VRCP03.cvr"},
+        {0x78B740, "VI.CVR"},
+        {0x77A5B8, "VGMT.CVR"},
+        {0x78B720, "VGMTP.CVR"},
+        {0x787100, "VW01.CVR"},
+        {0x78710C, "VW02.CVR"},
+        {0x787118, "VW03.CVR"},
+        {0x787124, "VW04.CVR"},
+        {0x787130, "VW05.CVR"},
+        {0x78713C, "VW06.CVR"},
+        {0x787148, "VW07.CVR"},
+        {0x787154, "VW08.CVR"},
+        {0x787160, "VW09.CVR"},
+        {0x78716C, "VW10.CVR"},
+        {0x787178, "VW11.CVR"},
+        {0x787184, "VW12.CVR"},
+        {0x78719C, "VW14.CVR"},
+        {0x7871A8, "VW12.CVR"},
+        {0x79A6F0, "AX.CVR"},
+        {0x78A600, "ACOLPOD.CVR"},
+        {0x787E60, "AT.CVR"},
+        {0x7880C0, "VTA.CVR"},
+        {0x7ABFC0, "ATp.CVR"},
+        {0, "AVGMTGUN.CVR"},
+        {0x7ACD60, "drop.cvr"},
+        {0x76EBD0, "droplet.cvr"},
+        {0, "adroper.cvr"},
+        {0x7796A0, "vwntu.cvr"},
+        {0x75AD78, "vt.cvr"},
+        {0x7AD170, "VCL.cvr"},
+        {0x789B58, "VCLT00.CVR"},
+        {0x7A6820, "VSP.cvr"},
+        {0x779270, "VSPA01.CVR"},
+        {0x77927C, "VSPA02.CVR"},
+        {0x7A7290, "vsptf.cvr"},
+        {0x7A7280, "vsptb.cvr"},
+        {0x779608, "vht-vbp.cvr"},
+        {0x78A640, "vhtp.cvr"},
+        {0x779648, "vhta00.cvr"},
+        {0x779654, "vhta01.cvr"},
+        {0x759310, "vhttp.cvr"},
+        {0x78B750, "vhtta00.cvr"},
+        {0x78B75C, "vhtta01.cvr"},
+        {0, "AVHT-GunReposition.cvr"},
+        {0, "AVHT-LightsReposition.cvr"},
+        {0x7ACC50, "VFL.cvr"},
+        {0x7A7240, "VGS.cvr"},
+        {0x798BF0, "VGSP.CVR"},
+        {0x7795B0, "VJTP.CVR"},
+        {0x78A2B8, "VJT00.cvr"},
+        {0x78A2C4, "VJT01.cvr"},
+        {0x75AEE0, "VCU.cvr"},
+        {0x75B440, "VCUP.CVR"},
+        {0x78CAB8, "VCUA00.cvr"},
+        {0x78CAC4, "VCUA01.cvr"},
+        {0x75B088, "VCUW.CVR"},
+        {0x79A680, "vct.cvr"},
+        {0x7ACFA0, "VCTP.CVR"},
+        {0x79A628, "vct00.cvr"},
+        {0x79A634, "vct01.cvr"},
+        {0x76E890, "VCTB.CVR"},
+        {0x78B730, "VWNTT.CVR"},
+        {0x78DE20, "VWNST.CVR"},
+        {0x7AC1A0, "VWNAA.CVR"},
+        {0x76E9B0, "vpbr00.cvr"},
+        {0x76E9BC, "vpbr01.cvr"},
+        {0x76E9C8, "vpbr02.cvr"},
+        {0x76E9D4, "vpbr03.cvr"},
+        {0x791D78, "VM.CVR"},
+        {0x78A5F0, "vw13.cvr"},
+        {0x79A690, "nw.CVR"},
+        {0x7791C0, "ni.CVR"},
+        {0x779660, "nlc.cvr"},
+};
+
+// Recolours VBP.CVR's shading table with a base colour (colortables_init, 0x423F55).
+void recolor(uint32_t out, int32_t color) {
+    const CaviarHandle* h = caviar_handle(0x78E968);
+    const uint8_t* shading = h->data ? h->data->shading() : nullptr;
+    if (!shading) return;
+    const uint8_t* base = GamePalette.rgb[color & 0xFF];
+    uint8_t* dst = mem::host(out);
+    for (int32_t i = 0; i < 0x1800; i++) {
+        const uint8_t* p = GamePalette.rgb[shading[i]];
+        // FP: base * palette (exact) * (1/255 as float), __ftol.
+        const int32_t r = x87_ftol((double)(base[0] * p[0]) * (double)fbits(0x3B808081));
+        const int32_t g = x87_ftol((double)(base[1] * p[1]) * (double)fbits(0x3B808081));
+        const int32_t b = x87_ftol((double)(base[2] * p[2]) * (double)fbits(0x3B808081));
+        dst[i] = (uint8_t)Palette_get_nearest_palette_index(&GamePalette, r & 0xFF, g & 0xFF, b & 0xFF, 0);
+    }
+}
+
+}  // namespace
+
+void vehdraw_color_tables_init() {
+    int32_t vehicle[8] = {0x60, 0x69, 0x9C, 0, 0x55, 0x2F, 0x59, 0xE3};
+    int32_t armor[4] = {0, 0, 0, 0};
+    int32_t trans_color = 0, trans_from = 0x32, trans_to = 0x64;
+    if (!text_open("system", "VEHICLECOLORING"))
+        for (int32_t& v : vehicle) {
+            text_get();
+            v = (text_item_number() + 10) & 0xFF;
+        }
+    if (!text_open("system", "ARMORCOLORING"))
+        for (int32_t& v : armor) {
+            text_get();
+            v = (text_item_number() + 10) & 0xFF;
+        }
+    if (!text_open("system", "ARMORCOLORING_TRANS")) {
+        text_get();
+        trans_color = (text_item_number() + 10) & 0xFF;
+        trans_from = text_item_number();
+        trans_to = text_item_number();
+    }
+    for (int32_t f = 0; f < 8; f++) recolor(faction_colors(f), vehicle[f]);
+    for (int32_t a = 0; a < 4; a++) recolor(0x792664 + (uint32_t)a * 0x1800, armor[a]);
+    // The light level table: row r all r.
+    for (int32_t r = 0; r < 24; r++) std::memset(mem::host(0x788250 + (uint32_t)r * 0x100), r, 0x100);
+    // The shield of armour 5: per light level a blend towards the shield colour.
+    for (int32_t i = 0, n = 0x18; n > 0; i++, n--) {
+        const int32_t pct = (n * trans_from + i * trans_to) / 24;
+        Palette_create_table_from_color(&GamePalette, trans_color, mem::host(0x6EEF7C + (uint32_t)i * 0x100), 10, 0xEC,
+                                        100 - pct, pct);
+    }
+}
+
+void vehdraw_faction_colors(int32_t faction_id, int32_t color) { recolor(faction_colors(faction_id), color); }
+
+void GAMEAPI load_voxels() {
+    voxel_renderer_init();
+    Scene_ctor(&VehScene);
+    CaviarHandle temp;
+    CaviarHandle_ctor(&temp);
+    Scene_init(&VehScene);
+    vehdraw_compute_facet_normals();
+    static const uint32_t kTempVec[] = {0x7AC1B0, 0x79A618, 0x798C30, 0x789B48};
+    int32_t temps = 0;
+    for (const VoxelFile& v : kVoxelFiles) {
+        if (v.addr) {
+            CaviarHandle_load(caviar_handle(v.addr), v.file);
+            continue;
+        }
+        CaviarHandle_load(&temp, v.file);
+        float* out = fptr(kTempVec[temps]);
+        if (!temp.data) {
+            out[0] = out[1] = out[2] = 0.0f;
+        } else if (temp.data->frame_count == 2 && !temp.data->frames.empty() && temp.data->frames[0].pos.size() >= 6) {
+            const float* p = temp.data->frames[0].pos.data();
+            vec3_sub(p + 3, p, out);
+        }
+        // (AVHT-GunReposition stays loaded until the next file replaces it.)
+        if (temps != 2) CaviarHandle_free(&temp);
+        temps++;
+    }
+    if (!text_open("system", "VEH_LIGHT_DIR_MAP")) {
+        text_get();
+        VehLightDir[0] = (float)text_item_number();
+        VehLightDir[1] = (float)text_item_number();
+        VehLightDir[2] = (float)text_item_number();
+        vec3_normalize(VehLightDir, VehLightDir);
+    }
+    // 0x7A81A0: 24 rows, row r all r (the fixed colour table of the renderer's 0x10 mode).
+    for (int32_t r = 0; r < 24; r++) std::memset(mem::host(0x7A81A0 + (uint32_t)r * 0x100), r, 0x100);
+    CaviarHandle_free(&temp);
+}
+
+void GAMEAPI vehdraw_compute_facet_normals() {
+    // FP: the corner heights as floats; cross products and normalisation (voxel.cpp).
+    const int32_t base = *reinterpret_cast<int32_t*>(mem::host(0x93341C));
+    float* t0 = fptr(0x8CDD10);
+    const uint32_t stride = 0x1C23;  // floats per table
+    uint32_t k = 0;
+    for (int32_t a = 0x1E; a < 0xF0; a += 0x1E) {
+        const float h0 = (float)((a >> 2) - base);
+        for (int32_t b = 0x1E; b < 0xF0; b += 0x1E) {
+            const float h1 = (float)((b >> 2) - base);
+            for (int32_t c = 0x1E; c < 0xF0; c += 0x1E) {
+                const float h2 = (float)((c >> 2) - base);
+                for (int32_t d = 0x1E; d < 0xF0; d += 0x1E, k += 3) {
+                    const float h3 = (float)((d >> 2) - base);
+                    const float va[3] = {-50.0f, 0.0f, h0}, vb[3] = {0.0f, -50.0f, h3};
+                    const float vc[3] = {50.0f, 0.0f, h2}, vd[3] = {0.0f, 50.0f, h1};
+                    float n0[3], n1[3], n2[3], n3[3];
+                    vec3_cross(vd, va, n0);
+                    vec3_cross(vc, vd, n1);
+                    vec3_cross(vb, vc, n2);
+                    vec3_cross(va, vb, n3);
+                    vec3_normalize(n0, n0);
+                    vec3_normalize(n1, n1);
+                    vec3_normalize(n2, n2);
+                    vec3_normalize(n3, n3);
+                    std::memcpy(t0 + k, n0, 12);
+                    std::memcpy(t0 + stride + k, n1, 12);
+                    std::memcpy(t0 + 2 * stride + k, n2, 12);
+                    std::memcpy(t0 + 3 * stride + k, n3, 12);
+                }
+            }
+        }
+    }
+}
+
+void GAMEAPI compute_camera(const float* up, float* out) {
+    float a[3] = {0.0f, 0.0f, fbits(0xBF85F92D)};  // -1.0466667
+    float r1[9], r2[9], v[3];
+    mat3_from_euler(a, r1);
+    mat3_apply(r1, up, v);
+    // FP: atan of a quotient computed in a register (double), the CRT atan's 64-bit result
+    // stored as float.
+    float yaw;
+    if (v[0] == 0.0f) yaw = 0.0f;
+    else if (v[1] == 0.0f) yaw = fbits(0x3FC8F5C3);  // 1.57
+    else yaw = (float)crt_atan((double)v[0] / v[1]);
+    CameraYaw = yaw;
+    a[0] = yaw;
+    a[1] = 0.0f;
+    a[2] = 0.0f;
+    mat3_from_euler(a, r1);
+    const float t[3] = {v[0], v[1], 0.0f};
+    const double len = vec3_length(t);
+    const float lenf = (float)len;
+    float pitch;
+    if (len == 0.0) pitch = 0.0f;
+    else if (v[2] == 0.0f) pitch = fbits(0x3FC8F5C3);
+    else pitch = (float)crt_atan((double)lenf / v[2]);
+    a[0] = 0.0f;
+    a[1] = 0.0f;
+    a[2] = pitch;
+    mat3_from_euler(a, r2);
+    mat3_mul(r1, r2, out);
+    out[6] = -out[6];
+    out[7] = -out[7];
+    out[8] = -out[8];
+}
+
+void GAMEAPI vehdraw_construct_chassis(int32_t f, int32_t chassis, int32_t weapon, int32_t armor, int32_t reactor,
+                                       VoxelScene* sc) {
+    if (f < 0 || f > 7) f = 0;
+    const uint32_t fcol = faction_colors(f);
+    // The armour: plated (1) or not (0, 2: special), its colour table.
+    int32_t plated = 0;
+    uint32_t acol = 0;
+    switch (armor) {
+    case 0: case 9: break;
+    case 1: plated = 1; break;
+    case 2: plated = 1; acol = 0x792664; break;
+    case 3: plated = 1; acol = 0x793E64; break;
+    case 4: case 8: plated = 2; break;
+    case 5: plated = 1; break;
+    case 6: plated = 1; acol = 0x795664; break;
+    case 7: plated = 1; acol = 0x796E64; break;
+    case 10: plated = 1; acol = 0x792664; add(sc, 0x7ACC90); break;
+    case 11: plated = 1; acol = 0x792664; add(sc, 0x78A5E0); break;
+    case 12: plated = 1; acol = 0x795664; add(sc, 0x7ACC90); break;
+    case 13: plated = 1; acol = 0x795664; add(sc, 0x78A5E0); break;
+    default: break;
+    }
+    if (weapon == 0x15 && chassis == 1) {
+        if (Armor[armor].defense_value <= 1) chassis = 0;
+    } else if ((uint32_t)chassis > 8) {
+        return;
+    }
+    // The reactor (by armour colour for the alien factions).
+    auto reactor_part = [&]() {
+        if (!reactor) return;
+        if (alien(f)) add_or_c(sc, 0x78A604 + (uint32_t)reactor * 0xC, acol);
+        else add(sc, 0x75ADAC + (uint32_t)reactor * 0xC);
+    };
+    switch (chassis) {
+    case 0: {  // infantry
+        const uint8_t mode = Weapon[weapon].mode;
+        if (mode < 3) {
+            if (weapon == 0x11) return;
+            addo(sc, alien(f) ? 0x79A6F0 : 0x78B740, 0x687AE8, frame15());
+            return;
+        }
+        if (weapon == 0x15) {
+            if (alien(f)) addco(sc, 0x79A6F0, 0x796E64, 0x687AE8, frame15());
+            else addo(sc, 0x7592D0, 0x687AE8, frame15());
+            return;
+        }
+        if (weapon == 0x16) return;
+        if (alien(f) && weapon == 0x11) return;
+        add(sc, 0x779230);
+        addc(sc, 0x78E968, fcol);
+        add(sc, 0x7AD170);
+        add(sc, 0x789B58);
+        add(sc, 0x75B848);
+        return;
+    }
+    case 1:  // speeder
+        reactor_part();
+        add(sc, 0x75AED0);
+        addc(sc, 0x76EBE0, fcol);
+        add(sc, 0x779230);
+        addc(sc, 0x78E968, fcol);
+        add(sc, 0x7A6820);
+        add(sc, 0x7A7280, VehAnimFrame);
+        add(sc, 0x7A7290, VehAnimFrame);
+        add(sc, 0x75B848);
+        return;
+    case 2:  // hovertank
+        add(sc, 0x779230);
+        addc(sc, 0x779608, fcol);
+        addc(sc, 0x78A640, fcol);
+        addc(sc, 0x759310, fcol);
+        if (!plated) {
+            add(sc, 0x779648);
+            add(sc, 0x78B750);
+        }
+        addo(sc, 0x75B848, 0x789B48, 0);
+        return;
+    case 3:  // foil
+        reactor_part();
+        add(sc, 0x75AED0);
+        addc(sc, 0x76EBE0, fcol);
+        add(sc, 0x779230);
+        addc(sc, 0x78E968, fcol);
+        add(sc, 0x7ACC50);
+        return;
+    case 4:  // cruiser
+        add(sc, 0x779230);
+        addc(sc, 0x78E968, fcol);
+        add(sc, 0x75AED0);
+        addc(sc, 0x76EBE0, fcol);
+        add(sc, 0x75AEE0);
+        addc(sc, 0x75B440, fcol);
+        add(sc, 0x75B088);
+        if (!plated) add(sc, 0x78CAB8);
+        return;
+    case 5:  // needlejet
+        reactor_part();
+        add(sc, 0x779230);
+        addc(sc, 0x78E968, fcol);
+        add(sc, 0x75AED0);
+        addc(sc, 0x76EBE0, fcol);
+        addc(sc, 0x7795B0, fcol);
+        if (plated) return;
+        add(sc, alien(f) ? 0x779288 : 0x78A2B8);
+        return;
+    case 6:  // copter
+        reactor_part();
+        add(sc, 0x779230);
+        addc(sc, 0x78E968, fcol);
+        add(sc, 0x75AED0);
+        addc(sc, 0x76EBE0, fcol);
+        add(sc, 0x79A680);
+        addc(sc, 0x7ACFA0, fcol);
+        add(sc, 0x76E890, frame15());
+        if (design_window_visible()) VehAnimFrame++;
+        if (!plated) addc(sc, 0x79A628, fcol);
+        return;
+    case 7:  // gravship
+        reactor_part();
+        add(sc, 0x779230);
+        addc(sc, 0x78E968, fcol);
+        add(sc, 0x75AED0);
+        addc(sc, 0x76EBE0, fcol);
+        add(sc, 0x7A7240);
+        addc(sc, 0x798BF0, fcol);
+        return;
+    case 8:  // missile
+        if (weapon == 0x10) {
+            add(sc, 0x78A5F0);
+        } else if (weapon == 0x18) {
+            add(sc, 0x791D78);
+            add(sc, 0x788028);
+        } else if (weapon == 0x19) {
+            add(sc, 0x791D78);
+            add(sc, 0x7ACC10);
+        } else {
+            add(sc, 0x791D78);
+        }
+        add(sc, 0x779230);
+        addc(sc, 0x78E968, fcol);
+        return;
+    }
+}
+
+void GAMEAPI vehdraw_construct_weapon(int32_t f, int32_t chassis, int32_t weapon, VoxelScene* sc) {
+    // Model by offense value (-1: none).
+    static const int32_t kGun[26] = {-1, -1, 0, 0, 1, 3, 2, 2, 4, 4, 5, 5, 6, 7, 7, 7, 8, 8, 8, 8, 9, 9, 9, 9, 10, 13};
+    if (chassis == 8) return;
+    if (weapon == 0x10) return add(sc, 0x78A5F0);
+    if (weapon == 0x17) return add(sc, 0x791D78);
+    if (weapon == 0x18) {
+        add(sc, 0x791D78);
+        return add(sc, 0x788028);
+    }
+    if (weapon == 0x19) {
+        add(sc, 0x791D78);
+        return add(sc, 0x7ACC10);
+    }
+    if (f < 0 || f > 7) f = 0;
+    const int32_t off = Weapon[weapon].offense_value;
+    const uint8_t mode = Weapon[weapon].mode;
+    const uint32_t fcol = faction_colors(f);
+    if (mode < 3) {
+        int32_t k;
+        if (off == -1) k = 0xB;
+        else if (off == 0x63) k = 0xC;
+        else k = kGun[off < 0 ? 0 : (off > 0x19 ? 0x19 : off)];
+        if (k != -1) {
+            const uint32_t h = weapon == 0xC ? 0x7ACCC0 : 0x787100 + (uint32_t)k * 0xC;
+            if (chassis == 0) {
+                addo(sc, h, 0x7AC1B0, 0);
+                add(sc, 0x77A5B8);
+                addc(sc, 0x78B720, fcol);
+            } else if (chassis == 2) {
+                addo(sc, h, 0x798C30, 0);
+            } else {
+                add(sc, h);
+            }
+        }
+    } else {
+        switch (mode) {
+        case 7: add(sc, 0x78B730); break;
+        case 8:
+            if (chassis == 0) {
+                if (alien(f)) add(sc, 0x78A600, frame15());
+                else {
+                    add(sc, 0x7ACD60);
+                    add(sc, 0x76EBD0);
+                }
+            } else {
+                addo(sc, 0x76EBD0, 0x79A618, 0);
+            }
+            break;
+        case 9:
+            if (chassis == 0) add(sc, alien(f) ? 0x7880C0 : 0x75AD78);
+            if (alien(f)) {
+                add(sc, 0x787E60);
+                add(sc, 0x7ABFC0);
+            } else {
+                add(sc, 0x7796A0);
+            }
+            break;
+        case 10: add(sc, 0x78DE20); break;
+        case 11:
+            if (chassis != 0) add(sc, 0x78A500);
+            break;
+        case 12: add(sc, 0x7AC1A0); break;
+        default: break;
+        }
+    }
+    if (weapon != 0xD) return;
+    if (chassis == 0) addo(sc, 0x7A7900, 0x7AC1B0, 0);
+    else if (chassis == 2) addo(sc, 0x7A7900, 0x798C30, 0);
+    else add(sc, 0x7A7900);
+}
+
+void GAMEAPI vehdraw_construct_abil(uint32_t abil, VoxelScene* sc, int32_t f) {
+    auto models = [&](uint32_t bits) {
+        if (bits & 0x1000000) add(sc, 0x7AD130);
+        if (bits & 0x2000000) add(sc, 0x799E38);
+        if (bits & 0x8000000) add(sc, 0x75AEF0);
+        if (bits & 0x4000000) add(sc, 0x7792A0);
+        if (alien(f)) {
+            if (bits & 1) add(sc, 0x78A510);
+            if (bits & 0x2000) add(sc, 0x79A640);
+        } else {
+            if (bits & 1) add(sc, 0x7ACCA0);
+            if (bits & 0x2000) add(sc, 0x79A6B0);
+        }
+        if (bits & 0x20) add(sc, 0x787E48);
+        if (bits & 0x80) add(sc, 0x799228);
+        if (bits & 0x400) add(sc, 0x77A578);
+        if (bits & 0x8000) add(sc, 0x7765B0);
+        if (bits & 0x200000) add(sc, 0x78A300);
+        if (bits & 0x10) add(sc, 0x79A6A0);
+        if (bits & 0x200) add(sc, 0x7ACC90);
+        if (bits & 0x40000) add(sc, 0x78A5E0);
+    };
+    // BUG(original): the faction's free abilities (bonus FREEABIL) the unit has are drawn twice.
+    const MFaction& m = MFactions[f];
+    for (int32_t k = 0; k < m.faction_bonus_count; k++) {
+        if (m.faction_bonus_id[k] != 0xF) continue;
+        const int32_t ab = m.faction_bonus_val1[k];
+        if (!has_tech(Ability[ab].preq_tech, f)) continue;
+        models((1u << (ab & 0x1F)) & abil);
+    }
+    models(abil);
+}
+
+void GAMEAPI vehdraw_construct_armor(int32_t f, int32_t chassis, int32_t weapon, int32_t armor, int32_t overlay,
+                                     VoxelScene* sc) {
+    int32_t plated = 0, done = 0;
+    uint32_t acol = 0;
+    // Armour with its own infantry model (4, 8, 9) or none outside infantry.
+    auto special = [&](uint32_t infantry, uint32_t other) {
+        done = 1;
+        const uint8_t mode = Weapon[weapon].mode;
+        if (chassis == 0 && (mode < 3 || mode == 0xB)) {
+            addo(sc, infantry, 0x687AE8, VehAnimFrame);
+        } else {
+            add(sc, 0x75AF00);
+            add(sc, other);
+        }
+    };
+    switch (armor) {
+    case 1: plated = 1; break;
+    case 2: case 10: case 11: plated = 1; acol = 0x792664; break;
+    case 3: plated = 1; acol = 0x793E64; break;
+    case 4: special(0x79A700, 0x78A490); break;
+    case 5:
+        if (!overlay) done = 1;
+        else {
+            plated = 1;
+            acol = 0x788250;
+        }
+        break;
+    case 6: case 12: case 13: plated = 1; acol = 0x795664; break;
+    case 7: plated = 1; acol = 0x796E64; break;
+    case 8: special(0x7AB3F0, 0x7AD120); break;
+    case 9: special(0x7795A0, 0x7ACCB0); break;
+    default: break;
+    }
+    const bool al = alien(f);
+    // The generic plate: 0x7AD040 (alien) / 0x7AD0E0.
+    auto plate = [&]() { add_or_c(sc, al ? 0x7AD040 : 0x7AD0E0, acol); };
+    switch (chassis) {
+    case -1:
+        if (!plated || done) return;
+        plate();
+        return;
+    case 0: {
+        if (done || !plated) return;
+        const bool gun = weapon != -1 && (Weapon[weapon].mode < 3 || Weapon[weapon].mode == 0xB);
+        if (al) {
+            if (!gun) return plate();
+            if (acol) addco(sc, 0x789A50, acol, 0x687AE8, frame15());
+            else addo(sc, 0x789A50, 0x687AE8, frame15());
+        } else {
+            if (!gun) return add_or_c(sc, 0x7AD0E0, acol);
+            const uint32_t h = 0x7791C4 + (uint32_t)plated * 0xC;
+            if (acol) addco(sc, h, acol, 0x687AE8, frame15());
+            else addo(sc, h, 0x687AE8, frame15());
+        }
+        return;
+    }
+    case 1:
+        if (done || !plated) return;
+        if (al) {
+            add_or_c(sc, 0x7AD040, acol);
+            add_or_c(sc, 0x75AFC0, acol);
+        } else {
+            add_or_c(sc, 0x7AD0E0, acol);
+            add_or_c(sc, 0x779264 + (uint32_t)plated * 0xC, acol);
+        }
+        return;
+    case 2:
+        if (done) {
+            add(sc, 0x779648);
+            add(sc, 0x78B750);
+            return;
+        }
+        if (!plated) return;
+        add_or_c(sc, 0x779654, acol);
+        add_or_c(sc, 0x78B75C, acol);
+        return;
+    case 3:
+        if (done || !plated) return;
+        plate();
+        return;
+    case 4:
+        if (done) {
+            if (armor == 5) return;
+            add(sc, 0x78CAB8);
+            return;
+        }
+        if (!plated) return;
+        add_or_c(sc, 0x78CAC4, acol);
+        return;
+    case 5:
+        if (done) {
+            if (armor == 5) return;
+            add(sc, al ? 0x779288 : 0x78A2B8);
+            return;
+        }
+        if (!plated) return;
+        if (al) {
+            add_or_c(sc, 0x7AD040, acol);
+            add_or_c(sc, 0x779294, acol);
+        } else {
+            add_or_c(sc, 0x7AD0E0, acol);
+            add_or_c(sc, 0x78A2C4, acol);
+        }
+        return;
+    case 6:
+        if (done) {
+            if (armor == 5) return;
+            add(sc, 0x79A628);
+            add(sc, al ? 0x7AD040 : 0x7AD0E0);
+            return;
+        }
+        if (!plated) return;
+        add_or_c(sc, 0x79A634, acol);
+        add_or_c(sc, al ? 0x7AD040 : 0x7AD0E0, acol);
+        return;
+    case 7:
+        if (!plated) return;
+        plate();
+        return;
+    default:
+        return;
+    }
+}
+
+void GAMEAPI vehdraw_construct_vehicle(int32_t veh_id, VoxelScene* sc) {
+    sc->count = 0;
+    const VEH& veh = Vehs[veh_id];
+    const UNIT& u = Units[veh.unit_id];
+    // Infantry with small arms (and the probe team...) are drawn larger, others smaller.
+    // FP: the scale times a float constant, stored as float.
+    if (u.chassis_id == 0) {
+        if (u.weapon_id < 3 || u.weapon_id == 0x15)
+            Scene_set_scale(sc, (float)((double)Scene_get_scale(sc) * 1.25f));
+        else
+            Scene_set_scale(sc, (float)((double)Scene_get_scale(sc) * fbits(0x3F4CCCCD)));  // 0.8
+    } else if (u.chassis_id == 1 && u.weapon_id == 0x15) {
+        Scene_set_scale(sc, (float)((double)Scene_get_scale(sc) * 1.25f));
+    }
+    int32_t morale = veh.faction_id ? morale_veh(veh_id, 0, 0) : morale_alien(veh_id, CurrentPlayerFaction);
+    // Native life: scaled by morale, animated.
+    auto native = [&](int32_t lo_add, int32_t hi, uint32_t h, int32_t frame) {
+        if (morale < 0) morale = 0;
+        else if (morale > hi) morale = hi;
+        Scene_set_scale(sc, (float)((double)Scene_get_scale(sc) * (morale + lo_add) * 0.125f));
+        add(sc, h, frame);
+    };
+    switch (veh.unit_id) {
+    case 8: return native(0xC, 6, 0x79A690, VehAnimFrame % 5 + 0x1E);
+    case 9: return native(6, 6, 0x7791C0, VehAnimFrame % 5 + 0x1E);
+    case 10: return native(5, 7, 0x779660, VehAnimFrame);
+    }
+    const uint32_t abil = u.ability_flags;
+    const int32_t reactor = u.reactor_id, weapon = u.weapon_id, armor = u.armor_id;
+    int32_t chassis = u.chassis_id;
+    const int32_t f = veh.faction_id;
+    sc->count = 0;
+    if (weapon == 0x15 && chassis == 1 && Armor[armor].defense_value <= 1) chassis = 0;
+    vehdraw_construct_chassis(f, chassis, weapon, armor, reactor, sc);
+    vehdraw_construct_weapon(f, chassis, weapon, sc);
+    vehdraw_construct_abil(abil, sc, f);
+    vehdraw_construct_armor(f, chassis, weapon, armor, 0, sc);
+    if (!reactor) return;
+    if (chassis == 0) {
+        const uint8_t mode = Weapon[weapon].mode;
+        if (mode < 3 || mode == 0xB) {
+            addo(sc, 0x79961C + (uint32_t)reactor * 0xC, 0x687AE8, 0);
+            return;
+        }
+    } else if (chassis == 8) {
+        add(sc, 0x76E9A4 + (uint32_t)reactor * 0xC);
+        return;
+    }
+    add(sc, 0x76E554 + (uint32_t)reactor * 0xC);
+    if (abil & 0x8000) add(sc, 0x779560);
+}
+
+void GAMEAPI vehdraw_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t mode, int32_t zoom, int32_t a7) {
+    const float light[3] = {fbits(0xBF13CD36), fbits(0x3F13CD36), fbits(0x3F13CD36)};
+    if (!dest) return;
+    const float ldir[3] = {VehLightDir[0], VehLightDir[1], VehLightDir[2]};
+    if (mode & 1) veh_id = pick_top_veh(veh_id);
+    int32_t x, y;
+    if (VehScootX == -1 || VehScootID != veh_id) {
+        x = Vehs[veh_id].x;
+        y = Vehs[veh_id].y;
+    } else {
+        x = VehScootX;
+        y = VehScootY;
+    }
+    int32_t rot = Vehs[veh_id].rotate_angle;
+    if (rot == -1) rot = 0;
+    const UNIT& u = Units[Vehs[veh_id].unit_id];
+    float up[3] = {0.0f, 0.0f, 1.0f};
+    if (a7 && (MapTiles[MapHalfX * y + (x >> 1)].climate & 0xE0) >= 0x60 &&
+        (u.chassis_id != 0 || Weapon[u.weapon_id].mode >= 3)) {
+        // Tilted with the terrain: the sum of the tile's four facet normals.
+        uint8_t* win = &MainConsole;
+        int32_t r[4];
+        for (int32_t c = 1; c <= 4; c++) {
+            pfncMapGetCornerYOffset(win, x, y, c);
+            const uint8_t* e = ui_mapwin_cache_entry(win, x, y);
+            r[c - 1] = e ? ((e[10] | e[11] << 8) >> ((c - 1) * 4)) & 0xF : 0;
+        }
+        const int32_t k = r[3] + ((r[0] * 7 + r[1]) * 7 + r[2]) * 7 - 400;
+        const float* t = fptr(0x8CDD10) + k * 3;
+        const uint32_t stride = 0x1C23;
+        vec3_add(t, t + stride, up);
+        vec3_add(up, t + 2 * stride, up);
+        vec3_add(up, t + 3 * stride, up);
+        vec3_normalize(up, up);
+    }
+    float cam[9], inv[9];
+    compute_camera(up, cam);
+    VoxelScene* sc = &VehScene;
+    std::memcpy(sc->v_light, ldir, 12);
+    mat3_inverse(cam, inv);
+    float sd[3];
+    mat3_apply(inv, light, sd);
+    std::memcpy(sc->v_shadow, sd, 12);
+    Scene_set_shadow_table(sc, ShadowTable);
+    // The camera 10000 units away along its view axis.
+    const float pos[3] = {(float)((double)cam[6] * -10000.0f), (float)((double)cam[7] * -10000.0f),
+                          (float)((double)cam[8] * -10000.0f)};
+    // FP: (zoom unit * 0.07) in a register, stored as float.
+    float scale;
+    if (ZoomNum > 0) scale = (float)((double)ZoomNum * fbits(0x3D8F5C29) / ZoomDenom);
+    else scale = (float)((double)(zoom + 0x10) * fbits(0x3D8F5C29) * 0.0625f);
+    Scene_set_scale(sc, scale);
+    Scene_set_camera(sc, pos, cam);
+    vehdraw_construct_vehicle(veh_id, sc);
+    Scene_set_rotation(sc, (float)((double)((rot - 3) & 7) * fbits(0x3F490E56) - CameraYaw), 0.0f, 0.0f);
+    const int32_t ox = ZoomNum > 0 ? ZoomNum * 0x32 / ZoomDenom : trunc_div16((zoom * 5 + 0x50) * 10);
+    const int32_t oy = ox;
+    Scene_render(sc, dest, px + ox, py + oy, (uint32_t)((mode & 0x2000) | 0x1000) >> 12);
+    if (u.armor_id == 5) {
+        // The shield of armour 5: drawn over the unit through the blend tables.
+        sc->count = 0;
+        vehdraw_construct_armor(Vehs[veh_id].faction_id, u.chassis_id, u.weapon_id, 5, 1, sc);
+        Scene_render_table(sc, dest, px + ox, py + oy, 0x18, table(0x6EEF7C), (uint32_t)(mode >> 12) & 2);
+        return;
+    }
+    Scene_clear(sc, 0);
 }
 
 int32_t GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t zoom, int32_t mode, int32_t a7) {

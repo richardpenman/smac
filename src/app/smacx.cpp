@@ -526,6 +526,7 @@ int main(int argc, char** argv) {
     // and mapwin_system_init's lighting table.
     load_palette();
     load_cycling();
+    load_voxels();
     colortables_init();
     load_terrain();
     load_vehicles();

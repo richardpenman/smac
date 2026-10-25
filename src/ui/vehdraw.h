@@ -37,7 +37,36 @@ ADDR_NATIVE(0x5593E0) int32_t GAMEAPI pick_top_veh(int32_t veh_id);
 // flag offset. Returns whether a 3D model was drawn.
 ADDR_NATIVE(0x5594F0) int32_t GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t zoom,
                                               int32_t mode, int32_t a7);
-// The 3D model of a unit (chassis 0..8) with its centre at (px + zoom unit, py + zoom unit).
-// Not reconstructed yet: nothing is drawn (see vehdraw.cpp).
+// The 3D model of a unit (chassis 0..8) with its centre at (px + zoom unit, py + zoom unit): the
+// unit's models (vehdraw_construct_vehicle) in VehScene (ui/voxel.h), seen by the map camera
+// (tilted with the terrain when a7), turned to the unit's direction, scaled by the zoom.
 ADDR_NATIVE(0x4C12A0) void GAMEAPI vehdraw_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t mode,
                                                int32_t zoom, int32_t a7);
+
+struct VoxelScene;
+// The unit models (*.cvr) and the renderer (load_fixed_sprites); before colortables_init.
+ADDR_NATIVE(0x451030) void GAMEAPI load_voxels();
+// vehdraw_setup (0x4C1D10 jumps here): the terrain tilt table (0x8CDD10): for every combination
+// of the four corner heights of a tile (relative altitude 1..7 each) the normals of its four
+// facets.
+ADDR_NATIVE(0x4C1B10) void GAMEAPI vehdraw_compute_facet_normals();
+// The camera matrix of the map for a ground normal (the map's isometric view rotated so that
+// the normal points up); sets the view's yaw (0x8E9F40).
+ADDR_NATIVE(0x4BF740) void GAMEAPI compute_camera(const float* up, float* out);
+// Fills the scene with the unit's models: chassis, weapon, abilities, armour, reactor.
+ADDR_NATIVE(0x4C1D20) void GAMEAPI vehdraw_construct_vehicle(int32_t veh_id, VoxelScene* scene);
+ADDR_NATIVE(0x4C2470) void GAMEAPI vehdraw_construct_chassis(int32_t faction_id, int32_t chassis_id, int32_t weapon_id,
+                                                            int32_t armor_id, int32_t reactor_id, VoxelScene* scene);
+ADDR_NATIVE(0x4C2CF0) void GAMEAPI vehdraw_construct_weapon(int32_t faction_id, int32_t chassis_id, int32_t weapon_id,
+                                                           VoxelScene* scene);
+ADDR_NATIVE(0x4C2030) void GAMEAPI vehdraw_construct_abil(uint32_t abilities, VoxelScene* scene, int32_t faction_id);
+// overlay: the second pass of armour 5 (its transparent shield).
+ADDR_NATIVE(0x4C3090) void GAMEAPI vehdraw_construct_armor(int32_t faction_id, int32_t chassis_id, int32_t weapon_id,
+                                                          int32_t armor_id, int32_t overlay, VoxelScene* scene);
+// The unit colour tables of colortables_init (0x423570; system.txt VEHICLECOLORING,
+// ARMORCOLORING, ARMORCOLORING_TRANS): per faction (0x79A7EC) and per armour (0x792664) the
+// shading table of VBP.CVR recoloured with a base colour, the light level table (0x788250) and
+// the shield blend tables (0x6EEF7C).
+void vehdraw_color_tables_init();
+// colortables_init_faction's part: the faction's unit colouring from a palette index.
+void vehdraw_faction_colors(int32_t faction_id, int32_t color);
