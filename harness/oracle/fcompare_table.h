@@ -466,6 +466,37 @@ static const FcFunc kFcFuncs[] = {
     {"net_set_treaty", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION1), BITS(0, 26), A(BOOL), C(0)}},
     /* probe: with the current VehAttackFlags (0 at the hooks: test only, the AI choice). */
     {"probe", FC_MUTATES, {A(VEH), A(BASE_OPT), A(VEH), A(BOOL)}},
+    /* ---- diplomacy, second half (diplomacy_b.cpp) ---- */
+    {"wants_to_attack", 0, {A(FACTION), A(FACTION), R(-1, 7)}},
+    {"great_beelzebub", 0, {A(FACTION), A(BOOL)}},
+    {"value_of_base", 0, {A(BASE_OPT), A(FACTION1), A(FACTION1), A(BOOL), A(BOOL)}},
+    {"get_adjective_leader", 0, {A(FACTION)}},
+    {"get_adjective_insult_leader", 0, {A(FACTION)}},
+    {"get_adjective_faction", 0, {A(FACTION)}},
+    {"get_adjective_insult_faction", 0, {A(FACTION)}},
+    {"get_insult_leader", FC_MUTATES, {A(FACTION)}},
+    {"bad_reg", 0, {R(-1, 130)}},
+    {"has_agenda", 0, {A(FACTION), A(FACTION), A(INT)}},
+    {"round_down", 0, {R(-50, 50), R(1, 7)}},
+    {"comm_check", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION1)}},
+    /* Not for fcompare: pact_attacks, pact_unpact, pact_truce, pact_treaty always show a viewer
+     * message (NetMsg_pop allocates heap objects that the image restore brings back: crash in
+     * free). pact_attacks, pact_truce and pact_treaty are never called by the original. */
+    {"enemies_war", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION1)}},
+    {"enemies_unpact", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION1)}},
+    {"enemies_team_up", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION1), A(FACTION1)}},
+    {"enemies_trade_tech", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION1)}},
+    {"enemies_treaty", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION1), A(BOOL)}},
+    {"encounter", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION), XY, A(BOOL), A(BOOL)}},
+    {"territory", FC_MUTATES, {A(FACTION1), A(FACTION1), R(0, 3), A(OUT), A(OUT)}},
+    /* Not for fcompare: atrocity (its ATROCITY message to the viewer, unless the council repealed
+     * the prohibitions: crash as above; late100 passes). */
+    {"major_atrocity", FC_MUTATES | FC_VOID, {A(FACTION1), R(-1, 7)}},
+    {"break_treaty", FC_MUTATES, {A(FACTION1), A(FACTION1), A(INT)}},
+    {"trade_maps", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION1)}},
+    {"give_a_base", FC_MUTATES | FC_VOID, {A(BASE), A(FACTION1)}},
+    {"contiguous", FC_MUTATES, {A(FACTION1), A(FACTION1), R(0, 63), A(BOOL)}},
+    {"at_climax", 0, {A(FACTION)}},
 };
 
 /* Image ranges that fcompare does not compare (UI objects and buffers that legitimately differ,

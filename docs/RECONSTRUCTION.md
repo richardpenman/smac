@@ -144,8 +144,24 @@ The original reads stack memory it never wrote in these places. The oracle makes
    slots, then reduces them by a quarter. Its result reaches `enemy_strategy` (region_flags bit 4
    via `local_60`). The residue depends on the depth at which the caller runs: fcompare of
    `time_warp` (whose callee `enemy_strategy` calls it) shows 1-byte `region_flags` differences on
-   a few turns although `time_warp` itself matches. Reconstruct with the slots' canonical value
-   (to be determined with `steptrace`/`slotlog`), marked `BUG(original)`.
+   a few turns although `time_warp` itself matches. `slotlog 55BC80 9 -134 ... -11C` (late100)
+   shows what the slots hold: in `enemy_strategy`'s region loop (calls at 0x562D0F/0x562D1E, the
+   pair `(f, g)` then `(g, f)`) the second call sees the first call's reduced slots when that call
+   reached the scan; the first call of a faction sees residue of earlier frames at that depth:
+   zeros, small values, -1, or large numbers (0x688CC4..0xD07018, the same every turn for a given
+   faction; stack addresses), which make the "own bases in this region" test true only in the
+   headquarters region. No single canonical value exists. Only a residue larger than 4/3 of a
+   faction's largest region base count changes the result (0 and -1 behave alike).
+   Implemented (src/engine/diplomacy_b.cpp, `wants_to_attack_core(..., slots)`): hybrid builds use a
+   shadow thunk (`HYBRID_SHADOW_THUNK`): the body reads the slots from the stack image saved at
+   entry (`[entry ESP - 0x138 + 4f]` for faction f) and the original re-runs to leave its frame, so
+   hybrid games are exact. Native builds keep the slots in `WantsToAttackResidue[8]` (start 0,
+   updated as the frame is), which reproduces consecutive calls at one depth but not residue left
+   by other functions. Measured in hybrid runs (result with the real residue vs. with zero
+   slots): late100 0 of 54 calls differ, std8 0 of 26, late140 4 of 120 (`encounter` and
+   `enemy_strategy` calls for factions 2/4 with residue 0xFFFF in faction 4's slot). Exact native
+   behaviour needs the callers (`enemy_strategy`, `encounter`) to emulate their callees' dead frames
+   and store them in `WantsToAttackResidue`. Marked `BUG(original)`.
 5. **`order_veh` (0x5947C0), `[ebp-0x24]`** ("move shown to the viewer"): the slot also holds the
    target stack offset (`stack_id * 0x34`) and the native-spawn chance; the dir 8 path reaches the
    post-move code without setting it. Only display timing (`clock_wait`), `boom` and viewer

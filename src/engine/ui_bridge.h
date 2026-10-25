@@ -491,6 +491,17 @@ ADDR_NATIVE(0x5BF5D0) int32_t GAMEAPI X_pops(const char* label, const char* pcx,
 ADDR_NATIVE(0x4ACBD0) void GAMEAPI report_intel(int32_t faction_id);
 // "him"/"her" of faction_id's leader in HisHerBuffer (mode as get_his_her). Returns HisHerBuffer.
 ADDR_NATIVE(0x58FC50) char* GAMEAPI get_him_her(int32_t faction_id, int32_t mode);
+
+// ---- diplomacy module, second half (diplomacy_b.cpp) ----
+// "he"/"she" of faction_id's leader in HisHerBuffer (labels 209/210; mode as get_his_her).
+ADDR_NATIVE(0x58FCE0) char* GAMEAPI get_he_she(int32_t faction_id, int32_t mode);
+// The diplomacy dialog (commlink) between faction_id and faction_id_with, one of them human
+// (callers: comm_check, enemy_diplomacy, control_turn, commlink_attempt, the multiplayer wait
+// loop). 34 KB of dialog code with the menus diplomacy_menu, make_a_proposal, proposal_menu,
+// battle_plans, call_off_vendetta and base_swap (0x54B140-0x5589E0), which change treaties and
+// trade bases, energy and technology as the human chooses. All-AI games never call it.
+// Headless: nothing happens (returns 0, as when the human closes the commlink at once).
+ADDR_NATIVE(0x54FFD0) int32_t GAMEAPI communicate(int32_t faction_id, int32_t faction_id_with, int32_t a3);
 // Not original functions: the probe menus the original builds on a Popup object on its stack,
 // shown only to a human player (VehAttackFlags bit 0). Hybrid builds and headless: not shown,
 // each returns its "cancelled" value (documented per function).
