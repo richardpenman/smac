@@ -297,6 +297,7 @@ int oracle_patch_set(const char *name, int on) {
 
 static void trace_orders(const char *what, int arg);
 static void poison_stack();
+static volatile LONG g_progress = 0; /* steps of the game loop, for the hang watchdog */
 
 /* ---- snapshots ---- */
 /* Binary state dump: records {u32 addr, u32 size, bytes} for each region of state_regions.h. */
@@ -365,6 +366,76 @@ static void install_popup_hook() {
     write_rel(entry, 0xE9, (void *)hook_basepop_exec, 5);
 }
 
+/* ---- Planetary Council session ----
+ * council (0x428350) opens the council window (CouncilWin, vtable 0x66AAE8) through
+ * FUN_00427230, which computes every non-human faction's vote (council_get_vote) and then enters
+ * the window's modal loop (Win_set_modal via vtable+0xE4, call at 0x4282F2). The loop has no
+ * timeout in single-player: the session is decided only when the viewer votes (YEA/NAY/ABSTAIN
+ * buttons, or VOTE + the GOVVOTE popup for elections; all end in FUN_00424720(viewer, vote),
+ * which recomputes the AI votes and tallies them, FUN_00424410), and the window closes on Enter
+ * (FUN_00425BA0: for a non-human viewer it releases the modal state and calls council_action when
+ * the proposal passed). An unattended observer would wait forever. The oracle replaces the modal
+ * loop by exactly these two steps: the viewer casts the vote the game already holds for its
+ * faction (for faction 0 the tally ignores it: only factions 1-7 are counted; for an AI viewer it
+ * is that faction's own AI vote), then presses Enter. See harness/README.md. */
+typedef int(__thiscall *f_cw_vote)(void *, int, int);
+typedef int(__thiscall *f_cw_key)(void *, int, int);
+typedef int(__thiscall *f_cw_modal)(void *, int, int, int);
+static f_cw_vote const o_councilwin_vote = (f_cw_vote)0x424720;
+static f_cw_key const o_councilwin_key = (f_cw_key)0x425BA0;
+#define MultiplayerActive G(int32_t, 0x93F660)
+static int __thiscall hook_council_modal(void *self, int a, int b, int c) {
+    int32_t *w = (int32_t *)self;
+    int viewer = CurrentPlayerFaction;
+    if (MultiplayerActive || (FactionStatus[0] & (1 << viewer)))
+        return ((f_cw_modal)(*(uint32_t **)self)[0xE4 / 4])(self, a, b, c);
+    int vote = w[0x295 + viewer];
+    logf_("council turn=%d proposal=%d candidate=%d viewer=%d vote=%d votes=%d,%d,%d,%d,%d,%d,%d\n", CurrentTurn,
+          w[0x287], w[0x288], viewer, vote, w[0x296], w[0x297], w[0x298], w[0x299], w[0x29A], w[0x29B], w[0x29C]);
+    if (w[0x289] == 0) o_councilwin_vote(self, viewer, vote);
+    int result = w[0x289], proposal = w[0x287], winner = w[0x288];
+    o_councilwin_key(self, 0, 0x0D);
+    logf_("council result=%d proposal=%d winner=%d governor=%d\n", result, proposal, winner, G(int32_t, 0x9A6614));
+    return 0;
+}
+static void install_council_hook() {
+    const uint32_t site = 0x4282F2; /* FUN_00427230: call [eax+0xE4] (Win_set_modal) */
+    const uint8_t expect[6] = {0xFF, 0x90, 0xE4, 0x00, 0x00, 0x00};
+    if (memcmp((void *)site, expect, 6)) {
+        logf_("patch error: no council modal call at %08X\n", site);
+        ExitProcess(3);
+    }
+    write_rel(site, 0xE8, (void *)hook_council_modal, 6);
+}
+
+/* ---- end of game ----
+ * When a game ends (time limit, victory), end_of_game (0x524870) shows the end screens after the
+ * game-state part (victory type, monuments): show_credits, report_score(1), quayle (rating),
+ * hall_of_fame(1) (reads/writes hallfame.jhh) and show_replay (saves "Alpha Centauri Autosave 1",
+ * replays the map history, reloads that save), then asks GAMEOVERMAN; control_game then reloads
+ * and returns to the main menu. These are UI screens with modal loops (report_score even crashes
+ * with viewer 0: ReportIf_on_status indexes its per-faction buttons with faction 0). The oracle
+ * skips the first four and, at show_replay, writes the final snapshot `game_end` and exits. */
+static void __cdecl end_screen_skip() {
+    logf_("end of game: end screen skipped (turn=%d)\n", CurrentTurn);
+}
+static void slotlog_flush();
+static void __cdecl hook_show_replay() {
+    snapshot("game_end");
+    FCOMPARE_FINISH();
+    slotlog_flush();
+    logf_("game over: turn=%d GameState=%08X victory=%d, exiting\n", CurrentTurn, GameState, G(int32_t, 0x9B206C));
+    if (g_log) fclose(g_log);
+    ExitProcess(0);
+}
+static void install_end_of_game_hooks() {
+    write_rel(0x428DF0, 0xE9, (void *)end_screen_skip, 5);  /* show_credits */
+    write_rel(0x4ACB80, 0xE9, (void *)end_screen_skip, 5);  /* report_score */
+    write_rel(0x496670, 0xE9, (void *)end_screen_skip, 5);  /* quayle */
+    write_rel(0x44AE50, 0xE9, (void *)end_screen_skip, 5);  /* hall_of_fame */
+    write_rel(0x5ADBF0, 0xE9, (void *)hook_show_replay, 5); /* show_replay */
+}
+
 /* ---- turn loop hooks ---- */
 /* trace 1: log RNG state at each faction step; trace 2: also dump state (STEP_TTT_F_x.state) */
 static void trace_point(const char *what, int f) {
@@ -383,6 +454,7 @@ static void trace_point(const char *what, int f) {
 }
 
 static int __cdecl hook_faction_upkeep(int f) {
+    g_progress++;
     FCOMPARE_HOOK("faction", f);
     trace_orders("faction_upkeep", f);
     trace_point("a_upkeep", f);
@@ -695,6 +767,7 @@ static void hook_enemy_veh_pump_void() { hook_enemy_veh_pump(); }
 static int g_trace_turn = -1, g_trace_seq = 0;
 ORIG(f_int, o_enemy_veh, 0x579240);
 static int __cdecl hook_enemy_veh(int veh) {
+    g_progress++;
     if (g_trace >= 3 && CurrentTurn == g_trace_turn) {
         char path[MAX_PATH];
         snprintf(path, sizeof(path), "%s\\step_%03d_9_c%05d_veh%d.state", g_outdir, CurrentTurn, g_trace_seq, veh);
@@ -740,6 +813,7 @@ static int __cdecl hook_human_turn() {
 static int __cdecl hook_observer_pause() { return 0; }
 
 static int __cdecl hook_turn_upkeep() {
+    g_progress++;
     char name[64];
     apply_observer_prefs();
     snprintf(name, sizeof(name), "turn_%03d", CurrentTurn);
@@ -759,6 +833,74 @@ static int __cdecl hook_turn_upkeep() {
     int r = o_turn_upkeep();
     trace_orders("turn_upkeep_done", 0);
     return r;
+}
+
+/* ---- hang diagnosis ----
+ * A watchdog thread logs where the main thread waits when the game makes no progress (no turn,
+ * faction or vehicle step) for `hangdump <seconds>` (default 60): EIP, the modal window stack and
+ * the return addresses into terranx.exe found on the stack (dwords preceded by a call
+ * instruction). Logging only: the main thread is suspended for the dump and resumed. */
+static int g_hang_secs = 60;
+static DWORD g_main_thread_id;
+static bool is_return_address(uint32_t v) {
+    if (v < 0x401005 || v >= kImageCodeHi) return false;
+    const uint8_t *p = (const uint8_t *)(uintptr_t)v;
+    if (p[-5] == 0xE8) return true;                                   /* call rel32 */
+    if (p[-2] == 0xFF && (p[-1] & 0x38) == 0x10) return true;         /* call r32 / [r32] */
+    if (p[-3] == 0xFF && (p[-2] & 0x38) == 0x10) return true;         /* call [r32+d8] */
+    if (p[-6] == 0xFF && (p[-5] & 0x38) == 0x10) return true;         /* call [r32+d32] / [abs] */
+    if (p[-7] == 0xFF && (p[-6] & 0x38) == 0x10) return true;         /* call [sib+d32] */
+    return false;
+}
+static void hang_dump() {
+    HANDLE th = OpenThread(THREAD_ALL_ACCESS, FALSE, g_main_thread_id);
+    if (!th) return;
+    SuspendThread(th);
+    CONTEXT ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.ContextFlags = CONTEXT_FULL;
+    GetThreadContext(th, &ctx);
+    logf_("HANG turn=%d eip=%08X esp=%08X modal_depth=%d modal_top=%08X vtbl=%08X stack:", CurrentTurn,
+          (uint32_t)ctx.Eip, (uint32_t)ctx.Esp, G(int32_t, 0x9B7AE4),
+          G(uint32_t, 0x9B7AE0), G(uint32_t, 0x9B7AE0) ? *(uint32_t *)(uintptr_t)G(uint32_t, 0x9B7AE0) : 0);
+    uint32_t sp = (uint32_t)ctx.Esp;
+    MEMORY_BASIC_INFORMATION mbi;
+    uint32_t end = sp + 0x40000;
+    if (VirtualQuery((void *)(uintptr_t)sp, &mbi, sizeof(mbi)))
+        end = (uint32_t)(uintptr_t)mbi.BaseAddress + (uint32_t)mbi.RegionSize;
+    int n = 0;
+    for (uint32_t a = sp & ~3u; a + 4 <= end && n < 48; a += 4) {
+        uint32_t v = *(uint32_t *)(uintptr_t)a;
+        if (is_return_address(v)) {
+            logf_(" %08X", v);
+            n++;
+        }
+    }
+    logf_("\n");
+    ResumeThread(th);
+    CloseHandle(th);
+}
+static DWORD WINAPI hang_watchdog(LPVOID) {
+    LONG last = g_progress;
+    int idle = 0;
+    for (;;) {
+        Sleep(1000);
+        LONG now = g_progress;
+        if (now != last) {
+            last = now;
+            idle = 0;
+            continue;
+        }
+        if (++idle % g_hang_secs == 0) hang_dump();
+    }
+    return 0;
+}
+static void hang_watchdog_start() {
+    static bool started = false;
+    if (started || g_hang_secs <= 0) return;
+    started = true;
+    g_main_thread_id = GetCurrentThreadId();
+    CloseHandle(CreateThread(NULL, 0, hang_watchdog, NULL, 0, NULL));
 }
 
 /* ---- newgame ---- */
@@ -903,6 +1045,7 @@ static int __cdecl oracle_top_menu() {
             snapshot(args);
         } else if (!strcmp(cmd, "turns")) {
             g_turn_limit = CurrentTurn + atoi(args);
+            hang_watchdog_start();
             fclose(f);
             return 0; /* continue into desktop_init + control_turn */
         } else if (!strcmp(cmd, "viewer")) {
@@ -928,6 +1071,21 @@ static int __cdecl oracle_top_menu() {
             install_slotlog(prologue);
         } else if (!strcmp(cmd, "steptrace")) {
             sscanf(args, "%d %d %d", &g_st_turn, &g_st_veh, &g_st_max);
+        } else if (!strcmp(cmd, "dumpmem")) {
+            /* dumpmem <hexaddr> <hexsize> <file>: raw bytes of the original's memory, now */
+            uint32_t addr = 0, size = 0;
+            char name[MAX_PATH] = "";
+            sscanf(args, "%x %x %259s", &addr, &size, name);
+            char path[MAX_PATH];
+            snprintf(path, sizeof(path), "%s\\%s", g_outdir, name);
+            FILE *df = fopen(path, "wb");
+            if (df) {
+                fwrite((const void *)(uintptr_t)addr, 1, size, df);
+                fclose(df);
+            }
+            logf_("dumpmem %08X %X %s -> %d\n", addr, size, name, df != NULL);
+        } else if (!strcmp(cmd, "hangdump")) {
+            g_hang_secs = atoi(args);
         } else if (!strcmp(cmd, "trace")) {
             sscanf(args, "%d %d", &g_trace, &g_trace_turn);
 #ifdef ORACLE_WITH_ENGINE
@@ -953,7 +1111,20 @@ static int __cdecl oracle_top_menu() {
 }
 
 static LONG WINAPI crash_filter(EXCEPTION_POINTERS *e) {
-    logf_("CRASH code=%08lX addr=%p\n", e->ExceptionRecord->ExceptionCode, e->ExceptionRecord->ExceptionAddress);
+    logf_("CRASH code=%08lX addr=%p turn=%d stack:", e->ExceptionRecord->ExceptionCode,
+          e->ExceptionRecord->ExceptionAddress, CurrentTurn);
+    {
+        uint32_t sp = (uint32_t)e->ContextRecord->Esp, end = sp + 0x40000;
+        MEMORY_BASIC_INFORMATION mbi;
+        if (VirtualQuery((void *)(uintptr_t)sp, &mbi, sizeof(mbi)))
+            end = (uint32_t)(uintptr_t)mbi.BaseAddress + (uint32_t)mbi.RegionSize;
+        int n = 0;
+        for (uint32_t a = sp & ~3u; a + 4 <= end && n < 32; a += 4) {
+            uint32_t v = *(uint32_t *)(uintptr_t)a;
+            if (is_return_address(v)) logf_(" %08X", v), n++;
+        }
+        logf_("\n");
+    }
     ExitProcess(4);
     return EXCEPTION_EXECUTE_HANDLER;
 }
@@ -972,6 +1143,8 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         write_call(0x5282C9, (void *)hook_observer_pause);
         for (uint32_t site : ui_sites_game_random) write_call(site, (void *)ui_game_random);
         install_popup_hook();
+        install_council_hook();
+        install_end_of_game_hooks();
         /* No cosmetic UI timers (cursor blink, status redraw): their WM_TIMER callbacks run at
          * wall-clock-dependent points inside engine message pumps and leave different stack
          * contents behind, which the original's AI code can read uninitialised. */

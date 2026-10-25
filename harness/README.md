@@ -30,6 +30,8 @@ random stream, and some engine code uses `timeGetTime()` as randomness. The orac
   and disables tutorial, autosave, movies and battle pauses;
 * forces popups through `BasePop_exec_3`'s no-display path (announcements are shown to everyone);
 * disables the cosmetic UI timers;
+* answers Planetary Council sessions for the observer (see "Planetary Council sessions" below);
+* skips the end-of-game screens and stops with a final `game_end` snapshot (see "End of game");
 * **poisons the stack** (fills 32 KB below the caller with a fixed byte) before `turn_upkeep`,
   `faction_upkeep`, `enemy_turn` and every `enemy_veh` call. The original AI reads an
   uninitialised local somewhere below `enemy_veh`: without poisoning, roughly one run in four
@@ -81,6 +83,7 @@ patch <spec>          hybrid only: all | none | +name | -name ...
 fcompare <from> <to> [hooks=turn,faction,enemy] [limit=<pure>,<mut>] <spec>
                       hybrid only: compare original and reconstructed functions on the live
                       state at the selected hooks of turns from..to (see "Function comparison")
+hangdump <seconds>    log where the main thread waits after that many seconds without progress
 quit
 ```
 
@@ -92,6 +95,72 @@ boots, so reconstructed boot code runs too.
 * `NAME.state` — records `{u32 addr, u32 size, bytes}` for every region in `state_regions.h`.
 * `NAME.rng` — `crt`, `game`, `clock`, `turn`.
 * `NAME.sav` — the game's own save (contains heap pointers and UI state; compared only with `--sav`).
+
+## Planetary Council sessions
+
+`council` (0x428350, called by `call_council` from `faction_upkeep`, or by `control_turn`)
+opens the council window (`CouncilWin`, vtable 0x66AAE8) through FUN_00427230. That function
+computes every non-human faction's vote with `council_get_vote` (three passes) and then enters the
+window's modal loop (`Win_set_modal`, vtable+0xE4, called at 0x4282F2). In single-player the loop
+has no timeout (the 60 s per human limit is a multiplayer feature): the session is only decided
+when the viewer votes, and only closed when the viewer then presses Enter / the close button.
+An unattended observer therefore waits forever: the probe131 game (long300 turn 120 reseeded
+1120/2120) at the end of turn 131 (governor election), and long300 itself at the end of turn 147
+(Global Trade Pact, then a governor election). `hangdump` shows the main thread in
+0x5EE24C (Win_set_modal) <- 0x4282F8 (FUN_00427230) <- 0x4284CF (council) <- 0x52D9C7
+(call_council) <- faction_upkeep. Scenarios past these points: council131, late147, long300 (now
+runs all 300 turns) and end300 (to the end of the game).
+
+What the viewer's input does in the original:
+
+1. A vote button (YEA/NAY/ABSTAIN, or VOTE + the GOVVOTE candidate popup in elections) calls
+   FUN_00424720(viewer, vote): it stores the viewer's vote, recomputes the votes of all living
+   non-human factions with `council_get_vote` (three passes, as when the window opened), redraws,
+   and tallies (FUN_00424410(1)). The tally counts **factions 1-7 only** (YEA -1 and NAY -2
+   weighted by council votes; abstentions -3 and dead factions -5 not counted; Supreme Leader
+   needs 3/4); it sets the session result (1 passed, -1 failed or no governor majority, -2 vetoed
+   by the governor's NAY), clears the per-faction vote-buying fields
+   for the proposal, sets `ProposalCallTurn[proposal]`, and for an election sets `GovernorFaction`.
+2. Enter (FUN_00425BA0 with key 0x0D, also what the close button sends): for a non-human viewer it
+   releases the modal state, closes the fonts and windows and, when the proposal passed, calls
+   `council_action(proposal, winner)`.
+
+The oracle (`install_council_hook`) replaces the modal loop call by exactly these two calls
+(FUN_00424720 then FUN_00425BA0), with the vote the window already holds for the viewer's faction.
+For the default viewer, faction 0, that vote is not counted at all, so the outcome is decided by
+the seven AI factions' own votes, independently of which button an observer would press; this is
+the result every attended observer game gets as soon as the observer clicks any vote button and
+closes the window. (For `viewer <f>` with an AI faction f, f keeps its own AI vote, as if the
+observer had confirmed it; pressing ABSTAIN instead would change f's vote.) Not reproduced: the
+alternative of closing the window without voting, which skips the tally and `council_action`
+(only `ProposalCallTurn`, set by `council` itself, would change). Hotseat, PBEM, multiplayer and
+human viewers keep the original modal loop. Each session is logged in `oracle.log`
+(`council turn=... proposal=... votes=...` and `council result=...`). A native reconstruction of
+`council` must reproduce this: AI votes, the extra three `council_get_vote` passes, the tally and
+`council_action` when passed.
+
+## End of game
+
+When a game ends (time limit, council or economic victory, ...), `end_of_game` (0x524870) first
+does the game-state part (victory type 0x9B206C, monuments) and then shows the end screens:
+`show_credits`, `report_score(1)`, `quayle` (rating), `hall_of_fame(1)` (reads and writes
+`hallfame.jhh`), `show_replay` (saves "Alpha Centauri Autosave 1", replays the map history and
+reloads that save), and the GAMEOVERMAN popup; `control_game` then reloads the game and returns to
+the main menu. All of these are UI with modal loops; `report_score` even crashes with viewer 0
+(ReportIf_on_status, 0x4A5C7E, calls a per-faction button indexed by faction 0). The oracle
+replaces the first four with no-ops and, when `show_replay` is called, writes the snapshot
+`game_end` (state after the victory processing, `GameState` with STATE_GAME_DONE) and exits with
+code 0. The `turns` limit is then not reached; the run ends at the game's end. A reconstruction
+run should write the same `game_end` snapshot at that point.
+
+## Hang diagnosis
+
+`hangdump <seconds>` (default 60; 0 disables): when the game loop makes no progress for that long,
+a watchdog thread logs a `HANG` line to `oracle.log` with EIP, the modal window stack
+(`WinModalState`, top window and its vtable) and the return addresses into terranx.exe found on
+the main thread's stack (repeated every period). It is armed by `turns` and only reads state.
+`run_oracle.sh` also takes a screenshot (`hang.png`) shortly before its timeout. A crash (`CRASH`
+line) is logged with the same return-address scan.
 
 ## Function comparison (`fcompare`)
 
