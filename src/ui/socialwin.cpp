@@ -104,13 +104,6 @@ int32_t* pending_effects(int32_t f) { return &fac(f).SE_economy_pending; }
 // Effect index of effect button i (0..9): TALENT (3) has no button.
 int32_t effect_of_button(int32_t i) { return i < 3 ? i : i + 1; }
 
-// Label colours of the window's buttons (approximated: normal, hover, pressed / selected).
-void button_colors(BaseButton* b) {
-    b->text_color[0] = 0x9F;
-    b->text_color[1] = 0xFF;
-    b->text_color[2] = 0xFF;
-}
-
 void SocialWinState::refresh_buttons() {
     for (int32_t i = 0; i < 16; i++)
         if (model_btn[i]) bw_button_set(model_btn[i], choices[i / 4] == i % 4);
@@ -597,11 +590,9 @@ void THISCALL SocialWin_exec(uint8_t* self, int32_t faction_id) {
         s->effect_btn[i] = sw_button(s, sw_upper(SocialParam[effect_of_button(i)].set2).c_str(), 0x11 + i, 0x274, y,
                                      0x303 - 0x274, 0x14, 0, s->font_button);
     }
-    for (BaseButton* b : s->buttons) button_colors(b);
     sw_button(s, sw_upper(sw_label(0x198)).c_str(), kCancel, 0x1E4, 0x13A, 0x286 - 0x1E4, 0x14, 0, s->font_button);
     sw_button(s, sw_upper(sw_label(0x4F4)).c_str(), kReset, 0x13F, 0x13A, 0x1E1 - 0x13F, 0x14, 0, s->font_button);
     sw_button(s, sw_upper(sw_label(0x194)).c_str(), kOk, 0x9A, 0x13A, 0x13C - 0x9A, 0x14, 0, s->font_button);
-    for (BaseButton* b : s->buttons) button_colors(b);
     // The allocation's -/+ buttons (economy 0x1D/0x1E, labs 0x1F/0x20, psych 0x21/0x22) and locks.
     static const int32_t ids[3][2] = {{0x1D, 0x1E}, {0x21, 0x22}, {0x1F, 0x20}};
     for (int32_t i = 0; i < 3; i++) {

@@ -111,22 +111,32 @@ void sw_clear_buttons(ScreenWin* s) {
 }
 
 void sw_font(Buffer* c, Font* font, int32_t color, int32_t shadow) {
-    Buffer_set_font(c, font, nullptr, nullptr, nullptr);
+    Buffer_set_font(c, font, font, font, nullptr);
     Buffer_set_text_color(c, color, shadow, 1, 1);
+    Buffer_set_text_color2(c, color, shadow, 1, 1);
+    Buffer_set_text_color3(c, color, shadow, 1, 1);
 }
 
+// Texts are written with the font switches of the original's strings ("{...}" the second font
+// slot, "[...]" the third: Buffer_write_multi_font_raw_l); sw_font sets every slot.
 int32_t sw_text(ScreenWin* s, Buffer* c, const std::string& text, int32_t x, int32_t y) {
     if (s) s->texts.push_back(text);
-    return Buffer_write_l_3(c, text.c_str(), x, y, (int32_t)text.size());
+    if (text.empty() || !c->fonts[0]) return x;
+    return Buffer_write_multi_font_raw_l(c, text.c_str(), x, y, (int32_t)text.size());
 }
 
 int32_t sw_text_cent(ScreenWin* s, Buffer* c, const std::string& text, const UiRect& r) {
     if (s) s->texts.push_back(text);
-    return Buffer_write_cent_l_7(c, text.c_str(), &r, (int32_t)text.size());
+    if (text.empty() || !c->fonts[0]) return 0;
+    int32_t w = Buffer_text_width_2(c, text.c_str(), (int32_t)text.size());
+    int32_t x = ((r.right - w) - r.left) / 2 + r.left;
+    int32_t y = ((r.bottom - c->fonts[0]->ascent_above) - r.top) / 2 + r.top;
+    return Buffer_write_multi_font_raw_l(c, text.c_str(), x, y, (int32_t)text.size());
 }
 
 int32_t sw_text_right(ScreenWin* s, Buffer* c, const std::string& text, const UiRect& r) {
     if (s) s->texts.push_back(text);
+    if (text.empty()) return 0;
     return Buffer_write_right_l_6(c, text.c_str(), &r, (int32_t)text.size());
 }
 
@@ -160,7 +170,8 @@ void sw_run(ScreenWin* s) {
             if (s->open) redraw(s);
             continue;
         }
-        if (in.type != UiInput::LDOWN && in.type != UiInput::LUP) continue;
+        bool right = in.type == UiInput::RDOWN || in.type == UiInput::RUP;
+        if (in.type == UiInput::MOVE || in.type == UiInput::RDOWN) continue;
         int32_t parent = -1, lx = 0, ly = 0;
         if (s->iface && in_box(in.x, in.y, mp) &&
             (opaque(&s->mi, in.x - mp.left, in.y - mp.top) || button_at(s, 1, in.x - mp.left, in.y - mp.top))) {
@@ -174,6 +185,13 @@ void sw_run(ScreenWin* s) {
         }
         if (parent < 0) continue;
         BaseButton* b = button_at(s, parent, lx, ly);
+        if (right) {  // a right click (on release): the spot's menu
+            int32_t index = -1, type = 0;
+            spot_check(&s->spots[parent], lx, ly, &index, &type);
+            s->on_click(parent, index, type, lx, ly, true, false);
+            if (s->open) redraw(s);
+            continue;
+        }
         if (in.type == UiInput::LDOWN) {
             if (b) {
                 b->pressed = 1;

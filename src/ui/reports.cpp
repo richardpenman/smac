@@ -43,6 +43,9 @@
 #include "engine/turn.h"
 #include "engine/ui_bridge.h"
 #include "engine/veh.h"
+#include "engine/log.h"
+#include "engine/net.h"
+#include "engine/zoc.h"
 #include "platform/ui_platform.h"
 #include "ui/basewin.h"
 #include "ui/console.h"
@@ -80,6 +83,8 @@ struct ReportScreen : ScreenWin {
     Sprite buttons[7][3];        // report.pcx: the report buttons, three states
     BaseButton* report_btn[7]{};
     BaseButton* ops_btn[3]{};    // the views of base operations (ids 0x8B3..0x8B5)
+    std::vector<BaseButton*> ops_iface;  // GOVERNOR / BEST BASES tabs, the governor buttons
+    bool ops_best = false;       // the BEST BASES tab (0xD0B) is shown
     std::vector<std::string> state;  // what log_state prints
 
     void redraw() override;
@@ -125,6 +130,7 @@ void ReportScreen::title(const std::string& t) {
     UiRect tr = title_rect();
     Buffer_box_sprite(&canvas, &tr, box_def(1));
     sw_font(&canvas, f_bold, 0x99);
+    Buffer_set_text_color3(&canvas, 0xE1, -1, 1, 1);  // ReportIf_reset: "[...]" in 0xE1
     UiRect tt{tr.left, tr.top - 1, tr.right, tr.bottom - 1};
     sw_text_cent(this, &canvas, t, tt);
 }
@@ -329,14 +335,15 @@ void ReportScreen::draw_ops() {
 }
 
 void ReportScreen::iface_ops() {
+    // ReportIf_draw_ops: the GOVERNOR tab (its buttons, created at the opening) or BEST BASES: the
+    // best base per sort key (the list box of ReportIf_draw_ops); a click on a line sorts.
+    if (!ops_best) return;
     Buffer* m = &mi;
     UiRect p = mi_rect(kMiPaneQueue);
-    UiRect r{p.left + 6, p.top + 6, p.right - 6, p.top + 0x20};
-    Buffer_box_sprite(m, &r, box_def(3));
-    sw_font(m, f_bold, 0x99);
-    sw_text_cent(this, m, up(sw_label(0xACC)), r);
-    // The list of the best base per sort key (ReportIf_draw_ops' list box); a click sorts.
-    int32_t y = r.bottom + 3, lh = f_small->height + 2;
+    int32_t y = p.top + 0x23, lh = f_small->height + 2;
+    UiRect r{p.left + 9, y, p.right - 9, p.bottom - 6};
+    Buffer_box_sprite(m, &r, box_def(0));
+    y += 3;
     for (int32_t mode = 1; mode <= 8; mode++) {
         int32_t best = -1, best_v = 0;
         for (int32_t i = 0; i < BaseCount; i++) {
@@ -357,6 +364,45 @@ void ReportScreen::iface_ops() {
         Buffer_set_clip(m, &all);
         spot_add(&spots[1], mode, 2, r.left, y, r.right - r.left, lh);
         y += lh;
+    }
+}
+
+// ReportIf_on_iface_button_clicked (base operations, the viewer's own report): the governor of
+// the selected bases.
+void ops_governor(ReportScreen* s, int32_t id) {
+    if (id == 0xCEF) {  // SELECT ALL
+        for (int32_t i = 0; i < 0x200; i++)
+            if (i < BaseCount && Bases[i].faction_id == CurrentPlayerFaction && Bases[i].faction_id == s->faction)
+                s->selected[i >> 5] |= 1u << (i & 31);
+        return;
+    }
+    if (id >= 0xCF0 && id <= 0xCF3) {
+        log_say_2("Global EDBC base set", 0, 0, 0);
+        for (int32_t i = 0; i < BaseCount; i++) {
+            if (Bases[i].faction_id != CurrentPlayerFaction || !(s->selected[i >> 5] & (1u << (i & 31)))) continue;
+            if (bw_lock_base(i)) continue;
+            BaseWin_soft_zoom(&BaseWin, i);
+            BASE& b = Bases[i];
+            b.governor_flags = (int32_t)(((uint32_t)b.governor_flags | 0x80000000) & 0xF0FFFFFF);
+            b.governor_flags |= (int32_t)(0x1000000u << (id - 0xCF0));
+            BaseWin_gov_activate(&BaseWin);
+            bw_unlock_base(i);
+        }
+        return;
+    }
+    if (id == 0xCF4) {  // ADVANCED SETTINGS: the governor dialog (BaseWin_governor), not reconstructed
+        console_not_reconstructed("ReportIf: ADVANCED SETTINGS (BaseWin_governor)");
+        return;
+    }
+    if (id == 0xCF5) {  // TURN GOVERNOR OFF
+        log_say_2("Global governor off", 0, 0, 0);
+        for (int32_t i = 0; i < BaseCount; i++) {
+            if (Bases[i].faction_id != CurrentPlayerFaction || !(s->selected[i >> 5] & (1u << (i & 31)))) continue;
+            if (bw_lock_base(i)) continue;
+            Bases[i].governor_flags &= 0x7FFFFFFF;
+            draw_radius(Bases[i].x, Bases[i].y, 2, 2);
+            bw_unlock_base(i);
+        }
     }
 }
 
@@ -589,6 +635,17 @@ void ReportScreen::draw_sat() {
     Buffer* c = &canvas;
     title("[" + up(adj(faction)) + " " + up(sw_label(0xAD4)) + "]");
     UiRect in = inner(), tr = title_rect();
+    // Nobody has the satellites' technology (the Sky Hydro Lab's): "Orbital Spaceflight not yet
+    // achieved" (label 0xCC4) in the middle.
+    bool any = false;
+    for (int32_t f = 1; f < 8; f++)
+        if (has_tech(Facility[65].preq_tech, f)) any = true;
+    if (!any) {
+        sw_font(c, f_bold, 0xE1);
+        sw_text_cent(this, c, sw_label(0xCC4), {in.left, (in.top + in.bottom) / 2 - 10, in.right, (in.top + in.bottom) / 2 + 10});
+        state.push_back("sat none");
+        return;
+    }
     int32_t y = tr.bottom + 10, lh = line_h() + 4;
     int32_t c0 = in.left + 12, step = 110;
     sw_font(c, f_bold, 0x99);
@@ -648,12 +705,12 @@ void ReportScreen::draw_security() {
         int32_t active = f.units_active[id] > 0xFA ? 0 : f.units_active[id];
         int32_t prod = f.units_queue[id] > 0xFA ? 0 : f.units_queue[id];
         int32_t lost = (int16_t)f.units_lost[id];
-        std::string name = std::string((Units[id].obsolete_factions & (1 << faction)) ? "*" : "") + Units[id].name;
+        std::string name = std::string((Units[id].obsolete_factions & (1 << faction)) ? "-" : "") + Units[id].name;
         StrBuffer[0] = 0;
         say_stats(StrBuffer, id, nullptr);
         std::string stats = StrBuffer;
-        std::string counts = "(" + num(active) + " " + sw_label(0x614) + ", " + num(prod) + " " + sw_label(0x618) + ", " +
-                             num(lost) + " " + sw_label(0x61C) + ")";
+        std::string counts = "{" + num(active) + " " + sw_label(0x614) + ", }" + num(prod) + " " + sw_label(0x618) + ", [" +
+                             num(lost) + " " + sw_label(0x61C) + "]";
         state.push_back("security " + num(id) + " " + name + " " + stats + " " + counts);
         if (r < scroll || r >= scroll + rows_shown) continue;
         int32_t y = top + (r - scroll) * row_h;
@@ -666,9 +723,10 @@ void ReportScreen::draw_security() {
         UiRect all{0, 0, c->width, c->height};
         Buffer_set_clip(c, &all);
         sw_font(c, f_text, 0x99);
+        Buffer_set_text_color2(c, 0xF2, -1, 1, 1);
+        Buffer_set_text_color3(c, 0xF9, -1, 1, 1);
         sw_text(this, c, name, in.left + 0x66, ty);
         sw_text(this, c, stats, (0x28A >> 1) + 0x28, ty);
-        sw_font(c, f_text, 0xF2);
         sw_text_right(this, c, counts, {in.left, ty, 0x28A - 2, ty + line_h()});
     }
 }
@@ -723,7 +781,7 @@ void ReportScreen::draw_score() {
             else if (f.player_flags & 0x100000) label = sw_label(0x1198);
             else if (!(GameState & 0x2000)) label = sw_label(0xE10);
         }
-        std::string v = (table[i] < 0 ? "-" : "+") + num(std::abs(table[i]));
+        std::string v = (table[i] < 0 ? "- " : "+ ") + num(std::abs(table[i]));
         sw_font(c, f_text, 0x99);
         sw_text(this, c, label, x, y);
         sw_text_right(this, c, v, {x, y, x + w, y + line_h()});
@@ -733,7 +791,7 @@ void ReportScreen::draw_score() {
     text_close();
     if (table[5]) {
         std::string label = sw_label(MapNativeLifeForms == 0 ? 0x904 : 0x908);
-        std::string v = (table[5] < 0 ? "-" : "+") + num(std::abs(table[5]));
+        std::string v = (table[5] < 0 ? "- " : "+ ") + num(std::abs(table[5]));
         sw_text(this, c, label, x, y);
         sw_text_right(this, c, v, {x, y, x + w, y + line_h()});
         state.push_back("score " + label + " " + v);
@@ -754,9 +812,12 @@ void ReportScreen::draw_score() {
 // ---- intelligence ----
 
 void ReportScreen::draw_intel() {
+    // ReportWin_draw_intel: the target's leader, the treaty, personality, interests, agenda,
+    // headquarters, reserves, research and votes (the mood line, say_special of Mood, is not
+    // written; the faction picture is not drawn).
     Buffer* c = &canvas;
     int32_t t = g_intel_target;
-    title("[" + up(sw_label(0xAE0)) + "]");
+    title("[" + up(adj(t)) + " " + up(sw_label(0xAE0)) + "]");
     UiRect in = inner(), tr = title_rect();
     int32_t x = in.left + 12, y = tr.bottom + 8, lh = line_h() + 2;
     auto line = [&](const std::string& s, int32_t color = 0x99) {
@@ -770,20 +831,29 @@ void ReportScreen::draw_intel() {
     line(std::string(m.title_leader) + " " + m.name_leader + " " + sw_label(0x2D0) + " " + m.noun_faction, 0xFF);
     std::string status;
     uint32_t d = Factions[faction].diplo_status[t];
-    if (d & 2) status = sw_label(0x34C);        // PACT
-    else if (d & 1 && d & 0x10) status = sw_label(0x350);  // TREATY
-    else if (d & 4) status = sw_label(0x358);   // VENDETTA
-    else if (d & 1) status = sw_label(0x354);   // TRUCE
-    line(sw_label(0xE98) + ": " + status);
-    line(sw_label(0xE4) + ": " + num(f.energy_credits));
-    StrBuffer[0] = 0;
-    if (f.tech_research_id >= 0) say_tech_2(StrBuffer, f.tech_research_id, 0);
-    line(sw_label(0x254) + ": " + StrBuffer);
-    line(sw_label(0xF00) + ": " + num(council_votes(t)));
+    if (d & 0x10) status = sw_label(0x358);      // VENDETTA
+    else if (d & 1) status = sw_label(0x34C);    // PACT
+    else if (d & 2) status = sw_label(0x350);    // TREATY
+    else if (d & 4) status = sw_label(0x354);    // TRUCE
+    line(sw_label(0xE98) + ":  " + status);
+    line(sw_label(0x5A0) + ":  " + sw_label(f.AI_fight < 1 ? (f.AI_fight < 0 ? 0x5AC : 0x5A8) : 0x5A4));
+    std::string interests;
+    const int32_t* ai = &f.AI_growth;
+    for (int32_t k = 0; k < 4; k++)
+        if (ai[k]) interests += (interests.empty() ? "" : ", ") + sw_label(0x824 + (uint32_t)k * 4);
+    line(sw_label(0x5B0) + ":  " + interests);
+    if (m.soc_priority_category >= 0 && m.soc_priority_model)
+        line(sw_label(0x5C0) + ":  " + std::string(SocialField[m.soc_priority_category].field_name) + ": " +
+             SocialField[m.soc_priority_category].soc_name[m.soc_priority_model]);
     int32_t hq = -1;
     for (int32_t b = 0; b < BaseCount; b++)
         if (Bases[b].faction_id == t && (Bases[b].facilities_built[0] & 2)) hq = b;  // FAC_HEADQUARTERS
-    if (hq >= 0) line(sw_label(0x5C4) + ": " + Bases[hq].name);
+    if (hq >= 0) line(sw_label(0x5C4) + ":  " + Bases[hq].name);
+    line(sw_label(0xE4) + ":  " + num(f.energy_credits));
+    StrBuffer[0] = 0;
+    if (f.tech_research_id >= 0) say_tech_2(StrBuffer, f.tech_research_id, 0);
+    line(sw_label(0x254) + ":  " + StrBuffer);
+    line(sw_label(0xF00) + ":  " + num(council_votes(t)));
 }
 
 void ReportScreen::iface_common(const std::string& head) {
@@ -801,6 +871,22 @@ void ReportScreen::redraw() {
     UiRect frame{0x17, 0, 0x28A + 0x17, c->height};
     Buffer_box_sprite(c, &frame, box_def(9));
     sw_restore_iface(this);
+    {
+        // The centre pane's header (ReportIf_draw_*): the report, M.Y.; base operations: the
+        // energy reserves.
+        static const uint32_t names[9] = {0xAE0, 0, 0xAC4, 0xA98, 0xACC, 0xAD0, 0xAD4, 0xAD8, 0xADC};
+        UiRect cp = mi_rect(kMiPaneCenter);
+        int32_t k = kind() >= 0 && kind() <= 8 ? kind() : 0;
+        std::string h = up(adj(faction)) + " " + up(sw_label(names[k])) + ",  " + sw_label(0xB68) + " " +
+                        num(game_year(CurrentTurn));
+        sw_font(&mi, f_bold, 0xE1);
+        sw_text_cent(this, &mi, h, {cp.left, cp.top + 4, cp.right, cp.top + 4 + f_bold->height});
+        if (k == kOps) {
+            sw_font(&mi, f_small, 0xF2);
+            sw_text_cent(this, &mi, up(sw_label(0xE4)) + ": " + num(Factions[faction].energy_credits),
+                         {cp.left, cp.top + 6 + f_bold->height, cp.right, cp.top + 6 + f_bold->height + f_small->height});
+        }
+    }
     switch (kind()) {
     case kLabs: draw_labs(); iface_labs(); break;
     case kEnergy: draw_energy(); iface_energy(); break;
@@ -813,6 +899,10 @@ void ReportScreen::redraw() {
     }
     for (int32_t i = 0; i < 7; i++)
         if (report_btn[i]) bw_button_set(report_btn[i], kind() == i + 2);
+    for (BaseButton* b : ops_iface) {
+        b->shown = kind() == kOps && (b->id == 0xD0A || b->id == 0xD0B || !ops_best);
+        if (b->id == 0xD0A || b->id == 0xD0B) bw_button_set(b, (b->id == 0xD0B) == ops_best);
+    }
     for (int32_t i = 0; i < 3; i++) {
         if (!ops_btn[i]) continue;
         ops_btn[i]->shown = kind() == kOps;
@@ -837,8 +927,12 @@ void ReportScreen::on_button(int32_t id) {
         if (kind() == id) sw_close(this);
         else switch_report(id);
     }
-    // ReportWin_on_button_clicked: the views of base operations.
+    // ReportWin_on_button_clicked: the views of base operations, DATALINKS (1), CLOSE (9).
     if (id >= 0x8B3 && id <= 0x8B5) g_ops_view = id - 0x8B3;
+    if (id == 9) sw_close(this);
+    if (id == 1) console_not_reconstructed("Datalink_exec");
+    if (id == 0xD0A || id == 0xD0B) ops_best = id == 0xD0B;
+    if (id >= 0xCEF && id <= 0xCF5 && kind() == kOps && faction == CurrentPlayerFaction) ops_governor(this, id);
 }
 
 // ReportWin_on_key_click.
@@ -994,12 +1088,33 @@ void open_reports(int32_t k) {
     for (int32_t i = 0; i < 3; i++) {
         s->ops_btn[i] = sw_button(s, up(sw_label(labels[i])).c_str(), 0x8B3 + i, lefts[i], by, rights[i] - lefts[i], 0x14, 0,
                                   s->f_bold);
-        s->ops_btn[i]->text_color[0] = 0x99;
-        s->ops_btn[i]->text_color[1] = 0xFF;
-        s->ops_btn[i]->text_color[2] = 0xFF;
     }
+    // DATALINKS (1) and CLOSE (9) below the report (ReportIf_on_status).
+    int32_t cx = (in.left + in.right) / 2, dl = in.left + 0x4B;
+    sw_button(s, up(sw_label(0x86C)).c_str(), 1, dl, in.bottom + 7, cx - 1 - dl, 0x14, 0, s->f_bold);
+    sw_button(s, up(sw_label(0xA64)).c_str(), 9, cx + 1, in.bottom + 7, cx - dl - 1, 0x14, 0, s->f_bold);
+    // Base operations' main interface: the GOVERNOR / BEST BASES tabs and the governor buttons.
+    s->ops_iface.clear();
+    const UiRect& q = mi_rect(kMiPaneQueue);
+    int32_t gx = q.left + 9, gw = (q.right - q.left) - 0x12;
+    s->ops_iface.push_back(sw_button(s, up(sw_label(0x7B8)).c_str(), 0xD0A, gx, q.top + 9, gw / 2 - 1, 0x14, 1, s->f_bold));
+    s->ops_iface.push_back(
+        sw_button(s, up(sw_label(0xAA8)).c_str(), 0xD0B, gx + gw / 2 + 1, q.top + 9, gw / 2, 0x14, 1, s->f_bold));
+    int32_t gy = q.top + 0x23;
+    s->ops_iface.push_back(sw_button(s, up(sw_label(0xBA8)).c_str(), 0xCEF, gx, gy, gw, 0x14, 1, s->f_bold));
+    for (int32_t k = 0; k < 4; k++) {
+        gy += 0x16;
+        std::string t = up(sw_label(0xBAC) + " " + sw_label(0x824 + (uint32_t)k * 4));
+        s->ops_iface.push_back(sw_button(s, t.c_str(), 0xCF0 + k, gx, gy, gw, 0x14, 1, s->f_bold));
+    }
+    gy += 0x16;
+    s->ops_iface.push_back(sw_button(s, up(sw_label(0xBB0)).c_str(), 0xCF4, gx, gy, gw, 0x14, 1, s->f_bold));
+    gy += 0x16;
+    s->ops_iface.push_back(sw_button(s, up(sw_label(0xBB4)).c_str(), 0xCF5, gx, gy, gw, 0x14, 1, s->f_bold));
+    s->ops_best = false;
     sw_run(s);
     sw_clear_buttons(s);
+    s->ops_iface.clear();
     for (auto& p : s->report_btn) p = nullptr;
     for (auto& p : s->ops_btn) p = nullptr;
 }

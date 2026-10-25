@@ -464,6 +464,9 @@ struct FameWinState : ScreenWin {
     void redraw() override;
     void on_button(int32_t id) override;
     void on_key(int32_t) override { sw_close(this); }
+    void on_click(int32_t, int32_t index, int32_t type, int32_t, int32_t, bool, bool) override {
+        if (type == 1 && index > 0 && index < 8) faction = index;  // ButtonGroup of the factions
+    }
     void log_state() override;
 };
 
@@ -472,49 +475,59 @@ FameWinState g_fw;
 uint8_t* fame_entry(int32_t f, int32_t slot) { return &HallOfFame[((f - 1) * 5 + slot) * 0x8C]; }
 
 void FameWinState::redraw() {
+    // FUN_00448400 / FUN_00448D90 (approximated layout): frame.pcx over the screen, hof.pcx (the
+    // panel: faction emblems, TOP 5 SCORES, WORLD MAP, SCORE ANALYSIS) centred; a click on an
+    // emblem shows that faction's top five.
     Buffer* c = &canvas;
     UiRect all{0, 0, c->width, c->height};
     Buffer_set_clip(c, &all);
     Buffer_fill_3(c, &all, 9);
-    {
-        Buffer bg;  // hof.pcx (FUN_00448400)
-        Buffer_ctor(&bg);
-        if (Buffer_load_pcx(&bg, "hof.pcx", nullptr, 10, 0xEC) == 0)
-            Buffer_copy_4(&bg, c, 0, 0, 0, 0, std::min(bg.width, c->width), std::min(bg.height, c->height));
-        else
-            Buffer_box_sprite(c, &all, box_def(9));
+    spot_init(&spots[0], 0x100);
+    Buffer bg;
+    Buffer_ctor(&bg);
+    if (Buffer_load_pcx(&bg, "frame.pcx", nullptr, 10, 0xEC) == 0)
+        Buffer_copy_4(&bg, c, 0, 0, 0, 0, std::min(bg.width, c->width), std::min(bg.height, c->height));
+    if (Buffer_load_pcx(&bg, "hof.pcx", nullptr, 10, 0xEC) == 0)
+        Buffer_copy_4(&bg, c, 0, 0, kOx, kOy, std::min(bg.width, c->width), std::min(bg.height, c->height));
+    // The six score categories (hoficons.pcx, 0x4F x 0x4F) and the factions' row (their names
+    // here where the original draws their emblems; the selected one framed).
+    if (Buffer_load_pcx(&bg, "hoficons.pcx", nullptr, 10, 0xEC) == 0) {
+        for (int32_t k = 0; k < 6; k++) {
+            Sprite icon;
+            pfncSpriteFromCanvasRectTrans(&icon, &bg, 9, 1 + k * 0x50, 1, 0x4F, 0x4F, 0);
+            sprite_copy1(&icon, c, 9, kOx + 0x5F + k * 0x6C, kOy + 0x23, 1, 1);
+        }
     }
-    UiRect in{0x10, 0x30, c->width - 0x10, c->height - 0x40};
-    Buffer_box_sprite(c, &in, box_def(0));
-    UiRect tr{in.left + 3, in.top + 3, in.right - 3, in.top + 0x1C};
-    Buffer_box_sprite(c, &tr, box_def(1));
-    sw_font(c, f_bold, 0x99);
-    sw_text_cent(this, c, sw_upper(sw_label(0x109C)) + ": " + sw_upper(MFactions[faction].noun_faction), tr);
-    int32_t y = tr.bottom + 10, lh = f_text->height + 2;
+    for (int32_t f = 1; f < 8; f++) {
+        UiRect r{kOx + 0x2D + (f - 1) * 0x6B, kOy + 0x8C, kOx + 0x2D + (f - 1) * 0x6B + 0x46, kOy + 0xD2};
+        spot_add(&spots[0], f, 1, r.left, r.top, r.right - r.left, r.bottom - r.top);
+        sw_font(c, f_text, f == faction ? 0xFF : 0x99);
+        sw_text_cent(this, c, MFactions[f].noun_faction, r);
+        if (f == faction) Buffer_box_2(c, &r, 0xFF, 0xFF);
+    }
+    sw_font(c, f_bold, 0);
+    sw_text_cent(this, c, sw_upper(sw_label(0x109C)), {kOx + 0x1C, kOy + 0xEE, kOx + 0x112, kOy + 0x100});
+    sw_text_cent(this, c, sw_upper(sw_label(0x4C8)), {kOx + 0x12E, kOy + 0xEE, kOx + 0x1FC, kOy + 0x100});
+    sw_text_cent(this, c, sw_upper(sw_label(0xF10)), {kOx + 0x226, kOy + 0xEE, kOx + 0x2F8, kOy + 0x100});
+    // The five entries in the TOP 5 SCORES column.
+    int32_t lh = f_text->height;
     for (int32_t slot = 0; slot < 5; slot++) {
         uint8_t* e = fame_entry(faction, slot);
+        int32_t y = kOy + 0x11B + slot * 0x3F;
         if (!(e[0] & 1)) continue;
         auto i32 = [&](int32_t o) { return *reinterpret_cast<int32_t*>(e + o); };
-        std::string who = std::string(reinterpret_cast<char*>(e + 0x22)) + " " + reinterpret_cast<char*>(e + 0x3A) + " " +
-                          sw_label(0x2D0) + " " + reinterpret_cast<char*>(e + 0x52);
-        std::string l = std::to_string(slot + 1) + ". " + sw_label(0xB68) + " " + std::to_string(i32(4)) + "  " + who;
+        std::string who = std::string(reinterpret_cast<char*>(e + 0x22)) + " " + reinterpret_cast<char*>(e + 0x3A);
         sw_font(c, f_text, 0xFF);
-        sw_text(this, c, l, in.left + 12, y);
-        y += lh;
-        std::string s = sw_label(0x1090) + ": " + std::to_string(i32(0x10)) + "   " + sw_label(0x6C0) + ": " +
-                        std::to_string(i32(8)) + "   " + sw_label(0x10A0) + ": " + std::to_string(e[0x20]);
-        if (e[0] & 2) s += "   " + sw_label(0x1044);
+        sw_text(this, c, std::to_string(slot + 1) + ". " + who, kOx + 0x26, y);
         sw_font(c, f_text, 0x99);
-        sw_text(this, c, s, in.left + 30, y);
-        y += lh + 6;
+        sw_text(this, c, sw_label(0xB68) + " " + std::to_string(i32(4)) + "  " + sw_label(0x6C0) + ": " +
+                             std::to_string(i32(8)), kOx + 0x26, y + lh);
+        sw_text(this, c, sw_label(0x1090) + ": " + std::to_string(i32(0x10)), kOx + 0x26, y + 2 * lh);
     }
-    for (BaseButton* b : buttons)
-        if (b->id >= 0x8AE && b->id < 0x8AE + 8) bw_button_set(b, b->id - 0x8AE == faction);
 }
 
 void FameWinState::on_button(int32_t id) {
     if (id == 0x7B8) sw_close(this);
-    else if (id > 0x8AE && id < 0x8AE + 8) faction = id - 0x8AE;
 }
 
 void FameWinState::log_state() {
@@ -571,17 +584,14 @@ void GAMEAPI hall_of_fame(int32_t add) {
     FameWinState* s = &g_fw;
     s->name = "halloffame";
     s->faction = CurrentPlayerFaction >= 1 && CurrentPlayerFaction < 8 ? CurrentPlayerFaction : 1;
-    sw_init(s, (ScreenWidth - 0x320) / 2, (ScreenHeight - 0x258) / 2, 0x320, 0x258, false);
-    s->f_text = find_font(14, 0);
-    s->f_bold = find_font(16, 1);
+    sw_init(s, (ScreenWidth - 0x400) / 2, ScreenHeight - 0x300, 0x400, 0x300, false);
+    s->f_text = find_font(12, 0);
+    s->f_bold = find_font(14, 1);
     sw_clear_buttons(s);
-    for (int32_t f = 1; f < 8; f++)
-        sw_button(s, MFactions[f].noun_faction, 0x8AE + f, 0x10 + (f - 1) * 0x6A, 8, 0x66, 0x1C, 0, s->f_text);
-    sw_button(s, sw_upper(sw_label(0xA64)).c_str(), 0x7B8, 0x320 / 2 - 0x50, 0x258 - 0x28, 0xA0, 0x1C, 0, s->f_bold);
-    for (BaseButton* b : s->buttons) {
-        b->text_color[0] = b->id == 0x7B8 ? 0x99 : 0;
-        b->text_color[2] = 0xFF;
-    }
+    BaseButton* close = sw_button(s, sw_upper(sw_label(0xA64)).c_str(), 0x7B8, kOx + 0x22C, kOy + 0x23A, 0xB8, 0x18, 0,
+                                  s->f_bold);
+    close->text_color[0] = 0;
+    close->text_color[2] = 0xFF;
     sw_run(s);
     sw_clear_buttons(s);
     if (FILE* f = std::fopen(fame_path().c_str(), "wb")) {

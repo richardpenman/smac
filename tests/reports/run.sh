@@ -103,7 +103,7 @@ check "alloc100 reload" "$(fs alloc100r 1 | sed 's/.* alloc //')" "6 1 3"
 #    NUTRIENT sort, the garrison view, a double click opens the base, its F-key closes), security
 #    nexus (the land units filter), score, projects, labs, energy, satellites; Right cycles.
 run reports147 --save work/saves_late/turn_147.sav --human 3 --keys \
-"F4,SHOT:ops.bmp,SCREENSTATE,CLICK:30x630,SCREENSTATE,CLICK:740x40,SHOT:garrison.bmp,SCREENSTATE,CLICK:530x40,\
+"F4,SHOT:ops.bmp,SCREENSTATE,CLICK:180x586,CLICK:30x628,SCREENSTATE,CLICK:740x40,SHOT:garrison.bmp,SCREENSTATE,CLICK:530x40,\
 DCLICK:400x120,BASESTATE,ESC,SCREENSTATE,F4,SCREENSTATE,\
 F7,SHOT:security.bmp,SCREENSTATE,CLICK:50x605,SCREENSTATE,F8,SHOT:score.bmp,SCREENSTATE,F5,SHOT:projects.bmp,SCREENSTATE,\
 F2,SHOT:labs.bmp,SCREENSTATE,F3,SHOT:energy.bmp,SCREENSTATE,F6,SHOT:sat.bmp,SCREENSTATE,RIGHT,SCREENSTATE,ESC,SCREENSTATE"
@@ -127,7 +127,7 @@ has reports147 "score total" "^report score total [0-9]+"
 has reports147 "projects" "^report project \{The Planetary Datalinks\} \{Koppernigk Observatory\} \(University\)"
 has reports147 "labs" "^report labs cost [0-9]+ accumulated 277 per turn"
 has reports147 "energy" "^report energy reserves 195 "
-has reports147 "satellites" "^report sat University "
+has reports147 "satellites (nobody has Orbital Spaceflight)" "^report sat none"
 check "right cycles to the security nexus" "$(grep -a '^reportstate' "$OUT/reports147.log" | tail -1 | cut -d' ' -f1-3)" \
     "reportstate kind 7"
 check "esc closes" "$(grep -a '^screenstate' "$OUT/reports147.log" | tail -1)" "screenstate none"
@@ -147,12 +147,30 @@ check "hallfame.jhh written" "$(stat -c %s "$OUT/monuments147/hallfame.jhh" 2>/d
 run monuments147r --save "$OUT/monuments147/after.sav" --human 3 --keys "F9,SCREENSTATE,ESC"
 check "monuments reload" "$(line monuments147r monustate 1)" "monustate f3 count 9 latest 7 zoom 0"
 
-# 6. turn_300 as faction 6 (three popups first, the last one opens a base window: Esc): every
+# 6. Base operations' governor (turn_147, University Base selected: Set to BUILD, then off) and the
+#    commlink panel (F12): the contacts, a right click's menu, Faction Profile (the intelligence
+#    report), the Council button (call_council: COUNCILNEEDALL here).
+run commlink147 --save work/saves_late/turn_147.sav --human 3 --keys \
+"F4,CLICK:500x75,CLICK:120x678,SCREENSTATE,CLICK:120x744,SCREENSTATE,ESC,F12,SHOT:commlink.bmp,SCREENSTATE,\
+RCLICK:950x365,SHOT:menu.bmp,SCREENSTATE,CLICK:900x394,SHOT:intel.bmp,SCREENSTATE,ESC,CLICK:950x478,ENTER,SCREENSTATE,ESC,\
+SCREENSTATE"
+nocrash commlink147
+check "governor set to build" "$(r commlink147 'ops 0 ' | head -1 | cut -d' ' -f5-10)" "2 University Base gov BUILD build"
+check "governor off" "$(r commlink147 'ops 0 ' | sed -n 2p | cut -d' ' -f5-11)" "2 University Base gov Governor Off build"
+check "commlink contacts" "$(line commlink147 multistate 1)" "multistate rows 2 4 5 6 7 votes 39 menu -1"
+check "commlink menu" "$(line commlink147 multistate 2 | sed 's/.* menu //')" "4"
+has commlink147 "faction profile" "^multiwin action 2 faction 4"
+has commlink147 "intelligence report" "^report intel CEO Morgan of the Morganites"
+has commlink147 "council" "^popup COUNCILNEEDALL shown"
+check "commlink closed" "$(grep -a '^screenstate' "$OUT/commlink147.log" | tail -1)" "screenstate none"
+
+# 7. turn_300 as faction 6 (three popups first, the last one opens a base window: Esc): every
 #    screen opens and closes.
 run late300 --save work/saves_late/turn_300.sav --human 6 --keys \
 "ENTER,ENTER,ENTER,BASESTATE,ESC,F4,SCREENSTATE,ESC,F7,ESC,F8,SCREENSTATE,ESC,F5,ESC,F2,ESC,F3,ESC,F6,ESC,e,SCREENSTATE,ESC,\
-F9,ESC,F10,ESC,SCREENSTATE"
+F9,ESC,F10,ESC,SCREENSTATE,F12,CLICK:950x478,SHOT:council.bmp,ESC,ESC"
 nocrash late300
+has late300 "council: the proposals" "^popup COUNCILISSUES shown"
 has late300 "base operations" "^reportstate kind 4 faction 6"
 has late300 "score" "^report score total"
 has late300 "social engineering" "^socialstate f6"

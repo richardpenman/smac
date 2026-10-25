@@ -1780,7 +1780,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         pfncMainMenuUpdateVisible(main_menu(self), mw(self, kConVeh));
         X_pop((GameMorePreferences & 0x200000) ? "MENUDETAIL" : "MENUSIMPLE", 0);
         break;
-    case 0x7B: console_not_reconstructed("MainInterface_on_iface_button_clicked"); break;  // F12
+    case 0x7B: MultiWin_show(nullptr); break;  // F12: MainInterface_on_iface_button_clicked(0x3EC)
     case 0x10008: console_not_reconstructed("Console_next_cursor"); break;  // shift+Backspace
     case 0x1004E: console_not_reconstructed("Console_name_landmark"); break;
     case 0x10051: console_not_reconstructed("Console_retire_game"); break;  // then the quit question

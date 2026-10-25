@@ -1,5 +1,6 @@
 // Script-driven popups of the original UI (see popup.h).
 #include "ui/popup.h"
+#include "ui/sprites.h"
 
 #include <algorithm>
 #include <cctype>
@@ -323,6 +324,10 @@ void popup_art_init() {
         extract(&g_bars[row][0], &canvas, 0x40, y, 3, 0x14);
         extract(&g_bars[row][1], &canvas, 0x44, y, 0x43, 0x14);
         extract(&g_bars[row][2], &canvas, 0x88, y, 3, 0x14);
+        // The same sprites at their original addresses (0x77A5C8 + row * 0x84: FlatButton_ctor's
+        // default look, the base window's and the screens' buttons).
+        for (int32_t part = 0; part < 3; part++)
+            *ArtSprite(0x77A5C8 + (uint32_t)row * 0x84 + (uint32_t)part * 0x2C) = g_bars[row][part];
     }
     for (int32_t i = 0, y = 1; i < 3; i++, y += 0x13) extract(&g_checks[i], &canvas, 0xE3, y, 0x12, 0x12);
     load_box_sprites();

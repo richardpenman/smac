@@ -15,6 +15,7 @@
 // not by those functions; the turn.flc animation, the button highlight states and the slide
 // animation of the arms are not drawn.
 #include "ui/console_frame.h"
+#include "ui/reports.h"
 
 #include <cstdio>
 #include <cstring>
@@ -248,7 +249,7 @@ void console_frame_mouse(int32_t type, int32_t x, int32_t y) {
     // MainInterface_on_iface_button_clicked: 0x3EB the menu, 0x3EC commlink (Alt / the menu
     // bar's HQ menu is the keyboard way to them).
     if (in(kMenuBtn)) console_menu_key(0x40000 | VKEY_MENU);
-    else if (in(kCommBtn)) console_not_reconstructed("MainInterface: commlink button");
+    else if (in(kCommBtn)) MultiWin_show(nullptr);
 }
 
 void console_frame_draw(Buffer* s) {

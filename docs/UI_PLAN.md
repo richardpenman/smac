@@ -109,6 +109,8 @@ src/app/smacx.cpp the native game executable
   | `pump` | wait_task, do_all_non_input, do_non_input, flush_input | win.cpp |
   | `popup` | popp, X_pop, X_pop_2, X_pops, X_pops_11, popb, POP2, POP3, NetMsg_pop, NetMsg_close, Popup_ctor/dtor, ui_first_base_name, ui_crash_landing_*, ui_pact_ends_dialog, ui_tech_popup_*, ui_production_popup_*, ui_council_menu_*, ui_supply_menu, ui_artifact_menu, ui_disembark_menu | win_popup.cpp, popup_menus.cpp (popup.cpp, font_text.cpp) |
   | `filebox` | FileDialog_*, FileBox_*, FileList_set_path/add_ext/close, ui_filebox_destroy (the dialogs of save_game / load_game) | console_filebox.cpp |
+  | `socialwin` | SocialWin_exec, SocialWin_close | socialwin.cpp |
+  | `reports` | report_score, report_intel, monument, hall_of_fame | reports.cpp, monuwin.cpp |
 
   To replace another function: move its headless definition into an area file of its own (or
   into the area it belongs to, if smacx implements the whole area), then define it in src/ui
@@ -207,7 +209,7 @@ computer players move with the engine.
 * **Save / load**: ctrl+S / ctrl+L (and the Game menu) run the engine's save_game / load_game with
   a simple file box (console_filebox.cpp): a name field, a list of saves; original naming.
 * **Placeholders** (src/ui/console_placeholders.cpp): the map cursor and selected unit are
-  diamonds; the F-key reports and HQ screens (F1..F7, F12), preferences, landmarks, the scenario
+  diamonds; the datalinks (F1, Datalink_exec), preferences, landmarks, the scenario
   editor, the unit menu of a right click, time controls, survey, assemble, tutorial hints log
   "not reconstructed". Multiplayer paths stop at the first network call.
 * **Testing**: `--keys` scripts input (characters, `C-`/`S-`/`A-` modifiers, `ALT`, `CLICK:XxY`,
@@ -352,3 +354,40 @@ functions, the unit colour tables), src/ui/x87.h (floating point helpers).
   invalid design (missile payload 0x17 on a cruiser on one tilted tile: ~120 pixels where its
   missile model meets the hull; the span calls, light tables and depth-clear rectangles were
   checked identical to the oracle's with slotlog, cause not found).
+
+
+## 8. Reports and HQ screens
+
+The keys are the original's (Console_on_key_click): `e` social engineering, F2 labs, F3 energy,
+F4 base operations, F5 secret projects, F6 satellites, F7 security nexus, F8 score, F9 monuments,
+F10 hall of fame, F11 menu detail, F12 the commlink panel (MainInterface_on_iface_button_clicked
+0x3EC). F1 (Datalink_exec, the help browser: ~30 KB of the original) is not reconstructed.
+
+* **Frame** (src/ui/screenwin.{h,cpp}, not an original class): a modal full-screen window with its
+  canvas, a copy of the main interface's canvas (the console art and pane rectangles of MainInfc),
+  FlatButtons (BaseButton of basewin_internal.h; interface.pcx bars 0x77A5C8, now also extracted
+  for the base window) and spots, run on ui_wait_input (keys, left / right / double clicks); a base
+  window opened from a screen gets the input until it closes.
+* **Social engineering** (socialwin.cpp: SocialWin_exec 0x4B2740 and the unnamed methods
+  0x4AE9E0..0x4B26D0): the game state changes are the original's (model choice with social_calc /
+  energy_compute, effect buttons, the allocation's +/- with locks and rebalancing, Reset, OK with
+  social_upheaval: UPHEAVALTOOMUCH / UPHEAVAL, net_energy; Cancel). synch_soc / synch_alloc are in
+  the engine (net.cpp). The models' effects are text instead of socwin.pcx icons.
+* **Reports** (reports.cpp: report_* 0x4AC9A0.., ReportWin / ReportIf): the report kinds and keys
+  of ReportWin_on_key_click; base operations with the eight sort keys (ReportIf_merge_sort), the
+  three views, selection, double click (BaseWin_zoom), the governor (picture click, GOVERNOR tab:
+  Set to EXPLORE.. / off); security nexus with the unit type filter; labs (Console_set_tech on the
+  research line); energy; projects; satellites; score (compute_score, #SCORING); the intelligence
+  file (report_intel). Layout at the original's rectangles; the labs tree, the energy budget's two
+  columns, the base locator map, the satellite FLC and scroll bars are simplified or missing.
+* **Monuments / hall of fame** (monuwin.cpp): MonuWin's slots, icons (monicons.pcx), texts
+  (monument.txt with MonuWin_on_redraw's parse slots), pictures (monbigN.pcx) and the recorded
+  latest monument; the background FLC is not decoded. FameWin: frame.pcx / hof.pcx, the faction's
+  top five of hallfame.jhh (read and written in --outdir).
+* **Commlink panel** (multiwin.cpp: MultiWin): contacts, treaties, votes, commlink_attempt, the
+  right click's menu (report_intel, renounce_pact, demands_withdrawal, call_council), the Council
+  button (call_council). Modal here (the original keeps it beside the map).
+* **Testing**: tests/reports/run.sh (SCREENSTATE / FACTIONSTATE dumps, saves reloaded);
+  tests/reports/compare.sh drives the plain original (orig_reports.steps, Difficulty=2) through
+  QUICK START and the same keys and scores each screen against smacx's.
+

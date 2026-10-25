@@ -431,7 +431,7 @@ bool ui_wait_input(UiInput* in) {
     static int32_t last_x = -100, last_y = -100;
     *in = UiInput();
     if (pending_up >= 0) {  // the release of a scripted click
-        in->type = UiInput::LUP;
+        in->type = pending_up == 2 ? UiInput::RUP : UiInput::LUP;
         in->x = pending_x;
         in->y = pending_y;
         pending_up = -1;
@@ -444,6 +444,13 @@ bool ui_wait_input(UiInput* in) {
             g_script.pop_front();
             ui_trace(("wait_input key " + std::to_string(k.vk) + " " + k.command).c_str());
             int32_t x, y;
+            if (std::sscanf(k.command.c_str(), "rclick %d %d", &x, &y) == 2) {
+                in->type = UiInput::RDOWN;
+                in->x = pending_x = x;
+                in->y = pending_y = y;
+                pending_up = 2;
+                return true;
+            }
             bool dbl = std::sscanf(k.command.c_str(), "dclick %d %d", &x, &y) == 2;
             if (dbl || std::sscanf(k.command.c_str(), "click %d %d", &x, &y) == 2) {
                 in->type = UiInput::LDOWN;
@@ -487,6 +494,10 @@ bool ui_wait_input(UiInput* in) {
         }
         if (ev.type == platform::EV_MOUSE_MOVE) {
             in->type = UiInput::MOVE;
+            return true;
+        }
+        if (ev.type == platform::EV_RBUTTON_DOWN || ev.type == platform::EV_RBUTTON_UP) {
+            in->type = ev.type == platform::EV_RBUTTON_DOWN ? UiInput::RDOWN : UiInput::RUP;
             return true;
         }
     }
