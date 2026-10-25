@@ -41,8 +41,6 @@ int32_t GAMEAPI tech_pick(int32_t faction_id, int32_t is_free, int32_t from_fact
     }
     return listed ? best : -1;
 }
-
-void GAMEAPI monument(int32_t) {}
 #endif
 #ifndef SMACX_HYBRID
 // No sound, no windows.

@@ -95,6 +95,15 @@ bool bw_own_base();
 void bw_redraw();
 void bw_button_set(BaseButton* b, int32_t on);
 void bw_button_draw(BaseButton* b);
+// FlatButton_ctor's look / BaseButton_init (also used by the screens of screenwin.h).
+void bw_button_ctor(BaseButton* b);
+void bw_button_init(BaseButton* b, const char* text, int32_t id, int32_t x, int32_t y, int32_t w, int32_t h,
+                    int32_t parent);
+// MainInterface_init's parts the base window and the screens need (console art, pane rectangles)
+// and the console art as loaded.
+void basewin_mi_init();
+const std::vector<uint8_t>& basewin_mi_back();
+Buffer* basewin_mi_canvas();
 BaseButton* bw_button(int32_t id);
 void mi_restore_back(int32_t clip);
 void iface_set_mode(int32_t mode);

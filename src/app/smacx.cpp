@@ -25,7 +25,9 @@
 // C-x (ctrl), S-x (shift), CLICK:XxY (a left click in a popup), POPUP:FILE/LABEL[/FLAGS[/PCX]]
 // (shows a script popup, a test aid), BASEDUMP:FILE (the open base window's canvases in the
 // oracle's basedump format), BASE:N (opens base N's window, a test aid), BASESTATE (the open
-// base's production, queue, workers and stores on stderr), and the commands SHOT[:FILE]
+// base's production, queue, workers and stores on stderr), SCREENSTATE (the open report / social
+// engineering / monuments screen: its texts and state), FACTIONSTATE (the viewer's social choice,
+// energy allocation, credits and upheaval paid), and the commands SHOT[:FILE]
 // (screenshot), SAVE:FILE (save the game
 // and its generators in FILE.rng, relative to --outdir), UNITS (list the human's units on
 // stderr), QUIT. --exit-after-keys (default with --hidden) quits when they run out.
@@ -426,6 +428,10 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         out->command = "base " + tok.substr(5);
         return true;
     }
+    if (tok == "SCREENSTATE" || tok == "FACTIONSTATE") {  // the open screen / the viewer's faction (test aids)
+        out->command = tok == "SCREENSTATE" ? "screenstate" : "factionstate";
+        return true;
+    }
     if (tok == "BASESTATE") {  // the open base's production, queue and workers on stderr (test aid)
         out->command = "basestate";
         return true;
@@ -434,10 +440,12 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         out->command = "popup " + tok.substr(6);
         return true;
     }
-        if (tok.rfind("CLICK:", 0) == 0) {  // CLICK:XxY, a left click at screen (X, Y) for a popup
+        if (tok.rfind("CLICK:", 0) == 0 || tok.rfind("DCLICK:", 0) == 0) {  // CLICK:XxY, a left click at screen
+        // (X, Y) for a popup; DCLICK:XxY, the second click of a double click (modal windows)
         int32_t x = 0, y = 0;
-        if (std::sscanf(tok.c_str() + 6, "%dx%d", &x, &y) != 2) return false;
-        out->command = "click " + std::to_string(x) + " " + std::to_string(y);
+        bool dbl = tok[0] == 'D';
+        if (std::sscanf(tok.c_str() + (dbl ? 7 : 6), "%dx%d", &x, &y) != 2) return false;
+        out->command = (dbl ? "dclick " : "click ") + std::to_string(x) + " " + std::to_string(y);
         return true;
     }
         if (tok.rfind("RCLICK:", 0) == 0 || tok.rfind("MOVE:", 0) == 0) {  // a right click / mouse move

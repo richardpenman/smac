@@ -184,6 +184,12 @@ void button_init(BaseButton* b, const char* text, int32_t id, int32_t x, int32_t
 
 }  // namespace
 
+void bw_button_ctor(BaseButton* b) { button_ctor(b); }
+void bw_button_init(BaseButton* b, const char* text, int32_t id, int32_t x, int32_t y, int32_t w, int32_t h,
+                    int32_t parent) {
+    button_init(b, text, id, x, y, w, h, parent);
+}
+
 // BaseButton_set (0x607C80): the toggled state (pressed look).
 void bw_button_set(BaseButton* b, int32_t on) {
     if (b->set_state == on) return;
@@ -294,6 +300,9 @@ void mi_init() {
 }
 
 }  // namespace
+
+void basewin_mi_init() { mi_init(); }
+const std::vector<uint8_t>& basewin_mi_back() { return g_bw.mi_back; }
 
 // MainInterface_restore_back (0x45C290): the panes' background (the centre of box 9 tiled).
 void mi_restore_back(int32_t clip) {

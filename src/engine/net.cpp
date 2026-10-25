@@ -2,6 +2,17 @@
 #include "engine/net.h"
 
 #include "engine/map.h"
+#include "engine/ui_bridge.h"
+
+// NetDaemon_synch(&NetState, type 0xC / 0xD, faction_id, 0, 0, 0, 1, 0x2101); it returns at once
+// without multiplayer.
+void GAMEAPI synch_alloc(int32_t faction_id) {
+    if (MultiplayerActive) NetDaemon_synch(&NetState, 0xC, faction_id, 0, 0, 0, 1, 0x2101);
+}
+
+void GAMEAPI synch_soc(int32_t faction_id) {
+    if (MultiplayerActive) NetDaemon_synch(&NetState, 0xD, faction_id, 0, 0, 0, 1, 0x2101);
+}
 
 // Tiles are visited in storage order: row y holds x = (y & 1), (y & 1) + 2, ...
 void GAMEAPI rebuild_vehicle_bits() {

@@ -5,6 +5,7 @@
 // sounds, most orders) go to placeholders (console_placeholders.cpp) or the bridge's headless
 // versions; their game-state effects, where they have any, are noted at the call.
 #include "ui/console.h"
+#include "ui/reports.h"
 
 #include <cctype>
 #include <cstdio>
@@ -1766,12 +1767,12 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         else console_not_reconstructed("ReportIf_done");
         break;
     case 0x70: console_not_reconstructed("Datalink_exec"); break;     // F1
-    case 0x71: console_not_reconstructed("report_labs"); break;       // F2
-    case 0x72: console_not_reconstructed("report_energy"); break;     // F3
-    case 0x73: console_not_reconstructed("report_ops"); break;        // F4
-    case 0x74: console_not_reconstructed("report_projects"); break;   // F5
-    case 0x75: console_not_reconstructed("report_sat"); break;        // F6
-    case 0x76: console_not_reconstructed("report_security"); break;   // F7
+    case 0x71: report_labs(); break;                                   // F2
+    case 0x72: report_energy(); break;                                 // F3
+    case 0x73: report_ops(); break;                                    // F4
+    case 0x74: report_projects(); break;                               // F5
+    case 0x75: report_sat(); break;                                    // F6
+    case 0x76: report_security(); break;                               // F7
     case 0x78: monument(0); break;                                     // F9
     case 0x79: hall_of_fame(0); break;                                 // F10
     case 0x7A:                                                         // F11: menu detail

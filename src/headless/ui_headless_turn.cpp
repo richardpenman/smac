@@ -41,9 +41,7 @@ void GAMEAPI clear_council_notify(int32_t faction_id) {
 }
 void GAMEAPI diplo(int32_t, int32_t) {}
 void GAMEAPI show_credits() {}
-void GAMEAPI report_score(int32_t) {}
 void GAMEAPI quayle(int32_t) {}
-void GAMEAPI hall_of_fame(int32_t) {}
 // The end of the game for the harness (g_harness_game_end: final snapshot, exit), as the oracle
 // does at the original's show_replay.
 void GAMEAPI show_replay() {

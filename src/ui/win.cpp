@@ -20,6 +20,7 @@
 #include "ui/console_frame.h"
 #include "ui/mapwin.h"
 #include "ui/popup.h"
+#include "ui/screenwin.h"
 
 bool g_ui_exit_when_script_done = false;
 std::string g_ui_outdir = ".";
@@ -180,6 +181,14 @@ bool run_command(const std::string& cmd) {
         if (id >= 0 && id < BaseCount) BaseWin_zoom(&BaseWin, id, 0);
         return true;
     }
+    if (cmd == "screenstate") {  // test aid: the open screen's texts and state (screenwin.h)
+        screens_log_state();
+        return true;
+    }
+    if (cmd == "factionstate") {  // test aid: the viewer's social choice and allocation (screenwin.h)
+        screens_log_faction();
+        return true;
+    }
     if (cmd == "quit") {
         ControlTurnA = 1;
         return true;
@@ -278,6 +287,7 @@ void ui_present() {
         draw_tile_marker(Vehs[MapWinVehA].x, Vehs[MapWinVehA].y, 0xFB);
     if (g_drag_x >= 0) draw_tile_marker(g_drag_x, g_drag_y, 0xFA);
     console_frame_draw(&g_canvas);
+    screens_compose(&g_canvas);  // full-screen windows (reports, social engineering; screenwin.h)
     basewin_compose(&g_canvas);  // the base window over the console frame
     console_menu_draw(&g_canvas);
     popup_draw_windows(&g_canvas);
@@ -434,10 +444,12 @@ bool ui_wait_input(UiInput* in) {
             g_script.pop_front();
             ui_trace(("wait_input key " + std::to_string(k.vk) + " " + k.command).c_str());
             int32_t x, y;
-            if (std::sscanf(k.command.c_str(), "click %d %d", &x, &y) == 2) {
+            bool dbl = std::sscanf(k.command.c_str(), "dclick %d %d", &x, &y) == 2;
+            if (dbl || std::sscanf(k.command.c_str(), "click %d %d", &x, &y) == 2) {
                 in->type = UiInput::LDOWN;
                 in->x = pending_x = x;
                 in->y = pending_y = y;
+                in->double_click = dbl;  // DCLICK: the second press of a double click
                 pending_up = 1;
                 return true;
             }
