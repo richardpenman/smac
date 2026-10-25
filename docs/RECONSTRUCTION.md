@@ -102,6 +102,22 @@ Ghidra prints `game_random`'s scaling as a signed `>>`, but the code uses `shr` 
   in-bounds index and drop or reorder the access. (GCC builds add
   `-fno-aggressive-loop-optimizations` as a backstop; clang has no such option.)
 
+* **Out-of-bounds reads into pointer tables.** When such a read lands in a table that native
+  builds keep outside the image (`GLOBAL_NATIVE`: it holds string pointers), the image bytes there
+  are stale. Read through `rules_orig_byte(addr)` (rules.h). It rebuilds Armor, Tech and Reactor
+  in their original 32-bit layout. String pointers become the original's addresses: the
+  StringTable pool sits at 0x01FBD3B8 in every oracle run, and native `Strings_put` allocates in
+  the same order. Known cases:
+  * `arm_val` is passed unit ids by `base_build` (BUG(original)). Ids 14..511 read Tech, including
+    the low bytes of name pointers (ids 22, 33, ...; e.g. id 44 reads -62, a "psi" armor). Before
+    the fix, native late100 diverged on turn 103, and the result depended on which native
+    globals happened to follow `Armor`.
+  * `Vehs[-1]` (0x9527F4) is the Reactor table. `Vehs[-1].unit_id` is the high half of
+    `Reactor[0].name_short` (0x01FC = 508), and `.faction_id` is `Reactor[0].power` (0). Readers:
+    `battle_fight_2` (pop loss of an undefended base: native probe131 diverged on turn 129), and
+    the `veh_at` result in `ai.cpp`'s attack odds. `veh_init` writes `Vehs[-1].morale` (Reactor[2]
+    preq_tech) when the table is full; native does not mirror that.
+
 ### Known uninitialised reads in the original (must be emulated)
 
 The original reads stack memory it never wrote in these places. The oracle makes them canonical
@@ -162,6 +178,13 @@ The original reads stack memory it never wrote in these places. The oracle makes
    `enemy_strategy` calls for factions 2/4 with residue 0xFFFF in faction 4's slot). Exact native
    behaviour needs the callers (`enemy_strategy`, `encounter`) to emulate their callees' dead frames
    and store them in `WantsToAttackResidue`. Marked `BUG(original)`.
+   **Still open in native late140** (turn 142, call 20 of enemy_veh = veh 206). This path is
+   spot_all -> encounter -> wants_to_attack(2, 4) / (4, 2). slotlog shows the slots holding residue
+   of UI/Win32 frames at that depth: 0x014101C1, 0x003152F4, 0x7A6D9ADF (a Wine address), and so
+   on. Natively, factions 2/4 then compare against small residues and come out at vendetta
+   instead of a treaty. Headless UI calls leave no frames, so native code cannot reproduce this
+   residue. A canonical value would need oracle-side poisoning before `encounter`, which would
+   change the references (decision pending).
 5. **`order_veh` (0x5947C0), `[ebp-0x24]`** ("move shown to the viewer"): the slot also holds the
    target stack offset (`stack_id * 0x34`) and the native-spawn chance; the dir 8 path reaches the
    post-move code without setting it. Only display timing (`clock_wait`), `boom` and viewer

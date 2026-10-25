@@ -62,9 +62,21 @@ void ui_stringlist_add(uint8_t* list, int32_t id, char* text);
 // ---- Console (main game UI controller) ----
 GLOBAL(uint8_t, MainConsole, 0x9156B0);  // Console object (UI)
 ADDR_NATIVE(0x5108A0) int32_t THISCALL Console_focus(uint8_t* console, int32_t x, int32_t y, int32_t faction_id);
-// AI unit upgrade (enemy_strategy): upgrades an obsolete unit, spending credits. Changes game state:
-// declared with ADDR (not reconstructed: hybrid forwards to the original, native aborts).
+// Unit upgrade command (enemy_strategy, Console_menu_proc, Console_veh_key): AI factions buy the
+// first eligible prototype if they can afford it (reconstructed in ai.cpp); human factions get
+// the dialog (Console_upgrade_human). Returns 1 if the unit was upgraded.
 ADDR(0x4D06C0) int32_t THISCALL Console_upgrade(uint8_t* console, int32_t veh_id);
+// Next unit of the viewer ready to move (a: start veh id, -1: from the beginning); -1 if none.
+ADDR_NATIVE(0x510CE0) int32_t THISCALL Console_ready_search(uint8_t* console, int32_t a);
+// Puts the console into unit move mode (pact_withdraw, after moving the selected unit).
+ADDR_NATIVE(0x511520) void THISCALL Console_set_move(uint8_t* console, int32_t a);
+// Not an original function: pact_ends' dialog for the viewer ("ENDPACT1", and "ENDPACT2" when
+// units were withdrawn), a Popup object on the original's stack. Viewer only: no-op in headless
+// and hybrid builds (observer games never reach it).
+void ui_pact_ends_dialog(int32_t withdrawn);
+// Not an original function: Console_upgrade for a unit of a human faction (the upgrade dialog).
+// Hybrid: runs the original Console_upgrade; headless: no human players, returns 0 (cancelled).
+int32_t THISCALL Console_upgrade_human(uint8_t* console, int32_t veh_id);
 
 // ---- popups ----
 ADDR_NATIVE(0x48C0A0) int32_t GAMEAPI popp(const char* file, const char* label, int32_t flags, const char* pcx,

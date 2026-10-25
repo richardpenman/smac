@@ -26,7 +26,13 @@ constexpr uint32_t kUnitCustomName = 0x2;
 constexpr uint32_t kUnitPrototyped = 0x4;
 
 inline int32_t weap_off(int32_t weapon_id) { return Weapon[weapon_id].offense_value; }
-inline int32_t arm_def(int32_t armor_id) { return Armor[armor_id].defense_value; }
+// Armor[armor_id].defense_value. base_build passes unit ids (up to 511) to arm_val (BUG(original)),
+// which reads past the table into Tech and the globals after it: those reads see the original's
+// memory (rules_orig_byte), including the low bytes of Tech name pointers.
+inline int32_t arm_def(int32_t armor_id) {
+    if ((uint32_t)armor_id < 14) return Armor[armor_id].defense_value;
+    return (int8_t)rules_orig_byte(0x94F278 + (uint32_t)armor_id * 0x10 + 8);
+}
 inline char* S(const char* str) { return Strings_get(&StringTable, str); }
 inline uint8_t faction_bit(int32_t faction_id) { return (uint8_t)(1u << (faction_id & 31)); }
 inline bool is_human(int32_t faction_id) { return (FactionStatus[0] & faction_bit(faction_id)) != 0; }

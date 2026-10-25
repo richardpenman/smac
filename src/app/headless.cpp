@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <string>
 
+#include "engine/ai.h"
 #include "engine/clock.h"
 #include "engine/game.h"
 #include "engine/map.h"
@@ -110,6 +111,53 @@ static void before_turn_upkeep() {
         logf_("turn limit reached, exiting\nexit=0\n");
         std::exit(0);
     }
+}
+
+// ---- trace (mirrors oracle.cpp): 1 logs the RNGs at each faction step, 2 also dumps the state
+// (step_TTT_F_{a_upkeep,b_enemy}), 3 <turn> dumps it before every enemy_veh call of that turn ----
+static int g_trace = 0, g_trace_turn = -1, g_trace_seq = 0;
+
+static void write_step(const char* name) {
+    write_state(g_outdir + "/" + name + ".state");
+    if (FILE* f = std::fopen((g_outdir + "/" + name + ".rng").c_str(), "w")) {
+        std::fprintf(f, "crt %u\ngame %u\nclock %u\nturn %d\n", crt_rand_state(), game_random_state(),
+                     engine_logic_clock_state(), CurrentTurn);
+        std::fclose(f);
+    }
+}
+
+static void trace_point(const char* what, int32_t f) {
+    if (!g_trace || g_trace >= 4) return;
+    logf_("%s %d turn=%d crt=%u game=%u\n", what, f, CurrentTurn, crt_rand_state(), game_random_state());
+    if (g_trace >= 2) {
+        char name[64];
+        std::snprintf(name, sizeof(name), "step_%03d_%d_%s", CurrentTurn, f, what);
+        write_step(name);
+    }
+}
+
+static int32_t harness_faction_upkeep(int32_t f) {
+    trace_point("a_upkeep", f);
+    faction_upkeep(f);
+    return 0;
+}
+
+static int32_t harness_enemy_turn(int32_t f) {
+    trace_point("b_enemy", f);
+    enemy_turn(f);
+    return 0;
+}
+
+static int32_t harness_enemy_veh(int32_t veh_id) {
+    if (g_trace == 5 && CurrentTurn == g_trace_turn) {
+        // Not in the oracle: only logs the RNGs before each enemy_veh call (no state files).
+        logf_("enemy_veh c%05d veh%d crt=%u game=%u\n", g_trace_seq++, veh_id, crt_rand_state(), game_random_state());
+    } else if (g_trace >= 3 && g_trace < 5 && CurrentTurn == g_trace_turn) {
+        char name[64];
+        std::snprintf(name, sizeof(name), "step_%03d_9_c%05d_veh%d", CurrentTurn, g_trace_seq++, veh_id);
+        write_step(name);
+    }
+    return enemy_veh(veh_id);
 }
 
 // ---- newgame (mirrors oracle.cpp cmd_newgame) ----
@@ -208,8 +256,15 @@ static int32_t run_script() {
         if (*args) *args++ = 0;
         args += std::strspn(args, " \t");
         logf_("> %s %s\n", cmd, args);
-        if (!std::strcmp(cmd, "outdir") || !std::strcmp(cmd, "patch") || !std::strcmp(cmd, "trace")) {
-            // outdir is set on the command line; patch/trace only apply to the hybrid oracle
+        if (!std::strcmp(cmd, "outdir") || !std::strcmp(cmd, "patch")) {
+            // outdir is set on the command line; patch only applies to the hybrid oracle
+        } else if (!std::strcmp(cmd, "trace")) {
+            std::sscanf(args, "%d %d", &g_trace, &g_trace_turn);
+            if (g_trace) {
+                g_harness_faction_upkeep = harness_faction_upkeep;
+                g_harness_enemy_turn = harness_enemy_turn;
+            }
+            if (g_trace >= 3) g_harness_enemy_veh = harness_enemy_veh;
         } else if (!std::strcmp(cmd, "seed")) {
             unsigned a = 0, b = 0;
             std::sscanf(args, "%u %u", &a, &b);

@@ -15,6 +15,20 @@ GLOBAL_NATIVE(char* [8], Repute, 0x946A30);
 GLOBAL_NATIVE(const char*, AlphaxFileName, 0x691AFC);
 GLOBAL_NATIVE(const char*, ScriptFileName, 0x691B0C);
 
+// Byte of the original's 32-bit memory at `addr`, for out-of-range reads past rule tables that
+// native builds keep outside the memory image (they hold string pointers): Armor (0x94F278), Tech
+// (0x94F358) and Reactor (0x9527F8, read as Vehs[-1]) are rebuilt in their original layout,
+// string pointers as the original's addresses (rules_orig_string_addr); other addresses are read
+// from the memory image. Hybrid builds read the original memory.
+uint8_t rules_orig_byte(uint32_t addr);
+inline int16_t rules_orig_i16(uint32_t addr) {
+    return (int16_t)(rules_orig_byte(addr) | (rules_orig_byte(addr + 1) << 8));
+}
+// The original's address of a string in StringTable: its pool sits at 0x01FBD3B8 in every
+// oracle run (allocated at boot under Wine), and native Strings_put allocates in the same order.
+// Other pointers: 0 (none occur in the emulated reads).
+uint32_t rules_orig_string_addr(const char* str);
+
 // Tech id of a short tech name ("None": -1, "Disable": -2). Trailing blanks of name are removed in
 // place. Unknown names show the BADTECHKEY error and yield -2.
 ADDR(0x584D60) int32_t GAMEAPI tech_name(char* name);

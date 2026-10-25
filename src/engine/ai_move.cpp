@@ -31,6 +31,7 @@
 #include "engine/path.h"
 #include "engine/probe.h"
 #include "engine/proto.h"
+#include "engine/rules.h"
 #include "engine/score.h"
 #include "engine/stack.h"
 #include "engine/tech.h"
@@ -3698,7 +3699,8 @@ Flow em_sea(EM& m) {
 
 // Faction of vehicle `veh_id` as the original reads it (also for -1: the bytes before Vehs).
 inline uint8_t veh_faction_raw(int32_t veh_id) {
-    return *(reinterpret_cast<const uint8_t*>(&Vehs[0]) + veh_id * (int32_t)sizeof(VEH) + offsetof(VEH, faction_id));
+    if ((uint32_t)veh_id < 2049) return Vehs[veh_id].faction_id;
+    return rules_orig_byte(0x952828 + (uint32_t)veh_id * 0x34 + offsetof(VEH, faction_id));
 }
 
 // L_57707f / L_57708a: pioneering land units in a region without own bases ask for a transport

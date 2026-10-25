@@ -455,7 +455,10 @@ int32_t GAMEAPI compute_odds(int32_t odds, int32_t faction_id, int32_t veh_id, i
                 int32_t sy = NearOffsetY[i] + ty;
                 if (!map_in_bounds(sx, sy)) continue;
                 int32_t v = veh_at(sx, sy);
-                if (Vehs[v].faction_id == (uint32_t)faction_id) near += stack_check(v, 3, 0, -1, -1);
+                // BUG(original): v may be -1 (no unit): Vehs[-1] lies in the Reactor table.
+                uint32_t v_faction = (uint32_t)v < 2049 ? Vehs[v].faction_id
+                                                        : rules_orig_byte(0x952828 + (uint32_t)v * 0x34 + offsetof(VEH, faction_id));
+                if (v_faction == (uint32_t)faction_id) near += stack_check(v, 3, 0, -1, -1);
             }
             int32_t n = stack_check(veh_id_tgt, 0x10, -1, -1, -1);
             if (n) {
@@ -3118,4 +3121,51 @@ base_attack:
         }
     }
     return -3;
+}
+
+// ---- Console_upgrade (ui module 0x4D06C0): unit upgrade ----------------------------------------------------
+
+// The engine part of the upgrade command. For AI factions (enemy_strategy) the first prototype that
+// may replace the unit is bought if the faction can afford it; human factions get the original
+// dialog (Console_upgrade_human, UI bridge). The original builds its popup objects in both cases
+// (no game state).
+int32_t THISCALL Console_upgrade(uint8_t* console, int32_t veh_id) {
+    if (veh_id < 0) return 0;
+    int32_t faction_id = Vehs[veh_id].faction_id;
+    uint8_t self_bit = (uint8_t)(1 << faction_id);
+    if (FactionStatus[0] & self_bit) return Console_upgrade_human(console, veh_id);
+    int32_t unit_id = Vehs[veh_id].unit_id;
+    if (unit_id < 64 && (Weapon[Units[unit_id].weapon_id].offense_value < 0 || unit_id == 15)) return 0;
+    for (int32_t i = 0; i < 64; i++) {
+        int32_t new_id = faction_id * 64 + i;
+        const UNIT& u = Units[new_id];
+        if (!(u.unit_flags & 1) || !(u.unit_flags & 4) || (u.obsolete_factions & self_bit)) continue;
+        unit_id = Vehs[veh_id].unit_id;
+        const UNIT& old = Units[unit_id];
+        if (new_id == unit_id || u.group_id != old.group_id || u.chassis_id != old.chassis_id) continue;
+        int32_t abil_new = has_abil(new_id, 0x8000);
+        if (abil_new != has_abil(unit_id, 0x8000)) continue;
+        if (u.plan != old.plan) continue;
+        int8_t offense = Weapon[old.weapon_id].offense_value;
+        if (offense == 0 ? old.weapon_id != u.weapon_id : offense > Weapon[u.weapon_id].offense_value) continue;
+        if (Armor[old.armor_id].defense_value > Armor[u.armor_id].defense_value) continue;
+        // The first candidate decides.
+        int32_t cost = upgrade_cost(faction_id, new_id, unit_id) * 10;
+        Faction& f = Factions[faction_id];
+        int32_t discount = DiffLevel * cost / 10 / (8 - Factions[RankingFactionIDUnk1].ranking);
+        int32_t credits = f.energy_credits;
+        if (credits > Factions[RankingFactionIDUnk2].energy_credits) {
+            if (credits >= 1000) discount /= 2;
+            if (credits >= 2000) discount = 0;
+        }
+        cost -= discount;
+        if (cost >= credits / ((u.plan != 2) - f.AI_power + f.AI_wealth + 1 + f.base_count)) return 0;
+        f.energy_credits = credits - cost;
+        f.units_active[unit_id]--;
+        Vehs[veh_id].unit_id = (int16_t)new_id;
+        f.units_active[new_id]++;
+        if (unit_triad(new_id) != 2) veh_skip(veh_id);
+        return 1;
+    }
+    return 0;
 }

@@ -45,6 +45,9 @@ ADDR(0x53A100) int32_t GAMEAPI reputation(int32_t faction_id, int32_t faction_id
 ADDR(0x55B820) void GAMEAPI agenda_off(int32_t faction_id, int32_t faction_id_with, uint32_t agenda);
 // Ends a pact between two factions (units withdrawn from each other's bases, messages).
 ADDR(0x53C650) void GAMEAPI pact_ends(int32_t faction_id, int32_t faction_id_with);
+// Moves faction_id's units in or in the territory of faction_id_with's bases to the nearest own
+// base they can reach. Returns the number of units moved.
+ADDR(0x53C370) int32_t GAMEAPI pact_withdraw(int32_t faction_id, int32_t faction_id_with);
 // communicate (0x54FFD0), the diplomacy dialog with a human player: engine/ui_bridge.h.
 // Multiplayer: takes / releases the global diplomatic lock. diplo_lock returns non-zero when the
 // player gave up waiting.

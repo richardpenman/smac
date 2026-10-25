@@ -22,6 +22,7 @@ extern "C" int32_t GAMEAPI morale_veh_impl_c(int32_t veh_id, int32_t check_drone
 #include "engine/parse.h"
 #include "engine/proto.h"
 #include "engine/random.h"
+#include "engine/rules.h"
 #include "engine/stack.h"
 #include "engine/tech.h"
 #include "engine/ui_bridge.h"
@@ -140,7 +141,11 @@ int32_t veh_vector_dist(int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
 namespace {
 // Raw view of the vehicle table: the original reads Vehs[-1] in a few places.
 uint8_t* veh_raw(int32_t veh_id) { return reinterpret_cast<uint8_t*>(&Vehs[0]) + veh_id * (int32_t)sizeof(VEH); }
-int16_t veh_unit_raw(int32_t veh_id) { return *reinterpret_cast<int16_t*>(veh_raw(veh_id) + offsetof(VEH, unit_id)); }
+// Vehs[-1] lies in the Reactor table (string pointers in the original): see rules_orig_byte.
+int16_t veh_unit_raw(int32_t veh_id) {
+    if ((uint32_t)veh_id < 2049) return Vehs[veh_id].unit_id;
+    return rules_orig_i16(0x952828 + (uint32_t)veh_id * 0x34 + offsetof(VEH, unit_id));
+}
 // Wrapped horizontal distance |x1 - x2| as the original computes it.
 int32_t wrap_dx(int32_t x1, int32_t x2) {
     int32_t dx = std::abs(x1 - x2);

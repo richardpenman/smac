@@ -4,6 +4,9 @@
 
 // Splits a bit number into a byte offset and a mask within that byte.
 ADDR(0x50BA00) void GAMEAPI bitmask(int32_t bit, int32_t* offset, int32_t* mask);
+// The pact partners of faction_id_with that have no treaty or vendetta with faction_id declare
+// vendetta on faction_id (double_cross).
+ADDR(0x50BA50) void GAMEAPI intervention(int32_t faction_id, int32_t faction_id_with);
 // Number of set bits.
 ADDR(0x50BA30) int32_t GAMEAPI bit_count(uint32_t value);
 // Number of sea regions bordering a land region (coast helpers).

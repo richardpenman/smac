@@ -171,6 +171,8 @@ ADDR(0x421670) int32_t GAMEAPI has_fac(int32_t facility_id, int32_t base_id, int
 ADDR(0x476EE0) void GAMEAPI mon_prototype_built(int32_t faction_id);
 ADDR(0x476FE0) void GAMEAPI mon_facility_built(int32_t faction_id, const char* base_name);
 ADDR(0x477100) void GAMEAPI mon_secret_project(int32_t faction_id, int32_t project_id);
+// First base conquered (capture_base): base_name is recorded as enemy_base_name.
+ADDR(0x477320) void GAMEAPI mon_conquer_base(int32_t faction_id, const char* base_name);
 ADDR(0x477440) void GAMEAPI mon_naval_unit_built(int32_t faction_id);
 ADDR(0x477540) void GAMEAPI mon_air_unit_built(int32_t faction_id);
 ADDR(0x477640) void GAMEAPI mon_native_life_bred(int32_t faction_id);

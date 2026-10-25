@@ -4186,3 +4186,88 @@ int32_t GAMEAPI base_upkeep(int32_t base_id) {
     if (!((CurrentBaseID + CurrentTurn) & 7)) cur_base().state_flags &= ~BSTATE_UNK_100000;
     return 0;
 }
+
+// ---- monuments (ui module 0x476EE0-0x477A60): records of base_production ---------------------------------
+
+namespace {
+
+// Common body of the "first to ..." monument records: marks `event` achieved for faction_id and
+// records who did it first (the faction itself if no other faction has the record, else the last
+// other faction that was itself first). Returns false if the record is not made (alien faction or
+// already achieved).
+bool mon_first_event(int32_t faction_id, int32_t event, int32_t year) {
+    MonumentEvent& e = Monuments[faction_id].events[event];
+    if ((MFactions[faction_id].rule_flags & 0x80) || e.achieved) return false;
+    e.prev_count = 0;
+    for (int32_t i = 0; i < 8; i++)
+        if (i != faction_id && Monuments[i].events[event].achieved) e.prev_count++;
+    int32_t who = faction_id;
+    if (!e.prev_count) {
+        e.prev_count = 1;
+    } else {
+        e.prev_count = 0;
+        for (int32_t i = 0; i < 8; i++) {
+            const MonumentEvent& o = Monuments[i].events[event];
+            if (i != faction_id && o.achieved && o.prev_count) who = i;
+        }
+    }
+    e.achieved = 1;
+    e.faction_id = who;
+    e.year = year;
+    return true;
+}
+
+void mon_simple_first(int32_t faction_id, int32_t event) {
+    int32_t year = game_year(CurrentTurn);
+    if (!mon_first_event(faction_id, event, year)) return;
+    Monuments[faction_id].latest_event_id = event;
+    if (faction_id == CurrentPlayerFaction) monument(1);
+}
+
+}  // namespace
+
+void GAMEAPI mon_prototype_built(int32_t faction_id) { mon_simple_first(faction_id, 3); }
+
+void GAMEAPI mon_facility_built(int32_t faction_id, const char* base_name) {
+    int32_t year = game_year(CurrentTurn);
+    if (!mon_first_event(faction_id, 4, year)) return;
+    std::strncpy(Monuments[faction_id].facility_name, base_name, 24);
+    Monuments[faction_id].latest_event_id = 4;
+    if (faction_id == CurrentPlayerFaction) monument(1);
+}
+
+void GAMEAPI mon_secret_project(int32_t faction_id, int32_t project_id) {
+    int32_t year = game_year(CurrentTurn);
+    if (!mon_first_event(faction_id, 5, year)) return;
+    Monuments[faction_id].events[5].param2 = project_id;
+    Monuments[faction_id].latest_event_id = 5;
+    if (faction_id == CurrentPlayerFaction) monument(1);
+}
+
+void GAMEAPI mon_conquer_base(int32_t faction_id, const char* base_name) {
+    int32_t year = game_year(CurrentTurn);
+    if (!mon_first_event(faction_id, 7, year)) return;
+    std::strncpy(Monuments[faction_id].enemy_base_name, base_name, 24);
+    Monuments[faction_id].latest_event_id = 7;
+    if (faction_id == CurrentPlayerFaction) monument(1);
+}
+
+void GAMEAPI mon_naval_unit_built(int32_t faction_id) { mon_simple_first(faction_id, 8); }
+void GAMEAPI mon_air_unit_built(int32_t faction_id) { mon_simple_first(faction_id, 9); }
+void GAMEAPI mon_native_life_bred(int32_t faction_id) { mon_simple_first(faction_id, 10); }
+void GAMEAPI mon_first_in_space(int32_t faction_id) { mon_simple_first(faction_id, 11); }
+void GAMEAPI mon_built_preserve(int32_t faction_id) { mon_simple_first(faction_id, 12); }
+
+void GAMEAPI mon_winning_trans(int32_t faction_id, int32_t by_faction_id) {
+    int32_t year = game_year(CurrentTurn);
+    Monument& m = Monuments[faction_id];
+    MonumentEvent& e = m.events[14];
+    if ((MFactions[faction_id].rule_flags & 0x80) || e.achieved) return;
+    e.year = year;
+    e.faction_id = faction_id;
+    e.prev_count = 1;
+    e.achieved = 1;
+    e.param2 = by_faction_id;
+    m.latest_event_id = 14;
+    if (faction_id == CurrentPlayerFaction) monument(1);
+}

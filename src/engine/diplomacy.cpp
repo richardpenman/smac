@@ -3,9 +3,15 @@
 
 #include <cstddef>
 
+#include "engine/action.h"
+#include "engine/base.h"
+#include "engine/map.h"
+#include "engine/parse.h"
+#include "engine/probe.h"
 #include "engine/tech.h"
 #include "engine/turn.h"
 #include "engine/ui_bridge.h"
+#include "engine/veh.h"
 
 void GAMEAPI treaty_off(int32_t faction_id, int32_t faction_id_with, uint32_t status) {
     if (status & 7) status |= 0x1100000;
@@ -158,4 +164,82 @@ void GAMEAPI treaty_on(int32_t faction_id, int32_t faction_id_with, uint32_t sta
     if ((faction_id == CurrentPlayerFaction || faction_id_with == CurrentPlayerFaction) && (status & 0x1F) &&
         MultiWinVisible)
         GraphicWin_redraw(&MultiWin);
+}
+
+// ---- pact ends ------------------------------------------------------------------------------------
+
+int32_t GAMEAPI pact_withdraw(int32_t faction_id, int32_t faction_id_with) {
+    int32_t moved = 0;
+    for (int32_t veh_id = 0; veh_id < VehCount; veh_id++) {
+        VEH& veh = Vehs[veh_id];
+        if (veh.faction_id != (uint32_t)faction_id) continue;
+        int32_t near = base_find(veh.x, veh.y);
+        if (near < 0) continue;
+        if ((uint8_t)Bases[near].faction_id != (uint32_t)faction_id_with &&
+            whose_territory(faction_id, veh.x, veh.y, nullptr, 0) != faction_id_with) {
+            continue;
+        }
+        int32_t best = -1, best_dist = 9999;
+        for (int32_t i = 0; i < BaseCount; i++) {
+            const BASE& base = Bases[i];
+            if ((uint8_t)base.faction_id != (uint32_t)faction_id) continue;
+            if (veh_triad(veh_id) == TRIAD_SEA) {
+                // BUG(original): is_coast is given the location of the base whose id is this
+                // base's x coordinate, and this base's y coordinate as the radius flag.
+                const BASE& odd = Bases[base.x];
+                if (!is_coast(odd.x, odd.y, base.y)) continue;
+            }
+            if (veh_triad(veh_id) == TRIAD_SEA && map_is_ocean(veh.x, veh.y) &&
+                !base_on_sea(i, map_tile(veh.x, veh.y)->region)) {
+                continue;
+            }
+            int32_t dist = veh_vector_dist(base.x, base.y, veh.x, veh.y);
+            if (dist < best_dist) {
+                best_dist = dist;
+                best = i;
+            }
+        }
+        if (best < 0) continue;
+        veh_drop(veh_lift(veh_id), Bases[best].x, Bases[best].y);
+        veh.order = 0;
+        veh.state &= 0xFCFFBDFF;
+        if (veh_triad(veh_id) == TRIAD_AIR) veh.movement_turns = 0;
+        moved++;
+        if (MapWinInVehMode && veh_id == MapWinVehA) Console_set_move(&MainConsole, 1);
+    }
+    return moved;
+}
+
+void GAMEAPI pact_ends(int32_t faction_id, int32_t faction_id_with) {
+    DiploSecondFaction = faction_id_with;
+    treaty_off(faction_id, faction_id_with, DIPLO_PACT);
+    int32_t withdrawn = pact_withdraw(faction_id, faction_id_with);
+    int32_t withdrawn_with = pact_withdraw(faction_id_with, faction_id);
+    draw_map(1);
+    int32_t count;
+    if (faction_id == CurrentPlayerFaction || faction_id_with == CurrentPlayerFaction) {
+        int32_t other = faction_id == CurrentPlayerFaction ? faction_id_with : faction_id;
+        GenderDefault = MFactions[other].noun_gender;
+        PluralDefault = MFactions[other].is_noun_plural;
+        parse_says(0, MFactions[other].noun_faction, -1, -1);
+        parse_says(1, MFactions[other].adj_name_faction, -1, -1);
+        count = faction_id == CurrentPlayerFaction ? withdrawn : withdrawn_with;
+    } else {
+        const Faction& viewer = Factions[CurrentPlayerFaction];
+        if (spying(faction_id) || spying(faction_id_with) || (GameState & 0x80) ||
+            (viewer.diplo_status[faction_id] & DIPLO_PACT) || (viewer.diplo_status[faction_id_with] & DIPLO_PACT)) {
+            GenderDefault = MFactions[faction_id].noun_gender;
+            PluralDefault = MFactions[faction_id].is_noun_plural;
+            parse_says(0, MFactions[faction_id].noun_faction, -1, -1);
+            GenderDefault = MFactions[faction_id_with].noun_gender;
+            PluralDefault = MFactions[faction_id_with].is_noun_plural;
+            parse_says(1, MFactions[faction_id_with].noun_faction, -1, -1);
+            parse_says(2, get_pact_hood(faction_id, faction_id_with), -1, -1);
+            X_pop("ENDPACT3", 0);
+        }
+        return;
+    }
+    parse_num(0, count);
+    parse_says(2, get_pact_hood(faction_id, faction_id_with), -1, -1);
+    ui_pact_ends_dialog(count);
 }

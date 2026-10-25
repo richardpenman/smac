@@ -975,3 +975,58 @@ void rules_static_init() {
     }
 }
 #endif
+
+// ---- original layout of the pointer tables (see rules.h) ----
+
+uint32_t rules_orig_string_addr(const char* str) {
+    constexpr uint32_t kOrigStringPoolBase = 0x01FBD3B8;  // StringTable.heap.base in the oracle
+    const char* base = reinterpret_cast<const char*>(StringTable.heap.base);
+    if (!str || !base || str < base || str >= base + StringTable.heap.base_size) return 0;
+    return kOrigStringPoolBase + (uint32_t)(str - base);
+}
+
+uint8_t rules_orig_byte(uint32_t addr) {
+#ifdef SMACX_HYBRID
+    return *mem::host(addr);
+#else
+    uint8_t rec[0x2C] = {};
+    auto put32 = [&](uint32_t off, uint32_t v) { crt_memcpy(rec + off, &v, 4); };
+    auto put16 = [&](uint32_t off, uint16_t v) { crt_memcpy(rec + off, &v, 2); };
+    if (addr >= 0x94F278 && addr < 0x94F278 + 14 * 0x10) {
+        const CArmor& a = Armor[(addr - 0x94F278) / 0x10];
+        put32(0, rules_orig_string_addr(a.name));
+        put32(4, rules_orig_string_addr(a.name_short));
+        rec[8] = (uint8_t)a.defense_value;
+        rec[9] = a.mode;
+        rec[10] = a.cost;
+        rec[11] = (uint8_t)a.padding1;
+        put16(12, (uint16_t)a.preq_tech);
+        put16(14, (uint16_t)a.padding2);
+        return rec[(addr - 0x94F278) % 0x10];
+    }
+    if (addr >= 0x9527F8 && addr < 0x9527F8 + 4 * 0xC) {
+        // Read as Vehs[-1] (0x9527F4) where a vehicle id is -1.
+        const CReactor& r = Reactor[(addr - 0x9527F8) / 0xC];
+        put32(0, rules_orig_string_addr(r.name));
+        put32(4, rules_orig_string_addr(r.name_short));
+        put16(8, (uint16_t)r.preq_tech);
+        put16(10, (uint16_t)r.power);
+        return rec[(addr - 0x9527F8) % 0xC];
+    }
+    if (addr >= 0x94F358 && addr < 0x94F358 + 89 * 0x2C) {
+        const CTech& t = Tech[(addr - 0x94F358) / 0x2C];
+        put32(0, (uint32_t)t.flags);
+        put32(4, rules_orig_string_addr(t.name));
+        crt_memcpy(rec + 8, t.short_name, 8);
+        put32(16, (uint32_t)t.padding);
+        put32(20, (uint32_t)t.AI_growth);
+        put32(24, (uint32_t)t.AI_tech);
+        put32(28, (uint32_t)t.AI_wealth);
+        put32(32, (uint32_t)t.AI_power);
+        put32(36, (uint32_t)t.preq_tech1);
+        put32(40, (uint32_t)t.preq_tech2);
+        return rec[(addr - 0x94F358) % 0x2C];
+    }
+    return *mem::host(addr);
+#endif
+}

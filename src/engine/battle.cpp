@@ -38,9 +38,17 @@ extern "C" int32_t GAMEAPI morale_alien_impl_c(int32_t veh_id, int32_t faction_i
 
 namespace {
 // Raw view of the vehicle table: the original reads Vehs[-1] where a vehicle id may be -1.
-const uint8_t* veh_raw(int32_t veh_id) { return reinterpret_cast<const uint8_t*>(&Vehs[0]) + veh_id * (int32_t)sizeof(VEH); }
-int32_t veh_unit_raw(int32_t veh_id) { return *reinterpret_cast<const int16_t*>(veh_raw(veh_id) + offsetof(VEH, unit_id)); }
-uint32_t veh_faction_raw(int32_t veh_id) { return veh_raw(veh_id)[offsetof(VEH, faction_id)]; }
+// Vehs[-1] lies in the Reactor table (string pointers in the original): read through
+// rules_orig_byte.
+uint32_t veh_raw_addr(int32_t veh_id, uint32_t offset) { return 0x952828 + (uint32_t)veh_id * 0x34 + offset; }
+int32_t veh_unit_raw(int32_t veh_id) {
+    if ((uint32_t)veh_id < 2049) return Vehs[veh_id].unit_id;
+    return rules_orig_i16(veh_raw_addr(veh_id, offsetof(VEH, unit_id)));
+}
+uint32_t veh_faction_raw(int32_t veh_id) {
+    if ((uint32_t)veh_id < 2049) return Vehs[veh_id].faction_id;
+    return rules_orig_byte(veh_raw_addr(veh_id, offsetof(VEH, faction_id)));
+}
 uint32_t base_faction_raw(int32_t base_id) {
     return reinterpret_cast<const uint8_t*>(&Bases[0])[base_id * (int32_t)sizeof(BASE) + offsetof(BASE, faction_id)];
 }

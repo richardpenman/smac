@@ -27,6 +27,13 @@ void ui_mapwins_clear_alt(int32_t, int32_t) {}
 // ---- Console ----
 // Centers the map view; returns the original's "view changed" flag (0: nothing to redraw).
 int32_t THISCALL Console_focus(uint8_t*, int32_t, int32_t, int32_t) { return 0; }
+// No human players headless: no unit of the viewer is ever selected (0: "found one", so callers
+// make no state change).
+int32_t THISCALL Console_ready_search(uint8_t*, int32_t) { return 0; }
+void THISCALL Console_set_move(uint8_t*, int32_t) {}
+void ui_pact_ends_dialog(int32_t) {}
+// No human players headless: the upgrade dialog is never reached; cancelled.
+int32_t THISCALL Console_upgrade_human(uint8_t*, int32_t) { return 0; }
 
 // ---- popups: dismissed with the default choice (0) ----
 int32_t GAMEAPI popp(const char*, const char*, int32_t, const char*, int32_t) { return 0; }

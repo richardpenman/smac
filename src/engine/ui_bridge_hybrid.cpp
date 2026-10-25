@@ -126,3 +126,17 @@ void ui_crash_landing_drop(int32_t, int32_t, bool) {}
 void ui_crash_landing_close() {}
 void ui_first_base_name(const char* default_name) { crt_strcpy(ParseStrBuffer[0], default_name); }
 #endif
+
+// ---- Console_upgrade for human factions: the original function (dialog) ----
+#ifdef SMACX_HYBRID
+// Enters the original Console_upgrade behind its jump patch: replays the prologue it overwrites
+// (push ebp; mov ebp, esp; mov eax, fs:[0]) and continues at 0x4D06C9 with the caller's frame.
+__attribute__((naked)) int32_t THISCALL Console_upgrade_human(uint8_t*, int32_t) {
+    __asm__("push %ebp\n mov %esp, %ebp\n mov %fs:0, %eax\n push $0x4D06C9\n ret\n");
+}
+#endif
+
+#ifdef SMACX_HYBRID
+// Viewer dialog of pact_ends (see ui_bridge.h): not shown by the reconstruction.
+void ui_pact_ends_dialog(int32_t) {}
+#endif
