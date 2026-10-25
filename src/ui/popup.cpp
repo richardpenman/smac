@@ -645,6 +645,8 @@ int32_t BasePop_string(BasePop* self, const char* text) {
 int32_t BasePop_item(BasePop* self, const char* text, int32_t id) {
     if (!text) return 3;
     self->items.push_back({self->keep(text), id, 1});
+    // Edit groups: the item is a field (EditGroup_edit; the default text goes to the first).
+    if (self->item_type == 4) self->edit.push_back(self->edit.empty() ? self->edit_default : std::string());
     return 0;
 }
 
@@ -660,6 +662,7 @@ void BasePop_set_loc(BasePop* self, int32_t x, int32_t y) {
 }
 
 void BasePop_set_width(BasePop* self, int32_t w) { self->dlg_width = scaled(self, w); }
+void BasePop_set_max_rows(BasePop* self, int32_t rows) { self->max_rows = rows; }  // as #listbox N
 
 void BasePop_set_picture(BasePop* self, const char* pcx) {
     if (!pcx || !*pcx) return;
@@ -683,6 +686,7 @@ const char* BasePop_edit_text(BasePop* self, int32_t i) {
 }
 int32_t BasePop_item_count(BasePop* self) { return (int32_t)self->items.size(); }
 void BasePop_set_mode(BasePop* self, int32_t mode) { self->mode = mode; }
+void BasePop_set_active(BasePop* self, int32_t id) { self->active = id; }
 std::string BasePop_text(BasePop* self) {
     std::string s;
     for (size_t i = 0; i < self->strings.size(); i++) {

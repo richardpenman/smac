@@ -48,13 +48,15 @@ extern bool g_ui_exit_when_script_done;
 extern std::string g_ui_outdir;
 extern int32_t g_ui_shots;
 
+// Dispatches a key (virtual key with modifier bits) as Win_on_key / WM_CHAR deliver it.
+void ui_dispatch_key(int32_t key);
 // Next key for a modal placeholder (popups): scripted or real; 0 when the input ended.
 int32_t ui_wait_key();
 // Next input of a modal window (popups, popup.cpp): a key (virtual key with the modifier bits), or
 // a left button press / release / mouse move at screen coordinates (scripted: "CLICK:XxY", a
 // press and a release). False when the input ended (scripted keys done, window closed).
 struct UiInput {
-    enum Type { KEY, LDOWN, LUP, MOVE } type = KEY;
+    enum Type { KEY, LDOWN, LUP, MOVE, RDOWN, RUP } type = KEY;
     int32_t key = 0, x = 0, y = 0;
     bool double_click = false;
 };

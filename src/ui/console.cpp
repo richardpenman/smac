@@ -36,6 +36,8 @@
 #include "engine/veh.h"
 #include "engine/zoc.h"
 #include "platform/ui_platform.h"
+#include "ui/basewin.h"
+#include "ui/console_frame.h"
 #include "ui/win.h"
 
 namespace {
@@ -112,6 +114,17 @@ int32_t net_action(int32_t veh_id, int32_t a2) {
     if (!MultiplayerActive) return action(veh_id);  // NetDaemon_action (0x532570)
     return NetDaemon_action(&NetState, veh_id, a2);
 }
+
+void ui_synch_veh(int32_t veh_id) {
+    if (MultiplayerActive) synch_veh(veh_id);
+}
+void ui_synch_base(int32_t base_id) {
+    if (MultiplayerActive) synch_base(base_id);
+}
+void net_await_synch() {
+    if (MultiplayerActive) NetDaemon_await_synch(&NetState);
+}
+int32_t net_add_global() { return MultiplayerActive ? NetDaemon_add_global(&NetState) : 0; }
 
 int32_t GAMEAPI not_my_turn() {
     if (!MultiplayerActive) return 0;
@@ -1489,7 +1502,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     case 0x3007A: console_not_reconstructed("Console_on_key_click: auto play timer"); break;
     default: break;
     }
-    console_not_reconstructed_quiet("AlphaMenu_hide");
+    AlphaMenu_hide_main();
     if (!dword_93A940) {
         ConsoleNotReady = 1;
         return 1;
@@ -1506,7 +1519,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     if (!dismiss && vk == 0xD && (Win_is_visible(&AlphaMenu) || MultiWinVisible)) dismiss = true;
     if (dismiss) {
         if (!Win_is_visible(&BaseWin)) console_not_reconstructed_quiet("ButtonGroup_button_click");
-        if (Win_is_visible(&AlphaMenu)) console_not_reconstructed_quiet("AlphaMenu_hide");
+        AlphaMenu_hide_main();
         if (MultiWinVisible) console_not_reconstructed("MultiWin_hide");
         if (InterfaceMessageShown) console_not_reconstructed("MainInterface_clear_message");
         if (NetMsgShownA || NetMsgShownB) {
@@ -1539,10 +1552,45 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         if (ControlTurnC) return 1;
     }
     int32_t mode = mw(self, kConMode);
-    if ((mode == 1 && MapWinMouseIndex >= 0 && mw(self, kConVeh) >= 0 && MapWinInVehMode) ||
-        (mode == 8 && mw(self, kMwTracking) && mw(self, kConVeh) >= 0 && MapWinInVehMode && (key == ' ' || key == 'g'))) {
-        // Waypoint keys of the mouse go-to and patrol modes (the modes are set by mouse code).
-        console_not_reconstructed("Console_on_key_click: go-to mode keys");
+    if (mode == 1 && MapWinMouseIndex >= 0 && mw(self, kConVeh) >= 0 && MapWinInVehMode) {
+        // Keys of the go-to drag: j toggles the group move, g / space add a waypoint (patrol
+        // or group waypoints), other keys end the patrol and the unit's orders.
+        uint8_t* w = MapWins[MapWinMouseIndex];
+        VEH& v = Vehs[mw(self, kConVeh)];
+        int32_t mx, my;
+        if (key == 'j') {
+            mw(w, 0x1DD84) = !mw(w, 0x1DD84);
+            ui_mouse_pos(&mx, &my);
+            MapWin_on_mouse_move(w, mx, my);
+            return 1;
+        }
+        if (key == 'g' || key == ' ') {
+            if ((v.state & 0x1000200) == 0x1000200) {
+                v.waypoint_count = v.waypoint_count < 3 ? v.waypoint_count + 1 : 0;
+            } else if (!(v.state & 0x2000000)) {
+                v.state |= 0x2000000;
+                v.patrol_current_point = 0;
+                v.waypoint_count = 1;
+            } else if (++v.waypoint_count >= 4) {
+                v.state &= 0xFDFFFFFF;
+                v.waypoint_count = 0;
+            }
+            ui_mouse_pos(&mx, &my);
+            mw(w, 0x1DE10) = -1;
+            mw(w, 0x1DE0C) = -1;
+            MapWin_on_mouse_move(w, mx, my);
+            return 1;
+        }
+        v.state &= 0xFDFFFDFF;
+        v.order = 0;
+    }
+    if (mode == 8 && mw(self, kMwTracking) && mw(self, kConVeh) >= 0 && MapWinInVehMode && (key == ' ' || key == 'g')) {
+        VEH& v = Vehs[mw(self, kConVeh)];
+        v.waypoint_count = v.waypoint_count < 3 ? v.waypoint_count + 1 : 0;
+        int32_t mx, my;
+        ui_mouse_pos(&mx, &my);
+        mw(main_view(), 0x1DE0C) = -1;
+        MapWin_on_mouse_move(main_view(), mx, my);
         return 1;
     }
     for_each_mapwin([&](int32_t, uint8_t* w) {
@@ -1564,13 +1612,12 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     });
     if (vk == 0xD && InfcList[InfcUsed] == 5) {
         console_not_reconstructed("ReportIf_done");
-        if (Win_is_visible(&BaseWin)) console_not_reconstructed("BaseWin_exit");
+        if (Win_is_visible(&BaseWin)) BaseWin_exit(&BaseWin);
         return 1;
     }
     if (Win_is_visible(&BaseWin)) {
-        // The base window's keys (production, next/previous base, ...).
-        console_not_reconstructed("Console_on_key_click: base window keys");
-        return 1;
+        // The base window's keys (production, next/previous base, ...): ui/basewin.cpp.
+        return basewin_console_key(self, ch, vk, key, net_busy);
     }
     if (InterfaceButtonState == 1000) console_not_reconstructed_quiet("ButtonGroup_button_click");
     if (vk == 0x2000D) {  // ctrl+Enter
@@ -1742,9 +1789,12 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         if (confirm_quit() && ControlTurnA) ControlTurnB = 1;
         break;
     case 0x20053: save_game(0); break;                     // ctrl+S
+    case 0x2004C:                                          // ctrl+L
+        if (!MultiplayerActive || (GameState & 0x1000)) Console_load_proc(self, 0, 0);
+        break;
     case 0x20058: pfncProcZoomKey(self, 0x208, 0); break;  // ctrl+X
     case 0x2005A: pfncProcZoomKey(self, 0x207, 0); break;  // ctrl+Z
-    case 0x20041: case 0x20047: case 0x20049: case 0x2004B: case 0x2004C: case 0x2004D: case 0x2004E:
+    case 0x20041: case 0x20047: case 0x20049: case 0x2004B: case 0x2004D: case 0x2004E:
     case 0x2004F: case 0x20050: case 0x20057: case 0x20073: case 0x30041: case 0x30047: case 0x3004C:
     case 0x3004E: case 0x30057: case 0x30058: case 0x30073:
         // Preferences, landmarks, load, editor, version, credits (menu commands).

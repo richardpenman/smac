@@ -5,7 +5,6 @@
 
 // Tutorial hints, base window refresh, sounds, cursor and report window: nothing to show.
 void THISCALL TutWin_tut_map(uint8_t*, const char*, int32_t, int32_t, int32_t, uint8_t*, int32_t, int32_t, int32_t) {}
-void THISCALL BaseWin_check_veh(uint8_t*, int32_t) {}
 void THISCALL FX_play_loc(uint8_t*, int32_t, int32_t, int32_t) {}
 void THISCALL ReportIf_on_redraw(uint8_t*) {}
 

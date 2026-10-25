@@ -35,6 +35,7 @@ constexpr uint32_t kConCursorHead = 0x23C0C;   // newest cursor history slot
 constexpr uint32_t kConCursorX = 0x23C10;      // MapWinCursorX[32]
 constexpr uint32_t kConCursorY = 0x23C90;      // MapWinCursorY[32]
 constexpr uint32_t kConMode = 0x23D10;         // mouse interaction mode (go to, ...; 0: none)
+constexpr uint32_t kConModeRange = 0x23D14;    // range of the mode's target (-1: any tile)
 constexpr uint32_t kConSearchReset = 0x23D18;  // Console_ready searches from the start
 constexpr uint32_t kCon23D1C = 0x23D1C;
 constexpr uint32_t kConMpSearch = 0x23D24;     // multiplayer: units of others' turns searched too
@@ -91,24 +92,26 @@ ADDR_NATIVE(0x511800) void THISCALL Console_turn_hints(uint8_t* console);
 // Multiplayer with simultaneous moves: 1 while it is not this player's turn (net module).
 ADDR_NATIVE(0x52DC70) int32_t GAMEAPI not_my_turn();
 
-// ---- placeholders: original functions the console calls that are not reconstructed yet
-// (console_placeholders.cpp). Each logs its name once and does nothing unless noted. ----
-ADDR_NATIVE(0x46AE00) void GAMEAPI draw_cursor();
-ADDR_NATIVE(0x46AD60) void THISCALL MapWin_draw_cursor(uint8_t* win);
-ADDR_NATIVE(0x458900) void THISCALL InfoWin_change(uint8_t* win, int32_t a1);
-ADDR_NATIVE(0x459280) void THISCALL InfoWin_reset(uint8_t* win);
-ADDR_NATIVE(0x4B9F90) void THISCALL StatusWin_set_loc(uint8_t* win, int32_t x, int32_t y);
-ADDR_NATIVE(0x4C3990) void THISCALL WorldWin_set_world_map(uint8_t* win);
-ADDR_NATIVE(0x460DD0) void THISCALL pfncMainMenuUpdateVisible(uint8_t* menu, int32_t veh_id);
-ADDR_NATIVE(0x4BC6E0) void THISCALL TutWin_tour(uint8_t* win);
-ADDR_NATIVE(0x4BDDE0) int32_t THISCALL TutWin_reset(uint8_t* win);
-ADDR_NATIVE(0x511BB0) void THISCALL Console_give_hints(uint8_t* console);
-ADDR_NATIVE(0x446D10) void GAMEAPI ambience_veh(int32_t veh_id);
+// ---- unit orders and mouse modes (console_orders.cpp) ----
+// Mouse interaction modes (kConMode, the cursor of CURSOR.PCX with the same index): 1 go to,
+// 2 road to, 3 mag tube to, 4 drop, 8 patrol, 10 artillery, 11 bombing run / air patrol target.
+ADDR_NATIVE(0x510400) void THISCALL Console_cursor_on(uint8_t* console, int32_t index);
+ADDR_NATIVE(0x510490) void THISCALL Console_cursor_on_2(uint8_t* console, int32_t mode, int32_t range);
+ADDR_NATIVE(0x510520) void THISCALL Console_cursor_off(uint8_t* console);
+// The map wants a target tile: the cursor for (x, y) (out of range: the "no" cursor); 0 if no mode.
+ADDR_NATIVE(0x5105C0) int32_t THISCALL Console_selecting(uint8_t* console, int32_t x, int32_t y);
+// Ends the mode; returns it (0: none).
+ADDR_NATIVE(0x5107E0) int32_t THISCALL Console_selected(uint8_t* console);
 ADDR_NATIVE(0x50EF50) void GAMEAPI go_reset();
-ADDR_NATIVE(0x467970) void THISCALL MapWin_draw_base_dest(uint8_t* win, int32_t a1);
-ADDR_NATIVE(0x4D2F00) void THISCALL Console_activate(uint8_t* console, int32_t x, int32_t y, int32_t a3);
-ADDR_NATIVE(0x4D61A0) void THISCALL Console_go_to(uint8_t* console, int32_t veh_id, int32_t mode, int32_t a3);
+ADDR_NATIVE(0x4D2F00) void THISCALL Console_activate(uint8_t* console, int32_t x, int32_t y, int32_t select);
+// Go-to list (mode: ORDER_MOVE_TO, ROAD_TO, MAGTUBE_TO, 0x80 bombing run; -1 a base's rally point
+// (id: the base), -2 find a base, -3 psi gate); group: the units of the stack follow.
+ADDR_NATIVE(0x4D61A0) void THISCALL Console_go_to(uint8_t* console, int32_t id, int32_t mode, int32_t group);
+ADDR_NATIVE(0x4D6070) void GAMEAPI Console_goto_routine(int32_t base_id);
 ADDR_NATIVE(0x4D7DE0) void THISCALL Console_go_home(uint8_t* console, int32_t veh_id);
+// Automation (veh state 0x200, order_auto_type mode): 0 full, 1 roads, 2 tubes, 3 farm + solar,
+// 4 farm + mine, 5 mines / boreholes..., 6 forests, 7 sensors, 10 bombing target, 11 air
+// defence, 12 air patrol.
 ADDR_NATIVE(0x4D8A70) void THISCALL Console_automate(uint8_t* console, int32_t veh_id, int32_t mode);
 ADDR_NATIVE(0x4D04E0) void THISCALL Console_unload(uint8_t* console, int32_t veh_id);
 ADDR_NATIVE(0x4D5D30) void THISCALL Console_oblit(uint8_t* console, int32_t veh_id);
@@ -123,6 +126,47 @@ ADDR_NATIVE(0x4D26A0) void THISCALL Console_give_veh(uint8_t* console, int32_t v
 ADDR_NATIVE(0x4D52A0) void THISCALL Console_destroy(uint8_t* console, int32_t veh_id);
 ADDR_NATIVE(0x4D2AC0) void THISCALL Console_disband(uint8_t* console, int32_t veh_id);
 ADDR_NATIVE(0x4D2DE0) void THISCALL Console_disband_2(uint8_t* console, int32_t x, int32_t y);
+// The units of the leader's tile (or the marked group) take the leader's go-to orders.
+ADDR_NATIVE(0x4D92D0) void THISCALL Console_group(uint8_t* console, int32_t veh_id);
+ADDR_NATIVE(0x4D8DC0) void THISCALL Console_set_road_to(uint8_t* console, int32_t veh_id, int32_t x, int32_t y,
+                                                       int32_t order);
+ADDR_NATIVE(0x4D8CD0) void THISCALL Console_set_bombing_run(uint8_t* console, int32_t veh_id, int32_t x, int32_t y);
+// Unit pick list of a stack (PICKUNIT...): the chosen unit, -1 cancelled.
+ADDR_NATIVE(0x48D0D0) int32_t GAMEAPI veh_pick(int32_t veh_id, const char* label, int32_t cancel);
+// A popup with a unit's picture; returns the answer.
+ADDR_NATIVE(0x48C360) int32_t GAMEAPI popv(const char* file, const char* label, int32_t veh_id, int32_t flags);
+// X_pop_9 of the script file (veh module 0x5BF3F0).
+ADDR_NATIVE(0x5BF3F0) int32_t GAMEAPI X_pop_6(const char* label, int32_t flags, int32_t a3);
+
+// Load game (scenario: a scenario) and the game's display reset after it.
+ADDR_NATIVE(0x51BBA0) void THISCALL Console_load_proc(uint8_t* console, int32_t scenario, int32_t relinearize);
+
+// ---- the map's mouse code (console_mouse.cpp) ----
+// MapWin's handlers (offsets from the MapWin object, the original's are from its GraphicWin base).
+ADDR_NATIVE(0x46ED30) void THISCALL MapWin_on_left_down(uint8_t* win, int32_t px, int32_t py);
+ADDR_NATIVE(0x46EBA0) void THISCALL MapWin_on_left_click(uint8_t* win, int32_t px, int32_t py);
+ADDR_NATIVE(0x46EBE0) void THISCALL MapWin_on_right_click(uint8_t* win, int32_t px, int32_t py);
+ADDR_NATIVE(0x46EC10) void THISCALL MapWin_on_right_down(uint8_t* win, int32_t px, int32_t py);
+ADDR_NATIVE(0x46F000) void THISCALL MapWin_on_mouse_move(uint8_t* win, int32_t px, int32_t py);
+// A click on the map: select / move / give the pending mode's order (right: menu or info).
+ADDR_NATIVE(0x46D5D0) void THISCALL MapWin_click(uint8_t* win, int32_t px, int32_t py, int32_t right);
+ADDR_NATIVE(0x50F170) void GAMEAPI go_timer();
+ADDR_NATIVE(0x5147E0) int32_t THISCALL Console_set_cursor(uint8_t* console, int32_t x, int32_t y);
+
+// ---- placeholders: original functions the console calls that are not reconstructed yet
+// (console_placeholders.cpp). Each logs its name once and does nothing unless noted. ----
+ADDR_NATIVE(0x46AE00) void GAMEAPI draw_cursor();
+ADDR_NATIVE(0x46AD60) void THISCALL MapWin_draw_cursor(uint8_t* win);
+ADDR_NATIVE(0x458900) void THISCALL InfoWin_change(uint8_t* win, int32_t a1);
+ADDR_NATIVE(0x459280) void THISCALL InfoWin_reset(uint8_t* win);
+ADDR_NATIVE(0x4B9F90) void THISCALL StatusWin_set_loc(uint8_t* win, int32_t x, int32_t y);
+ADDR_NATIVE(0x4C3990) void THISCALL WorldWin_set_world_map(uint8_t* win);
+ADDR_NATIVE(0x460DD0) void THISCALL pfncMainMenuUpdateVisible(uint8_t* menu, int32_t veh_id);
+ADDR_NATIVE(0x4BC6E0) void THISCALL TutWin_tour(uint8_t* win);
+ADDR_NATIVE(0x4BDDE0) int32_t THISCALL TutWin_reset(uint8_t* win);
+ADDR_NATIVE(0x511BB0) void THISCALL Console_give_hints(uint8_t* console);
+ADDR_NATIVE(0x446D10) void GAMEAPI ambience_veh(int32_t veh_id);
+ADDR_NATIVE(0x467970) void THISCALL MapWin_draw_base_dest(uint8_t* win, int32_t a1);
 ADDR_NATIVE(0x4D95F0) void THISCALL Console_assemble(uint8_t* console);
 ADDR_NATIVE(0x515450) void THISCALL Console_survey(uint8_t* console);
 ADDR_NATIVE(0x515900) void THISCALL Console_time_controls(uint8_t* console);
@@ -153,6 +197,15 @@ void net_unlock_veh();
 void net_synch_veh(int32_t veh_id);
 int32_t net_order_veh(int32_t veh_id, int32_t dir, int32_t a3);
 int32_t net_action(int32_t veh_id, int32_t a2);
+// synch_veh / synch_base (NetDaemon_synch: nothing without multiplayer).
+void ui_synch_veh(int32_t veh_id);
+void ui_synch_base(int32_t base_id);
+void net_await_synch();     // NetDaemon_await_synch: nothing without multiplayer
+int32_t net_add_global();   // NetDaemon_add_global: 0 without multiplayer
+// The mouse cursor over the map windows (Win_set_cursor of CURSOR.PCX sprite `index`; -1: the
+// arrow) and the mouse position in screen coordinates (Win_get_mouse_pos).
+void ui_set_map_cursor(int32_t index);
+void ui_mouse_pos(int32_t* x, int32_t* y);
 // Every open map window: index 0 is the main view; others count when active (kMwActive).
 template <typename F> inline void for_each_mapwin(F&& fn) {
     for (int32_t i = 0; i < 8; i++) {

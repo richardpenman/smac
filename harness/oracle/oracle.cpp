@@ -1058,6 +1058,109 @@ static void run_map_dumps() {
     g_mapdumps.clear();
 }
 
+/* ---- base window dumps (basedump; harness/README.md "Base window dumps") ----
+ * `basedump <file> base=N [viewer=N]` queues a dump of the base window (BaseWin 0x6A7628) as the
+ * original draws it for that base: at the first turn_upkeep hook (after the map dumps) the viewer
+ * is set (default: the base's owner), BaseWin_zoom (0x41A920) opens the window, and the 8-bit canvases of BaseWin and of the
+ * main interface (MainInfc 0x7AE820, whose panes the base window uses) are written; BaseWin_exit
+ * closes it and the viewer and random generators are restored. File: "SMXBASE1", 256 x RGB, then
+ * per canvas (BaseWin, MainInfc) int32 width, height and the pixels, top-down. <file>.obj: the
+ * data segment 0x682000..0x9CA000 while the window is open (layout fields, art pointers, colours); <file>.bmp: the
+ * screen (GDI capture after do_all_draws: the child windows, e.g. buttons, are only there). */
+struct BaseDump {
+    std::string file;
+    int base, viewer;
+};
+static std::vector<BaseDump> g_basedumps;
+static void cmd_basedump(char *args) {
+    BaseDump d = {"", 0, kMapDumpKeep};
+    char *tok = strtok(args, " \t");
+    if (tok) d.file = tok;
+    while ((tok = strtok(NULL, " \t"))) {
+        if (!strncmp(tok, "base=", 5)) d.base = atoi(tok + 5);
+        else if (!strncmp(tok, "viewer=", 7)) d.viewer = atoi(tok + 7);
+    }
+    if (d.file.empty()) logf_("basedump: no file\n");
+    else g_basedumps.push_back(d);
+}
+static void write_canvas(FILE *f, const uint8_t *buf) {
+    const uint8_t *bits = *(uint8_t *const *)(buf + 0x54);
+    int32_t wh[2] = {*(const int32_t *)(buf + 0x80), -*(const int32_t *)(buf + 0x84)};
+    int stride = *(const int32_t *)(buf + 0x4A8);
+    if (!bits || wh[0] <= 0 || wh[1] <= 0) wh[0] = wh[1] = 0;
+    fwrite(wh, 4, 2, f);
+    for (int y = 0; y < wh[1]; y++) fwrite(bits + (size_t)y * stride, 1, wh[0], f);
+}
+/* The screen as the game shows it (GDI capture of the desktop), as a 24-bit BMP. */
+static void screen_bmp(const char *path) {
+    int w = GetSystemMetrics(SM_CXSCREEN), h = GetSystemMetrics(SM_CYSCREEN);
+    HDC sdc = GetDC(NULL), mdc = CreateCompatibleDC(sdc);
+    BITMAPINFO bi = {};
+    bi.bmiHeader.biSize = sizeof(bi.bmiHeader);
+    bi.bmiHeader.biWidth = w;
+    bi.bmiHeader.biHeight = h;
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 24;
+    void *bits = NULL;
+    HBITMAP bmp = CreateDIBSection(sdc, &bi, DIB_RGB_COLORS, &bits, NULL, 0);
+    HGDIOBJ old = SelectObject(mdc, bmp);
+    BitBlt(mdc, 0, 0, w, h, sdc, 0, 0, SRCCOPY);
+    GdiFlush();
+    int stride = (w * 3 + 3) & ~3;
+    if (FILE *f = fopen(path, "wb")) {
+        BITMAPFILEHEADER fh = {};
+        fh.bfType = 0x4D42;
+        fh.bfOffBits = sizeof(fh) + sizeof(bi.bmiHeader);
+        fh.bfSize = fh.bfOffBits + stride * h;
+        fwrite(&fh, sizeof(fh), 1, f);
+        fwrite(&bi.bmiHeader, sizeof(bi.bmiHeader), 1, f);
+        fwrite(bits, 1, (size_t)stride * h, f);
+        fclose(f);
+    }
+    SelectObject(mdc, old);
+    DeleteObject(bmp);
+    DeleteDC(mdc);
+    ReleaseDC(NULL, sdc);
+}
+
+static void run_base_dumps() {
+    typedef void(__thiscall * f_zoom)(void *, int, int);
+    uint8_t *bw = (uint8_t *)0x6A7628, *mi = (uint8_t *)0x7AE820;
+    for (const BaseDump &d : g_basedumps) {
+        int old_viewer = CurrentPlayerFaction;
+        uint32_t crt = crt_state(), game = GameRandomState;
+        /* default viewer: the base's owner (Bases 0x97D040, 0x134 bytes, faction_id at +4) */
+        CurrentPlayerFaction = d.viewer != kMapDumpKeep ? d.viewer : G(int8_t, 0x97D040 + d.base * 0x134 + 4);
+        ((f_zoom)0x41A920)(bw, d.base, 0);
+        char path[MAX_PATH];
+        snprintf(path, sizeof(path), "%s\\%s", g_outdir, d.file.c_str());
+        FILE *f = fopen(path, "wb");
+        if (f) {
+            fwrite("SMXBASE1", 1, 8, f);
+            for (int i = 0; i < 256; i++) fwrite(GamePaletteObj + i * 4, 1, 3, f);
+            write_canvas(f, bw + 0x444);
+            write_canvas(f, mi + 0x444);
+            fclose(f);
+        }
+        ((f_none)0x5FCBB0)(); /* do_all_draws: the windows reach the screen */
+        snprintf(path, sizeof(path), "%s\\%s.bmp", g_outdir, d.file.c_str());
+        screen_bmp(path);
+        snprintf(path, sizeof(path), "%s\\%s.obj", g_outdir, d.file.c_str());
+        if (FILE *of = fopen(path, "wb")) {
+            fwrite((const void *)0x682000, 1, 0x9CA000 - 0x682000, of);
+            fclose(of);
+        }
+        ((f_this)0x41A4C0)(bw); /* BaseWin_exit */
+        crt_set_state(crt);
+        GameRandomState = game;
+        /* tiles: the tile array address (MapTiles 0x94A30C), which seeds the terrain variants */
+        logf_("basedump %s base=%d viewer=%d tiles=%x -> %d\n", d.file.c_str(), d.base, CurrentPlayerFaction,
+              G(uint32_t, 0x94A30C), f != NULL);
+        CurrentPlayerFaction = old_viewer;
+    }
+    g_basedumps.clear();
+}
+
 static void run_at_commands();
 static int __cdecl hook_turn_upkeep() {
     g_progress++;
@@ -1067,6 +1170,7 @@ static int __cdecl hook_turn_upkeep() {
     snprintf(name, sizeof(name), "turn_%03d", CurrentTurn);
     snapshot(name);
     if (!g_mapdumps.empty()) run_map_dumps();
+    if (!g_basedumps.empty()) run_base_dumps();
     FCOMPARE_HOOK("turn", 0);
     if (g_turn_limit >= 0 && CurrentTurn >= g_turn_limit) {
         FCOMPARE_FINISH();
@@ -1420,6 +1524,8 @@ static int __cdecl oracle_top_menu() {
             cmd_fontmetrics(args);
         } else if (!strcmp(cmd, "mapdump")) {
             cmd_mapdump(args);
+        } else if (!strcmp(cmd, "basedump")) {
+            cmd_basedump(args);
         } else if (!strcmp(cmd, "dumpmem")) {
             /* dumpmem <hexaddr> <hexsize> <file>: raw bytes of the original's memory, now */
             uint32_t addr = 0, size = 0;

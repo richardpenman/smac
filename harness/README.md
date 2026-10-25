@@ -95,6 +95,9 @@ viewer <faction>      faction whose view is shown (default 0)
 mapdump <file> [viewer=N] [zoom=Z] [center=X,Y] [scrollfrom=X,Y]
                       at the first turn_upkeep: redraw the main map view for that view and dump
                       its canvas (see "Map view dumps"); repeatable
+basedump <file> base=N [viewer=N]
+                      at the first turn_upkeep (after mapdump): open the base window of base N
+                      and dump its canvases (see "Base window dumps"); repeatable
 fontmetrics <file> <pixels> <style>  write the metrics and widths (chars 32..255) of a game font
 trace <n> [turn]      1: log RNG at each faction step; 2: also dump state per step;
                       3 <turn>: dump state before every enemy_veh on that turn;
@@ -182,6 +185,20 @@ smacx reproduces a dump with `smacx --save SAVE --hidden --like REF.smxmap --dum
 [--scroll-from X,Y]` (same canvas size, view and redraw sequence), and
 `tools/venv/bin/python work/ui/mapcmp.py REF OUT diff.png [--grid N]` prints the share of
 matching pixels and writes oracle | smacx | difference side by side.
+
+## Base window dumps
+
+`basedump` gives per-pixel references for the base screen (src/ui/basewin*.cpp). At the first
+turn_upkeep hook, after the map dumps, the oracle sets the viewer (default: the base's owner),
+opens the base window with BaseWin_zoom (0x41A920) and writes `<file>`: `"SMXBASE1"`, 256 RGB
+palette entries, then for BaseWin (0x6A7628) and the main interface MainInfc (0x7AE820, whose
+panes the base window draws into) int32 width, height and the 8-bit pixels top-down. Side files:
+`<file>.bmp` (the screen after do_all_draws, GDI capture: the buttons are child windows and appear
+only there) and `<file>.obj` (the data segment 0x682000..0x9CA000 while the window is open). The
+window is closed with BaseWin_exit (0x41A4C0); viewer and generators are restored. The log line
+`basedump FILE base=N viewer=V tiles=ADDR` gives the tile array address (terrain variants).
+smacx draws the same with `smacx --save SAVE --hidden --basedump N:OUT.smxbase:ADDR`;
+`tests/basewin/compare.sh` runs both and scores them with `tests/basewin/cmp.py`.
 
 ## Snapshot files
 

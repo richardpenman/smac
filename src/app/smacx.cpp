@@ -23,7 +23,9 @@
 // --keys: scripted input, consumed before real input. Tokens: a character (b, B = shift+b, ., [ ...),
 // LEFT RIGHT UP DOWN HOME END PGUP PGDN ENTER SPACE TAB BACK ESC F1..F12, KP1..KP9 (keypad),
 // C-x (ctrl), S-x (shift), CLICK:XxY (a left click in a popup), POPUP:FILE/LABEL[/FLAGS[/PCX]]
-// (shows a script popup, a test aid), and the commands SHOT[:FILE]
+// (shows a script popup, a test aid), BASEDUMP:FILE (the open base window's canvases in the
+// oracle's basedump format), BASE:N (opens base N's window, a test aid), BASESTATE (the open
+// base's production, queue, workers and stores on stderr), and the commands SHOT[:FILE]
 // (screenshot), SAVE:FILE (save the game
 // and its generators in FILE.rng, relative to --outdir), UNITS (list the human's units on
 // stderr), QUIT. --exit-after-keys (default with --hidden) quits when they run out.
@@ -37,6 +39,9 @@
 // redraw (format of the oracle's mapdump); --like REF takes the view of an oracle dump (canvas
 // size, viewer, zoom, centre, tile address); --scroll-from X,Y makes it a scrolled redraw from a
 // view centred there (the oracle's mapdump scrollfrom=). Compare with work/ui/mapcmp.py.
+// --basedump BASE:FILE[:TILES]: observer mode: the base window of base BASE as its owner sees it, in the
+// format of the oracle's basedump (and the screen in FILE.bmp; tests/basewin/compare.sh); TILES:
+// the oracle's tile array address in hex (terrain variants).
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -67,6 +72,7 @@
 #include "ui/colortables.h"
 #include "ui/sprites.h"
 #include "ui/vehdraw.h"
+#include "ui/basewin.h"
 #include "ui/win.h"
 
 namespace fs = std::filesystem;
@@ -77,6 +83,7 @@ struct Options {
     std::string save, gamedir = "game", image = "src/data/data_image.bin";
     std::string ini = "harness/oracle/runtime/Alpha Centauri.Ini", outdir = "smacx_out", shot, snapshots, rng;
     std::string dump, like;  // --dump FILE [--like REF]: map canvas dump (ui_mapdump_like)
+    std::string basedump;    // --basedump BASE:FILE: the base window's canvases (the oracle's basedump)
     int scroll_x = -1, scroll_y = -1;  // --scroll-from X,Y: the dump's redraw scrolls from there
     bool new_game = false;
     std::string new_args;
@@ -179,6 +186,27 @@ void observer_pause() {
     if (!g_opt.dump.empty()) {
         bool ok = ui_mapdump_like(&MainConsole, g_opt.dump.c_str(), g_opt.like.c_str(), g_opt.scroll_x, g_opt.scroll_y);
         std::fprintf(stderr, "dump %s: %s\n", g_opt.dump.c_str(), ok ? "ok" : "failed");
+        g_quit = true;
+        return;
+    }
+    if (!g_opt.basedump.empty()) {
+        // As the oracle's basedump: the base's owner views it, the window opens, its canvases and
+        // the screen are written, it closes (basewin.h).
+        int32_t base_id = std::atoi(g_opt.basedump.c_str());
+        std::string file = g_opt.basedump.substr(g_opt.basedump.find(':') + 1);
+        // BASE:FILE:TILES: the address of the oracle's tile array (the terrain variants' seed).
+        size_t colon = file.rfind(':');
+        if (colon != std::string::npos && colon > 1) {
+            TileVariantBase = (uint32_t)std::strtoul(file.c_str() + colon + 1, nullptr, 16);
+            file = file.substr(0, colon);
+        }
+        int32_t viewer = CurrentPlayerFaction;
+        CurrentPlayerFaction = (uint8_t)Bases[base_id].faction_id;
+        BaseWin_zoom(&BaseWin, base_id, 0);
+        basewin_dump(file.c_str());
+        ui_screenshot(file + ".bmp");
+        BaseWin_exit(&BaseWin);
+        CurrentPlayerFaction = viewer;
         g_quit = true;
         return;
     }
@@ -384,6 +412,18 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         out->command = "save " + tok.substr(5);
         return true;
     }
+    if (tok.rfind("BASEDUMP:", 0) == 0) {  // BASEDUMP:FILE, the base window's canvases (basewin.h)
+        out->command = "basedump " + tok.substr(9);
+        return true;
+    }
+    if (tok.rfind("BASE:", 0) == 0) {  // BASE:N, opens the base window of base N (test aid)
+        out->command = "base " + tok.substr(5);
+        return true;
+    }
+    if (tok == "BASESTATE") {  // the open base's production, queue and workers on stderr (test aid)
+        out->command = "basestate";
+        return true;
+    }
     if (tok.rfind("POPUP:", 0) == 0) {  // POPUP:FILE/LABEL[/FLAGS[/PCX]], a popup by label (test aid)
         out->command = "popup " + tok.substr(6);
         return true;
@@ -394,13 +434,27 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         out->command = "click " + std::to_string(x) + " " + std::to_string(y);
         return true;
     }
+        if (tok.rfind("RCLICK:", 0) == 0 || tok.rfind("MOVE:", 0) == 0) {  // a right click / mouse move
+        int32_t x = 0, y = 0;
+        size_t c = tok.find(':');
+        if (std::sscanf(tok.c_str() + c + 1, "%dx%d", &x, &y) != 2) return false;
+        out->command = (tok[0] == 'R' ? "rclick " : "move ") + std::to_string(x) + " " + std::to_string(y);
+        return true;
+    }
+    if (tok.rfind("DRAG:", 0) == 0) {  // DRAG:X1xY1:X2xY2, the go-to drag of a held left button
+        int32_t x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+        if (std::sscanf(tok.c_str() + 5, "%dx%d:%dx%d", &x1, &y1, &x2, &y2) != 4) return false;
+        out->command = "drag " + std::to_string(x1) + " " + std::to_string(y1) + " " + std::to_string(x2) + " " +
+                       std::to_string(y2);
+        return true;
+    }
         if (tok == "QUIT" || tok == "UNITS") {
         out->command = tok == "QUIT" ? "quit" : "units";
         return true;
     }
     int32_t mods = 0;
-    while (tok.size() > 2 && tok[1] == '-' && (tok[0] == 'C' || tok[0] == 'S')) {
-        mods |= tok[0] == 'C' ? 0x20000 : 0x10000;
+    while (tok.size() > 2 && tok[1] == '-' && (tok[0] == 'C' || tok[0] == 'S' || tok[0] == 'A')) {
+        mods |= tok[0] == 'C' ? 0x20000 : (tok[0] == 'S' ? 0x10000 : 0x40000);
         tok = tok.substr(2);
     }
     struct Named { const char* name; int32_t vk; };
@@ -408,7 +462,7 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         {"LEFT", VKEY_LEFT}, {"RIGHT", VKEY_RIGHT}, {"UP", VKEY_UP}, {"DOWN", VKEY_DOWN}, {"HOME", VKEY_HOME},
         {"END", VKEY_END}, {"PGUP", VKEY_PRIOR}, {"PGDN", VKEY_NEXT}, {"ENTER", VKEY_RETURN},
         {"SPACE", VKEY_SPACE}, {"TAB", VKEY_TAB}, {"BACK", VKEY_BACK}, {"ESC", VKEY_ESCAPE},
-        {"PLUS", VKEY_ADD}, {"MINUS", VKEY_SUBTRACT}, {"COMMA", 0xBC}};
+        {"PLUS", VKEY_ADD}, {"MINUS", VKEY_SUBTRACT}, {"COMMA", 0xBC}, {"ALT", VKEY_MENU}};
     for (const Named& n : kNamed) {
         if (tok == n.name) {
             out->vk = n.vk | mods;
@@ -472,6 +526,7 @@ int main(int argc, char** argv) {
         else if (a == "--turns") g_opt.turns = std::atoi(next().c_str());
         else if (a == "--shot") g_opt.shot = next();
         else if (a == "--dump") g_opt.dump = fs::absolute(next()).string();
+        else if (a == "--basedump") g_opt.basedump = next();
         else if (a == "--like") g_opt.like = fs::absolute(next()).string();
         else if (a == "--scroll-from") std::sscanf(next().c_str(), "%d,%d", &g_opt.scroll_x, &g_opt.scroll_y);
         else if (a == "--snapshots") g_opt.snapshots = next();

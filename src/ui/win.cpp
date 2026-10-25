@@ -16,6 +16,8 @@
 #include "engine/veh.h"
 #include "platform/ui_platform.h"
 #include "ui/console.h"
+#include "ui/basewin.h"
+#include "ui/console_frame.h"
 #include "ui/mapwin.h"
 #include "ui/popup.h"
 
@@ -44,6 +46,8 @@ bool g_font_ok = false;
 
 // GetKeyState bits of the modifiers while a scripted key is dispatched.
 int32_t g_script_mods = 0;
+// The tile under a go-to drag (ui_set_drag_target).
+int32_t g_drag_x = -1, g_drag_y = -1;
 
 // ---- keyboard: the original's Win_on_key (0x5F5D10) with TranslateMessage for a US layout ----
 
@@ -91,7 +95,8 @@ void dispatch_key(int32_t key) {
         std::fprintf(stderr, "key %05X (turn %d, unit %d, mode %d)\n", (uint32_t)key, CurrentTurn, MapWinVehA,
                      MapWinInVehMode);
     }
-    if (key & 0x40000) return;  // Alt: WM_SYSKEYDOWN, the menus (not reconstructed)
+    if (console_menu_key(key)) return;  // the menu bar (Alt, Alt+letter) and an open pull-down
+    if (key & 0x40000) return;          // other Alt keys: WM_SYSKEYDOWN
     // Keys without a character reach the focused window from Win_key_down_event as (0, key).
     if (!vk_has_char(vk)) {
         Console_on_key_click(&MainConsole, 0, key);
@@ -109,6 +114,13 @@ int32_t event_key(const platform::Event& ev) {
     if (ev.mods & platform::MOD_ALT) key |= 0x40000;
     return key;
 }
+
+}  // namespace
+
+// A key as the window layer delivers it (menu commands send their shortcut keys).
+void ui_dispatch_key(int32_t key) { dispatch_key(key); }
+
+namespace {
 
 void quit_requested() {
     std::fprintf(stderr, "window closed: quitting\n");
@@ -155,6 +167,19 @@ bool run_command(const std::string& cmd) {
         }
         return true;
     }
+    if (cmd.rfind("basedump", 0) == 0) {  // test aid: the base window's canvases (basewin.h)
+        basewin_dump((arg[0] == '/' ? arg : g_ui_outdir + "/" + arg).c_str());
+        return true;
+    }
+    if (cmd.rfind("basestate", 0) == 0) {  // test aid: the open base's state (basewin.h)
+        basewin_log_state();
+        return true;
+    }
+    if (cmd.rfind("base ", 0) == 0) {  // test aid: opens a base window (basewin.h)
+        int32_t id = std::atoi(arg.c_str());
+        if (id >= 0 && id < BaseCount) BaseWin_zoom(&BaseWin, id, 0);
+        return true;
+    }
     if (cmd == "quit") {
         ControlTurnA = 1;
         return true;
@@ -177,7 +202,8 @@ bool pump_platform(int32_t timeout_ms) {
         if (ev.type == platform::EV_QUIT) quit_requested();
         else if (ev.type == platform::EV_EXPOSE) g_dirty = true;
         else if (ev.type == platform::EV_KEY_DOWN || ev.type == platform::EV_LBUTTON_DOWN ||
-                 ev.type == platform::EV_LBUTTON_UP)
+                 ev.type == platform::EV_LBUTTON_UP || ev.type == platform::EV_RBUTTON_DOWN ||
+                 ev.type == platform::EV_RBUTTON_UP)
             g_input.push_back(ev);
         else if (ev.type == platform::EV_MOUSE_MOVE) {  // the latest position only
             if (!g_input.empty() && g_input.back().type == platform::EV_MOUSE_MOVE) g_input.back() = ev;
@@ -189,13 +215,6 @@ bool pump_platform(int32_t timeout_ms) {
 }
 
 // ---- drawing ----
-
-void text(int32_t x, int32_t y, const std::string& s, int32_t color) {
-    if (!g_font_ok || s.empty()) return;
-    Buffer_set_font(&g_canvas, &g_font, nullptr, nullptr, nullptr);
-    Buffer_set_text_color(&g_canvas, color, 0, 1, 1);
-    Buffer_write_l_3(&g_canvas, s.c_str(), x, y, (int32_t)s.size());
-}
 
 // Placeholder of the map cursor (draw_cursor / MapWin_draw_cursor): a diamond on the tile.
 void draw_tile_marker(int32_t x, int32_t y, int32_t color) {
@@ -215,40 +234,6 @@ void draw_tile_marker(int32_t x, int32_t y, int32_t color) {
     Buffer_set_clip(&g_canvas, nullptr);
 }
 
-// Placeholder of the console panel (MainInterface, StatusWin, InfoWin): the turn, the selected
-// unit and the cursor's tile as text.
-void draw_panel() {
-    UiRect r = {0, g_view.height, g_canvas.width, g_canvas.height};
-    Buffer_fill_3(&g_canvas, &r, 0);
-    Buffer_line_2(&g_canvas, 0, g_view.height, g_canvas.width - 1, g_view.height, 0xF8);
-    int32_t f = CurrentPlayerFaction;
-    char line[512];
-    int32_t y = g_view.height + 6, dy = 18;
-    std::snprintf(line, sizeof(line), "%s   Mission Year %d (turn %d)   Energy %d   %s", MFactions[f].noun_faction,
-                  CurrentMissionYear, CurrentTurn, Factions[f].energy_credits,
-                  (FactionStatus[0] & (1 << f)) ? "" : "(computer player)");
-    text(8, y, line, 0xFF);
-    y += dy;
-    int32_t v = MapWinVehA;
-    if (MapWinInVehMode && v >= 0 && v < VehCount) {
-        const VEH& u = Vehs[v];
-        std::snprintf(line, sizeof(line), "Unit %d: %s at (%d,%d)   moves spent %d   order %d   %s", v,
-                      Units[u.unit_id].name, u.x, u.y, u.moves_spent, u.order, veh_ready(v) ? "ready" : "done");
-    } else {
-        std::snprintf(line, sizeof(line), "View mode: cursor (%d,%d)", MapWinCursorX[MapWinCursorIndex],
-                      MapWinCursorY[MapWinCursorIndex]);
-    }
-    text(8, y, line, 0xFF);
-    y += dy;
-    text(8, y, g_message, 0xFB);
-    y += dy * 2;
-    text(8, y,
-         "keypad/arrows: move   space: skip   w: wait   l: sentry   h: hold   b: build base   f m s r F k: terraform",
-         0xF9);
-    y += dy;
-    text(8, y, "v: view/unit mode   Enter: next turn   ctrl+Enter: end turn   z/x: zoom   Esc: quit", 0xF9);
-}
-
 }  // namespace
 
 // ---- screen ----
@@ -265,6 +250,11 @@ void ui_screen_init(int32_t width, int32_t height) {
 }
 
 Buffer* ui_screen_canvas() { return &g_canvas; }
+void ui_set_drag_target(int32_t x, int32_t y) {
+    g_drag_x = x;
+    g_drag_y = y;
+    g_dirty = true;
+}
 void ui_invalidate_map() { g_map_dirty = g_dirty = true; }
 void ui_invalidate() { g_dirty = true; }
 void ui_set_message(const std::string& text) {
@@ -286,8 +276,12 @@ void ui_present() {
         draw_tile_marker(MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex], 0xFF);
     if (MapWinInVehMode && MapWinVehA >= 0 && MapWinVehA < VehCount)
         draw_tile_marker(Vehs[MapWinVehA].x, Vehs[MapWinVehA].y, 0xFB);
-    draw_panel();
+    if (g_drag_x >= 0) draw_tile_marker(g_drag_x, g_drag_y, 0xFA);
+    console_frame_draw(&g_canvas);
+    basewin_compose(&g_canvas);  // the base window over the console frame
+    console_menu_draw(&g_canvas);
     popup_draw_windows(&g_canvas);
+    console_draw_cursor(&g_canvas);
     platform::video_present(g_canvas.data, g_canvas.stride, g_canvas.width, g_canvas.height,
                             reinterpret_cast<const platform::Rgb*>(GamePalette.rgb));
     g_dirty = false;
@@ -317,13 +311,33 @@ void ui_script_keys(const std::vector<ScriptedKey>& keys) {
 
 // ---- message pump ----
 
+// Mouse input of the main screen: the base window when it is open, else the console.
+static void ui_mouse(int32_t type, int32_t x, int32_t y) {
+    if (basewin_mouse(type, x, y, false, type == UiInput::RDOWN || type == UiInput::RUP)) return;
+    console_ui_mouse(type, x, y);
+}
+
 void GAMEAPI wait_task() {
     // do_video: the window is presented when it changed.
     if (g_dirty || g_map_dirty) ui_present();
     if (!g_script.empty()) {
         ScriptedKey k = g_script.front();
         g_script.pop_front();
-        if (!k.command.empty()) {
+        int32_t x1, y1, x2, y2;
+        if (std::sscanf(k.command.c_str(), "click %d %d", &x1, &y1) == 2) {
+            ui_mouse(UiInput::MOVE, x1, y1);
+            ui_mouse(UiInput::LDOWN, x1, y1);
+            ui_mouse(UiInput::LUP, x1, y1);
+        } else if (std::sscanf(k.command.c_str(), "rclick %d %d", &x1, &y1) == 2) {
+            ui_mouse(UiInput::MOVE, x1, y1);
+            ui_mouse(UiInput::RDOWN, x1, y1);
+            ui_mouse(UiInput::RUP, x1, y1);
+        } else if (std::sscanf(k.command.c_str(), "drag %d %d %d %d", &x1, &y1, &x2, &y2) == 4) {
+            ui_mouse(UiInput::MOVE, x1, y1);
+            console_ui_drag(x1, y1, x2, y2);
+        } else if (std::sscanf(k.command.c_str(), "move %d %d", &x1, &y1) == 2) {
+            ui_mouse(UiInput::MOVE, x1, y1);
+        } else if (!k.command.empty()) {
             run_command(k.command);
         } else {
             g_script_mods = k.vk & 0x30000;
@@ -332,6 +346,7 @@ void GAMEAPI wait_task() {
         }
         return;
     }
+    console_ui_tick();
     if (g_script_given && g_ui_exit_when_script_done) {
         std::fprintf(stderr, "scripted keys done (turn %d): quitting\n", CurrentTurn);
         ControlTurnA = 1;
@@ -341,7 +356,15 @@ void GAMEAPI wait_task() {
     if (g_input.empty()) return;
     platform::Event ev = g_input.front();
     g_input.pop_front();
-    if (ev.type == platform::EV_KEY_DOWN) dispatch_key(event_key(ev));
+    switch (ev.type) {
+    case platform::EV_KEY_DOWN: dispatch_key(event_key(ev)); break;
+    case platform::EV_LBUTTON_DOWN: ui_mouse(UiInput::LDOWN, ev.x, ev.y); break;
+    case platform::EV_LBUTTON_UP: ui_mouse(UiInput::LUP, ev.x, ev.y); break;
+    case platform::EV_RBUTTON_DOWN: ui_mouse(UiInput::RDOWN, ev.x, ev.y); break;
+    case platform::EV_RBUTTON_UP: ui_mouse(UiInput::RUP, ev.x, ev.y); break;
+    case platform::EV_MOUSE_MOVE: ui_mouse(UiInput::MOVE, ev.x, ev.y); break;
+    default: break;
+    }
 }
 
 int32_t GAMEAPI do_non_input() {

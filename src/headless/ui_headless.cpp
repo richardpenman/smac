@@ -51,7 +51,6 @@ int32_t THISCALL Datalink_init(uint8_t*) { return 0; }
 void GAMEAPI bung_momma() {}
 void GAMEAPI release_sound() {}
 void THISCALL DesignWin_close(uint8_t*) {}
-void THISCALL BaseWin_close(uint8_t*) {}
 void GAMEAPI mapwin_system_shutdown() {}
 void THISCALL StatusWin_close(uint8_t*) {}
 void THISCALL GraphicWin_close(uint8_t*) {}
@@ -79,10 +78,6 @@ void THISCALL BaseButton_set_bubble_text(uint8_t*, const char*) {}
 void THISCALL FX_play(uint8_t*, int32_t) {}
 void THISCALL FX_fade(uint8_t*, int32_t) {}
 void THISCALL InfoWin_on_redraw(uint8_t*) {}
-void THISCALL GraphicWin_redraw(uint8_t*) {}
-// The base window is never visible headless: nothing to recompute.
-void THISCALL BaseWin_check_base(uint8_t*, int32_t) {}
-void THISCALL BaseWin_check_loc(uint8_t*, int32_t, int32_t, int32_t) {}
 // ---- save module: map windows, editor panel, PBEM message lists ----
 void THISCALL MapWin_close(uint8_t*) {}
 void ui_editor_panel_show(bool) {}
@@ -115,26 +110,6 @@ void ui_stringlist_add(uint8_t* list, int32_t id, char* text) {
     *reinterpret_cast<int32_t*>(list + 0x10) = (int32_t)entries.size();
     *reinterpret_cast<int32_t*>(list + 0x14) = (int32_t)entries.size() - 1;
 }
-// ---- file dialogs: nothing is shown; every dialog is cancelled (an unattended observer neither
-// saves nor loads through the menus) ----
-void THISCALL FileDialog_ctor(uint8_t* self) { std::memset(self, 0, kFileDialogSize); }
-void THISCALL FileDialog_dtor(uint8_t*) {}
-char* THISCALL FileDialog_save(uint8_t*) { return nullptr; }
-char* THISCALL FileDialog_open(uint8_t*) { return nullptr; }
-int32_t THISCALL FileDialog_add_filter(uint8_t*, const char*, const char*) { return 0; }
-int32_t THISCALL FileDialog_set_ext(uint8_t*, const char*) { return 0; }
-int32_t THISCALL FileDialog_set_name(uint8_t*, const char*) { return 0; }
-void THISCALL FileBox_ctor(uint8_t* self) { std::memset(self, 0, kFileBoxSize); }
-void THISCALL FileBox_init(uint8_t*) {}
-void THISCALL FileBox_close(uint8_t*) {}
-char* THISCALL FileBox_save(uint8_t*) { return nullptr; }
-char* THISCALL FileBox_load(uint8_t*) { return nullptr; }
-int32_t THISCALL FileList_set_path(uint8_t*, const char*) { return 0; }
-int32_t THISCALL FileList_add_ext(uint8_t*, const char*) { return 0; }
-void THISCALL FileList_close(uint8_t*) {}
-void ui_filebox_destroy(uint8_t*) {}
-// No window is ever visible.
-int32_t THISCALL Win_is_visible(uint8_t*) { return 0; }
 void GAMEAPI do_all_draws() {}
 void THISCALL Lock_clear(uint8_t*) {}
 void THISCALL AlphaNet_close(uint8_t*) {}

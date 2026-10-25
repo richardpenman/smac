@@ -67,6 +67,12 @@ struct PopupHolder {  // the Popup object a function constructs on its stack
 
 }  // namespace
 
+// Popup_start (0x406380) for the other UI files (popup.h).
+int32_t Popup_start(BasePop* pop, const char* file, const char* label, int32_t active, const char* edit,
+                    uint32_t flags) {
+    return popup_start(pop, file, label, active, edit, flags);
+}
+
 // ---- pop module (0x627100..) ----
 
 int32_t GAMEAPI pops_18(const char* file, const char* label, int32_t active, const char* edit, uint32_t flags,

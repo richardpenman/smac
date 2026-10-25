@@ -51,8 +51,8 @@ looks and behaves like terranx.exe.
   colour ramps), dithered rows (`color 0x41`) for tiles not currently seen.
 * **Fonts**: GDI `CreateFontIndirect` ("Arial", pixel heights) and `TextOut` with baseline
   alignment on the DIB; no antialiasing.
-* **Units**: voxel models (`*.cvr`, load_voxels, ~"Caviar") rendered at runtime; native life from
-  Units.pcx; flags from flags.pcx.
+* **Units**: voxel models (`*.cvr`, load_voxels, "Caviar") rendered at runtime (section 7); native
+  life from Units.pcx; flags from flags.pcx.
 
 ### Message pump and modality
 
@@ -108,6 +108,7 @@ src/app/smacx.cpp the native game executable
   | `art` | load_faction_art, load_flags | sprites.cpp, vehdraw.cpp |
   | `pump` | wait_task, do_all_non_input, do_non_input, flush_input | win.cpp |
   | `popup` | popp, X_pop, X_pop_2, X_pops, X_pops_11, popb, POP2, POP3, NetMsg_pop, NetMsg_close, Popup_ctor/dtor, ui_first_base_name, ui_crash_landing_*, ui_pact_ends_dialog, ui_tech_popup_*, ui_production_popup_*, ui_council_menu_*, ui_supply_menu, ui_artifact_menu, ui_disembark_menu | win_popup.cpp, popup_menus.cpp (popup.cpp, font_text.cpp) |
+  | `filebox` | FileDialog_*, FileBox_*, FileList_set_path/add_ext/close, ui_filebox_destroy (the dialogs of save_game / load_game) | console_filebox.cpp |
 
   To replace another function: move its headless definition into an area file of its own (or
   into the area it belongs to, if smacx implements the whole area), then define it in src/ui
@@ -132,7 +133,7 @@ src/app/smacx.cpp the native game executable
 | 2 | complete `MapWin_gen_terrain_poly`: coasts/beaches (Texture_draw_coast), rivers, roads/mag tubes, landmarks textures and sprites, territory borders, resources/pods/monolith, jungle; bit-exact Texture_draw_* stepping; `pfncPtToTile`; scrolled redraws (`pfncRedrawMap` partial copy) | pixel diff per tile class |
 | 3 | units: load_vehicles, flags, Units.pcx natives, voxel renderer (cvr) or pre-rendered sprite cache; veh_draw with stacks, health, animation (vehdraw_*) | unit close-ups vs oracle |
 | 4 | Win/GraphicWin/z-order/message pump/modal loops on the platform events; MainInterface (console frame), StatusWin, InfoWin, WorldWin (mini map), MessageWin; Console key handling and `Console_human_turn`: a human player can move units and end turns | scripted key sequences, state compare with oracle (same keys) |
-| 5 | BaseWin (base screen) | screenshots per base |
+| 5 (mostly done: src/ui/basewin*.cpp, tests/basewin/) | BaseWin (base screen): layout and art, panes, city map, clicks, build menu (text popup stand-in for the picker grid), queue, hurry, governor, specialists, rename, recycling; headless stubs in src/headless/ui_headless_basewin.cpp | `basedump` canvases vs oracle (tests/basewin/compare.sh), scripted keys (tests/basewin/run.sh) |
 | 6 (done, section 6) | popups: BasePop on the game's script files (Script.txt, xscript.txt etc.: `#LABEL`, `^` lines, `$STR` parsing via the reconstructed text module), `popp/popb/X_pop*`, NetMsg, choice lists | popups by label vs oracle |
 | 7 | design workshop (DesignWin), social engineering, tech pick/NewTechWin, datalinks (help) | |
 | 8 | diplomacy (DiploWin, commlink), council window, reports (ReportWin/ReportIf), monuments | |
@@ -166,9 +167,8 @@ builds stay unchanged.
   dumps") dumps the main view's canvas after a full or scrolled redraw for a given viewer, zoom
   and centre; `smacx --like REF --dump OUT [--scroll-from X,Y]` draws the same view and
   `work/ui/mapcmp.py` scores it. Terrain, coasts, rivers, roads, borders, bases, base names,
-  landmarks, unit sprites, flags, health bars and order letters match pixel for pixel; the 3D unit
-  models (chassis 0..8: voxel models drawn by vehdraw_draw through the gfx2 software renderer) are
-  not reconstructed yet and are the remaining differences.
+  landmarks, unit sprites, flags, health bars, order letters and the 3D unit models (section 7)
+  match pixel for pixel.
 
 ## 5. The human turn (phase 4, first part)
 
@@ -186,19 +186,38 @@ computer players move with the engine.
   Console_turn_hints, pfncProcZoomKey, MapWin_focus, not_my_turn; wait_loop (net_misc, in the
   engine). Keys reach Console_on_key_click as the original's Win_on_key / WM_CHAR handling delivers
   them (character, virtual key | 0x10000 shift | 0x20000 ctrl), so the original key bindings apply.
-* **Placeholders** (src/ui/console_placeholders.cpp, win.cpp): the console panel is
-  text (turn, energy, selected unit, message line) instead of MainInterface/StatusWin/InfoWin; the
-  cursor and the selected unit are diamonds; popups are reconstructed (section 6); orders that
-  open other code (go to, automate, unload, artillery, abilities, convoy, patrol, road to,
-  designate, destroy, disband, upgrade dialog), the base window, reports, menus, preferences and
-  the scenario editor log "not reconstructed" and do nothing. Map redraws are full redraws at
-  presentation time. Multiplayer paths stop at the first network call.
-* **Testing**: `--keys` scripts input (characters, `C-`/`S-` modifiers, KP1..KP9, named keys, and
+* **Unit orders and mouse** (src/ui/console_orders.cpp, console_mouse.cpp; asm-faithful):
+  Console_go_to (go-to / road-to / tube-to / bombing / rally point / find base / psi gate lists
+  with the sort buttons), go_home, automate (all modes), unload, oblit, arty, use_ability (drop
+  pods, tectonic / fungal missiles), explore, convoy, set_patrol, designate, road_to, give_veh,
+  destroy (pillage), disband, disband_2, activate, group, set_road_to, set_bombing_run, veh_pick,
+  popv, Console_load_proc; the mouse modes (Console_cursor_on(_2), cursor_off, selecting,
+  selected; CURSOR.PCX cursors drawn in software), MapWin_on_left_down / left_click /
+  right_click / right_down / mouse_move, MapWin_click (select, centre, open bases, the modes'
+  targets, rally-point drag), the go-to drag (go_timer, go_reset) and its keys (g, space, j).
+  say_orders (statuswin.cpp). Not reconstructed: MapWin_right_menu, MapWin_editor, the path
+  preview (MapWin_dest_line, Console_goto_routine's PlanWin), sounds.
+* **Main interface** (console_frame.cpp; approximated, see its header): console2_A.pcx frame,
+  pane backgrounds, menu / commlink buttons, "TURN COMPLETE", the unit, tile, stack, info and
+  date panes and a simple world map, drawn with the original's art, fonts and colours at the
+  measured positions, not by StatusWin_draw_* / InfoWin_setup_text / WorldWin_on_redraw.
+* **Menus** (menu.cpp; approximated): the bar and pull-downs of menu.txt with the original's
+  command ids and init-hidden items (Alt, Alt+letter, arrows, Enter, mouse); a command sends its
+  shortcut key to Console_on_key_click (Console_menu_proc is not reconstructed).
+* **Save / load**: ctrl+S / ctrl+L (and the Game menu) run the engine's save_game / load_game with
+  a simple file box (console_filebox.cpp): a name field, a list of saves; original naming.
+* **Placeholders** (src/ui/console_placeholders.cpp): the map cursor and selected unit are
+  diamonds; the F-key reports and HQ screens (F1..F7, F12), preferences, landmarks, the scenario
+  editor, the unit menu of a right click, time controls, survey, assemble, tutorial hints log
+  "not reconstructed". Multiplayer paths stop at the first network call.
+* **Testing**: `--keys` scripts input (characters, `C-`/`S-`/`A-` modifiers, `ALT`, `CLICK:XxY`,
+  `RCLICK:XxY`, `MOVE:XxY`, `DRAG:X1xY1:X2xY2` (a held left button: the go-to drag), KP1..KP9, named keys, and
   the commands `SHOT[:file]`, `SAVE:file` (also writes `file.rng`), `UNITS`, `QUIT`);
   `--snapshots DIR` writes the harness's turn_NNN.state/.rng/.sav before every turn_upkeep and
   `--rng FILE` restores a snapshot's generators after `--save`. Checks done:
   * observer mode (`--human 0`) with every smacx area replaced matches the oracle references
     (harness/compare.py): tiny20, small12, std8 (new games), late140 (load);
+  * tests/console/run.sh: orders by key, go-to list and drag, menus, save / load, late saves;
   * a human game played with scripted keys for several turns, saved at the start of a human turn
     (`SAVE:`) and continued from that save with the same keys, gives identical snapshots (state
     and generators) on the following turns; the only difference is FactionTurnMight of the loaded
@@ -259,3 +278,59 @@ win_popup.cpp, popup_menus.cpp); every engine popup call opens the original's di
   pixel shift of what follows the text (which also moves the scan-line phase of the box
   textures), and the main interface's arms beside the frame (slide_show, not reconstructed).
 
+
+## 7. Unit models (voxel renderer)
+
+The 3D unit models (chassis 0..8) are reconstructed: src/ui/voxel.{h,cpp} (the .cvr loader, model
+handles, the unit scene, the vector/matrix helpers), src/ui/voxel_render.cpp (the renderer and its
+span drawers), src/ui/vehdraw.cpp (load_voxels, vehdraw_draw, compute_camera, the construct_*
+functions, the unit colour tables), src/ui/x87.h (floating point helpers).
+
+* **Models**: `load_voxels` (0x451030) loads 133 .cvr files into 12-byte handles at fixed
+  addresses of the original (CaviarHandle; native: `caviar_handle(addr)`); four temporary loads
+  give part offsets (AVGMTGUN, adroper, AVHT-Gun/LightsReposition: frame 1 - frame 0 of object 0,
+  stored at 0x7AC1B0, 0x79A618, 0x798C30, 0x789B48). The .cvr reader (0x6381F0..0x6391F0) is
+  chunked; the game's files use no mesh patches (0x04050000), size chunks or segmented streams.
+* **Scene** (0x8CC828): `vehdraw_construct_vehicle` and the chassis/weapon/abil/armor functions
+  add model objects (frame, position, matrix, mesh, shading table: the model's own, a faction
+  table at 0x79A7EC or an armour table at 0x792664). Faction and armour tables are the shading
+  table of VBP.CVR recoloured (colortables_init / _faction: system.txt VEHICLECOLORING,
+  ARMORCOLORING; the faction PCX pixel (0x1B3, 0x2E9)); armour 5 adds a translucent shield drawn
+  through the blend tables at 0x6EEF7C (ARMORCOLORING_TRANS).
+* **Camera**: the map's view tilted with the terrain (the four facet normals of the tile's corner
+  heights, table 0x8CDD10 built by vehdraw_compute_facet_normals), turned to the unit's direction,
+  scaled by the zoom; the shadow is the model projected along the light onto z = 0.
+* **Renderer** (gfx2 0x617230, video 0x6396A0..0x6404F0): per object a level of detail, a light
+  table chosen from the light direction in voxel space (24 latitudes x 89 longitudes of static
+  tables at 0x699100), then the voxel stream: each 3-byte record steps to a neighbour voxel (26
+  directions in 8.8 fixed point) and splats 1 or 2x2 pixels into a 256x256 canvas with a 16-bit
+  depth buffer, the shadow into a second canvas. Scene_render blits the shadow (through the shadow
+  table) and the model to the map; Scene_clear clears the drawn rectangle. The _SELFMOD span
+  drawers patch their own addresses; they are plain loops here.
+* **Floating point**: the control word is taken as 0x27F (53-bit precision, round to nearest: the
+  Windows / MSVC default, which the CRT math functions check for and force); the test views do
+  not distinguish it from 64-bit precision (below). With 53-bit precision every FADD/FSUB/FMUL/
+  FDIV/FSQRT result is a correctly rounded double, so register values are `double` and the code
+  repeats the original's operation order and its float stores (fst/fstp DWORD) exactly. FSIN,
+  FCOS and FPATAN ignore the precision control: their 64-bit results (mat3_from_euler, the CRT
+  atan/acos) are computed with the x87 instructions themselves on x86 hosts (inline asm,
+  `long double`), and an operation on such a value is rounded once to 53 bits (`x87_mul/x87_add`
+  run fmul/fadd under control word 0x27F); other hosts use libm (may differ in the last bit).
+  Conversions: `__ftol` truncates (`x87_ftol`), FISTP rounds to nearest even (`x87_fistp`);
+  `round_away` is the original's x*256 +- 0.5 then __ftol. `_hypot` (0x650231) is reproduced step
+  by step (crt_hypot). A test build with 64-bit intermediates gave the same pixels on the test
+  views.
+* **Not reconstructed**: segmented voxel streams (node flag 4, part flag 1; unused by the game's
+  models), Scene_render's flag 4 (bounding box centring, 0x63A6F0) and the double-size mode
+  (scene flag 0x20), the turn/move animations (vehdraw_turn*, vehdraw_scoot*), the battle and
+  explosion frames (XI.PCX / XF.PCX, skipped in load_vehicles). The design workshop's copter
+  animation step (pfncWinIsVisible of the workshop window) is always off.
+* **Verification**: work/vx (cmpall.sh, cmpdir.sh, classify.py: diff pixels inside / outside
+  what the models drew). All 34 map views of work/mv and 36 new zoom 8/12/16 views of turns 100
+  and 147 (several viewers) have no model pixel that differs from the oracle; the remaining
+  differences are base art (Morgan bases and leader portrait overlays), terrain texels and base name
+  glyphs, present before. A scenario with 21 extra prototypes (all chassis, armours 1..13
+  including the armour 5 shield, abilities, reactors 1..4, natives 9 and 10) matched except one
+  invalid design (missile payload 0x17 on a cruiser on one tilted tile: ~120 pixels where its
+  missile model meets the hull; the span calls, light tables and depth-clear rectangles were
+  checked identical to the oracle's with slotlog, cause not found).

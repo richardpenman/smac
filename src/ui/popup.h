@@ -72,6 +72,7 @@ int32_t BasePop_item(BasePop* self, const char* text, int32_t id);
 int32_t BasePop_button(BasePop* self, const char* text);
 void BasePop_set_loc(BasePop* self, int32_t x, int32_t y);
 void BasePop_set_width(BasePop* self, int32_t width);
+void BasePop_set_max_rows(BasePop* self, int32_t rows);
 // Shows the popup and waits for the answer (no_display: prepare only, return 0).
 int32_t BasePop_exec_3(BasePop* self, int32_t no_display, int32_t a2);
 // The picture shown left of the text (a PCX file; null for none).
@@ -87,6 +88,12 @@ int32_t BasePop_item_count(BasePop* self);
 // Not original functions: the popup's mode (+0x30AC, #extra: 1 message line, 2 base message,
 // 0x3EA base message and dialog) and its text lines joined by spaces (Popup_on_exec, POP2).
 void BasePop_set_mode(BasePop* self, int32_t mode);
+// The initial selection (+0xA44) set after Popup_start (Console_go_to): the item with this id.
+void BasePop_set_active(BasePop* self, int32_t id);
+// Popup_start (0x406380, win_popup.cpp): BasePop_start with the expansion's alien scripts tried
+// first.
+int32_t Popup_start(BasePop* pop, const char* file, const char* label, int32_t active, const char* edit,
+                    uint32_t flags);
 std::string BasePop_text(BasePop* self);
 
 // ---- the pop module (0x627100..) and the veh module's wrappers (0x5BF310..) ----
