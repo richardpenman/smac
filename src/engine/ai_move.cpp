@@ -83,12 +83,6 @@ inline bool sq_ocean(const MAP* sq) { return (sq->climate & 0xE0) < 0x60; }
 inline int32_t sq_ocean_i(const MAP* sq) { return sq_ocean(sq) ? 1 : 0; }
 inline int32_t tile_region(int32_t x, int32_t y) { return map_tile(x, y)->region; }
 inline int32_t base_region(int32_t base_id) { return tile_region(Bases[base_id].x, Bases[base_id].y); }
-// Owner (0-7) of the base on a tile, or -1 (the inline check of the original).
-inline int32_t sq_base_owner(const MAP* sq) {
-    if (!(sq->items & 3)) return -1;
-    int32_t owner = sq->val2 & 0xF;
-    return owner < 8 ? owner : -1;
-}
 inline bool sq_has_base(const MAP* sq) { return (sq->items & 1) && (sq->val2 & 0xF) < 8; }
 // Preq tech of a terraform (sea: the ocean variant).
 inline int32_t tf_preq(int32_t terraform_id, int32_t sea) {
@@ -109,8 +103,6 @@ inline int32_t vdist(int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
     int32_t dy = std::abs(y1 - y2);
     return vector_dist(x_dist(x1, x2), dy);
 }
-// Region of a tile's index into the per-faction region arrays.
-inline Faction& fac_of(int32_t faction_id) { return Factions[faction_id]; }
 inline int32_t top_of(int32_t veh_id) {
     while (Vehs[veh_id].prev_veh_id_stack >= 0) veh_id = Vehs[veh_id].prev_veh_id_stack;
     return veh_id;

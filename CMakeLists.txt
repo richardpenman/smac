@@ -13,13 +13,32 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
+# Code generation must keep the original's (MSVC, 32-bit x86) semantics:
+# -fwrapv: signed overflow wraps; -fno-strict-aliasing: the engine reads game state through other
+# types; -fsigned-char: char is signed as in MSVC (the default on x86, not on Linux arm64);
+# -ffp-contract=off: no fused multiply-add (arm64), so floating point rounds like the original's
+# x87 code at 53-bit precision (= SSE2 double).
 # -fno-aggressive-loop-optimizations: the original indexes tables out of bounds in places that are
 # preserved on purpose (BUG(original)); without it GCC may assume such loops end early.
-add_compile_options(-Wall -Wextra -Wno-unused-parameter -fwrapv -fno-strict-aliasing)
-include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag(-fno-aggressive-loop-optimizations SMACX_HAS_NO_AGGRESSIVE_LOOP_OPT)
-if(SMACX_HAS_NO_AGGRESSIVE_LOOP_OPT)  # GCC only
-  add_compile_options(-fno-aggressive-loop-optimizations)
+if(MSVC)
+  # cl.exe or clang-cl (experimental: native results are verified with GCC and Clang only).
+  # cl.exe: /d2UndefIntOverflow- keeps the optimizer from assuming that signed overflow cannot
+  # happen; it has no type-based alias analysis, char is signed and /fp:precise does not contract.
+  add_compile_options(/W3 /bigobj /permissive- /Zc:__cplusplus /wd4100 /wd4244 /wd4267 /wd4996)
+  add_compile_definitions(_CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_WARNINGS)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    add_compile_options(/d2UndefIntOverflow-)
+  else()  # clang-cl
+    add_compile_options(-fwrapv -fno-strict-aliasing -ffp-contract=off)
+  endif()
+else()
+  add_compile_options(-Wall -Wextra -Wno-unused-parameter -fwrapv -fno-strict-aliasing -fsigned-char
+                      -ffp-contract=off)
+  include(CheckCXXCompilerFlag)
+  check_cxx_compiler_flag(-fno-aggressive-loop-optimizations SMACX_HAS_NO_AGGRESSIVE_LOOP_OPT)
+  if(SMACX_HAS_NO_AGGRESSIVE_LOOP_OPT)  # GCC only
+    add_compile_options(-fno-aggressive-loop-optimizations)
+  endif()
 endif()
 if(NOT SMACX_HYBRID AND SMACX_SANITIZE)
   # Overflow checks stay off: -fwrapv makes signed wrapping defined, as in the original.
@@ -69,6 +88,11 @@ else()
   add_executable(smacx_headless src/app/headless.cpp ${HEADLESS_SOURCES})
   target_link_libraries(smacx_headless PRIVATE smacx_engine)
   target_include_directories(smacx_headless PRIVATE harness)
+  # Portability smoke test (no game data needed): ctest, or run smacx_smoke.
+  enable_testing()
+  add_executable(smacx_smoke tests/smoke.cpp)
+  target_link_libraries(smacx_smoke PRIVATE smacx_engine)
+  add_test(NAME smoke COMMAND smacx_smoke WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
   # Native game with the SDL2 UI (src/ui, src/platform/sdl). Uses tools/sdl2 when present.
   find_package(SDL2 CONFIG QUIET HINTS ${CMAKE_SOURCE_DIR}/tools/sdl2/lib/cmake/SDL2)
   find_package(SDL2_ttf CONFIG QUIET HINTS ${CMAKE_SOURCE_DIR}/tools/sdl2/lib/cmake/SDL2_ttf)

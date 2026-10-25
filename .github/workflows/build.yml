@@ -1,0 +1,79 @@
+# Builds the native engine and smacx_headless on Linux, macOS and Windows, and runs the
+# portability smoke test (tests/smoke.cpp). The game data and src/data/data_image.bin are not in
+# the repository, so games cannot be played or compared here (see harness/README.md for that).
+name: build
+
+# Manual only for now: the repository is private, so every run uses paid Actions minutes (macOS
+# counts 10x). Add `push:` / `pull_request:` here to build every commit.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # The SDL2 UI (smacx) is not built here; only the engine, smacx_headless and the smoke test.
+  CONFIGURE_FLAGS: -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=ON -DCMAKE_DISABLE_FIND_PACKAGE_SDL2_ttf=ON
+  TARGETS: smacx_headless smacx_smoke
+
+jobs:
+  unix:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-gcc, os: ubuntu-latest, cc: gcc, cxx: g++ }
+          - { name: linux-clang, os: ubuntu-latest, cc: clang, cxx: clang++ }
+          - { name: macos-clang, os: macos-latest, cc: clang, cxx: clang++ }  # Apple clang, arm64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compiler
+        run: ${{ matrix.cxx }} --version
+      - name: Configure
+        run: cmake -S . -B build $CONFIGURE_FLAGS -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+      - name: Build
+        run: cmake --build build --parallel 4 --target $TARGETS
+      - name: Smoke test
+        run: ctest --test-dir build --output-on-failure
+
+  windows-mingw:
+    name: windows-clang (MSYS2 CLANG64)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: false
+          install: >-
+            mingw-w64-clang-x86_64-clang
+            mingw-w64-clang-x86_64-cmake
+            mingw-w64-clang-x86_64-ninja
+            mingw-w64-clang-x86_64-python
+      - name: Compiler
+        run: clang++ --version
+      - name: Configure
+        run: cmake -S . -B build -G Ninja $CONFIGURE_FLAGS -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXE_LINKER_FLAGS=-static
+      - name: Build
+        run: cmake --build build --parallel 4 --target $TARGETS
+      - name: Smoke test
+        run: ctest --test-dir build --output-on-failure
+
+  # Experimental: cl.exe builds are not verified against the original (see README "Compilers").
+  windows-msvc:
+    name: windows-msvc (experimental)
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -A x64 -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=ON -DCMAKE_DISABLE_FIND_PACKAGE_SDL2_ttf=ON
+      - name: Build
+        run: cmake --build build --config RelWithDebInfo --parallel 4 --target smacx_headless smacx_smoke
+      - name: Smoke test
+        run: ctest --test-dir build -C RelWithDebInfo --output-on-failure

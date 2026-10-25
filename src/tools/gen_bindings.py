@@ -67,7 +67,7 @@ def main():
                         cc = (cc or "GAMEAPI").strip()
                         decls[name] = dict(addr=int(addr, 16), ret=" ".join(ret.split()), name=name, cc=cc,
                                            params=split_params(params), native_only=bool(native_only),
-                                           header=os.path.relpath(path, d))
+                                           header=os.path.relpath(path, d).replace(os.sep, "/"))
                 elif f.endswith(".cpp") and not f.startswith(("native_stubs", "hybrid_bindings")):
                     clean = re.sub(r"//[^\n]*|/\*.*?\*/", "", text, flags=re.S)
                     for m in re.finditer(r"^[A-Za-z_][\w:<>\s\*&]*?\b(\w+)\s*\([^;{]*\)\s*(?:const\s*)?\{",

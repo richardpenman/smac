@@ -39,7 +39,9 @@ namespace {
 // runs at the stack depth of the base_minerals call before it.
 inline void base_energy_call() {
     base_energy();
-    __asm__ volatile("");
+#ifdef SMACX_HYBRID
+    __asm__ volatile("");  // no tail call: base_energy reads the stack left by base_minerals
+#endif
 }
 // Raw byte view of the base table (the original indexes it without range checks).
 uint8_t* base_raw(int32_t base_id) {

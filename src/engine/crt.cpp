@@ -8,8 +8,6 @@ bool crt_feof(CrtFile* file) { return (*((const uint8_t*)file + 0xC) & 0x10) != 
 
 #else
 
-#include <sys/stat.h>
-
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -36,7 +34,7 @@ void GAMEAPI crt_exit(int32_t code) { std::exit(code); }
 int32_t GAMEAPI crt_mkdir(const char* path) {
     char p[1024];
     platform::resolve_path(path, p, sizeof(p));
-    return mkdir(p, 0777) == 0 ? 0 : -1;
+    return platform::host_mkdir(p) ? 0 : -1;
 }
 
 CrtFile* GAMEAPI crt_fopen(const char* path, const char* mode) {
@@ -52,8 +50,8 @@ CrtFile* GAMEAPI crt_fopen(const char* path, const char* mode) {
         return cf;
     }
     if (mode[0] != 'r') return nullptr;
-    struct stat st;
-    if (stat(p, &st) != 0 || S_ISDIR(st.st_mode)) return nullptr;
+    bool is_dir = false;
+    if (!platform::host_stat(p, &is_dir, nullptr) || is_dir) return nullptr;
     FILE* f = std::fopen(p, "rb");
     if (!f) return nullptr;
     CrtFile* cf = new CrtFile;
@@ -170,8 +168,8 @@ uint32_t GAMEAPI crt_fwrite(const void* buf, uint32_t size, uint32_t count, CrtF
 int32_t GAMEAPI crt_remove(const char* path) {
     char p[1024];
     platform::resolve_path(path, p, sizeof(p));
-    struct stat st;
-    if (stat(p, &st) != 0 || S_ISDIR(st.st_mode)) return -1;
+    bool is_dir = false;
+    if (!platform::host_stat(p, &is_dir, nullptr) || is_dir) return -1;
     return std::remove(p) == 0 ? 0 : -1;
 }
 
@@ -179,8 +177,8 @@ int32_t GAMEAPI crt_rename(const char* from, const char* to) {
     char a[1024], b[1024];
     platform::resolve_path(from, a, sizeof(a));
     platform::resolve_path(to, b, sizeof(b));
-    struct stat st;
-    if (stat(a, &st) != 0 || stat(b, &st) == 0) return -1;  // MoveFileA fails if the target exists
+    // MoveFileA fails if the target exists
+    if (!platform::host_stat(a, nullptr, nullptr) || platform::host_stat(b, nullptr, nullptr)) return -1;
     return std::rename(a, b) == 0 ? 0 : -1;
 }
 

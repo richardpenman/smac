@@ -43,4 +43,11 @@ namespace platform {
 // the file system. Returns the resolved host path, or the input with separators converted when
 // nothing matches.
 const char* resolve_path(const char* path, char* out, uint32_t out_size);
+#ifndef SMACX_HYBRID
+// Native builds, portable file system access on resolved host paths (std::filesystem).
+// host_stat: false if nothing exists at path; otherwise *is_dir and *size (files) are set.
+bool host_stat(const char* path, bool* is_dir, uint64_t* size);
+// _mkdir: true if the directory was created (false if it exists or cannot be created).
+bool host_mkdir(const char* path);
+#endif
 }  // namespace platform

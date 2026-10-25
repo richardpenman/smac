@@ -55,14 +55,14 @@ const char* resolve_path(const char* path, char* out, uint32_t out_size) {
 
 #else  // native
 
-#include <dirent.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <string>
+#include <system_error>
 #include <vector>
+
+namespace fs = std::filesystem;
 
 namespace {
 
@@ -127,6 +127,23 @@ bool is_key(const std::string& line, const char* key, std::string* value) {
 }  // namespace
 
 namespace platform {
+bool host_stat(const char* path, bool* is_dir, uint64_t* size) {
+    std::error_code ec;
+    fs::file_status st = fs::status(path, ec);
+    if (ec || !fs::exists(st)) return false;
+    if (is_dir) *is_dir = fs::is_directory(st);
+    if (size) {
+        uintmax_t n = fs::is_regular_file(st) ? fs::file_size(path, ec) : 0;
+        *size = ec ? 0 : (uint64_t)n;
+    }
+    return true;
+}
+
+bool host_mkdir(const char* path) {
+    std::error_code ec;
+    return fs::create_directory(path, ec) && !ec;
+}
+
 const char* resolve_path(const char* path, char* out, uint32_t out_size) {
     std::string p(path);
     for (char& c : p)
@@ -144,19 +161,17 @@ const char* resolve_path(const char* path, char* out, uint32_t out_size) {
         if (!comp.empty()) {
             std::string dir = result.empty() ? "." : result;
             std::string cand = (result.empty() || result.back() == '/' ? result : result + "/") + comp;
-            struct stat st;
-            if (ok && comp != "." && comp != ".." && stat(cand.c_str(), &st) != 0) {
+            std::error_code ec;
+            if (ok && comp != "." && comp != ".." && !fs::exists(cand, ec)) {
                 // look for a case-insensitive match in dir
                 bool found = false;
-                if (DIR* d = opendir(dir.c_str())) {
-                    while (struct dirent* de = readdir(d)) {
-                        if (ieq(de->d_name, comp)) {
-                            cand = (result.empty() || result.back() == '/' ? result : result + "/") + de->d_name;
-                            found = true;
-                            break;
-                        }
+                for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
+                    std::string name = it->path().filename().string();
+                    if (ieq(name, comp)) {
+                        cand = (result.empty() || result.back() == '/' ? result : result + "/") + name;
+                        found = true;
+                        break;
                     }
-                    closedir(d);
                 }
                 if (!found) ok = false;
             }
@@ -258,18 +273,21 @@ int32_t WritePrivateProfileStringA(const char* section, const char* key, const c
 }
 
 uint32_t GetCurrentDirectoryA(uint32_t size, char* buf) {
-    char tmp[4096];
-    if (!getcwd(tmp, sizeof(tmp))) return 0;
-    uint32_t n = (uint32_t)std::strlen(tmp);
+    std::error_code ec;
+    std::string tmp = fs::current_path(ec).string();
+    if (ec) return 0;
+    uint32_t n = (uint32_t)tmp.size();
     if (n + 1 > size) return n + 1;
-    std::memcpy(buf, tmp, n + 1);
+    std::memcpy(buf, tmp.c_str(), n + 1);
     return n;
 }
 
 int32_t SetCurrentDirectoryA(const char* path) {
     char p[1024];
     platform::resolve_path(path, p, sizeof(p));
-    return chdir(p) == 0;
+    std::error_code ec;
+    fs::current_path(p, ec);
+    return !ec;
 }
 
 uint32_t GetDriveTypeA(const char*) { return 1; /* DRIVE_NO_ROOT_DIR */ }
@@ -277,25 +295,25 @@ uint32_t GetDriveTypeA(const char*) { return 1; /* DRIVE_NO_ROOT_DIR */ }
 bool file_exists(const char* path) {
     char p[1024];
     platform::resolve_path(path, p, sizeof(p));
-    struct stat st;
-    return stat(p, &st) == 0;
+    return platform::host_stat(p, nullptr, nullptr);
 }
 
 uint8_t* read_file(const char* path, uint32_t* size) {
     char p[1024];
     platform::resolve_path(path, p, sizeof(p));
-    struct stat st;
-    if (stat(p, &st) != 0 || S_ISDIR(st.st_mode)) return nullptr;
+    bool is_dir = false;
+    uint64_t file_size = 0;
+    if (!platform::host_stat(p, &is_dir, &file_size) || is_dir) return nullptr;
     FILE* f = std::fopen(p, "rb");
     if (!f) return nullptr;
-    uint8_t* data = (uint8_t*)std::malloc(st.st_size ? (size_t)st.st_size : 1);
-    size_t got = std::fread(data, 1, (size_t)st.st_size, f);
+    uint8_t* data = (uint8_t*)std::malloc(file_size ? (size_t)file_size : 1);
+    size_t got = std::fread(data, 1, (size_t)file_size, f);
     std::fclose(f);
-    if (got != (size_t)st.st_size) {
+    if (got != (size_t)file_size) {
         std::free(data);
         return nullptr;
     }
-    *size = (uint32_t)st.st_size;
+    *size = (uint32_t)file_size;
     return data;
 }
 

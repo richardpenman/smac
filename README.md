@@ -10,9 +10,10 @@ and prove behavioural equivalence against the original binary with a differentia
 | --- | --- |
 | `game/` | Installed game data (assets, `terranx.exe`). Read-only input. |
 | `ref/` | Public reverse-engineering references: Thinker (MIT), OpenSMACX (GPL-3). Used for names/layouts. |
-| `tools/` | Downloaded tooling: Ghidra, llvm-mingw (i686 Windows cross compiler), Python venv. |
+| `tools/` | Downloaded tooling: Ghidra, llvm-mingw (Windows cross compiler), Python venv. |
 | `re/` | Analysis: Ghidra project, symbol map, exported decompilation (`re/out/functions.jsonl`). |
 | `src/` | The reconstructed game. |
+| `tests/` | Portability smoke test (`smacx_smoke`, no game data needed). |
 | `harness/` | Differential harness: `oracle/` (DLL injected into the original), comparison tools. |
 | `work/` | Scratch run directories, Wine prefix. Disposable. |
 
@@ -35,7 +36,7 @@ and prove behavioural equivalence against the original binary with a differentia
 | Tool | Location | Notes |
 | --- | --- | --- |
 | Ghidra 12.1.4 | `tools/ghidra_12.1.4_PUBLIC` | Project in `re/ghidra_proj`; scripts in `re/ghidra_scripts` (`ApplySymbols`, `ExportAll`). |
-| llvm-mingw 20260922 | `tools/llvm-mingw-*` | i686 Windows cross compiler for `oracle.dll`/`hybrid.dll` (`cmake/i686-mingw.cmake`). |
+| llvm-mingw 20260922 | `tools/llvm-mingw-*` | Windows cross compiler: i686 for `oracle.dll`/`hybrid.dll` (`cmake/i686-mingw.cmake`), x86-64 native builds (`cmake/x86_64-mingw.cmake`). |
 | Python venv | `tools/venv` | pefile, capstone, pillow, numpy, mss. |
 | SDL2 2.30.11 + SDL2\_ttf 2.24.0 | `tools/sdl2` | Built from source (`tools/SDL2-*`); X11/ALSA loaded dynamically. Headers for the build came from Debian `-dev` packages unpacked into `tools/sysroot`. |
 | Wine prefix | `work/wineprefix` | Private; crash debugger disabled. |
@@ -43,23 +44,62 @@ and prove behavioural equivalence against the original binary with a differentia
 ## Builds
 
 ```sh
-cmake -S . -B build/native && cmake --build build/native -j2          # engine + smacx_headless (+ smacx with SDL2)
+cmake -S . -B build/native && cmake --build build/native -j2          # engine + smacx_headless
 cmake -S . -B build/hybrid -DSMACX_HYBRID=ON -DCMAKE_TOOLCHAIN_FILE=cmake/i686-mingw.cmake
 cmake --build build/hybrid -j2                                         # oracle.dll, hybrid.dll, oracle_launch.exe
 ```
 
-`smacx` (native game with the SDL2 UI, first slice: the map of a save; docs/UI_PLAN.md) is built
-when SDL2 and SDL2\_ttf are found (tools/sdl2 first): `build/native/smacx --save FILE.sav`.
+The native build needs CMake 3.20+, Python 3 (it generates the original-function bindings) and a
+C++17 compiler with `<filesystem>`. Game data is only needed at run time: `smacx_headless` reads
+`game/` and `src/data/data_image.bin` (see "Getting started"). `smacx_smoke` (`ctest`) is a
+portability self-test that needs no game data.
 
-Reconstruction work follows `docs/RECONSTRUCTION.md`; the harness is described in `harness/README.md`.
+**macOS** (Xcode command line tools, CMake from Homebrew or cmake.org; Apple Silicon or Intel):
+
+```sh
+cmake -S . -B build/native -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build build/native -j8 --target smacx_headless smacx_smoke && ctest --test-dir build/native
+```
+
+**Windows**: MSYS2 with the CLANG64 (or UCRT64) environment is the supported toolchain:
+
+```sh
+pacman -S mingw-w64-clang-x86_64-{clang,cmake,ninja,python}
+cmake -S . -B build/native -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_EXE_LINKER_FLAGS=-static
+cmake --build build/native --target smacx_headless smacx_smoke && ctest --test-dir build/native
+```
+
+Cross-compiling from Linux with the local llvm-mingw: `-DCMAKE_TOOLCHAIN_FILE=cmake/x86_64-mingw.cmake`
+(64-bit) or `cmake/i686-mingw.cmake` without `SMACX_HYBRID` (32-bit native, runs under 32-bit Wine).
+Run `smacx_headless` from the repository root (or pass `--gamedir`, `--image`, `--ini`).
+
+### Compilers
+
+The reconstruction keeps the original's MSVC/x86 semantics (signed overflow wraps, no type-based
+aliasing, signed `char`, no fused multiply-add, out-of-bounds table reads kept as in the original);
+`CMakeLists.txt` sets the flags (`-fwrapv -fno-strict-aliasing -fsigned-char -ffp-contract=off`,
+GCC also `-fno-aggressive-loop-optimizations`). Targets must be little-endian (x86, x86-64, arm64).
+
+| Compiler | Targets | Status |
+| --- | --- | --- |
+| GCC 9+ (tested 14) | Linux x86-64 | reference build; matches the original on all harness scenarios |
+| Clang 10+ (tested 23) | Linux x86-64 | matches (tiny20, small12, std8, late140, council131) |
+| llvm-mingw / MSYS2 clang (libc++) | Windows x86-64, i686 | builds; the i686 build matches under Wine (same five scenarios) |
+| Apple clang | macOS arm64 / x86-64 | built and smoke-tested in CI |
+| MSVC (cl.exe) | Windows x86-64 | experimental (CI, allowed to fail); not verified against the original |
+
+CI (`.github/workflows/build.yml`) builds `smacx_headless` and runs `smacx_smoke` on all of these.
 
 ## Status
 
-Work in progress. There is no playable build yet: the UI has not been reconstructed, and the
-native engine (`smacx_headless`) still aborts at the first original function that is not
-reconstructed. Reconstructed so far: boot, text/rules/preferences, map and world generation,
-vehicles/stacks/prototypes/zones of control, save/load; bases and technology/social/unit design are
-in progress. Progress per function: `build/*/generated/status.tsv`.
+The engine is reconstructed: `smacx_headless` plays complete AI-only games natively (no original
+code, no Wine) and its game state matches the original's after every turn on all 19 harness scenarios
+(`harness/scenarios/`, from tiny maps to 300-turn games through Planetary Council sessions and the
+end of the game). Progress per function: `build/*/generated/status.tsv`.
+
+The user interface is not reconstructed yet, so the game cannot be played by a human. The UI phase
+(SDL2 port of the original windows, map view and dialogs; target `smacx`) is in progress; see
+`docs/UI_PLAN.md`.
 
 ## Getting started
 

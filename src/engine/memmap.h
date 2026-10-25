@@ -22,7 +22,8 @@ constexpr uint32_t kImageEnd = 0x9CA000;
 #ifdef SMACX_HYBRID
 inline uint8_t* host(uint32_t addr) { return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(addr)); }
 #else
-extern uint8_t g_image[kImageEnd - kImageBase];
+// Page-aligned like the original segment, so every global keeps its natural alignment.
+alignas(4096) extern uint8_t g_image[kImageEnd - kImageBase];
 inline uint8_t* host(uint32_t addr) { return g_image + (addr - kImageBase); }
 #endif
 // Load the initial data image (native builds). Returns false if the image is missing.
