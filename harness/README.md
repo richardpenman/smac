@@ -39,6 +39,21 @@ random stream, and some engine code uses `timeGetTime()` as randomness. The orac
   timing-dependent UI code. With poisoning, every run matches, and fill values 0x00 and 0xFF give
   identical games, so this poisoned behaviour is the canonical one the reconstruction reproduces.
   (The exact read has not been located yet.)
+* **poisons `wants_to_attack`'s slot array** (known uninitialised read #4 in
+  docs/RECONSTRUCTION.md): every call site that starts an evaluation (a single call, or the
+  first `(a, b)` call of an `(a, b)` / `(b, a)` pair: wants_prop, diplomacy_check, propose_attack,
+  threaten, call_off_vendetta, communicate, encounter, enemy_strategy, tech_val; list
+  `kWantsToAttackFirstSites`) calls a thunk that fills exactly the 8 dwords
+  `[entry ESP - 0x138, entry ESP - 0x118)` (the array at `[ebp-0x134]`) with the poison value and
+  enters 0x55BC80 at the original stack depth. The second call of a pair is not touched, so it
+  still sees the first call's reduced slots, as in the original; no other dead stack changes.
+  Without this the slots hold whatever earlier frames left at that depth, e.g. in
+  `spot_all -> encounter` the frames of `draw_radius` / `MapWin_draw_radius` / `GraphicWin_redraw`
+  and the Win32/DirectDraw code below them (late140, turn 142: 0x014101C1, 0x7A6D9ADF, ...),
+  which a headless build cannot reproduce. Slot values 0 and -1 behave alike, so fill values 0x00
+  and 0xFF give identical games. Native equivalent: `WantsToAttackResidue` is 0 at the start of
+  every evaluation and keeps the first call's values for the second call of a pair. (`steptrace`
+  treats the thunk as an external call, so a call entered through it is not traced.)
 
 ## Reconstructed game loops
 
@@ -77,8 +92,9 @@ poisonpump            also poison after enemy_veh's message pump (do_all_non_inp
 steptrace <turn> <veh|-1> [max]  single-step enemy_veh calls, write step_*.trc register traces;
                       analyse with tools/venv/bin/python harness/scripts/uninit_reads.py X.trc
                       [--summary --engine] (reads of released/unwritten stack, with writer)
-slotlog <func> <prologue_len> <off>...  log return address, 8 args and [entryESP+off] dwords
-                      at each entry of an original function (logger runs on a private stack)
+slotlog <func> <prologue_len> <off>...  log return address, 8 args, [entryESP+off] dwords and
+                      EBX/ESI/EDI/EBP at each entry of an original function (logger runs on a
+                      private stack; the caller's register locals and frame are visible this way)
 patch <spec>          hybrid only: all | none | +name | -name ...
 fcompare <from> <to> [hooks=turn,faction,enemy] [limit=<pure>,<mut>] <spec>
                       hybrid only: compare original and reconstructed functions on the live

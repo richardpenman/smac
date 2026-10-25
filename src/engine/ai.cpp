@@ -427,7 +427,10 @@ int32_t GAMEAPI compute_odds(int32_t odds, int32_t faction_id, int32_t veh_id, i
                 int32_t sy = NearOffsetY[i] + ty;
                 if (!map_in_bounds(sx, sy)) continue;
                 int32_t v = veh_at(sx, sy);
-                if (Vehs[v].faction_id == (uint32_t)faction_id && stack_check(v, 3, 0, -1, -1)) {
+                // BUG(original): v may be -1 (no unit): Vehs[-1] lies in the Reactor table.
+                uint32_t v_faction = (uint32_t)v < 2049 ? Vehs[v].faction_id
+                                                        : rules_orig_byte(0x952828 + (uint32_t)v * 0x34 + offsetof(VEH, faction_id));
+                if (v_faction == (uint32_t)faction_id && stack_check(v, 3, 0, -1, -1)) {
                     odds *= 2;
                     break;
                 }
@@ -2108,7 +2111,7 @@ void enemy_strategy_regions(int32_t faction_id, int32_t abandon, int32_t target_
                     }
                 }
             }
-            if (!(s & 3) || ((wants_to_attack(faction_id, k, 0) || wants_to_attack(k, faction_id, 0)) && path)) hostile = 1;
+            if (!(s & 3) || ((wants_to_attack_fresh(faction_id, k, 0) || wants_to_attack(k, faction_id, 0)) && path)) hostile = 1;
         }
         int32_t unk6 = f.region_unk_6[r];
         int32_t pressure = (CurrentTurn > 75) + 3 + (MapAreaTiles > 3200) + occupied +

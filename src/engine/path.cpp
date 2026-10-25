@@ -750,7 +750,8 @@ int32_t THISCALL Path_sensors(Path* self, int32_t faction_id, int32_t* x, int32_
             }
             int32_t zoc = zoc_veh(tx, ty, faction_id);
             if (zoc == 1) continue;
-            if (zoc != 0 && (Factions[faction_id].diplo_status[zoc] & 0x10)) continue;
+            // BUG(original): zoc may be 8 (diplo_status[8] is the field after the array).
+            if (zoc != 0 && (diplo_status_raw(faction_id, zoc) & 0x10)) continue;
             uint32_t items = sq->items;
             if ((items & 0x50) || (items & 0x1402000)) continue;
             if (bonus_at(tx, ty)) continue;

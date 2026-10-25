@@ -171,20 +171,22 @@ The original reads stack memory it never wrote in these places. The oracle makes
    Implemented (src/engine/diplomacy_b.cpp, `wants_to_attack_core(..., slots)`): hybrid builds use a
    shadow thunk (`HYBRID_SHADOW_THUNK`): the body reads the slots from the stack image saved at
    entry (`[entry ESP - 0x138 + 4f]` for faction f) and the original re-runs to leave its frame, so
-   hybrid games are exact. Native builds keep the slots in `WantsToAttackResidue[8]` (start 0,
-   updated as the frame is), which reproduces consecutive calls at one depth but not residue left
-   by other functions. Measured in hybrid runs (result with the real residue vs. with zero
-   slots): late100 0 of 54 calls differ, std8 0 of 26, late140 4 of 120 (`encounter` and
-   `enemy_strategy` calls for factions 2/4 with residue 0xFFFF in faction 4's slot). Exact native
-   behaviour needs the callers (`enemy_strategy`, `encounter`) to emulate their callees' dead frames
-   and store them in `WantsToAttackResidue`. Marked `BUG(original)`.
-   **Still open in native late140** (turn 142, call 20 of enemy_veh = veh 206). This path is
-   spot_all -> encounter -> wants_to_attack(2, 4) / (4, 2). slotlog shows the slots holding residue
-   of UI/Win32 frames at that depth: 0x014101C1, 0x003152F4, 0x7A6D9ADF (a Wine address), and so
-   on. Natively, factions 2/4 then compare against small residues and come out at vendetta
-   instead of a treaty. Headless UI calls leave no frames, so native code cannot reproduce this
-   residue. A canonical value would need oracle-side poisoning before `encounter`, which would
-   change the references (decision pending).
+   hybrid games are exact. Native builds keep the slots in `WantsToAttackResidue[8]`, updated as
+   the frame is, so the second call of an `(a, b)` / `(b, a)` pair sees the first call's values.
+   Marked `BUG(original)`.
+   **Canonical start value.** The residue the first call of an evaluation sees comes from
+   unrelated frames, including UI/Win32 ones (late140 turn 142, `spot_all -> encounter`: residue
+   of `draw_radius` / `GraphicWin_redraw` / Wine code such as 0x014101C1, 0x7A6D9ADF), which
+   headless code cannot reproduce. The oracle therefore poisons the 8 slots before every first or
+   single call (harness/README.md, "poisons `wants_to_attack`'s slot array"; sites
+   `kWantsToAttackFirstSites`); 0 and -1 behave alike. Reconstructed callers make these calls
+   through `wants_to_attack_fresh` (diplomacy.h): native code clears `WantsToAttackResidue`
+   first, hybrid code calls the oracle's poisoning thunk through
+   `g_harness_wants_to_attack_fresh`, so it fills the slots at the same entry ESP. The second
+   call of a pair stays a plain `wants_to_attack` call. Callers: `enemy_strategy` (ai.cpp),
+   `encounter` (diplomacy_b.cpp), `tech_val` (tech.cpp), `wants_prop` (turn.cpp, two pairs).
+   References from before the poisoning differed from turn 142 in late140 and long300 (old ones:
+   work/ref_old_*).
 5. **`order_veh` (0x5947C0), `[ebp-0x24]`** ("move shown to the viewer"): the slot also holds the
    target stack offset (`stack_id * 0x34`) and the native-spawn chance; the dir 8 path reaches the
    post-move code without setting it. Only display timing (`clock_wait`), `boom` and viewer

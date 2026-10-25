@@ -32,7 +32,9 @@
 
 namespace {
 inline bool is_human(int32_t faction_id) { return (FactionStatus[0] & (uint8_t)(1u << (faction_id & 31))) != 0; }
-inline uint32_t dstat(int32_t faction_id, int32_t other) { return Factions[faction_id].diplo_status[other]; }
+// other may be -1 (order_veh, no target faction): the original then reads the field before
+// diplo_status (diplo_status_raw).
+inline uint32_t dstat(int32_t faction_id, int32_t other) { return diplo_status_raw(faction_id, other); }
 inline const UNIT& veh_unit(int32_t veh_id) { return Units[Vehs[veh_id].unit_id]; }
 inline int32_t veh_chassis_triad(int32_t veh_id) { return Chassis[veh_unit(veh_id).chassis_id].triad; }
 inline int32_t veh_chassis_range(int32_t veh_id) { return Chassis[veh_unit(veh_id).chassis_id].range; }

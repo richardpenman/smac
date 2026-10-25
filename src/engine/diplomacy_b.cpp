@@ -218,6 +218,14 @@ int32_t GAMEAPI wants_to_attack(int32_t faction_id, int32_t faction_id_tgt, int3
 }
 #endif
 
+int32_t(GAMEAPI* g_harness_wants_to_attack_fresh)(int32_t, int32_t, int32_t) = nullptr;
+
+int32_t wants_to_attack_fresh(int32_t faction_id, int32_t faction_id_tgt, int32_t odds_override) {
+    if (g_harness_wants_to_attack_fresh) return g_harness_wants_to_attack_fresh(faction_id, faction_id_tgt, odds_override);
+    for (int32_t k = 0; k < 8; k++) WantsToAttackResidue[k] = 0;
+    return wants_to_attack(faction_id, faction_id_tgt, odds_override);
+}
+
 int32_t GAMEAPI great_beelzebub(int32_t faction_id, int32_t is_aggressive) {
     if (!is_human(faction_id) || FactionRankings[7] != faction_id) return 0;
     int32_t min_bases = (CurrentTurn + 25) / 50;
@@ -679,7 +687,7 @@ void GAMEAPI encounter(int32_t faction_id, int32_t faction_id_with, int32_t x, i
             enemies_trade_tech(p1, p2);
             return;
         }
-        if (!wants_to_attack(p1, p2, 0) && !wants_to_attack(p2, p1, 0)) {
+        if (!wants_to_attack_fresh(p1, p2, 0) && !wants_to_attack(p2, p1, 0)) {
             enemies_treaty(p1, p2, 1);
             return;
         }

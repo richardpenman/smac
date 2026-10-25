@@ -1894,7 +1894,7 @@ int32_t GAMEAPI wants_prop(int32_t faction_id, int32_t proposal, int32_t candida
                 if (value == 0) {
                     if (pact) {
                         value = 1;
-                        if (!wants_to_attack(faction_id, candidate, 0) && !wants_to_attack(candidate, faction_id, 0))
+                        if (!wants_to_attack_fresh(faction_id, candidate, 0) && !wants_to_attack(candidate, faction_id, 0))
                             value = 2;
                     } else {
                         const MFaction& m = MFactions[faction_id];
@@ -1924,7 +1924,7 @@ int32_t GAMEAPI wants_prop(int32_t faction_id, int32_t proposal, int32_t candida
                             value -= 2;
                             penalty = true;  // (the original stores 2)
                         }
-                        if ((status & DIPLO_TREATY) && !wants_to_attack(faction_id, candidate, 0) &&
+                        if ((status & DIPLO_TREATY) && !wants_to_attack_fresh(faction_id, candidate, 0) &&
                             !wants_to_attack(candidate, faction_id, 0))
                             value++;
                         if (great_satan(candidate, 0)) {

@@ -1319,7 +1319,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                         w = w * 2 / 3;
                         by_plan = true;
                     } else {
-                        if (skunk_count) w = (skunk_count + 5) * w / 10;
+                        if (skunk_count) w = (skunk_count + 5) * w / 5;
                         by_plan = skunk_count < f.base_count / 4;
                     }
                     if (by_plan) {

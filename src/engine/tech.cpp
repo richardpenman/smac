@@ -671,7 +671,7 @@ int32_t GAMEAPI tech_val(int32_t tech_id, int32_t faction_id, int32_t is_simple)
         // a faction's knowledge (commlink): more valuable when relations are hostile
         int32_t other = tech_id - 89;
         int32_t value = 1;
-        if (!wants_to_attack(faction_id, other, 0)) value = 2;
+        if (!wants_to_attack_fresh(faction_id, other, 0)) value = 2;
         if (!wants_to_attack(other, faction_id, 0)) value++;
         return value / (f.AI_fight + 2) * value;
     }

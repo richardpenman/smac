@@ -513,7 +513,7 @@ void GAMEAPI action_destroy(int32_t veh_id, int32_t items, int32_t x, int32_t y)
             if (!(Terraform[k].bit & found)) continue;
             removed |= Terraform[k].bit;
             bit_set(x, y, Terraform[k].bit, 0);
-            parse_says(2, Strings_get(&StringTable, (&Terraform[k].name)[map_is_ocean(x, y)]), -1, -1);
+            parse_says(2, Strings_get(&StringTable, map_is_ocean(x, y) ? Terraform[k].name_sea : Terraform[k].name), -1, -1);
             if (veh_triad(veh_id) == 2 && faction_id == CurrentPlayerFaction)
                 NetMsg_pop(&NetMsg, "BOMBSUCCEEDED", 5000, 0, nullptr);
             synch_bit(x, y, faction_id);

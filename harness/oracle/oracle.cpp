@@ -38,6 +38,9 @@ extern int (*g_harness_top_menu)();
 /* Reconstructed enemy_turn -> enemy_veh and enemy_veh's message pump (engine/ai.h). */
 extern int (*g_harness_enemy_veh)(int);
 extern void (*g_harness_enemy_veh_pump)();
+/* Reconstructed first/single wants_to_attack calls (engine/diplomacy.h): oracle_wta_poison_thunk. */
+extern int(__cdecl *g_harness_wants_to_attack_fresh)(int, int, int);
+extern "C" void oracle_wta_poison_thunk();
 static void hook_enemy_veh_pump_void();
 /* Reconstructed CouncilWin_session -> the window's modal loop (engine/council.h). */
 extern int (*g_harness_council_modal)(unsigned char *);
@@ -697,8 +700,8 @@ static int steptrace_enemy_veh(int veh, int seq) {
 }
 
 /* slotlog <func> <prologue_len> <off>...: at every entry of the original function <func> (hex),
- * log the return address, the first 8 stack arguments and the dwords at entry ESP + <off> (hex,
- * may be negative: -30 is the callee's [ebp-0x2c]) to slotlog.txt. The entry thunk runs the
+ * log the return address, the first 8 stack arguments, the dwords at entry ESP + <off> (hex,
+ * may be negative: -30 is the callee's [ebp-0x2c]) to slotlog.txt, and EBX, ESI, EDI, EBP at entry. The entry thunk runs the
  * logger on a private stack, so the game's stack (including dead slots below ESP) is untouched.
  * <prologue_len> must cover whole instructions without relative jumps (Path_find: 6). */
 static struct {
@@ -706,10 +709,11 @@ static struct {
     int noff;
 } g_sl;
 static uint32_t g_sl_saved_esp;
+static const uint32_t *g_sl_regs;
 static uint8_t g_sl_stack[65536] __attribute__((aligned(16)));
 struct SlotRec {
     int32_t turn;
-    uint32_t ret, args[8], vals[8];
+    uint32_t ret, args[8], vals[8], regs[4]; /* regs: EBX, ESI, EDI, EBP at entry */
 };
 static std::vector<SlotRec> g_sl_recs;
 static void __cdecl slotlog_cb(uint32_t esp) {
@@ -719,6 +723,13 @@ static void __cdecl slotlog_cb(uint32_t esp) {
     r.ret = sp[0];
     for (int i = 0; i < 8; i++) r.args[i] = sp[1 + i];
     for (int i = 0; i < g_sl.noff; i++) r.vals[i] = *(const uint32_t *)(esp + g_sl.off[i]);
+    /* The thunk's pushfd/pushad frame: EFLAGS, EDI, ESI, EBP, ESP, EBX, ... (the registers at
+     * entry; EBP is the caller's frame pointer). */
+    const uint32_t *pa = g_sl_regs;
+    r.regs[0] = pa[5];
+    r.regs[1] = pa[2];
+    r.regs[2] = pa[1];
+    r.regs[3] = pa[3];
     if (g_sl_recs.capacity() == g_sl_recs.size()) return; /* never reallocate here */
     g_sl_recs.push_back(r);
 }
@@ -732,7 +743,7 @@ static void slotlog_flush() {
             for (int i = 0; i < 8; i++) fprintf(f, "%s%X", i ? "," : "", r.args[i]);
             fprintf(f, " vals=");
             for (int i = 0; i < g_sl.noff; i++) fprintf(f, "%s%08X", i ? "," : "", r.vals[i]);
-            fprintf(f, "\n");
+            fprintf(f, " ebx=%08X esi=%08X edi=%08X ebp=%08X\n", r.regs[0], r.regs[1], r.regs[2], r.regs[3]);
         }
         fclose(f);
     }
@@ -747,6 +758,7 @@ static void install_slotlog(int prologue) {
     *t++ = 0x89; *t++ = 0x25; u32((uint32_t)(uintptr_t)&g_sl_saved_esp); /* mov [saved], esp */
     *t++ = 0xBC; u32(top);                                                /* mov esp, top */
     *t++ = 0x60; *t++ = 0x9C;                                             /* pushad; pushfd */
+    *t++ = 0x89; *t++ = 0x25; u32((uint32_t)(uintptr_t)&g_sl_regs);      /* mov [g_sl_regs], esp */
     *t++ = 0xFF; *t++ = 0x35; u32((uint32_t)(uintptr_t)&g_sl_saved_esp);  /* push [saved] */
     *t++ = 0xE8; u32((uint32_t)(uintptr_t)slotlog_cb - ((uint32_t)(uintptr_t)t + 4));
     *t++ = 0x83; *t++ = 0xC4; *t++ = 0x04;                                /* add esp, 4 */
@@ -771,6 +783,49 @@ static int __cdecl hook_enemy_veh_pump() {
 #ifdef ORACLE_WITH_ENGINE
 static void hook_enemy_veh_pump_void() { hook_enemy_veh_pump(); }
 #endif
+
+/* wants_to_attack slot poisoning: wants_to_attack (0x55BC80) takes per-faction maxima starting
+ * from the never-initialised dword array [ebp-0x134..-0x118] (known uninitialised read #4,
+ * docs/RECONSTRUCTION.md). Before every call that starts an evaluation (a single call, or the
+ * first (a, b) call of an (a, b) / (b, a) pair) the oracle fills exactly these 8 dwords
+ * ([entry ESP - 0x138, entry ESP - 0x118)) with the poison value and then enters the function at
+ * the original stack depth. The second call of a pair (same ESP, no call in between) still sees
+ * the first call's reduced slots, as in the original. Without this the slots hold whatever
+ * earlier frames left at that depth, including UI/Win32 frames (move animation, popups, Wine
+ * internals) that a headless build cannot reproduce. Only these dwords are written, so no other
+ * dead stack changes. */
+static const uint32_t kWantsToAttackFirstSites[] = {
+    0x52B0E1, 0x52B21A,           /* wants_prop (pairs) */
+    0x53BED6,                     /* diplomacy_check */
+    0x54648E, 0x54685A,           /* propose_attack (pairs) */
+    0x549DF1,                     /* threaten (pair) */
+    0x54C352,                     /* call_off_vendetta */
+    0x552566, 0x5527E8, 0x553325, /* communicate (two singles, one pair) */
+    0x55EB3F,                     /* encounter (pair) */
+    0x562D0A,                     /* enemy_strategy (pair) */
+    0x5BCC70,                     /* tech_val (pair) */
+};
+extern "C" uint32_t oracle_wta_fill[8];
+uint32_t oracle_wta_fill[8];
+extern "C" void __cdecl oracle_wta_prepare() {
+    uint8_t *b = (uint8_t *)oracle_wta_fill;
+    for (size_t i = 0; i < sizeof(oracle_wta_fill); i++) {
+        if (g_poison_rand) {
+            g_poison_rand = g_poison_rand * 1103515245u + 12345u;
+            b[i] = (uint8_t)(g_poison_rand >> 16);
+        } else {
+            b[i] = (uint8_t)g_poison;
+        }
+    }
+}
+/* Called instead of wants_to_attack at the sites above; ESP at entry equals the original entry ESP. */
+extern "C" __attribute__((naked, used)) void oracle_wta_poison_thunk() {
+    __asm__("call _oracle_wta_prepare\n"
+            "xor %ecx, %ecx\n"
+            "1:\n mov _oracle_wta_fill(,%ecx,4), %eax\n mov %eax, -0x138(%esp,%ecx,4)\n"
+            "inc %ecx\n cmp $8, %ecx\n jb 1b\n"
+            "mov $0x55BC80, %eax\n jmp *%eax\n");
+}
 
 /* trace 3 <turn>: dump state before every enemy_veh call on that turn */
 static int g_trace_turn = -1, g_trace_seq = 0;
@@ -1148,6 +1203,8 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         /* Poison again after enemy_veh's message pump (do_all_non_input), so the uninitialised
          * local read by enemy_move ([ebp-0x48], 0x574DD7) never sees UI leftovers. */
         write_call(0x57928D, (void *)hook_enemy_veh_pump);
+        /* Poison wants_to_attack's uninitialised slot array before each evaluation. */
+        for (uint32_t site : kWantsToAttackFirstSites) write_call(site, (void *)oracle_wta_poison_thunk);
         write_call(0x52826E, (void *)hook_human_turn);
         write_call(0x5282C9, (void *)hook_observer_pause);
         for (uint32_t site : ui_sites_game_random) write_call(site, (void *)ui_game_random);
@@ -1175,6 +1232,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         g_harness_top_menu = oracle_top_menu;
         g_harness_enemy_veh = hook_enemy_veh;
         g_harness_enemy_veh_pump = hook_enemy_veh_pump_void;
+        g_harness_wants_to_attack_fresh = (int(__cdecl *)(int, int, int))(void *)oracle_wta_poison_thunk;
         g_harness_council_modal = council_modal_engine;
         engine_set_deterministic(true);
         patches_init();

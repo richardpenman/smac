@@ -48,18 +48,36 @@ constexpr int32_t kProjectNanoFactory = 22;  // has_project ids (SP index)
 // ---- small helpers (inline code of the original) ------------------------------------------------
 
 inline bool is_human(int32_t faction_id) { return (FactionStatus[0] & (uint8_t)(1u << (faction_id & 31))) != 0; }
-inline uint32_t dstat(int32_t faction_id, int32_t other) { return Factions[faction_id].diplo_status[other]; }
 // diplo_status[other] for any index, as the original reads it (other -1: the field before).
 inline uint32_t dstat_raw(int32_t faction_id, int32_t other) {
     uint32_t r;
-    std::memcpy(&r, reinterpret_cast<const uint8_t*>(&Factions[faction_id].diplo_status[0]) + 4 * other, 4);
+    std::memcpy(&r, reinterpret_cast<const uint8_t*>(&Factions[0].diplo_status[0]) +
+                faction_id * (int32_t)sizeof(Faction) + 4 * other, 4);
     return r;
 }
+// The original has no range check here: other may be the faction of Bases[-1] (255) or a zoc
+// result of 8 (fields after diplo_status, in the same record), so read through dstat_raw.
+inline uint32_t dstat(int32_t faction_id, int32_t other) { return dstat_raw(faction_id, other); }
 inline const UNIT& unit_of(int32_t veh_id) { return Units[Vehs[veh_id].unit_id]; }
 inline int32_t unit_plan(int32_t veh_id) { return (uint8_t)unit_of(veh_id).plan; }
 inline int32_t veh_triad_of(int32_t veh_id) { return Chassis[unit_of(veh_id).chassis_id].triad; }
 inline int32_t veh_offense(int32_t veh_id) { return Weapon[unit_of(veh_id).weapon_id].offense_value; }
-inline int32_t base_faction(int32_t base_id) { return (uint8_t)Bases[base_id].faction_id; }
+// base_id may be -1 (no base) where the original reads Bases[-1]: the last 0x134 bytes of
+// Factions[7] (plain data in the memory image), so read through the raw table.
+inline const uint8_t* base_raw(int32_t base_id) {
+    return reinterpret_cast<const uint8_t*>(&Bases[0]) + base_id * (int32_t)sizeof(BASE);
+}
+inline int32_t base_faction(int32_t base_id) { return base_raw(base_id)[offsetof(BASE, faction_id)]; }
+inline int32_t base_x_raw(int32_t base_id) {
+    int16_t v;
+    std::memcpy(&v, base_raw(base_id) + offsetof(BASE, x), 2);
+    return v;
+}
+inline int32_t base_y_raw(int32_t base_id) {
+    int16_t v;
+    std::memcpy(&v, base_raw(base_id) + offsetof(BASE, y), 2);
+    return v;
+}
 inline MAP* sq_at(int32_t x, int32_t y) { return map_tile(x, y); }
 inline bool sq_ocean(const MAP* sq) { return (sq->climate & 0xE0) < 0x60; }
 inline int32_t sq_ocean_i(const MAP* sq) { return sq_ocean(sq) ? 1 : 0; }
@@ -1689,7 +1707,8 @@ Flow em_colony(EM& m) {
         m.ty = TableOffsetY[m.best_dir] + m.y;
         m.val = m.base_id < 6 ? 1 : 2;
         if (m.dist_any >= 0) {
-            m.s38 = hdist(m.tx, m.ty, Bases[m.base_any].x, Bases[m.base_any].y);
+            // BUG(original): base_any may be -1 here (Bases[-1], see base_raw).
+            m.s38 = hdist(m.tx, m.ty, base_x_raw(m.base_any), base_y_raw(m.base_any));
             if (m.s38 <= 4) m.val = 1;
             if (m.s38 >= 6 && m.s38 < 12 && m.base_id >= 10) m.val = 3;
         }
