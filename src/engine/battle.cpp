@@ -990,13 +990,16 @@ done:
 
 int32_t GAMEAPI best_defender(int32_t veh_id_def, int32_t veh_id_atk, int32_t check_arty) {
     int32_t offense_atk = veh_id_atk < 0 ? 8 : get_basic_offense(veh_id_atk, veh_id_def, 0, 0, 0);
+    // Without a defender (veh_id_def -1) the original first reads Vehs[-1].x/y (the halves of the
+    // Reactor table's first name pointer: y >= 0x1FB), the tile there and base_at (-1, y out of
+    // range), all unused: returning first is equivalent and keeps native reads in bounds.
+    if (veh_id_def < 0) return veh_id_def;
     int32_t x = Vehs[veh_id_def].x;
     int32_t y = Vehs[veh_id_def].y;
     uint8_t climate = map_tile(x, y)->climate;
     int32_t base_id = base_at(x, y);
     int32_t best_score = -999;
     int32_t best_id = veh_id_def;
-    if (veh_id_def < 0) return best_id;
     int32_t veh_id = veh_id_def;
     while (Vehs[veh_id].prev_veh_id_stack >= 0) veh_id = Vehs[veh_id].prev_veh_id_stack;
     // BUG(original): without an attacker (veh_id_atk -1), Vehs[-1] is read for its unit.
@@ -1263,9 +1266,20 @@ int32_t GAMEAPI interceptor(int32_t faction_id_def, int32_t faction_id_atk, int3
 
 int32_t GAMEAPI battle_fight(int32_t veh_id, int32_t dir, int32_t is_arty, int32_t is_real, int32_t* def_out) {
     // Artillery fire selects among all tiles within range (TableOffset), a melee attack a neighbour.
-    int32_t x = Vehs[veh_id].x + (is_arty ? TableOffsetX[dir] : NearOffsetX[dir]);
-    x = map_wrap_x(x);
-    int32_t y = Vehs[veh_id].y + (is_arty ? TableOffsetY[dir] : NearOffsetY[dir]);
+    int32_t dx, dy;
+    if (dir == -1) {
+        // BUG(original): enemy_move rates an attack on its own tile (index 0 of its 9-tile loop) with
+        // dir -1. The original reads the dword before each table: NearOffsetX[-1] (0x66EF4C) = 0,
+        // NearOffsetY[-1] = NearOffsetX[8] = 0, TableOffsetX[-1] (0x66EFB8) = 5,
+        // TableOffsetY[-1] = TableOffsetX[288] = -1.
+        dx = is_arty ? 5 : 0;
+        dy = is_arty ? -1 : 0;
+    } else {
+        dx = is_arty ? TableOffsetX[dir] : NearOffsetX[dir];
+        dy = is_arty ? TableOffsetY[dir] : NearOffsetY[dir];
+    }
+    int32_t x = map_wrap_x(Vehs[veh_id].x + dx);
+    int32_t y = Vehs[veh_id].y + dy;
     return battle_fight_2(veh_id, dir, x, y, is_arty, is_real, def_out);
 }
 
@@ -1350,17 +1364,19 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
         intercepted = interceptor(veh_faction_raw(def_top), atk_f, x, y);
     int32_t def_id = best_defender(def_top, veh_id, arty);
     int32_t veh_id_def = def_id;
-    uint32_t def_f = Vehs[veh_id_def].faction_id;
+    // BUG(original): with no unit on the target tile (veh_id_def -1; enemy_move rates such attacks
+    // with is_real 0), Vehs[-1] is read for the defender's faction, unit and damage.
+    uint32_t def_f = veh_faction_raw(veh_id_def);
+    int32_t def_unit = veh_unit_raw(veh_id_def);
     int32_t base_id = base_at(x, y);
-    if (can_arty(Vehs[veh_id].unit_id, 1) && can_arty(Vehs[veh_id_def].unit_id, 1)) {
+    if (can_arty(Vehs[veh_id].unit_id, 1) && can_arty(def_unit, 1)) {
         if (veh_triad(veh_id) == TRIAD_LAND)
             arty |= 2;
         else if (arty || (sq->climate & 0xE0) > 0x5F)
             arty |= 2;
     }
-    if (has_abil(Vehs[veh_id_def].unit_id, ABL_AIR_SUPERIORITY) && veh_triad(veh_id) == TRIAD_AIR &&
-        !unit_missile(Vehs[veh_id].unit_id) && !unit_missile(Vehs[veh_id_def].unit_id) &&
-        veh_triad(veh_id_def) == TRIAD_AIR)
+    if (has_abil(def_unit, ABL_AIR_SUPERIORITY) && veh_triad(veh_id) == TRIAD_AIR &&
+        !unit_missile(Vehs[veh_id].unit_id) && !unit_missile(def_unit) && chassis_triad(def_unit) == TRIAD_AIR)
         arty |= 0x1A;
     int32_t moves_cost;
     if ((arty & 3) == 0 || arty > 3) {
@@ -1372,9 +1388,14 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
     int32_t offense, defense;
     battle_compute(veh_id, veh_id_def, &offense, &defense, arty);
     int32_t atk_hp = veh_hp(veh_id);
-    int32_t def_hp = veh_hp(veh_id_def);
+    int32_t def_hp;
+    if (veh_id_def >= 0) {
+        def_hp = veh_hp(veh_id_def);
+    } else {
+        def_hp = unit_max_hp(def_unit) - rules_orig_byte(veh_raw_addr(veh_id_def, offsetof(VEH, damage_taken)));
+        def_hp = def_hp < 0 ? 0 : def_hp > 9999 ? 9999 : def_hp;
+    }
     int32_t atk_unit = Vehs[veh_id].unit_id;
-    int32_t def_unit = Vehs[veh_id_def].unit_id;
     // Psi combat: each round's damage is the opponent's reactor (hit points are reactor x 10).
     bool psi = weapon_value(atk_unit) < 0 || armor_value(def_unit) < 0;
     int32_t def_power = psi ? Units[def_unit].reactor_id : 1;

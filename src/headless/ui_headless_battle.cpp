@@ -14,9 +14,6 @@ void THISCALL StatusWin_draw(uint8_t*, int32_t, int32_t, int32_t, int32_t, int32
 void THISCALL StatusWin_redraw(uint8_t*) {}
 void THISCALL StatusWin_reset(uint8_t*) {}
 void THISCALL BaseWin_focus(uint8_t*) {}
-void GAMEAPI draw_tile_fixup_2(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t) {}
-// Only shown to human players (hotseat/PBEM); never reached by an unattended observer.
-int32_t GAMEAPI POP3(const char*, int32_t, int32_t, int32_t, int32_t) { return 0; }
 // As the original: the hint is due once, for a single-player game with tutorial hints (preference
 // 0x20) and a non-alien viewer; the hint itself (shown by the caller) is not displayed headless.
 int32_t GAMEAPI tut_check2(int32_t bit) {

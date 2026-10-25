@@ -8,6 +8,7 @@
 #include "engine/net.h"
 #include "engine/parse.h"
 #include "engine/rules.h"
+#include "engine/turn.h"
 #include "engine/ui_bridge.h"
 
 #include "engine/strings.h"
@@ -164,4 +165,20 @@ int32_t GAMEAPI checksum_password(const char* password) {
     uint8_t sum = 0;
     for (const char* p = upper; *p; p++) sum ^= (uint8_t)*p;
     return sum + 1;
+}
+
+// The human turn's and the multiplayer waits' message pump: one pass of wait_task; in multiplayer
+// the network tasks, then the diplomatic channels computer factions asked the player for.
+void GAMEAPI wait_loop() {
+    if (!MultiplayerActive) {
+        wait_task();
+        return;
+    }
+    NetDaemon_net_tasks();
+    if (ControlUpkeepA || ControlTurnC || (NetTurnDoneMask & (1 << (CurrentPlayerFaction & 31)))) return;
+    for (int32_t i = 1; i < 8; i++) {
+        if (i == CurrentPlayerFaction || (FactionStatus[0] & (1 << i)) || !NetChannelRequests[i - 1]) continue;
+        log_say_2("Initiating diplomatic channel", CurrentPlayerFaction, i, 0);
+        if (!NetDaemon_open_channel(&NetState, CurrentPlayerFaction, i)) communicate(CurrentPlayerFaction, i, 0);
+    }
 }

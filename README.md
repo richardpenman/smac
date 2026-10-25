@@ -97,9 +97,10 @@ code, no Wine) and its game state matches the original's after every turn on all
 (`harness/scenarios/`, from tiny maps to 300-turn games through Planetary Council sessions and the
 end of the game). Progress per function: `build/*/generated/status.tsv`.
 
-The user interface is not reconstructed yet, so the game cannot be played by a human. The UI phase
-(SDL2 port of the original windows, map view and dialogs; target `smacx`) is in progress; see
-`docs/UI_PLAN.md`.
+The user interface (SDL2 port of the original windows, map view and dialogs; target `smacx`) is in
+progress; see `docs/UI_PLAN.md`. smacx draws the map and lets a human play a faction against the
+computer players (`smacx --new --human 1`: move units, the basic orders, build bases, terraform,
+end turns, with the original key bindings); panes, menus and popups are placeholders so far.
 
 ## Getting started
 

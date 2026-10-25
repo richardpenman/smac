@@ -3,8 +3,11 @@
 // The original engine calls straight into its UI (popups, map redraws, sound, window classes).
 // Those functions belong to the UI reconstruction; until then they are declared here with
 // ADDR_NATIVE: hybrid builds always call the original UI, and native builds use the headless
-// implementations in src/headless/ui_headless.cpp, which behave like an unattended observer
-// (no drawing, popups return their default choice). Keep declarations grouped by original class.
+// implementations in src/headless (the static library smacx_ui_headless, one object file per UI
+// area), which behave like an unattended observer (no drawing, popups return their default
+// choice). smacx replaces whole areas with its SDL UI (src/ui) by defining their functions in its
+// own objects (src/headless/ui_headless_mapview.cpp explains the mechanism). Keep declarations
+// grouped by original class.
 #pragma once
 #include "engine/globals.h"
 
@@ -87,6 +90,8 @@ ADDR_NATIVE(0x5BF330) int32_t GAMEAPI X_pop_2(const char* label, const char* pcx
 // ---- message pump ----
 // Processes pending window messages (the original keeps the UI responsive during long loops).
 ADDR_NATIVE(0x5FCB20) void GAMEAPI do_all_non_input();
+// One pass of the message pump (wait_loop: the human turn and multiplayer waits).
+ADDR_NATIVE(0x5FC700) void GAMEAPI wait_task();
 
 // ---- boot: window/sprite/font setup (system_init, system_close, game_init, game_reload) ----
 // UI objects (opaque to the engine).

@@ -5,9 +5,9 @@
 // written at the original byte offsets (mapwin_field). What the original keeps behind pointers
 // (the GraphicWin canvas, the per-tile terrain cache at +4) is native: MapWinNative.
 //
-// Functions declared in engine/ui_bridge.h (pfncRedrawMap, draw_map, pfncMoveMap, ...) are bound
-// to the headless implementations in the engine link; their native versions are in namespace
-// native_ui (same names) until the bridge selects the SDL UI (see docs/UI_PLAN.md).
+// Functions declared in engine/ui_bridge.h (pfncRedrawMap, pfncMoveMap) are defined here under
+// their own names: smacx replaces the headless "mapview" area with them (src/headless
+// ui_headless_mapview.cpp; the rest of that area is in src/ui/win_mapview.cpp).
 #pragma once
 #include <cstdint>
 #include <vector>
@@ -60,6 +60,41 @@ GLOBAL(int32_t, ZoomDenom, 0x691E70);
 
 inline int32_t& mw(uint8_t* win, uint32_t off) { return *reinterpret_cast<int32_t*>(win + off); }
 
+// ---- original globals of the map drawing ----
+GLOBAL(UiRect, VisibleTiles, 0x7D3C28);          // prVisibleTiles: main view tile range
+GLOBAL(int32_t[4][2], TileCorners, 0x7D3C08);    // W, N, E, S corner points of the last tile drawn
+GLOBAL(int32_t[4][2], CursorTileCorners, 0x7D3BE8);  // TileCorners of the cursor tile
+GLOBAL(int32_t, TerrainDefaultLight, 0x686354);  // light of tiles not currently seen
+// Sub-polygon tables of the tile (4 triangles: centre + two diamond corners).
+GLOBAL(int32_t[12], TilePolyX, 0x685F20);        // in 2q units
+GLOBAL(int32_t[12], TilePolyY, 0x685F50);        // in q units
+GLOBAL(int32_t[12], TilePolyCorner, 0x685F80);   // corner index of each vertex (0 centre, 1..4 W N E S)
+GLOBAL(int32_t[12][2], TilePolyUV, 0x686090);    // texture coordinates of each vertex
+// The 4 tiles around each tile corner (corner c: entries (c-1)*4 .. +3), and 4-vertex quads.
+GLOBAL(int32_t[16], CornerTileX, 0x685EA0);
+GLOBAL(int32_t[16], CornerTileY, 0x685EE0);
+GLOBAL(uint8_t[256][2], RainTransition, 0x685484);  // [neighbour mask]: texture variant, rotation
+GLOBAL(int32_t[16][2], OceanQuadUV, 0x685CA8);
+GLOBAL(int32_t[16][2], CoastQuadUV, 0x6860F0);
+GLOBAL(int32_t[80], OceanDepthLight, 0x6861F0);     // ocean depth (detail) -> light
+GLOBAL(int32_t[4][4][2], WaterQuadPoints, 0x7D3AF0); // the 4 water quads of the last tile drawn
+GLOBAL(int32_t[4][4], WaterQuadLight, 0x7F6644);     // their depth lights
+// The point whose surroundings GamePreferences 0x200 outlines (DAT_00685478 / _0068547C).
+GLOBAL(int32_t, OutlineCenterX, 0x685478);
+GLOBAL(int32_t, OutlineCenterY, 0x68547C);
+// Landmark overlay tables [code]: texture index (-1: none) and rotation.
+GLOBAL(int8_t[64][2], VolcanoOverlay, 0x685A98);
+GLOBAL(int8_t[64][2], MesaOverlay, 0x685AFC);
+GLOBAL(int8_t[64][2], CraterOverlay, 0x685BD4);
+// Coast masks: [texel of the coast shape][coast bits 0..7] (0x684730, 53 x 8 bytes).
+GLOBAL(uint8_t[53][8], CoastMask, 0x684730);
+// Low 32 bits of the original's tile array address (paTiles): MapWin_gen_terrain_poly seeds the
+// tile variants with the tile's address, so it depends on where the heap put the map. Native
+// builds use this value as the address of tile 0 (0 by default; harness dumps record it).
+extern uint32_t TileVariantBase;
+// The tile cache entry of (x, y) (12 bytes; nullptr without cache).
+uint8_t* ui_mapwin_cache_entry(uint8_t* win, int32_t x, int32_t y);
+
 // Native parts of a map window.
 struct MapWinNative {
     uint8_t* win = nullptr;            // object in the memory image
@@ -72,12 +107,31 @@ MapWinNative* ui_mapwin_attach(uint8_t* win, uint32_t vbase, Buffer* canvas);
 MapWinNative* ui_mapwin_native(uint8_t* win);
 // MapWin_clear_terrain for the native cache (all entries unknown, 0xFF).
 void ui_mapwin_clear_cache(uint8_t* win);
+// Map canvas dumps (the oracle's `mapdump`, harness/README.md): "SMXMAP1\0", int32 width,
+// height, viewer, zoom, centre x, centre y, turn, 0; 256 x RGB palette; width * height pixels.
+struct MapDumpHeader {
+    int32_t width = 0, height = 0, viewer = 0, zoom = 0, cx = 0, cy = 0, turn = 0, reserved = 0;
+};
+// Reads the header of a dump (false: not a dump).
+bool ui_mapdump_read_header(const char* path, MapDumpHeader* out);
+// Writes the window's canvas with the game palette.
+bool ui_mapdump_write(uint8_t* win, const char* path, int32_t viewer);
+// smacx --dump: when `like` names a dump, takes its view (canvas size, viewer, zoom, centre,
+// tile address), redraws the window fully and writes its canvas to `path` (the viewer is
+// restored afterwards). Without `like`, dumps the current view.
+// scroll_from (x >= 0): the dumped redraw is a scrolled one, from a full redraw centred there
+// (the oracle's mapdump scrollfrom=X,Y).
+bool ui_mapdump_like(uint8_t* win, const char* path, const char* like, int32_t scroll_from_x = -1,
+                     int32_t scroll_from_y = -1);
 
 // ---- original functions ----
 // Resets a window (desktop_init -> mapwin_system_init): options cleared, zoom 0 (-6 below 1000
 // pixels), centred on the map centre, or for the main view (index 0) on the cursor.
 ADDR_NATIVE(0x462870) void THISCALL MapWin_clear(uint8_t* win, int32_t index);
 ADDR_NATIVE(0x462980) void THISCALL pfncZoomProcessing(uint8_t* win);
+// Tile under the point (px, py) of the window: 0 when it is on the map, 1 otherwise. The row is
+// found by walking down the zigzag of tile edges (with their corner heights) under the point.
+ADDR_NATIVE(0x463040) int32_t THISCALL pfncPtToTile(uint8_t* win, int32_t px, int32_t py, int32_t* x, int32_t* y);
 ADDR_NATIVE(0x462F00) void THISCALL pfncTileToPoint(uint8_t* win, int32_t x, int32_t y, int32_t* px, int32_t* py);
 // Height of a tile corner above the flat map (corner 0: centre, 1..4: W, N, E, S), cached per
 // tile; land only (ocean tiles are flat).
@@ -101,14 +155,12 @@ ADDR_NATIVE(0x469CA0) void THISCALL pfncDrawMap(uint8_t* win, int32_t faction_id
 // Base sprite with its population box and name plate at (px, py).
 ADDR_NATIVE(0x55AF20) void GAMEAPI base_draw(Buffer* dest, int32_t base_id, int32_t px, int32_t py, int32_t zoom,
                                             int32_t flags);
-// Unit at (px, py). Approximation: flag and a stand-in figure; the original renders the unit's
-// voxel model (.cvr) or its Units.pcx sprite.
-ADDR_NATIVE(0x5594F0) void GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t zoom,
-                                           int32_t mode, int32_t a7);
+// veh_draw and the unit art are in ui/vehdraw.h.
+// The map label font cache (FUN_005592D0): Arial of the zoom unit * num / den pixels (10 -> 11),
+// three fonts kept, least recently used replaced.
+Font* ui_label_font(int32_t zoom, int32_t num, int32_t den, int32_t style);
 
-namespace native_ui {
 // Full redraw of the view (scrolled redraws are not reconstructed yet: always full).
 void THISCALL pfncRedrawMap(uint8_t* win, int32_t flag);  // 0x46A550
 // Centres the view on (x, y) and redraws it.
 void THISCALL pfncMoveMap(uint8_t* win, int32_t x, int32_t y, int32_t redraw);  // 0x46B1F0
-}  // namespace native_ui

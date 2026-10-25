@@ -13,7 +13,6 @@
 #include "platform/win32.h"
 
 Palette GamePalette;
-uint8_t ShadowTable[256];
 
 // ---- Palette ------------------------------------------------------------------------------------
 
@@ -26,21 +25,6 @@ static const uint8_t kStaticColors[20][3] = {
     {255, 255, 0},   {0, 0, 255},     {255, 0, 255},   {0, 255, 255},   {255, 255, 255},
 };
 
-int32_t THISCALL Palette_get_nearest_palette_index(Palette* pal, int32_t r, int32_t g, int32_t b) {
-    // Approximation: least squared RGB distance over the game colours 10..245 (the original
-    // matches in HSV space, Palette_get_nearest_palette_index_2).
-    int32_t best = 10, best_d = 0x7FFFFFFF;
-    for (int32_t i = 10; i < 246; i++) {
-        int32_t dr = pal->rgb[i][0] - r, dg = pal->rgb[i][1] - g, db = pal->rgb[i][2] - b;
-        int32_t d = dr * dr * 3 + dg * dg * 4 + db * db * 2;
-        if (d < best_d) {
-            best_d = d;
-            best = i;
-        }
-    }
-    return best;
-}
-
 void GAMEAPI load_palette() {
     Buffer canvas;
     Buffer_ctor(&canvas);
@@ -48,23 +32,24 @@ void GAMEAPI load_palette() {
     for (int32_t i = 0; i < 10; i++) std::memcpy(GamePalette.rgb[i], kStaticColors[i], 3);
     for (int32_t i = 0; i < 10; i++) std::memcpy(GamePalette.rgb[246 + i], kStaticColors[10 + i], 3);
     Buffer_load_pcx(&canvas, "PALETTE.PCX", &GamePalette, 10, 0xEC);
-    // FUN_005C8E60: gamma correction of the game colours (identity at 100%).
-    if (gamma > 0 && gamma != 100) {
-        double inv = 100.0 / gamma;
-        for (int32_t i = 10; i < 246; i++)
-            for (int32_t c = 0; c < 3; c++)
-                GamePalette.rgb[i][c] = (uint8_t)std::lround(255.0 * std::pow(GamePalette.rgb[i][c] / 255.0, inv));
-    }
-    // colortables_init: the shadow table (Palette_create_table(ShadowTable, 0, 256, -43)): every
-    // colour with its HSV value lowered by 43%. Approximation: RGB scaled to 57%, nearest colour.
-    for (int32_t i = 0; i < 256; i++) {
-        if (i < 10 || i >= 246) {
-            ShadowTable[i] = (uint8_t)i;
-            continue;
+    // FUN_005C8E60 -> FUN_005C95E0: gamma correction of the game colours 10..245, also at 100%:
+    // each component c becomes (int)(clamp(pow(c / 235, 1 / gamma), 0, 1) * 235.99), so 236..255
+    // become 235.
+    double inv = 1.0 / (double)(float)((float)gamma * 0.01);
+    for (int32_t i = 10; i < 246; i++) {
+        for (int32_t c = 0; c < 3; c++) {
+            double v = std::pow((double)GamePalette.rgb[i][c] * 0.00425531914893617, inv);
+            if (v < 0.0) v = 0.0;
+            else if (v > 1.0) v = 1.0;
+            GamePalette.rgb[i][c] = (uint8_t)(int32_t)(v * 235.99);
         }
-        ShadowTable[i] = (uint8_t)Palette_get_nearest_palette_index(
-            &GamePalette, GamePalette.rgb[i][0] * 57 / 100, GamePalette.rgb[i][1] * 57 / 100,
-            GamePalette.rgb[i][2] * 57 / 100);
+    }
+    // Palette_init: entries 8, 9, 246 and 247 are PC_EXPLICIT system colour references.
+    for (int32_t i = 0; i < 2; i++) {
+        GamePalette.rgb[8 + i][0] = (uint8_t)(8 + i);
+        GamePalette.rgb[8 + i][1] = GamePalette.rgb[8 + i][2] = 0;
+        GamePalette.rgb[246 + i][0] = (uint8_t)(0xF5 + i);
+        GamePalette.rgb[246 + i][1] = GamePalette.rgb[246 + i][2] = 0;
     }
 }
 
@@ -220,39 +205,299 @@ void THISCALL Buffer_fill_3(Buffer* self, const UiRect* rect, int32_t color) {
     for (int32_t y = t; y < b; y++) std::memset(self->data + (size_t)y * self->stride + l, color, (size_t)std::max(0, r - l));
 }
 
+void THISCALL Buffer_fill_2(Buffer* self, int32_t color) { Buffer_fill_3(self, &self->clip, color); }
+
+void THISCALL Buffer_fill(Buffer* self, int32_t x, int32_t y, int32_t w, int32_t h, int32_t color) {
+    UiRect r{x, y, x + w, y + h};
+    Buffer_fill_3(self, &r, color);
+}
+
+int32_t THISCALL Buffer_copy_4(Buffer* self, Buffer* dest, int32_t sx, int32_t sy, int32_t dx, int32_t dy, int32_t w,
+                               int32_t h) {
+    if (!self->data) return 7;
+    if (!dest) return 3;
+    if (sx < 0) {
+        w += sx;
+        dx -= sx;
+        sx = 0;
+    }
+    if (sy < 0) {
+        h += sy;
+        dy -= sy;
+        sy = 0;
+    }
+    if (self->width < sx || self->height < sy) return 0;
+    if (self->width < w + sx) w = self->width - sx;
+    if (self->height < sy + h) h = self->height - sy;
+    UiRect r{std::max(dx, dest->clip.left), std::max(dy, dest->clip.top), std::min(dx + w, dest->clip.right),
+             std::min(dy + h, dest->clip.bottom)};
+    if (r.left >= r.right || r.top >= r.bottom) return 0;
+    sx += r.left - dx;
+    sy += r.top - dy;
+    int32_t cw = r.right - r.left, ch = r.bottom - r.top;
+    if (r.left >= dest->width || r.top >= dest->height) return 3;
+    auto row = [&](int32_t j) {
+        std::memmove(dest->data + (size_t)(r.top + j) * dest->stride + r.left, self->data + (size_t)(sy + j) * self->stride + sx, (size_t)cw);
+    };
+    if (r.top <= sy)
+        for (int32_t j = 0; j < ch; j++) row(j);
+    else
+        for (int32_t j = ch - 1; j >= 0; j--) row(j);
+    return 0;
+}
+
 static inline void put_clipped(Buffer* self, int32_t x, int32_t y, int32_t color) {
     if (x >= self->clip.left && x < self->clip.right && y >= self->clip.top && y < self->clip.bottom)
         self->data[(size_t)y * self->stride + x] = (uint8_t)color;
 }
 
+// Horizontal line x1..x2 (inclusive, either order) at y; nothing when x1 == x2.
+void THISCALL Buffer_hline_2(Buffer* self, int32_t x1, int32_t x2, int32_t y, int32_t color) {
+    if (!self->data || y < self->clip.top || y >= self->clip.bottom || x1 == x2) return;
+    int32_t lo = x1, hi = x2;
+    if (x2 < x1) {
+        lo = x2;
+        hi = x1;
+    }
+    if (lo >= self->clip.right || hi < self->clip.left) return;
+    if (lo < self->clip.left) lo = self->clip.left;
+    if (self->clip.right <= hi) hi = self->clip.right - 1;
+    if (lo >= self->width || y >= self->height) return;
+    std::memset(self->data + (size_t)y * self->stride + lo, color, (size_t)(hi - lo + 1));
+}
+
+// Vertical line y1..y2 (inclusive, either order) at x; nothing when y1 == y2.
+void THISCALL Buffer_vline_2(Buffer* self, int32_t x, int32_t y1, int32_t y2, int32_t color) {
+    if (!self->data || x < self->clip.left || x >= self->clip.right || y1 == y2) return;
+    int32_t lo = y1, hi = y2;
+    if (y2 < y1) {
+        lo = y2;
+        hi = y1;
+    }
+    if (lo >= self->clip.bottom || hi < self->clip.top) return;
+    if (lo < self->clip.top) lo = self->clip.top;
+    if (self->clip.bottom <= hi) hi = self->clip.bottom - 1;
+    if (x >= self->width || lo >= self->height) return;
+    for (int32_t y = lo; y <= hi; y++) self->data[(size_t)y * self->stride + x] = (uint8_t)color;
+}
+
 void THISCALL Buffer_box_2(Buffer* self, const UiRect* rect, int32_t color_tl, int32_t color_br) {
-    int32_t l = rect->left, t = rect->top, r = rect->right - 1, b = rect->bottom - 1;
-    for (int32_t x = l; x <= r; x++) {
-        put_clipped(self, x, t, color_tl);
-        put_clipped(self, x, b, color_br);
-    }
-    for (int32_t y = t; y <= b; y++) {
-        put_clipped(self, l, y, color_tl);
-        put_clipped(self, r, y, color_br);
-    }
+    if (!rect) return;
+    int32_t l = rect->left, t = rect->top, r = rect->right, b = rect->bottom;
+    Buffer_hline_2(self, l + 1, r - 1, t, color_tl);
+    Buffer_hline_2(self, l, r - 2, b - 1, color_br);
+    Buffer_vline_2(self, l, t, b - 2, color_tl);
+    Buffer_vline_2(self, r - 1, t + 1, b - 1, color_br);
 }
 
 void THISCALL Buffer_line_2(Buffer* self, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t color) {
-    // Bresenham (the original's run-slice variant draws the same pixel set for these lines).
-    int32_t dx = std::abs(x2 - x1), dy = -std::abs(y2 - y1);
-    int32_t sx = x1 < x2 ? 1 : -1, sy = y1 < y2 ? 1 : -1, err = dx + dy;
+    if (!self->data) return;
+    if (x1 == x2) {
+        Buffer_vline_2(self, x1, y1, y2, color);
+        return;
+    }
+    if (y1 == y2) {
+        Buffer_hline_2(self, x1, x2, y1, color);
+        return;
+    }
+    if (x2 < x1) {
+        std::swap(x1, x2);
+        std::swap(y1, y2);
+    }
+    const int32_t L = self->clip.left, T = self->clip.top, R = self->clip.right, B = self->clip.bottom;
+    const int32_t stride = self->stride;
+    int32_t dx = x2 - x1, dy = y2 - y1;
+    auto plot_at = [&](int32_t x, int32_t y) { self->data[(size_t)y * stride + x] = (uint8_t)color; };
+    if (y1 < y2) {
+        if (!(x1 <= R && y1 <= B && L <= x2 && T <= y2)) return;
+        if (dx < dy) {
+            int32_t d = dx * 2 - dy, inc = (dx - dy) * 2;
+            while (x1 < L || y1 < T) {
+                if (d < 1) {
+                    d += dx * 2;
+                    y1++;
+                } else {
+                    d += inc;
+                    x1++;
+                    y1++;
+                }
+            }
+            if (x1 < R && y1 < B) {
+                plot_at(x1, y1);
+                if (B <= y2) y2 = B - 1;
+                for (; y1 < y2; y1++) {
+                    int32_t step = dx * 2;
+                    if (d > 0) {
+                        x1++;
+                        if (R <= x1) break;
+                        step = inc;
+                    }
+                    d += step;
+                    plot_at(x1, y1 + 1);
+                }
+            }
+        } else {
+            int32_t d = dy * 2 - dx, inc = (dy - dx) * 2;
+            while (x1 < L || y1 < T) {
+                if (d < 1) {
+                    d += dy * 2;
+                    x1++;
+                } else {
+                    d += inc;
+                    y1++;
+                    x1++;
+                }
+            }
+            if (x1 < R && y1 < B) {
+                plot_at(x1, y1);
+                if (R <= x2) x2 = R - 1;
+                for (; x1 < x2; x1++) {
+                    int32_t step = dy * 2;
+                    if (d > 0) {
+                        y1++;
+                        if (B <= y1) break;
+                        step = inc;
+                    }
+                    d += step;
+                    plot_at(x1 + 1, y1);
+                }
+            }
+        }
+        return;
+    }
+    if (!(x1 <= R && T <= y1 && L <= x2 && y2 <= B)) return;
+    dy = std::abs(dy);
+    if (dx < dy) {
+        int32_t d = dx * 2 - dy, inc = (dx - dy) * 2;
+        while (x1 < L || B <= y1) {
+            if (d < 1) {
+                d += dx * 2;
+                y1--;
+            } else {
+                d += inc;
+                x1++;
+                y1--;
+            }
+        }
+        if (x1 < R && T <= y1) {
+            plot_at(x1, y1);
+            if (y2 < T) y2 = T;
+            for (; y2 < y1; y1--) {
+                int32_t step = dx * 2;
+                if (d > 0) {
+                    x1++;
+                    if (R <= x1) break;
+                    step = inc;
+                }
+                d += step;
+                plot_at(x1, y1 - 1);
+            }
+        }
+    } else {
+        int32_t d = dy * 2 - dx, inc = (dy - dx) * 2;
+        while (x1 < L || B <= y1) {
+            if (d < 1) {
+                d += dy * 2;
+                x1++;
+            } else {
+                d += inc;
+                y1--;
+                x1++;
+            }
+        }
+        if (x1 < R && T <= y1) {
+            plot_at(x1, y1);
+            if (R <= x2) x2 = R - 1;
+            for (; x1 < x2; x1++) {
+                int32_t step = dy * 2;
+                if (d > 0) {
+                    y1--;
+                    if (y1 < T) break;
+                    step = inc;
+                }
+                d += step;
+                plot_at(x1 + 1, y1);
+            }
+        }
+    }
+}
+
+namespace {
+// Polygon edge (FUN_00626470): integer x with Bresenham steps.
+struct PolyEdge {
+    int32_t dir, count, end, x, xstep, sign, err, rem, dy;
+};
+bool poly_edge(const int32_t* pts, int32_t n, int32_t bottom, PolyEdge* e, int32_t start) {
+    if (start == bottom) return false;
+    int32_t next;
     for (;;) {
-        put_clipped(self, x1, y1, color);
-        if (x1 == x2 && y1 == y2) break;
-        int32_t e2 = 2 * err;
-        if (e2 >= dy) {
-            err += dy;
-            x1 += sx;
+        next = e->dir + start;
+        if (n - 1 < next) next = 0;
+        else if (next < 0) next = n - 1;
+        e->count = pts[next * 2 + 1] - pts[start * 2 + 1];
+        if (e->count != 0) break;
+        start = next;
+        if (next == bottom) return false;
+    }
+    if (e->count < 0) return false;
+    e->end = next;
+    e->x = pts[start * 2];
+    int32_t dx = pts[next * 2] - pts[start * 2];
+    if (dx < 0) {
+        e->sign = -1;
+        dx = -dx;
+        e->err = 1 - e->count;
+        e->xstep = -(dx / e->count);
+    } else {
+        e->sign = 1;
+        e->xstep = dx / e->count;
+        e->err = 0;
+    }
+    e->rem = dx % e->count;
+    e->dy = e->count;
+    return true;
+}
+bool poly_step(const int32_t* pts, int32_t n, int32_t bottom, PolyEdge* e) {
+    if (--e->count == 0) return poly_edge(pts, n, bottom, e, e->end);
+    e->err += e->rem;
+    e->x += e->xstep;
+    if (e->err > 0) {
+        e->x += e->sign;
+        e->err -= e->dy;
+    }
+    return true;
+}
+}  // namespace
+
+void THISCALL Buffer_poly(Buffer* self, const int32_t* pts, int32_t n, int32_t color) {
+    if (!pts || !self || !self->data) return;
+    int32_t right = self->clip.right - 1, bottom_clip = self->clip.bottom - 1;
+    int32_t top_y = 0x7FFF, bottom_y = -0x7FFD, top = 0, bottom = 0;
+    for (int32_t i = 0; i < n; i++) {
+        int32_t y = pts[i * 2 + 1];
+        if (y < top_y) {
+            top_y = y;
+            top = i;
         }
-        if (e2 <= dx) {
-            err += dx;
-            y1 += sy;
+        if (bottom_y < y) {
+            bottom_y = y;
+            bottom = i;
         }
+    }
+    if (top_y >= bottom_y) return;
+    PolyEdge a{}, b{};
+    a.dir = -1;
+    b.dir = 1;
+    if (!poly_edge(pts, n, bottom, &a, top) || !poly_edge(pts, n, bottom, &b, top)) return;
+    for (int32_t y = top_y; y < bottom_clip; y++) {
+        if (self->clip.top <= y) {
+            int32_t lo = a.x < b.x ? a.x : b.x, hi = a.x < b.x ? b.x : a.x;
+            if (lo < hi && self->clip.left < hi && lo < right) {
+                int32_t end = hi < right ? hi : right, start = lo < self->clip.left ? self->clip.left : lo;
+                if (start < end) std::memset(self->data + (size_t)y * self->stride + start, color, (size_t)(end - start));
+            }
+        }
+        if (!poly_step(pts, n, bottom, &a) || !poly_step(pts, n, bottom, &b)) break;
     }
 }
 
@@ -306,6 +551,19 @@ int32_t THISCALL Buffer_write_l_3(Buffer* self, const char* text, int32_t x, int
     return Buffer_write_raw_l(self, text, x, y, len);
 }
 
+int32_t THISCALL Buffer_write_cent_l_7(Buffer* self, const char* text, const UiRect* rect, int32_t len) {
+    if (!text || !rect) return 0;
+    Font* font = self->fonts[0];
+    if (!font || !font->handle) return 3;
+    int32_t n = (int32_t)std::strlen(text);
+    if (n < len) len = n;
+    if (len < 0 || len == 0) return 0;
+    int32_t w = Font_width_2(font, text, n);  // Buffer_text_width_2 of the whole string
+    int32_t x = ((rect->right - w) - rect->left) / 2 + rect->left;
+    int32_t y = ((rect->bottom - font->ascent_above) - rect->top) / 2 + rect->top;
+    return Buffer_write_raw_l(self, text, x, y, len);
+}
+
 int32_t THISCALL Buffer_write_cent_l_8(Buffer* self, const char* text, int32_t x, int32_t y, int32_t len) {
     if (!text) return x;
     if (!self->fonts[0] || !self->fonts[0]->handle) return 3;
@@ -321,22 +579,47 @@ int32_t THISCALL Buffer_write_cent_l_8(Buffer* self, const char* text, int32_t x
 int32_t THISCALL pfncSpriteFromCanvasRectTrans(Sprite* self, Buffer* canvas, int32_t key, int32_t x, int32_t y,
                                                int32_t w, int32_t h, int32_t) {
     if (!canvas || !canvas->data) return 3;
-    self->width = w;
-    self->height = h;
-    self->stride = w;
-    self->key = key;
-    self->x_offset = 0;
-    self->y_offset = 0;
-    self->pixels.assign((size_t)w * h, (uint8_t)key);
-    for (int32_t j = 0; j < h; j++)
+    *self = Sprite();
+    if (w == 0 || h == 0 || x + w > canvas->width || y + h > canvas->height) return 3;
+    uint8_t k = (uint8_t)key;
+    self->key = k;
+    self->full_width = w;
+    self->full_height = h;
+    auto px = [&](int32_t i, int32_t j) { return canvas->data[(size_t)(y + j) * canvas->stride + x + i]; };
+    auto row_empty = [&](int32_t j) {
         for (int32_t i = 0; i < w; i++)
-            self->pixels[(size_t)j * w + i] = (uint8_t)Buffer_get_pixel(canvas, x + i, y + j);
+            if (px(i, j) != k) return false;
+        return true;
+    };
+    // Rows of key at the top, then at the bottom.
+    int32_t top = 0;
+    while (top < h && row_empty(top)) top++;
+    if (top == h) return 9;
+    int32_t height = h - top;
+    for (int32_t j = h - 1; j >= 0 && row_empty(j); j--) height--;
+    if (height == 0) return 9;
+    // Columns of key at the left and the right of the remaining rows.
+    int32_t left = w, right = w;
+    for (int32_t j = top; j < top + height; j++) {
+        int32_t i = 0;
+        while (i < w && px(i, j) == k) i++;
+        left = std::min(left, i);
+        int32_t n = 0;
+        for (int32_t m = w; m > 0 && px(m - 1, j) == k; m--) n++;
+        right = std::min(right, n);
+    }
+    int32_t width = w - left - right;
+    if (width == 0) return 9;
+    self->x_offset = left;
+    self->y_offset = top;
+    self->width = width;
+    self->height = height;
+    self->stride = width;
+    self->pixels.resize((size_t)width * height);
+    for (int32_t j = 0; j < height; j++)
+        for (int32_t i = 0; i < width; i++) self->pixels[(size_t)j * width + i] = px(left + i, top + j);
     return 0;
 }
-
-// Scaling table (0x9B3AD8, 800 entries) and the scale it was built for.
-static int32_t ScaleTable[800];
-static int32_t ScaleTableDest = 1, ScaleTableSource = 1;  // DAT_00696D20 / DAT_00696D24
 
 void GAMEAPI Sprite_fill_scaling_table() {
     int32_t big = BlitDestScale, small = BlitSourceScale;
@@ -350,10 +633,10 @@ void GAMEAPI Sprite_fill_scaling_table() {
         err = 0;
         quot = big;
     } else {
-        step2 = small * 2;
-        rem2 = big % small << 1;
-        err = (rem2 >> 1) - small * 2;
         quot = big / small;
+        rem2 = big % small << 1;
+        step2 = small * 2;
+        err = (rem2 >> 1) - small * 2;
     }
     if (quot & 1) err += big;
     if (small == 1) {
@@ -370,60 +653,178 @@ void GAMEAPI Sprite_fill_scaling_table() {
     }
 }
 
-// Destination size of `n` source pixels (expanding) or source pixels consumed per destination
-// pixel (shrinking), following the scaling table.
-static void build_axis_map(int32_t src_len, std::vector<int32_t>* map) {
-    map->clear();
-    bool expand = BlitDestScale > BlitSourceScale;
-    if (BlitDestScale == BlitSourceScale) {
-        for (int32_t i = 0; i < src_len; i++) map->push_back(i);
-    } else if (expand) {
-        for (int32_t i = 0; i < src_len && i < 800; i++)
-            for (int32_t k = 0; k < ScaleTable[i]; k++) map->push_back(i);
-    } else {
-        int32_t s = 0;
-        for (int32_t i = 0; s < src_len && i < 800; i++) {
-            map->push_back(s);
-            s += ScaleTable[i];
-        }
-    }
+namespace {
+
+enum SpriteOp { SPR_COPY, SPR_SHADOW, SPR_TRANSLATE, SPR_MONO };
+
+uint8_t g_mono_color = 0;  // DAT_009B53E0
+
+inline void sprite_put(uint8_t* d, uint8_t p, SpriteOp op, const uint8_t* table) {
+    if (op == SPR_MONO) *d = g_mono_color;
+    else if (op == SPR_SHADOW && p == 0) *d = table[*d];
+    else if (op == SPR_TRANSLATE) *d = table[p];
+    else *d = p;
 }
 
-static int32_t sprite_blit(Sprite* self, Buffer* dest, int32_t key, int32_t x, int32_t y, const uint8_t* table) {
-    if (self->pixels.empty() || !dest || !dest->data) return 3;
-    if (BlitDestScale != BlitSourceScale && (ScaleTableDest != BlitDestScale || ScaleTableSource != BlitSourceScale)) {
-        if ((float)BlitDestScale / (float)BlitSourceScale > 4.0f) return 0;
-        Sprite_fill_scaling_table();
-        ScaleTableDest = BlitDestScale;
-        ScaleTableSource = BlitSourceScale;
+bool intersect(UiRect* out, const UiRect& a, const UiRect& b) {  // IntersectRect
+    UiRect r{std::max(a.left, b.left), std::max(a.top, b.top), std::min(a.right, b.right), std::min(a.bottom, b.bottom)};
+    if (r.left >= r.right || r.top >= r.bottom) {
+        *out = UiRect{0, 0, 0, 0};
+        return false;
     }
-    std::vector<int32_t> mx, my;
-    build_axis_map(self->width, &mx);
-    build_axis_map(self->height, &my);
-    int32_t ox = x + self->x_offset, oy = y + self->y_offset;
-    for (size_t j = 0; j < my.size(); j++) {
-        int32_t dy = oy + (int32_t)j;
-        if (dy < dest->clip.top || dy >= dest->clip.bottom) continue;
-        const uint8_t* srow = &self->pixels[(size_t)my[j] * self->stride];
-        uint8_t* drow = dest->data + (size_t)dy * dest->stride;
-        for (size_t i = 0; i < mx.size(); i++) {
-            int32_t dx = ox + (int32_t)i;
-            if (dx < dest->clip.left || dx >= dest->clip.right) continue;
-            uint8_t p = srow[mx[i]];
-            if (p == (uint8_t)key) continue;
-            if (p == 0 && table) drow[dx] = table[drow[dx]];
-            else drow[dx] = p;
+    *out = r;
+    return true;
+}
+
+// Sprite_get_clipped_{x,y}_table_expand (0x5EAB0F / 0x5EABBF) on one axis: lo/hi of the full and
+// the clipped destination ranges. Out: source entries to skip, destination pixels clipped
+// before, the table entries (destination pixels per source pixel; the first and last ones
+// shortened by the clipping) and the visible destination length. False: empty.
+bool clip_table_expand(int32_t full_lo, int32_t full_hi, int32_t clip_lo, int32_t clip_hi, int32_t* src_skip,
+                       int32_t* dst_skip, std::vector<int32_t>* table, int32_t* visible) {
+    int32_t skip = clip_lo - full_lo, len = clip_hi - clip_lo;
+    if (len == 0) return false;
+    *visible = len;
+    *dst_skip = skip;
+    table->clear();
+    int32_t i = 0;
+    while (skip > 0) skip -= ScaleTable[i++ % 800];
+    if (skip < 0) {
+        int32_t part = -skip;
+        len -= part;
+        *src_skip = i - 1;
+        table->push_back(part);
+    } else {
+        *src_skip = i;
+    }
+    while (len > 0) {
+        int32_t v = ScaleTable[i++ % 800];
+        table->push_back(v);
+        len -= v;
+    }
+    if (len < 0) table->back() += len;
+    return true;
+}
+
+// Sprite_get_clipped_{x,y}_table_shrink (0x5EAC6F / 0x5EACFF): source pixels skipped for the
+// clipped destination pixels, and the source step of each visible destination pixel.
+bool clip_table_shrink(int32_t full_lo, int32_t full_hi, int32_t clip_lo, int32_t clip_hi, int32_t* dst_skip,
+                       int32_t* src_skip, std::vector<int32_t>* table, int32_t* visible) {
+    int32_t skip = clip_lo - full_lo, len = clip_hi - clip_lo;
+    if (len == 0) return false;
+    *dst_skip = skip;
+    *visible = len;
+    *src_skip = 0;
+    for (int32_t i = 0; i < skip; i++) *src_skip += ScaleTable[i % 800];
+    table->clear();
+    for (int32_t j = 0; j < len; j++) table->push_back(ScaleTable[(skip + j) % 800]);
+    return true;
+}
+
+// The blitters' common code (pfncSpriteStretchCopyToCanvas 0x5E4B9A, Sprite_draw_dest 0x5E5833,
+// Sprite_draw_4 0x5E9D44).
+int32_t sprite_blit(Sprite* self, Buffer* dest, int32_t key, int32_t x, int32_t y, SpriteOp op,
+                    const uint8_t* table) {
+    if (self->pixels.empty() || !dest || !dest->data) return 3;
+    float ratio = 1.0f;  // DAT_009B6624
+    if (BlitDestScale != BlitSourceScale) {
+        ratio = (float)((double)BlitDestScale / (double)BlitSourceScale);
+        if ((ScaleTableDest != BlitDestScale || ScaleTableSource != BlitSourceScale)) {
+            if (ratio > 4.0f) return 0;
+            Sprite_fill_scaling_table();
+            ScaleTableDest = BlitDestScale;
+            ScaleTableSource = BlitSourceScale;
         }
+    }
+    uint8_t k = (uint8_t)key;
+    const int32_t sstride = self->stride, dstride = dest->stride;
+    // Source reads as in memory: rows follow each other; nothing beyond the bits.
+    const size_t nbits = self->pixels.size();
+    auto src_at = [&](int64_t off) -> uint8_t { return off >= 0 && (size_t)off < nbits ? self->pixels[(size_t)off] : k; };
+    if (BlitDestScale == BlitSourceScale) {
+        UiRect full{x + self->x_offset, y + self->y_offset, 0, 0};
+        full.right = full.left + self->width;
+        full.bottom = full.top + self->height;
+        UiRect r;
+        if (!intersect(&r, full, dest->clip)) return 0;
+        for (int32_t j = r.top; j < r.bottom; j++) {
+            const uint8_t* s = &self->pixels[(size_t)(j - full.top) * sstride + (r.left - full.left)];
+            uint8_t* d = dest->data + (size_t)j * dstride + r.left;
+            for (int32_t i = r.left; i < r.right; i++, s++, d++)
+                if (*s != k) sprite_put(d, *s, op, table);
+        }
+        return 0;
+    }
+    // __ftol of the scaled size and position.
+    int32_t h = (int32_t)((double)self->height * ratio);
+    int32_t w = (int32_t)((double)self->width * ratio);
+    int32_t top = (int32_t)((double)y + (double)self->y_offset * ratio);
+    int32_t left = (int32_t)((double)x + (double)self->x_offset * ratio);
+    UiRect full{left, top, left + w, top + h}, r;
+    if (!intersect(&r, full, dest->clip)) return 0;
+    std::vector<int32_t> tx, ty;
+    if (BlitDestScale < BlitSourceScale) {
+        int32_t dx_skip, sx_skip, dy_skip, sy_skip, vw, vh;
+        intersect(&r, full, dest->clip);
+        if (!clip_table_shrink(full.left, full.right, r.left, r.right, &dx_skip, &sx_skip, &tx, &vw)) return 0;
+        if (!clip_table_shrink(full.top, full.bottom, r.top, r.bottom, &dy_skip, &sy_skip, &ty, &vh)) return 0;
+        uint8_t* drow = dest->data + (size_t)(full.top + dy_skip) * dstride + full.left + dx_skip;
+        int64_t srow = (int64_t)sstride * sy_skip + sx_skip;
+        for (int32_t j = 0; j < vh; j++) {
+            int64_t s = srow;
+            for (int32_t i = 0; i < vw; i++) {
+                uint8_t p = src_at(s);
+                if (p != k) sprite_put(drow + i, p, op, table);
+                s += tx[(size_t)i];
+            }
+            srow += (int64_t)sstride * ty[(size_t)j];
+            drow += dstride;
+        }
+        return 0;
+    }
+    int32_t sx_skip, dx_skip, sy_skip, dy_skip, vw, vh;
+    intersect(&r, full, dest->clip);
+    if (!clip_table_expand(full.left, full.right, r.left, r.right, &sx_skip, &dx_skip, &tx, &vw)) return 0;
+    if (!clip_table_expand(full.top, full.bottom, r.top, r.bottom, &sy_skip, &dy_skip, &ty, &vh)) return 0;
+    uint8_t* drow = dest->data + (size_t)(full.top + dy_skip) * dstride + full.left + dx_skip;
+    int64_t srow = (int64_t)sstride * sy_skip + sx_skip;
+    for (size_t j = 0; j < ty.size(); j++) {
+        int32_t rows = ty[j] & 0xFF;  // the row count is read as a byte
+        if (rows < 1 || rows > 4) rows = 4;
+        uint8_t* d = drow;
+        int64_t s = srow;
+        for (size_t i = 0; i < tx.size(); i++, s++) {
+            int32_t n = tx[i];
+            uint8_t p = src_at(s);
+            if (p != k) {
+                for (int32_t m = 0; m < rows; m++)
+                    for (int32_t c = 0; c < n; c++) sprite_put(d + (size_t)m * dstride + c, p, op, table);
+            }
+            d += n;
+        }
+        drow += (size_t)rows * dstride;
+        srow += sstride;
     }
     return 0;
 }
 
+}  // namespace
+
 int32_t THISCALL Sprite_draw_dest(Sprite* self, Buffer* dest, int32_t key, int32_t x, int32_t y, const uint8_t* table) {
-    return sprite_blit(self, dest, key, x, y, table);
+    return sprite_blit(self, dest, key, x, y, SPR_SHADOW, table);
 }
 
 int32_t THISCALL pfncSpriteStretchCopyToCanvas(Sprite* self, Buffer* dest, int32_t key, int32_t x, int32_t y) {
-    return sprite_blit(self, dest, key, x, y, nullptr);
+    return sprite_blit(self, dest, key, x, y, SPR_COPY, nullptr);
+}
+
+int32_t THISCALL Sprite_draw_mono_2(Sprite* self, Buffer* dest, int32_t key, int32_t x, int32_t y, int32_t color) {
+    g_mono_color = (uint8_t)color;
+    return sprite_blit(self, dest, key, x, y, SPR_MONO, nullptr);
+}
+
+int32_t THISCALL Sprite_draw_4(Sprite* self, Buffer* dest, int32_t key, int32_t x, int32_t y, const uint8_t* table) {
+    return sprite_blit(self, dest, key, x, y, SPR_TRANSLATE, table);
 }
 
 // ---- Texture ------------------------------------------------------------------------------------
@@ -444,82 +845,4 @@ int32_t THISCALL pfncImageFromCanvas(Texture* self, Buffer* canvas, int32_t x, i
                                 {r, b}, {cx, b}, {0, b}, {0, cy}};
     std::memcpy(self->points, pts, sizeof(pts));
     return 0;
-}
-
-// Scan conversion shared by the texture blitters: convex polygon, per row the edge crossings
-// with interpolated (u, v, light). key >= 0: skip texels equal to key; threshold: skip pixels
-// whose light is at or above it.
-static void texture_poly(Texture* t, Buffer* dest, const int32_t* pts, const int32_t* light, int32_t n,
-                         const int32_t* uv, int32_t color, int32_t key, int32_t threshold) {
-    if (!dest || !dest->data || t->pixels.empty() || n < 3) return;
-    int32_t top = 0x7FFF, bottom = -0x7FFF;
-    for (int32_t i = 0; i < n; i++) {
-        top = std::min(top, pts[i * 2 + 1]);
-        bottom = std::max(bottom, pts[i * 2 + 1]);
-    }
-    const UiRect& c = dest->clip;
-    for (int32_t y = std::max(top, c.top); y < std::min(bottom, c.bottom); y++) {
-        double yc = y + 0.5;
-        double xl = 1e9, xr = -1e9, ul = 0, vl = 0, ll = 0, ur = 0, vr = 0, lr = 0;
-        for (int32_t i = 0; i < n; i++) {
-            int32_t j = (i + 1) % n;
-            double y0 = pts[i * 2 + 1], y1 = pts[j * 2 + 1];
-            if ((yc < y0) == (yc < y1)) continue;
-            double s = (yc - y0) / (y1 - y0);
-            double x = pts[i * 2] + s * (pts[j * 2] - pts[i * 2]);
-            double u = uv[i * 2] + s * (uv[j * 2] - uv[i * 2]);
-            double v = uv[i * 2 + 1] + s * (uv[j * 2 + 1] - uv[i * 2 + 1]);
-            double l = light[i] + s * (light[j] - light[i]);
-            if (x < xl) {
-                xl = x;
-                ul = u;
-                vl = v;
-                ll = l;
-            }
-            if (x > xr) {
-                xr = x;
-                ur = u;
-                vr = v;
-                lr = l;
-            }
-        }
-        if (xr < xl) continue;
-        int32_t x0 = (int32_t)std::ceil(xl - 0.5), x1 = (int32_t)std::ceil(xr - 0.5);
-        double span = xr - xl > 0 ? xr - xl : 1;
-        uint8_t* row = dest->data + (size_t)y * dest->stride;
-        bool fill_row = color != -1 && !(y & 1);
-        for (int32_t x = std::max(x0, c.left); x < std::min(x1, c.right); x++) {
-            double s = (x + 0.5 - xl) / span;
-            int32_t l = (int32_t)std::floor(ll + s * (lr - ll));
-            if (l >= threshold) continue;
-            int32_t u = std::max(0, std::min(t->width - 1, (int32_t)(ul + s * (ur - ul))));
-            int32_t v = std::max(0, std::min(t->height - 1, (int32_t)(vl + s * (vr - vl))));
-            uint8_t texel = t->pixels[(size_t)v * t->width + u];
-            if (key >= 0 && texel == (uint8_t)key) continue;
-            row[x] = fill_row ? (uint8_t)color : (uint8_t)(texel + l);
-        }
-    }
-}
-
-static void clamp_light(int32_t* light, int32_t n) {
-    for (int32_t i = 0; i < n; i++) light[i] = std::max(TextureLightMin, std::min(TextureLightMax, light[i]));
-}
-
-void THISCALL pfncImageCopytoCanvas2(Texture* self, Buffer* dest, const int32_t* pts, int32_t* light, int32_t n,
-                                    const int32_t* uv, int32_t color) {
-    clamp_light(light, n);
-    texture_poly(self, dest, pts, light, n, uv, color, -1, 0x7FFFFFFF);
-}
-
-void THISCALL Texture_draw_trans_5(Texture* self, Buffer* dest, const int32_t* pts, int32_t* light, int32_t n,
-                                  const int32_t* uv, int32_t color) {
-    clamp_light(light, n);
-    texture_poly(self, dest, pts, light, n, uv, color, TextureKey, 0x7FFFFFFF);
-}
-
-void THISCALL Texture_draw_4(Texture* self, Buffer* dest, const int32_t* pts, const int32_t* light, int32_t n,
-                            const int32_t* uv, int32_t threshold, int32_t color) {
-    bool any = false;
-    for (int32_t i = 0; i < n; i++) any |= light[i] < threshold;
-    if (any) texture_poly(self, dest, pts, light, n, uv, color, -1, threshold);
 }

@@ -27,6 +27,11 @@ ADDR(0x52F8E0) void THISCALL NetDaemon_game_checksum(uint8_t* net, FullChecksum*
 ADDR(0x5932B0) void GAMEAPI synch_researching(int32_t faction_id);
 // Processes pending network messages (multiplayer wait loops).
 ADDR(0x530360) void GAMEAPI NetDaemon_net_tasks();
+// Multiplayer: asks the player of faction_id_with to open a diplomatic channel; 0 when opened.
+ADDR(0x5304A0) int32_t THISCALL NetDaemon_open_channel(uint8_t* net, int32_t faction_id, int32_t faction_id_with);
+// Multiplayer: per faction 1..7, a diplomatic channel the faction asked for (wait_loop opens it).
+GLOBAL(int32_t[7], NetChannelRequests, 0x93F67C);
+GLOBAL(int32_t, NetTurnDoneMask, 0x93E8EC);  // multiplayer: factions that ended their turn
 // Multiplayer: sends a synchronisation message (does nothing in single player).
 ADDR(0x532E00) void THISCALL NetDaemon_synch(uint8_t* net, int32_t type, int32_t a2, int32_t a3, int32_t a4,
                                             int32_t a5, int32_t a6, int32_t a7);

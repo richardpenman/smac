@@ -27,12 +27,7 @@ extern Palette GamePalette;  // 0x94C590, loaded by load_palette
 // 0..235 in 10..245 (the pixel offset every art file is loaded with), then gamma correction
 // ("Gamma Correction" preference, percent). The shadow translation table is derived from it.
 ADDR_NATIVE(0x451A10) void GAMEAPI load_palette();
-// Nearest palette index (10..245) to an RGB colour, as Palette_get_nearest_palette_index.
-ADDR_NATIVE(0x5FF470) int32_t THISCALL Palette_get_nearest_palette_index(Palette* pal, int32_t r, int32_t g,
-                                                                         int32_t b);
-// Colour translation used by Sprite_draw_dest for shadow pixels (sprite pixel 0): each index is
-// mapped to a darker one (unk_6F107C, cached by the original in shadow.tmp).
-extern uint8_t ShadowTable[256];
+// Colour tables (shadow, tints) and the nearest-colour searches are in ui/colortables.h.
 
 // ---- Font (0x2C bytes; Font_ctor 0x618EA0) ----
 // All fields are 32-bit: the HFONT is a platform font handle, so Font objects can also live in
@@ -91,12 +86,26 @@ ADDR_NATIVE(0x5E2210) int32_t THISCALL Buffer_get_pixel(Buffer* self, int32_t x,
 ADDR_NATIVE(0x5D8000) void THISCALL Buffer_set_clip(Buffer* self, const UiRect* rect);
 // Fills the rectangle (clipped) with a palette index.
 ADDR_NATIVE(0x5DFCD0) void THISCALL Buffer_fill_3(Buffer* self, const UiRect* rect, int32_t color);
+ADDR_NATIVE(0x5E1A80) void THISCALL Buffer_hline_2(Buffer* self, int32_t x1, int32_t x2, int32_t y, int32_t color);
+ADDR_NATIVE(0x5E1BF0) void THISCALL Buffer_vline_2(Buffer* self, int32_t x, int32_t y1, int32_t y2, int32_t color);
+// Fills the clip rectangle.
+ADDR_NATIVE(0x5DFB50) void THISCALL Buffer_fill_2(Buffer* self, int32_t color);
+// Fills (x, y, w, h) (clipped).
+ADDR_NATIVE(0x5D8240) void THISCALL Buffer_fill(Buffer* self, int32_t x, int32_t y, int32_t w, int32_t h, int32_t color);
+// Copies the w x h rectangle at (sx, sy) of self (clipped to self's size) to (dx, dy) of `dest`
+// (clipped to dest's clip rectangle); dest may be self (overlapping copies move correctly).
+ADDR_NATIVE(0x5DFF00) int32_t THISCALL Buffer_copy_4(Buffer* self, Buffer* dest, int32_t sx, int32_t sy, int32_t dx,
+                                                     int32_t dy, int32_t w, int32_t h);
 // Draws a one-pixel frame: top/left in color_tl, bottom/right in color_br.
 ADDR_NATIVE(0x5E3203) void THISCALL Buffer_box_2(Buffer* self, const UiRect* rect, int32_t color_tl,
                                                  int32_t color_br);
-// Line from (x1, y1) to (x2, y2), endpoints included, clipped.
+// Line from (x1, y1) to (x2, y2) (Bresenham from the left end; clipped to the clip rectangle).
 ADDR_NATIVE(0x5E15F0) void THISCALL Buffer_line_2(Buffer* self, int32_t x1, int32_t y1, int32_t x2, int32_t y2,
                                                   int32_t color);
+// Filled polygon in one colour (Buffer_poly -> polygon 0x626620): pts[n] (x, y); rows from the
+// top vertex to the row before the bottom one, x from the left edge to the right one (excluded);
+// clipped to the clip rectangle minus its last row and column.
+ADDR_NATIVE(0x5DA680) void THISCALL Buffer_poly(Buffer* self, const int32_t* pts, int32_t n, int32_t color);
 ADDR_NATIVE(0x5DAC70) int32_t THISCALL Buffer_set_font(Buffer* self, Font* font, Font* font1, Font* font2,
                                                        Font* font3);
 // Text colour and shadow (colour -1: none; offset dx, dy) of the current font slot.
@@ -107,35 +116,53 @@ ADDR_NATIVE(0x5DBD00) int32_t THISCALL Buffer_write_raw_l(Buffer* self, const ch
                                                           int32_t len);
 ADDR_NATIVE(0x5DCEA0) int32_t THISCALL Buffer_write_l_3(Buffer* self, const char* text, int32_t x, int32_t y,
                                                         int32_t len);
+// Centred in the rectangle (horizontally by the text extent, vertically by the font's ascent
+// above the internal leading).
+ADDR_NATIVE(0x5DD130) int32_t THISCALL Buffer_write_cent_l_7(Buffer* self, const char* text, const UiRect* rect,
+                                                             int32_t len);
 // Centred on x.
 ADDR_NATIVE(0x5DD250) int32_t THISCALL Buffer_write_cent_l_8(Buffer* self, const char* text, int32_t x, int32_t y,
                                                              int32_t len);
 
 // ---- Sprite (0x2C bytes; gfx 0x5E37E0..) ----
+// A transparent bitmap trimmed to its non-transparent bounding box when extracted.
 struct Sprite {
-    std::vector<uint8_t> pixels;  // +0x04: bits (row stride = width)
+    std::vector<uint8_t> pixels;  // +0x04: bits (stride bytes per row)
+    int32_t key = 0;              // +0x08 (byte): transparent index given at extraction
     int32_t stride = 0;           // +0x0C
-    int32_t width = 0;            // +0x10
+    int32_t width = 0;            // +0x10: trimmed size
     int32_t height = 0;           // +0x14
-    int32_t key = 0;              // transparent index given at extraction
-    int32_t x_offset = 0;         // +0x20: drawing offset
+    int32_t full_width = 0;       // +0x18: extracted rectangle
+    int32_t full_height = 0;      // +0x1C
+    int32_t x_offset = 0;         // +0x20: position of the trimmed box in the rectangle
     int32_t y_offset = 0;         // +0x24
 };
-// Copies the w x h rectangle at (x, y) of a canvas into the sprite; `key` marks transparency.
+// Copies the w x h rectangle at (x, y) of a canvas into the sprite, trimmed to the pixels that
+// are not `key` (0: ok; 3: bad arguments or the rectangle leaves the canvas; 9: all transparent).
 ADDR_NATIVE(0x5E39A0) int32_t THISCALL pfncSpriteFromCanvasRectTrans(Sprite* self, Buffer* canvas, int32_t key,
                                                                     int32_t x, int32_t y, int32_t w, int32_t h,
                                                                     int32_t flags);
-// Scale table of the blitters (BlitDestScale / BlitSourceScale, i.e. piDestScale/piSourceScale):
-// how many destination pixels each source pixel covers (expanding) or source pixels each
-// destination pixel skips (shrinking).
+// Scale table of the blitters (0x9B3AD8, 800 entries) for BlitDestScale / BlitSourceScale
+// (piDestScale/piSourceScale): destination pixels per source pixel (expanding) or source pixels
+// per destination pixel (shrinking), Bresenham distributed.
+GLOBAL(int32_t[800], ScaleTable, 0x9B3AD8);
+GLOBAL(int32_t, ScaleTableDest, 0x696D20);    // scale the table was built for
+GLOBAL(int32_t, ScaleTableSource, 0x696D24);
 ADDR_NATIVE(0x5EB20F) void GAMEAPI Sprite_fill_scaling_table();
-// Draws the sprite at (x, y) + its offsets, scaled by piDestScale/piSourceScale: pixels equal
-// to `key` are skipped, pixel 0 maps the destination through `table` (shadow), others are copied.
+// Draws the sprite at (x, y) + its offsets, scaled by BlitDestScale/BlitSourceScale (at most
+// 4x): pixels equal to `key` are skipped, pixel 0 maps the destination through `table`
+// (shadow), others are copied.
 ADDR_NATIVE(0x5E5833) int32_t THISCALL Sprite_draw_dest(Sprite* self, Buffer* dest, int32_t key, int32_t x, int32_t y,
                                                         const uint8_t* table);
-// Scaled copy: like Sprite_draw_dest without the shadow table (pixel 0 is copied).
+// As Sprite_draw_dest, every non-key pixel copied.
 ADDR_NATIVE(0x5E4B9A) int32_t THISCALL pfncSpriteStretchCopyToCanvas(Sprite* self, Buffer* dest, int32_t key,
                                                                     int32_t x, int32_t y);
+// As Sprite_draw_dest, every non-key pixel drawn in `color` (the silhouette).
+ADDR_NATIVE(0x5E3E50) int32_t THISCALL Sprite_draw_mono_2(Sprite* self, Buffer* dest, int32_t key, int32_t x, int32_t y,
+                                                          int32_t color);
+// As Sprite_draw_dest, non-key pixels translated: dest = table[pixel].
+ADDR_NATIVE(0x5E9D44) int32_t THISCALL Sprite_draw_4(Sprite* self, Buffer* dest, int32_t key, int32_t x, int32_t y,
+                                                     const uint8_t* table);
 
 // ---- Texture (0x70 bytes; gfx2 0x619650..) ----
 struct Texture {
@@ -147,25 +174,4 @@ struct Texture {
 // Copies a w x h rectangle of a canvas into the texture.
 ADDR_NATIVE(0x619710) int32_t THISCALL pfncImageFromCanvas(Texture* self, Buffer* canvas, int32_t x, int32_t y,
                                                            int32_t w, int32_t h, int32_t flags);
-// Draws the polygon pts[n] (n = 3 or 4, screen coordinates) textured with texture coordinates
-// uv[n] and per-vertex light (clamped to the light range, then added to the texel index).
-// color == -1: every row textured (Texture_draw_2); otherwise even screen rows are filled with
-// `color` and odd rows textured (the original's dithered "not currently seen" look).
-// Approximation (all Texture_draw_* here): affine mapping with per-row interpolation; the
-// original's 16.16 edge stepping is not reproduced bit-exactly yet.
-ADDR_NATIVE(0x6233C0) void THISCALL pfncImageCopytoCanvas2(Texture* self, Buffer* dest, const int32_t* pts,
-                                                          int32_t* light, int32_t n, const int32_t* uv,
-                                                          int32_t color);
-// As pfncImageCopytoCanvas2, skipping transparent texels (index kTextureKey).
-ADDR_NATIVE(0x622DB0) void THISCALL Texture_draw_trans_5(Texture* self, Buffer* dest, const int32_t* pts,
-                                                        int32_t* light, int32_t n, const int32_t* uv, int32_t color);
-// Textured where the interpolated light is below `threshold` (nothing when every vertex is at or
-// above it); lights are not clamped. Used to blend shallow over deep water.
-ADDR_NATIVE(0x624670) void THISCALL Texture_draw_4(Texture* self, Buffer* dest, const int32_t* pts,
-                                                  const int32_t* light, int32_t n, const int32_t* uv,
-                                                  int32_t threshold, int32_t color);
-// Transparent texel index of the texture blitters (DAT_009BB548).
-GLOBAL(int32_t, TextureKey, 0x9BB548);
-// Light clamp range of the texture drawers.
-GLOBAL(int32_t, TextureLightMin, 0x6972CC);
-GLOBAL(int32_t, TextureLightMax, 0x6972D0);
+// The texture blitters (Texture_draw_*) are in ui/texture.h.

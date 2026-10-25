@@ -85,12 +85,17 @@ seed <crt> <game>     reseed MSVC rand() and the game LCG; resets the logic cloc
 newgame k=v ...       new game without dialogs; keys: size(0-4) width height ocean erosion orbit
                       clouds natives diff rules(hex) factions=a,b,c,d,e,f,g
                       random(bit 0: random leader personalities, bit 1: random social agendas)
-load <file.sav>       load a saved game
+load <file.sav>       load a saved game (load_daemon, then the save's faction art and flags:
+                      load_faction_art(1..7) and load_flags, as load_game does)
 save <file.sav>       save (RNG state preserved)
 snapshot <name>       write <name>.state/.rng/.sav now (headless: no .sav before newgame/load)
 dumprules <file>      write all rule tables as text into the output directory (harness/rules_dump.h)
 turns <n>             run the real turn loop; snapshot turn_NNN before each turn_upkeep; exit after n
 viewer <faction>      faction whose view is shown (default 0)
+mapdump <file> [viewer=N] [zoom=Z] [center=X,Y] [scrollfrom=X,Y]
+                      at the first turn_upkeep: redraw the main map view for that view and dump
+                      its canvas (see "Map view dumps"); repeatable
+fontmetrics <file> <pixels> <style>  write the metrics and widths (chars 32..255) of a game font
 trace <n> [turn]      1: log RNG at each faction step; 2: also dump state per step;
                       3 <turn>: dump state before every enemy_veh on that turn;
                       4: log vehicle order changes and a state hash at every step
@@ -112,11 +117,71 @@ fcompare <from> <to> [hooks=turn,faction,enemy] [limit=<pure>,<mut>] <spec>
                       hybrid only: compare original and reconstructed functions on the live
                       state at the selected hooks of turns from..to (see "Function comparison")
 hangdump <seconds>    log where the main thread waits after that many seconds without progress
+poke <hexaddr> <1|2|4> <value>         setup: write a value into the memory image (see below)
+poketile <x> <y> <offset> <1|2|4> <value>  setup: write into a map tile (MAP, 44 bytes)
+call <function> [int args...]          setup: call an engine function (harness/script_calls.h)
+at <turn> <setup command>              run a setup command before that turn's snapshot
 quit
 ```
 
 `PATCH_SPEC="..."` (run_oracle.sh / verify.sh) applies a patch spec at DLL load, before the game
 boots, so reconstructed boot code runs too.
+
+### Setup commands
+
+AI-only observer games never reach large parts of the game logic (human-only unit actions, probe
+actions chosen by a human, AI paths that need rare states). The setup commands edit the game
+state between turns, identically in the oracle, hybrid.dll and `smacx_headless`, so the edited
+state is a fair start state and the following turns are compared as usual
+(`harness/scenarios/cov_*.cmd` use them):
+
+* `poke <hexaddr> <size> <value>` writes 1, 2 or 4 bytes (little-endian; value decimal, 0x hex or
+  negative) at an address of the memory image (0x682000-0x9CA000), e.g. a faction's energy
+  reserve, `Vehs[i].probe_action`, `FactionStatus[0]`. Tables that native builds keep outside the
+  image (`GLOBAL_NATIVE`: rule tables with string pointers, `MapTiles`) cannot be poked.
+* `poketile <x> <y> <offset> <size> <value>` writes into the MAP record of a map tile.
+* `call <function> [args]` calls one of the engine functions listed in `harness/script_calls.h`
+  (cdecl, up to 8 integer arguments) and logs the result (`call veh_init (4 args) -> 263`; void
+  functions log no result). The oracle calls the original address, so hybrid.dll runs the
+  reconstruction when the function is patched; `smacx_headless` calls the reconstruction. Add
+  functions to the table as needed (`smacx_headless` checks the result flag at compile time).
+  Examples: `call veh_init <unit> <faction> <x> <y>` creates a unit, `call probe <veh> <base> -1 1`
+  lets a probe team act, `call action_arty <veh> <x> <y>`.
+* `at <turn> <command>` queues one of these commands. It runs at the turn_upkeep hook of that turn
+  (CurrentTurn), before the snapshot `turn_NNN`, so the snapshot shows its effect; it runs once
+  even when turn_upkeep runs again for the same turn (an aircraft in flight makes turn_upkeep
+  return early, BUG(original)). Use `at` rather than plain setup commands before `turns`: the
+  oracle's windows only exist once the game loop runs.
+
+Vehicle ids are predictable (veh_init appends at `VehCount`), but `kill`/`veh_kill` renumber the
+vehicles above the killed one: scripts create their units first and then use them in descending
+id order. Generated scenarios list the ids in comments. Some edited states make the original loop
+forever (`hangdump` shows it): with the units cov_actions creates on end300's turn-300 state, a
+nerve staple (`action_staple`) or a base given away (`give_a_base`) before the turn is played
+leads to a stack list that `veh_top` (0x579920, called from enemy_move) follows forever; the
+reconstruction loops the same way. cov_actions therefore staples only before its last snapshot.
+
+## Map view dumps
+
+`mapdump` gives exact per-pixel references for the native map view (src/ui). At the first
+turn_upkeep hook (after the snapshot; `turns 0` exits right after) the oracle sets the main view
+(MapWin at MainConsole) to the given viewer, zoom and centre, calls pfncRedrawMap (0x46A550) and
+writes `<file>`: `"SMXMAP1\0"`, int32 width, height, viewer, zoom, centre x, centre y, turn and
+the address of the tile array (the original seeds each tile's texture variant with
+`Random_reseed(tile address)`; smacx reads it back), then 256 RGB palette entries (0x94C590) and
+the 8-bit pixels. Two side files: `<file>.pt` (pfncPtToTile at every 4th pixel) and `<file>.co`
+(pfncMapGetCornerYOffset of every tile, corners 0..4). With `scrollfrom=X,Y` the view is first
+fully drawn centred on X,Y and then moved with pfncMoveMap (the scrolled, partial redraw). The
+game RNG and the viewer are restored afterwards. Defaults: the current viewer, zoom and centre.
+Dumps of one run share the map window's terrain cache (the outline of an unexplored tile reads
+cached corner heights that earlier redraws left), so a later dump can differ from a single-dump
+run on such outlines; smacx reproduces the single-dump sequence (first a redraw of the save's own
+view, then the dump's view).
+
+smacx reproduces a dump with `smacx --save SAVE --hidden --like REF.smxmap --dump OUT.smxmap
+[--scroll-from X,Y]` (same canvas size, view and redraw sequence), and
+`tools/venv/bin/python work/ui/mapcmp.py REF OUT diff.png [--grid N]` prints the share of
+matching pixels and writes oracle | smacx | difference side by side.
 
 ## Snapshot files
 

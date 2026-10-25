@@ -1,9 +1,9 @@
-// Headless implementations of the UI-layer functions declared in engine/ui_bridge.h.
+// Headless implementations of the UI-layer functions declared in engine/ui_bridge.h (the areas
+// that no native UI replaces yet; see ui_headless_mapview.cpp for how areas are replaced).
 // Native builds only: hybrid builds always call the original UI.
 #ifndef SMACX_HYBRID
 #include "engine/ui_bridge.h"
 
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <map>
@@ -14,33 +14,13 @@
 #include "engine/prefs.h"
 
 // ---- map windows: nothing is drawn ----
-void GAMEAPI draw_radius(int32_t, int32_t, int32_t, int32_t) {}
-void GAMEAPI draw_tile(int32_t, int32_t, int32_t) {}
-void GAMEAPI draw_map(int32_t) {}
-void THISCALL MapWin_clear_alt(uint8_t*, int32_t, int32_t, int32_t) {}
-void THISCALL MapWin_clear_terrain(uint8_t*) {}
 void GAMEAPI mapwin_terrain_fixup() {}
 void THISCALL WorldWin_clear_terrain(uint8_t*) {}
-void ui_mapwins_clear_terrain() {}
-void ui_mapwins_clear_alt(int32_t, int32_t) {}
 
-// ---- Console ----
-// Centers the map view; returns the original's "view changed" flag (0: nothing to redraw).
-int32_t THISCALL Console_focus(uint8_t*, int32_t, int32_t, int32_t) { return 0; }
-// No human players headless: no unit of the viewer is ever selected (0: "found one", so callers
-// make no state change).
-int32_t THISCALL Console_ready_search(uint8_t*, int32_t) { return 0; }
-void THISCALL Console_set_move(uint8_t*, int32_t) {}
-void ui_pact_ends_dialog(int32_t) {}
+// ---- Console dialogs ----
 // No human players headless: the upgrade dialog is never reached; cancelled.
 int32_t THISCALL Console_upgrade_human(uint8_t*, int32_t) { return 0; }
 
-// ---- popups: dismissed with the default choice (0) ----
-int32_t GAMEAPI popp(const char*, const char*, int32_t, const char*, int32_t) { return 0; }
-int32_t GAMEAPI X_pop_2(const char*, const char*, int32_t) { return 0; }
-
-// ---- message pump: no window ----
-void GAMEAPI do_all_non_input() {}
 // ---- boot: no windows, sprites, fonts or timers ----
 void GAMEAPI textcolor_init() {}
 void GAMEAPI load_fixed_sprites() {}
@@ -90,21 +70,14 @@ uint8_t* GAMEAPI headless_basepop_alloc() { return (uint8_t*)std::calloc(1, 0x32
 int32_t THISCALL BasePop_start(uint8_t*, const char*, const char*, int32_t, int32_t, int32_t, int32_t) { return 0; }
 int32_t GAMEAPI BasePop_set_def_ok_text(const char*) { return 0; }
 int32_t GAMEAPI BasePop_set_def_cancel_text(const char*) { return 0; }
-int32_t GAMEAPI X_pop(const char* label, int32_t) {
-    std::fprintf(stderr, "popup: %s\n", label ? label : "");
-    return 0;
-}
 int32_t BasePop_choice(uint8_t* pop) { return *reinterpret_cast<int32_t*>(pop + 0x3100); }
 
 // ---- interface buttons, faction art ----
 void THISCALL BaseButton_set_bubble_text(uint8_t*, const char*) {}
-void GAMEAPI load_faction_art(int32_t) {}
 
 // ---- vehicles, spotting: no sound, messages or windows ----
 void THISCALL FX_play(uint8_t*, int32_t) {}
 void THISCALL FX_fade(uint8_t*, int32_t) {}
-// Message box dismissed (returns 0).
-int32_t THISCALL NetMsg_pop(uint8_t*, const char*, int32_t, int32_t, const char*) { return 0; }
 void THISCALL InfoWin_on_redraw(uint8_t*) {}
 void THISCALL GraphicWin_redraw(uint8_t*) {}
 // The base window is never visible headless: nothing to recompute.
@@ -163,9 +136,6 @@ void ui_filebox_destroy(uint8_t*) {}
 // No window is ever visible.
 int32_t THISCALL Win_is_visible(uint8_t*) { return 0; }
 void GAMEAPI do_all_draws() {}
-// Dismissed with the first choice (0).
-int32_t GAMEAPI X_pops_11(const char*, int32_t, const char*, int32_t) { return 0; }
-void GAMEAPI load_flags() {}
 void THISCALL Lock_clear(uint8_t*) {}
 void THISCALL AlphaNet_close(uint8_t*) {}
 #endif

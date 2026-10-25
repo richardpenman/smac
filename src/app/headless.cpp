@@ -14,8 +14,19 @@
 #include <cstring>
 #include <filesystem>
 #include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include "engine/action.h"
 #include "engine/ai.h"
+#include "engine/base.h"
+#include "engine/diplomacy.h"
+#include "engine/goody.h"
+#include "engine/probe.h"
+#include "engine/proto.h"
+#include "engine/tech.h"
+#include "engine/veh.h"
 #include "engine/clock.h"
 #include "engine/game.h"
 #include "engine/map.h"
@@ -102,8 +113,109 @@ static void snapshot(const std::string& name) {
     logf_("snapshot %s turn=%d crt=%u game=%u save=%d\n", name.c_str(), CurrentTurn, crt, game, r);
 }
 
+// ---- setup commands (mirror oracle.cpp; harness/README.md "Setup commands") ----
+// poke / poketile / call edit the game state; `at <turn> <command>` runs one of them before the
+// snapshot of that turn (before turn_upkeep).
+template <typename R, typename... A, size_t... I>
+static int32_t script_invoke(R (*fn)(A...), const int32_t* a, std::index_sequence<I...>) {
+    if constexpr (std::is_void_v<R>) {
+        fn(static_cast<A>(a[I])...);
+        return 0;
+    } else {
+        return static_cast<int32_t>(fn(static_cast<A>(a[I])...));
+    }
+}
+template <typename R, typename... A> static int32_t script_invoke(R (*fn)(A...), const int32_t* a) {
+    static_assert(sizeof...(A) <= 8, "at most 8 arguments");
+    return script_invoke(fn, a, std::index_sequence_for<A...>{});
+}
+struct ScriptCall {
+    const char* name;
+    int32_t (*fn)(const int32_t*);
+    bool has_result;  // false: void (the oracle logs no result either)
+};
+template <typename R, typename... A> constexpr bool script_returns_value(R (*)(A...)) { return !std::is_void_v<R>; }
+#define SCRIPT_CALL(name, addr, has_result) \
+    static_assert(script_returns_value(&name) == (has_result), "script_calls.h: wrong result flag of " #name);
+#include "script_calls.h"
+#undef SCRIPT_CALL
+static const ScriptCall kScriptCalls[] = {
+#define SCRIPT_CALL(name, addr, has_result) {#name, [](const int32_t* a) { return script_invoke(&name, a); }, has_result},
+#include "script_calls.h"
+#undef SCRIPT_CALL
+};
+
+static void poke_bytes(uint8_t* p, int size, int64_t v) {
+    for (int i = 0; i < size; i++) p[i] = (uint8_t)((uint64_t)v >> (8 * i));
+}
+
+// Returns false if cmd is not a setup command.
+static bool setup_command(const char* cmd, char* args) {
+    if (!std::strcmp(cmd, "poke")) {
+        unsigned addr = 0;
+        int size = 0;
+        long long v = 0;
+        if (std::sscanf(args, "%x %d %lli", &addr, &size, &v) == 3 && size >= 1 && size <= 4 &&
+            addr >= mem::kImageBase && addr + size <= mem::kImageEnd) {
+            poke_bytes(mem::host(addr), size, v);
+            logf_("poke %08X %d %lld\n", addr, size, v);
+        } else {
+            logf_("poke: bad arguments %s\n", args);
+        }
+    } else if (!std::strcmp(cmd, "poketile")) {
+        int x = 0, y = 0, off = 0, size = 0;
+        long long v = 0;
+        if (std::sscanf(args, "%d %d %i %d %lli", &x, &y, &off, &size, &v) == 5 && size >= 1 && size <= 4 &&
+            off >= 0 && off + size <= (int)sizeof(MAP) && x >= 0 && x < MapAreaX && y >= 0 && y < MapAreaY) {
+            poke_bytes(reinterpret_cast<uint8_t*>(map_tile(x, y)) + off, size, v);
+            logf_("poketile %d %d %d %d %lld\n", x, y, off, size, v);
+        } else {
+            logf_("poketile: bad arguments %s\n", args);
+        }
+    } else if (!std::strcmp(cmd, "call")) {
+        char name[64] = "";
+        int32_t a[8] = {};
+        int n = std::sscanf(args, "%63s %i %i %i %i %i %i %i %i", name, &a[0], &a[1], &a[2], &a[3], &a[4], &a[5],
+                            &a[6], &a[7]);
+        for (const ScriptCall& c : kScriptCalls) {
+            if (std::strcmp(c.name, name)) continue;
+            int32_t r = c.fn(a);
+            if (c.has_result) logf_("call %s (%d args) -> %d\n", name, n - 1, r);
+            else logf_("call %s (%d args)\n", name, n - 1);
+            return true;
+        }
+        logf_("call: unknown function %s\n", name);
+    } else {
+        return false;
+    }
+    return true;
+}
+
+struct AtCommand {
+    int turn;
+    std::string line;
+    bool done;  // run once: turn_upkeep can run again for the same turn
+};
+static std::vector<AtCommand> g_at;
+
+static void run_at_commands() {
+    for (AtCommand& c : g_at) {
+        if (c.turn != CurrentTurn || c.done) continue;
+        c.done = true;
+        std::vector<char> buf(c.line.begin(), c.line.end());
+        buf.push_back(0);
+        char* cmd = buf.data();
+        char* args = cmd + std::strcspn(cmd, " \t");
+        if (*args) *args++ = 0;
+        args += std::strspn(args, " \t");
+        logf_("at %d> %s %s\n", c.turn, cmd, args);
+        if (!setup_command(cmd, args)) logf_("at: not a setup command %s\n", cmd);
+    }
+}
+
 static void before_turn_upkeep() {
     apply_observer_prefs();
+    run_at_commands();
     char name[64];
     std::snprintf(name, sizeof(name), "turn_%03d", CurrentTurn);
     snapshot(name);
@@ -300,6 +412,10 @@ static int32_t run_script() {
             return 0;  // into the game loop (desktop_init, control_turn)
         } else if (!std::strcmp(cmd, "quit")) {
             break;
+        } else if (!std::strcmp(cmd, "at")) {
+            char* rest = args + std::strcspn(args, " \t");
+            g_at.push_back({std::atoi(args), std::string(rest + std::strspn(rest, " \t")), false});
+        } else if (setup_command(cmd, args)) {
         } else {
             logf_("unknown command %s\n", cmd);
         }

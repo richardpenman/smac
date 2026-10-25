@@ -1,5 +1,6 @@
 // Units, bases and base names on the map (see mapwin.h).
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstring>
 
@@ -9,10 +10,14 @@
 #include "engine/probe.h"
 #include "engine/ui_bridge.h"
 #include "engine/veh.h"
+#include "engine/rules.h"
+#include "engine/strings.h"
+#include "engine/score.h"
+#include "ui/colortables.h"
 #include "ui/mapwin.h"
 #include "ui/sprites.h"
+#include "ui/texture.h"
 
-GLOBAL(int32_t, VehMovingID, 0x689F30); // unit being animated (-1: none)
 GLOBAL(int32_t, BaseShownDefense, 0x9A6528);  // base whose faction's bases show perimeter defence
 
 namespace {
@@ -52,7 +57,9 @@ struct LabelFonts {
 };
 LabelFonts g_label_fonts;
 
-Font* label_font(int32_t zoom, int32_t num, int32_t den, int32_t style) {
+}  // namespace
+
+Font* ui_label_font(int32_t zoom, int32_t num, int32_t den, int32_t style) {
     LabelFonts& c = g_label_fonts;
     int32_t size = zoom_scale(zoom, 0x32) * num / den;
     if (size == 10) size = 0xB;
@@ -78,6 +85,9 @@ Font* label_font(int32_t zoom, int32_t num, int32_t den, int32_t style) {
     }
     return &c.fonts[i];
 }
+
+namespace {
+Font* label_font(int32_t zoom, int32_t num, int32_t den, int32_t style) { return ui_label_font(zoom, num, den, style); }
 
 }  // namespace
 
@@ -178,32 +188,6 @@ void GAMEAPI base_draw(Buffer* dest, int32_t base_id, int32_t px, int32_t py, in
     BlitSourceScale = 1;
 }
 
-void GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t zoom, int32_t mode, int32_t) {
-    // Approximation: the original renders the unit's voxel model (.cvr) at the tile centre, with
-    // the faction flag (and stack count) at its left. Here: the flag and a figure in the
-    // faction's colours.
-    VEH& v = Vehs[veh_id];
-    int32_t f = v.faction_id;
-    int32_t q = std::max(1, zoom_scale(zoom, 0x32) / 4);
-    int32_t cx = px + q * 4, cy = py + q * 2;  // tile centre (py is lifted by half a tile)
-    int32_t fw = std::max(3, q * 3 / 4), fh = std::max(4, q);
-    UiRect pole = {cx - q * 2, cy - q * 2 - fh, cx - q * 2 + 1, cy - q};
-    Buffer_fill_3(dest, &pole, 0);
-    UiRect flag = {pole.right, pole.top, pole.right + fw, pole.top + fh};
-    Buffer_box_2(dest, &flag, 0, 0);
-    UiRect inner = {flag.left + 1, flag.top + 1, flag.right - 1, flag.bottom - 1};
-    Buffer_fill_3(dest, &inner, FactionColorFill[f]);
-    // Health bar along the pole (green, red when damaged).
-    int32_t hp = 10 - std::min<int32_t>(v.damage_taken, 10);
-    UiRect bar = {pole.left - 2, pole.bottom - (fh + q) * hp / 10, pole.left - 1, pole.bottom};
-    Buffer_fill_3(dest, &bar, hp > 5 ? 0xFA : 0xF9);
-    UiRect body = {cx - q, cy - q, cx + q, cy + q / 2};
-    Buffer_box_2(dest, &body, 0, 0);
-    UiRect fill = {body.left + 1, body.top + 1, body.right - 1, body.bottom - 1};
-    Buffer_fill_3(dest, &fill, FactionColorFill[f]);
-    (void)mode;
-}
-
 void THISCALL MapWin_draw_bases(uint8_t* win, int32_t x, int32_t y, int32_t px, int32_t py, int32_t faction_id) {
     uint32_t opts = (uint32_t)mw(win, kMwOptions);
     if (!(opts & 0x200080)) return;
@@ -221,70 +205,114 @@ void THISCALL MapWin_draw_bases(uint8_t* win, int32_t x, int32_t y, int32_t px, 
     base_draw(ui_mapwin_native(win)->canvas, b, px, py, mw(win, kMwZoom), (opts >> 0x12) & 8);
 }
 
-void THISCALL MapWin_draw_vehicles(uint8_t* win, int32_t x, int32_t y, int32_t px, int32_t py, int32_t faction_id) {
-    uint32_t opts = (uint32_t)mw(win, kMwOptions);
-    if (!dword_93A940 && !ControlTurnMove && !(GameRules & 0x80)) return;
-    if ((opts & 0x1000000) || !(opts & 0x802000C0) || (opts & 0x1000)) return;
-    MAP* sq = tile(x, y);
-    if ((!(opts & 0x80000000u) || (opts & 0x80)) && tile_known(faction_id, sq))
-        MapWin_draw_bases(win, x, y, px, py, faction_id);
-    if (opts & 0x80000000u) return;
-    // Units being animated (VehMovingID, combat) and the blinking selected unit of a human
-    // player are not handled yet: the top unit of the stack is drawn.
-    if (!tile_known(faction_id, sq)) return;
-    if (!(opts & 0x200040)) return;
-    int32_t v = veh_at(x, y);
-    if ((opts & 0x200000) != 0) {
-        while (v >= 0 && Vehs[v].home_base_id != BaseUpkeepDrawID) v = Vehs[v].next_veh_id_stack;
-    }
-    if (v < 0) return;
-    if (!(GameState & 0x80)) {
-        VEH& u = Vehs[v];
-        if ((u.faction_id != CurrentPlayerFaction || (u.flags & 0x440) == 0x440) &&
-            !(u.visibility & (1 << CurrentPlayerFaction)))
-            return;
-    }
-    if ((sq->items & 1) && (sq->val2 & 0xF) < 8) return;  // units inside bases are not shown
-    veh_draw(ui_mapwin_native(win)->canvas, v, px, py, mw(win, kMwZoom), 3, 1);
-}
-
 void THISCALL MapWin_draw_base_names(uint8_t* win) {
     if (!dword_93A940 && !ControlTurnMove && !(GameRules & 0x80)) return;
     MapWinNative* n = ui_mapwin_native(win);
     Buffer* canvas = n->canvas;
     UiRect saved = canvas->clip;
     Buffer_set_clip(canvas, reinterpret_cast<UiRect*>(win + n->vbase + kGwClientRect));
-    if (!((mw(win, kMwOptions) & 0x800) && (GameMorePreferences & 0x2000)) || mw(win, kMwZoom) < -10) {
+    // MapWin_draw_base_dest(0): destination lines (option 0x40000), not reconstructed.
+    if (!(mw(win, kMwOptions) & 0x800) || !(GameMorePreferences & 0x2000)) {
+        Buffer_set_clip(canvas, &saved);
+        return;
+    }
+    if (mw(win, kMwZoom) < -10) {
         Buffer_set_clip(canvas, &saved);
         return;
     }
     Font* font = reinterpret_cast<Font*>(win + kMwFont0);
-    for (int32_t i = 0; i < BaseCount; i++) {
-        BASE& b = Bases[i];
-        if (!(GameState & 0x80) && (uint8_t)b.faction_id != (uint32_t)CurrentPlayerFaction &&
-            !(b.visibility & (1 << CurrentPlayerFaction)))
-            continue;
-        int32_t by = b.y, bx = b.x;
+    const int32_t viewer = CurrentPlayerFaction;
+    auto in_view = [&](int32_t bx, int32_t by) {
         int32_t oy = mw(win, kMwOriginY), ox = mw(win, kMwOriginX);
-        if (by < oy || by >= mw(win, kMwRowsBelow) + mw(win, kMwRowsAbove) + oy) continue;
-        int32_t cols = mw(win, kMwColsEven) + mw(win, kMwColsOdd);
-        int32_t x1 = bx;
+        if (by < oy || by >= mw(win, kMwRowsBelow) + mw(win, kMwRowsAbove) + oy) return false;
+        int32_t cols = mw(win, kMwColsEven) + mw(win, kMwColsOdd), x1 = bx;
         if ((MapToggleFlat & 1) == 0) {
             if (bx < ox) x1 = bx + MapAreaX;
             if (cols + ox <= x1) x1 -= MapAreaX;
         }
-        if (x1 < ox || x1 >= cols + ox) continue;
+        return x1 >= ox && x1 < cols + ox;
+    };
+    // The second line below the name: a line of the font lower.
+    auto second_line_y = [&](int32_t py) {
+        int32_t dy = font->field_0 < 0 ? font->height : font->ascent_above + font->field_0;
+        return (mw(win, kMwQ) * 7) / 2 + dy + py;
+    };
+    auto str = [](uint32_t addr) { return reinterpret_cast<const char*>(mem::host(addr)); };
+    for (int32_t i = 0; i < BaseCount; i++) {
+        BASE& b = Bases[i];
+        uint8_t f = (uint8_t)b.faction_id;
+        if (!(GameState & 0x80) && f != (uint32_t)viewer && !(b.visibility & (1 << viewer))) continue;
+        if (!in_view(b.x, b.y)) continue;
         int32_t px, py;
-        pfncTileToPoint(win, bx, by, &px, &py);
+        pfncTileToPoint(win, b.x, b.y, &px, &py);
         Buffer_set_font(canvas, font, nullptr, nullptr, nullptr);
-        char name[256];
-        std::snprintf(name, sizeof(name), "%s", b.name);
-        if ((b.state_flags & 0x10) && (uint8_t)b.faction_id == (uint32_t)CurrentPlayerFaction)
-            std::strncat(name, " (*)", sizeof(name) - std::strlen(name) - 1);
-        Buffer_set_text_color(canvas, FactionColorText[(uint8_t)b.faction_id], FactionColorShadow[(uint8_t)b.faction_id], 1, 1);
-        Buffer_write_cent_l_8(canvas, name, px + mw(win, kMwHalfW), (mw(win, kMwQ) * 7) / 2 + py,
-                              (int32_t)std::strlen(name));
-        // Not drawn yet: the objective / production line below the name.
+        char line[256];
+        std::snprintf(line, sizeof(line), "%s", b.name);
+        if ((b.state_flags & 0x10) && f == (uint32_t)viewer) std::strncat(line, str(0x686358), sizeof(line) - std::strlen(line) - 1);
+        Buffer_set_text_color(canvas, FactionColorText[f], FactionColorShadow[f], 1, 1);
+        if ((GameState & 0x1000) && ((GameState & 0x80) || !(FactionStatus[0] & (1 << viewer)))) {
+            const uint8_t* fac = reinterpret_cast<const uint8_t*>(&Factions[f]);
+            int32_t tx = *reinterpret_cast<const int32_t*>(fac + 0x3F0), ty = *reinterpret_cast<const int32_t*>(fac + 0x3F4);
+            if (tx >= 0 && b.x == tx && b.y == ty) Buffer_set_text_color(canvas, 0xFF, 0, 1, 1);
+        }
+        int32_t cx = px + mw(win, kMwHalfW);
+        Buffer_write_cent_l_8(canvas, line, cx, (mw(win, kMwQ) * 7) / 2 + py, (int32_t)std::strlen(line));
+        bool objective = is_objective(i) && !(GameRules & 0x20000000);
+        auto objective_line = [&]() {
+            if (!objective) return;
+            std::snprintf(line, sizeof(line), "%s", label_get(0x382));
+            for (char* c = line; *c; c++) *c = (char)std::toupper((unsigned char)*c);  // CharUpperA
+            Buffer_write_cent_l_8(canvas, line, cx, second_line_y(py), (int32_t)std::strlen(line));
+        };
+        auto production = [&]() -> const char* {
+            int32_t id = b.queue_items[0];
+            return id < 0 ? Facility[-id].name : Units[id].name;
+        };
+        if ((GameState & 0x1000) && (GameState & 0x80) && mw(win, kMwZoom) >= -3) {
+            uint8_t region = MapTiles[MapHalfX * b.y + (b.x >> 1)].region;
+            uint8_t plan = Factions[f].region_base_plan[region];
+            std::snprintf(line, sizeof(line), "%s%s%s%s%s", str(0x682E9C), PlansShortName[plan], str(0x682E94), production(),
+                          str(0x682E98));
+            Buffer_write_cent_l_8(canvas, line, cx, second_line_y(py), (int32_t)std::strlen(line));
+        } else if (!(GameMorePreferences & 0x1000) && !(mw(win, kMwOptions) & 0x8000000)) {
+            objective_line();
+        } else if (f == (uint32_t)viewer || spying(f)) {
+            std::snprintf(line, sizeof(line), "%s", str(0x682E9C));
+            if (!objective) {
+                uint32_t g = (uint32_t)b.governor_flags;
+                if ((g & 0x80000000u) && (g & 1)) {
+                    int32_t label = (g & 0x1000000) ? 650 : (g & 0x2000000) ? 651 : (g & 0x4000000) ? 652
+                                    : (g & 0x8000000) ? 653 : 649;
+                    std::strncat(line, label_get(label), sizeof(line) - std::strlen(line) - 1);
+                    std::strncat(line, str(0x682E94), sizeof(line) - std::strlen(line) - 1);
+                }
+            } else {
+                std::strncat(line, label_get(0x382), sizeof(line) - std::strlen(line) - 1);
+                std::strncat(line, str(0x682E94), sizeof(line) - std::strlen(line) - 1);
+                for (char* c = line; *c; c++) *c = (char)std::toupper((unsigned char)*c);
+            }
+            std::strncat(line, production(), sizeof(line) - std::strlen(line) - 1);
+            std::strncat(line, str(0x682E98), sizeof(line) - std::strlen(line) - 1);
+            Buffer_write_cent_l_8(canvas, line, cx, second_line_y(py), (int32_t)std::strlen(line));
+        } else {
+            objective_line();
+        }
+    }
+    // Landmark names (italic font), white with a black shadow offset by the zoom.
+    int32_t off = mw(win, kMwZoom) < 1 ? 1 : (ZoomNum < 1 ? trunc_div16(mw(win, kMwZoom) + 0x10) : ZoomNum / ZoomDenom);
+    Buffer_set_text_color(canvas, 0xFF, 0, off, off);
+    Buffer_set_font(canvas, reinterpret_cast<Font*>(win + kMwFont2), nullptr, nullptr, nullptr);
+    for (int32_t i = 0; i < MapLandmarkCount; i++) {
+        const uint8_t* lmk = mem::host(0x949894 + i * 0x28);
+        int32_t lx = *reinterpret_cast<const int32_t*>(lmk), ly = *reinterpret_cast<const int32_t*>(lmk + 4);
+        const char* name = reinterpret_cast<const char*>(lmk + 8);
+        MAP* sq = &MapTiles[MapHalfX * ly + (lx >> 1)];
+        if (!(GameState & 0x80) && !(Factions[viewer].player_flags & 0x200) && !(sq->visibility & (1 << viewer))) continue;
+        if (!in_view(lx, ly)) continue;
+        if ((sq->items & 1) && (sq->val2 & 0xF) <= 7) continue;  // a base is named instead
+        int32_t px, py;
+        pfncTileToPoint(win, lx, ly, &px, &py);
+        Buffer_write_cent_l_8(canvas, name, mw(win, kMwHalfW) + px, (mw(win, kMwQ) * 7) / 2 + py, (int32_t)std::strlen(name));
     }
     Buffer_set_clip(canvas, &saved);
 }

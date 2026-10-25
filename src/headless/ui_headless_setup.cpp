@@ -61,10 +61,4 @@ char* GAMEAPI get_his_her(int32_t faction_id, int32_t mode) {
 }
 #endif
 
-#ifndef SMACX_HYBRID
-// ---- crash_landing: no animation; the first base keeps its name ----
-void GAMEAPI flush_input() {}
-void ui_crash_landing_drop(int32_t, int32_t, bool) {}
-void ui_crash_landing_close() {}
-void ui_first_base_name(const char* default_name) { crt_strcpy(ParseStrBuffer[0], default_name); }
-#endif
+// crash_landing's UI (drop animation, FIRSTBASE question) is in the popup area.

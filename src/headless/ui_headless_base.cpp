@@ -10,19 +10,10 @@ void ui_messages_base_killed(int32_t) {}
 // No sound, no help pages.
 void GAMEAPI wave_it(int32_t) {}
 void GAMEAPI help_topic(int32_t, int32_t) {}
-// Alerts are dismissed (0).
-int32_t GAMEAPI popb(const char*, int32_t, int32_t, const char*, int32_t) { return 0; }
-void THISCALL Console_update_data(uint8_t*, int32_t) {}
-void THISCALL pfncMoveMap(uint8_t*, int32_t, int32_t, int32_t) {}
-int32_t GAMEAPI POP2(const char*, const char*, int32_t) { return 0; }
 bool ui_shift_pressed() { return false; }
 void THISCALL BaseWin_on_redraw(uint8_t*) {}
 void THISCALL BaseWin_zoom(uint8_t*, int32_t, int32_t) {}
-void GAMEAPI draw_tiles(int32_t, int32_t, int32_t) {}
-// base_production: no popups, movies, help or voice clips.
-void ui_production_popup_open(int32_t) {}
-void ui_production_popup_blurb(bool) {}
-void ui_production_popup_exec() {}
+// base_production: no movies, help or voice clips (its popups are in the popup area).
 void GAMEAPI amovie_project(int32_t) {}
 void GAMEAPI amovie_project_2(const char*) {}
 void GAMEAPI help_project(int32_t) {}

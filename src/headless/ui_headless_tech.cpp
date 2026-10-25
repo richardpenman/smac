@@ -42,7 +42,6 @@ int32_t GAMEAPI tech_pick(int32_t faction_id, int32_t is_free, int32_t from_fact
     return listed ? best : -1;
 }
 
-void THISCALL NetMsg_close(uint8_t*) {}
 void GAMEAPI monument(int32_t) {}
 #endif
 #ifndef SMACX_HYBRID
@@ -51,7 +50,4 @@ int32_t GAMEAPI ambience(int32_t) { return 0; }
 void GAMEAPI desktop_update() {}
 void THISCALL DesignWin_shutdown(uint8_t*) {}
 int32_t THISCALL NewTechWin_exec(uint8_t*, int32_t, int32_t) { return 0; }
-void ui_tech_popup_open() {}
-void ui_tech_popup_show(int32_t, int32_t, int32_t, bool) {}
-void ui_tech_popup_exec() {}
 #endif

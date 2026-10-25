@@ -1,0 +1,162 @@
+// Console (timers/console modules 0x4CF7C0..0x4E2240, 0x50F460..0x51DF70): the main view's game
+// controller. MainConsole (0x9156B0, engine/ui_bridge.h) is a Console: a MapWin (the main map view)
+// whose fields from +0x23BD4 hold the human turn's state. The object lives in the memory image, so
+// its fields are used in place (mw(console, offset)); several of them are also engine globals
+// (MapWinInVehMode, MapWinVehA, MapWinCursorX, ...).
+//
+// Reconstructed: the human turn (Console_human_turn, Console_veh_turn, Console_ready...), unit
+// selection, the key dispatcher (Console_on_key_click: the main view's keys; menu commands, the
+// scenario editor and debug keys are placeholders) and the unit orders Console_veh_key dispatches
+// to skip, wait, sentry, hold, build base and terraform. The Console functions the engine calls are
+// declared in engine/ui_bridge.h; smacx replaces their headless "console" area with these.
+// Functions called here but not reconstructed yet are placeholders (console_placeholders.cpp).
+#pragma once
+#include <cstdint>
+
+#include "engine/net.h"
+#include "engine/ui_bridge.h"
+#include "ui/mapwin.h"
+
+// ---- Console fields (byte offsets from MainConsole) ----
+constexpr uint32_t kConFaction = 0x23BD4;      // faction whose console this is (the viewer)
+constexpr uint32_t kConVehMode = 0x23BD8;      // MapWinInVehMode: unit mode (1) or view mode (0)
+constexpr uint32_t kConVeh = 0x23BDC;          // MapWinVehA: selected vehicle (-1: none)
+constexpr uint32_t kConNextVeh = 0x23BE0;      // MapWinVehB: vehicle to select next (multiplayer)
+constexpr uint32_t kConWaiting = 0x23BE4;      // waiting for orders for the selected unit
+constexpr uint32_t kConTurnActive = 0x23BE8;   // the human turn goes on (0: end the turn)
+constexpr uint32_t kConAnySelect = 0x23BEC;    // keep the selection if selectable (not only ready)
+constexpr uint32_t kConNoFocus = 0x23BF0;      // a go-to order is under way (no recentring)
+constexpr uint32_t kConMoveSet = 0x23BF4;      // the unit was just selected by Console_set_move
+constexpr uint32_t kConCursorShown = 0x23BF8;  // the cursor is drawn
+constexpr uint32_t kConCursorOn = 0x23BFC;
+constexpr uint32_t kConRedraw = 0x23C00;       // the view needs a full redraw before the cursor
+constexpr uint32_t kConCursorIdx = 0x23C08;    // MapWinCursorIndex: current cursor history slot
+constexpr uint32_t kConCursorHead = 0x23C0C;   // newest cursor history slot
+constexpr uint32_t kConCursorX = 0x23C10;      // MapWinCursorX[32]
+constexpr uint32_t kConCursorY = 0x23C90;      // MapWinCursorY[32]
+constexpr uint32_t kConMode = 0x23D10;         // mouse interaction mode (go to, ...; 0: none)
+constexpr uint32_t kConSearchReset = 0x23D18;  // Console_ready searches from the start
+constexpr uint32_t kCon23D1C = 0x23D1C;
+constexpr uint32_t kConMpSearch = 0x23D24;     // multiplayer: units of others' turns searched too
+
+// ---- globals used by the console ----
+GLOBAL(int32_t, ConsoleTurnFlag, 0x90D930);        // cleared at the start of a human turn
+GLOBAL(int32_t, TutorialTourPending, 0x8CC248);    // TutWin_tour requested
+GLOBAL(int32_t, TutorialWinActive, 0x8CC210);      // dword_8CC210: a tutorial window is up
+GLOBAL(int32_t, TutorialArrowShown, 0x8CC228);
+GLOBAL(int32_t, NetSimultaneous, 0x93E8E0);        // multiplayer: units move simultaneously
+GLOBAL(int32_t, NetLocked, 0x93E944);              // multiplayer: input locked
+GLOBAL(int32_t, NetBusyCount, 0x93F664);           // nested network waits
+GLOBAL(int32_t, MapWinMouseIndex, 0x68A5CC);       // map window under the mouse (-1: none)
+GLOBAL(int32_t, ConsoleNotReady, 0x93A944);        // a key arrived before the game was shown
+GLOBAL(int32_t, NewBaseX, 0x685478);               // site shown while naming a new base
+GLOBAL(int32_t, NewBaseY, 0x68547C);
+GLOBAL(uint8_t, ReportWindow, 0x876478);           // a report window (Thinker: ReportWin)
+GLOBAL(int32_t, NetLockHeld, 0x93E940);            // multiplayer: this client holds the unit lock
+
+// ---- reconstructed functions (also: Console_human_turn, Console_focus, Console_ready_search,
+// Console_set_move, Console_cursor_next, Console_update_data in engine/ui_bridge.h) ----
+// Leaves unit mode for view mode (force: also when already in view mode); redraws the panes.
+ADDR_NATIVE(0x511480) void THISCALL Console_set_view(uint8_t* console, int32_t force);
+// Moves the selected unit through its turn until it has no orders or moves left; 1 if the
+// player was waited for.
+ADDR_NATIVE(0x513B90) int32_t THISCALL Console_veh_turn(uint8_t* console);
+// Selects the next unit ready to move and centres the view on it.
+ADDR_NATIVE(0x510F50) void THISCALL Console_ready(uint8_t* console);
+// Key commands: skip (space), wait (w), sentry (l), hold (h, H: 10 turns).
+ADDR_NATIVE(0x4D0450) void THISCALL Console_skip(uint8_t* console, int32_t veh_id);
+ADDR_NATIVE(0x4D04A0) void THISCALL Console_wait(uint8_t* console, int32_t veh_id);
+ADDR_NATIVE(0x4D2220) void THISCALL Console_sentry(uint8_t* console, int32_t veh_id, int32_t turns);
+ADDR_NATIVE(0x4D24C0) void THISCALL Console_hold(uint8_t* console, int32_t veh_id, int32_t turns);
+// Ctrl+Enter: ends the human turn (asks when units still have orders to give).
+ADDR_NATIVE(0x5169F0) void THISCALL Console_end_my_turn(uint8_t* console);
+// The selected unit's order keys: ch is the character, key the lower-cased character, vk the key
+// with its modifier bits (0x10000 shift, 0x20000 ctrl, 0x40000 alt).
+ADDR_NATIVE(0x5171D0) void THISCALL Console_veh_key(uint8_t* console, int32_t ch, int32_t key, int32_t vk);
+// Keys acting on the cursor's tile in view mode.
+ADDR_NATIVE(0x5166D0) void THISCALL Console_cursor_key(uint8_t* console, int32_t ch, int32_t key, int32_t vk);
+// A key pressed in the main view (character ch, key vk with modifier bits). Returns 1.
+ADDR_NATIVE(0x5178C0) int32_t THISCALL Console_on_key_click(uint8_t* console, int32_t ch, int32_t vk);
+// Build base (b): founds a base with a colony pod (asks for the name), or joins a base.
+ADDR_NATIVE(0x4CF7C0) void THISCALL Console_new_base(uint8_t* console, int32_t veh_id);
+// Terraforming orders (f, m, s, r, F, ...): checks the tile and starts terraform_id.
+ADDR_NATIVE(0x4D3470) void THISCALL Console_terraform(uint8_t* console, int32_t veh_id, int32_t terraform_id);
+// Scenario editor protection: 1 when editing is locked (editor on, Scroll Lock or lock flag).
+ADDR_NATIVE(0x4E1F40) int32_t THISCALL Console_edit_lock(uint8_t* console);
+// Zoom commands (0x203 in, 0x204 out, 0x205 normal, 0x206..0x208 presets) on map window `index`
+// (-1: all; < 0 except -1: the one under the mouse).
+ADDR_NATIVE(0x5150D0) void THISCALL pfncProcZoomKey(uint8_t* console, int32_t command, int32_t index);
+// Hints for new players (tutorial preference): first base, second base, more bases, vendetta.
+ADDR_NATIVE(0x511800) void THISCALL Console_turn_hints(uint8_t* console);
+// Multiplayer with simultaneous moves: 1 while it is not this player's turn (net module).
+ADDR_NATIVE(0x52DC70) int32_t GAMEAPI not_my_turn();
+
+// ---- placeholders: original functions the console calls that are not reconstructed yet
+// (console_placeholders.cpp). Each logs its name once and does nothing unless noted. ----
+ADDR_NATIVE(0x46AE00) void GAMEAPI draw_cursor();
+ADDR_NATIVE(0x46AD60) void THISCALL MapWin_draw_cursor(uint8_t* win);
+ADDR_NATIVE(0x458900) void THISCALL InfoWin_change(uint8_t* win, int32_t a1);
+ADDR_NATIVE(0x459280) void THISCALL InfoWin_reset(uint8_t* win);
+ADDR_NATIVE(0x4B9F90) void THISCALL StatusWin_set_loc(uint8_t* win, int32_t x, int32_t y);
+ADDR_NATIVE(0x4C3990) void THISCALL WorldWin_set_world_map(uint8_t* win);
+ADDR_NATIVE(0x460DD0) void THISCALL pfncMainMenuUpdateVisible(uint8_t* menu, int32_t veh_id);
+ADDR_NATIVE(0x4BC6E0) void THISCALL TutWin_tour(uint8_t* win);
+ADDR_NATIVE(0x4BDDE0) int32_t THISCALL TutWin_reset(uint8_t* win);
+ADDR_NATIVE(0x511BB0) void THISCALL Console_give_hints(uint8_t* console);
+ADDR_NATIVE(0x446D10) void GAMEAPI ambience_veh(int32_t veh_id);
+ADDR_NATIVE(0x50EF50) void GAMEAPI go_reset();
+ADDR_NATIVE(0x467970) void THISCALL MapWin_draw_base_dest(uint8_t* win, int32_t a1);
+ADDR_NATIVE(0x4D2F00) void THISCALL Console_activate(uint8_t* console, int32_t x, int32_t y, int32_t a3);
+ADDR_NATIVE(0x4D61A0) void THISCALL Console_go_to(uint8_t* console, int32_t veh_id, int32_t mode, int32_t a3);
+ADDR_NATIVE(0x4D7DE0) void THISCALL Console_go_home(uint8_t* console, int32_t veh_id);
+ADDR_NATIVE(0x4D8A70) void THISCALL Console_automate(uint8_t* console, int32_t veh_id, int32_t mode);
+ADDR_NATIVE(0x4D04E0) void THISCALL Console_unload(uint8_t* console, int32_t veh_id);
+ADDR_NATIVE(0x4D5D30) void THISCALL Console_oblit(uint8_t* console, int32_t veh_id);
+ADDR_NATIVE(0x4D9170) void THISCALL Console_arty(uint8_t* console, int32_t veh_id);
+ADDR_NATIVE(0x4D7F60) void THISCALL Console_use_ability(uint8_t* console, int32_t veh_id);
+ADDR_NATIVE(0x4D8F40) void THISCALL Console_explore(uint8_t* console, int32_t veh_id);
+ADDR_NATIVE(0x4D8FA0) void THISCALL Console_convoy(uint8_t* console, int32_t veh_id);
+ADDR_NATIVE(0x4D7EE0) void THISCALL Console_set_patrol(uint8_t* console, int32_t veh_id);
+ADDR_NATIVE(0x4D7CF0) void THISCALL Console_designate(uint8_t* console, int32_t veh_id);
+ADDR_NATIVE(0x4D7BE0) void THISCALL Console_road_to(uint8_t* console, int32_t veh_id, int32_t order);
+ADDR_NATIVE(0x4D26A0) void THISCALL Console_give_veh(uint8_t* console, int32_t veh_id);
+ADDR_NATIVE(0x4D52A0) void THISCALL Console_destroy(uint8_t* console, int32_t veh_id);
+ADDR_NATIVE(0x4D2AC0) void THISCALL Console_disband(uint8_t* console, int32_t veh_id);
+ADDR_NATIVE(0x4D2DE0) void THISCALL Console_disband_2(uint8_t* console, int32_t x, int32_t y);
+ADDR_NATIVE(0x4D95F0) void THISCALL Console_assemble(uint8_t* console);
+ADDR_NATIVE(0x515450) void THISCALL Console_survey(uint8_t* console);
+ADDR_NATIVE(0x515900) void THISCALL Console_time_controls(uint8_t* console);
+ADDR_NATIVE(0x517060) void THISCALL Console_use_time_bonus(uint8_t* console);
+ADDR_NATIVE(0x515010) void THISCALL Console_set_tech(uint8_t* console, int32_t faction_id);
+ADDR_NATIVE(0x5165B0) void THISCALL Console_zoom_to_upkeep_base(uint8_t* console);
+ADDR_NATIVE(0x516C50) void THISCALL Console_show_scen_objectives(uint8_t* console);
+ADDR_NATIVE(0x4DD1B0) void THISCALL Console_custom_my_faction(uint8_t* console);
+ADDR_NATIVE(0x4E2000) void THISCALL Console_corner_the_market(uint8_t* console);
+// Tutorial popup (popup `label` of file, e.g. TUTOR).
+ADDR_NATIVE(0x48C320) int32_t GAMEAPI popt(const char* file, const char* label, int32_t a3, int32_t a4, int32_t a5);
+// Text entry popup (label of SCRIPT.txt): the default text in `text`; 0 when confirmed, with the
+// entry in ParseStrBuffer[0].
+ADDR_NATIVE(0x5BFAB0) int32_t GAMEAPI X_pop_ask(const char* label, int32_t max_len, const char* text, int32_t a4,
+                                                int32_t a5);
+
+// ---- not original functions ----
+// Placeholder of an original function that is not reconstructed: logs the name once (stderr) and
+// shows it on the message line.
+void console_not_reconstructed(const char* name);
+// The same without the message line (UI-only calls made on every key).
+void console_not_reconstructed_quiet(const char* name);
+// Single-player paths of the net layer (net module, not reconstructed), with the console's
+// arguments: what the original NetDaemon functions do when MultiplayerActive is 0 (multiplayer:
+// the original function is called; native builds stop there).
+int32_t net_lock_veh(int32_t* veh_id, int32_t a2);
+void net_unlock_veh();
+void net_synch_veh(int32_t veh_id);
+int32_t net_order_veh(int32_t veh_id, int32_t dir, int32_t a3);
+int32_t net_action(int32_t veh_id, int32_t a2);
+// Every open map window: index 0 is the main view; others count when active (kMwActive).
+template <typename F> inline void for_each_mapwin(F&& fn) {
+    for (int32_t i = 0; i < 8; i++) {
+        uint8_t* w = MapWins[i];
+        if (w && (i == 0 || mw(w, kMwActive))) fn(i, w);
+    }
+}

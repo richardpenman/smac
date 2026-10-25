@@ -2709,25 +2709,26 @@ L_572d66:
     }
     // L_5739aa: a tile near a base to improve.
     if (v.order == 0x18 || m.s84) return F_5741cf;
+    // BUG(original): the base may be -1 (no home base, no own base): Bases[-1] (see base_raw).
     if (m.s30) {
         m.base_id = v.home_base_id;
-        m.sa4 = Bases[m.base_id].x;
-        m.s58 = Bases[m.base_id].y;
+        m.sa4 = base_x_raw(m.base_id);
+        m.s58 = base_y_raw(m.base_id);
     } else {
         m.base_id = m.base_own;
         if (v.state & 0x200) {
-            m.sa4 = Bases[m.base_id].x;
-            m.s58 = Bases[m.base_id].y;
+            m.sa4 = base_x_raw(m.base_id);
+            m.s58 = base_y_raw(m.base_id);
         } else {
             m.sa4 = m.x;
             m.s58 = m.y;
         }
         m.val = 0;
         m.s60 = m.base_id * 0x134;
-        const BASE& bo = Bases[m.base_id];
+        const int32_t bx = base_x_raw(m.base_id), by = base_y_raw(m.base_id);
         for (int32_t i = 1; i < 21; i++) {
-            m.tx = map_wrap_x(TableOffsetX[i] + bo.x);
-            m.ty = TableOffsetY[i] + bo.y;
+            m.tx = map_wrap_x(TableOffsetX[i] + bx);
+            m.ty = TableOffsetY[i] + by;
             if (!on_map(m.tx, m.ty) || tile_region(m.tx, m.ty) != m.region) continue;
             m.other = veh_at(m.tx, m.ty);
             if (m.other < 0 || Vehs[m.other].faction_id != (uint32_t)m.fac) continue;

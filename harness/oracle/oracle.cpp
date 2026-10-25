@@ -909,12 +909,164 @@ static int __cdecl hook_human_turn() {
  * "TURN COMPLETE"). For unattended runs the observer continues immediately. */
 static int __cdecl hook_observer_pause() { return 0; }
 
+/* ---- map canvas dumps (mapdump; harness/README.md "Map canvas dumps") ----
+ * `mapdump <file> [viewer=N] [zoom=Z] [center=X,Y]` queues a dump of the main view's canvas. The
+ * queue runs at the first turn_upkeep hook (after desktop_init has set up the windows and
+ * control_turn has drawn the map, with units and bases): for each entry the view is set, the
+ * map fully redrawn (pfncRedrawMap without the scroll shortcut and without the screen update)
+ * and the GraphicWin's 8-bit Buffer written with the game palette. The viewer is restored after
+ * each dump; the game state is not changed otherwise (the random generators are saved around
+ * the redraw). File: "SMXMAP1\0", int32 width, height, viewer, zoom, center x, center y, turn,
+ * map tiles address (paTiles: seeds the tile variants); 256 x RGB (Palette 0x94C590); width * height pixels, top-down. smacx --dump writes the same
+ * format (work/ui/mapcmp.py compares them). */
+struct MapDump {
+    std::string file;
+    int viewer, zoom, cx, cy; /* kMapDumpKeep: unchanged */
+    int fx, fy;               /* scrollfrom=X,Y: full redraw there first, then a scrolled move */
+};
+static const int kMapDumpKeep = -99999;
+static std::vector<MapDump> g_mapdumps;
+typedef void(__thiscall *f_this_int)(void *, int);
+ORIG(f_this_int, o_pfncRedrawMap, 0x46A550);
+ORIG(f_int, o_load_faction_art, 0x453710);
+ORIG(f_none, o_load_flags, 0x453F70);
+#define MainConsoleObj ((uint8_t *)0x9156B0)
+#define GamePaletteObj ((const uint8_t *)0x94C590)
+
+/* `fontmetrics <file> <pixels> <style>`: the original's Font (Font_init "Arial") metrics and the
+ * text extent (Font_width) of every character 32..255, as text: calibrates the native font
+ * rasteriser against GDI. */
+typedef int(__thiscall *f_font_init)(void *, const char *, int, int);
+typedef int(__thiscall *f_font_width)(void *, const char *);
+ORIG(f_this, o_Font_ctor, 0x618EA0);
+ORIG(f_font_init, o_Font_init, 0x618F40);
+ORIG(f_font_width, o_Font_width, 0x619280);
+static void cmd_fontmetrics(char *args) {
+    char name[MAX_PATH] = "";
+    int pixels = 0, style = 0;
+    sscanf(args, "%259s %d %d", name, &pixels, &style);
+    int32_t font[11];
+    o_Font_ctor(font);
+    int r = o_Font_init(font, "Arial", pixels, style);
+    char path[MAX_PATH];
+    snprintf(path, sizeof(path), "%s\\%s", g_outdir, name);
+    FILE *f = fopen(path, "w");
+    if (!f) return;
+    fprintf(f, "init %d height %d ascent_above %d internal %d ascent %d descent %d\n", r, font[3], font[4], font[5],
+            font[6], font[7]);
+    for (int c = 32; c < 256; c++) {
+        char text[2] = {(char)c, 0};
+        fprintf(f, "%d %d\n", c, o_Font_width(font, text));
+    }
+    fclose(f);
+    logf_("fontmetrics %s %d %d -> %d\n", name, pixels, style, r);
+}
+
+static void cmd_mapdump(char *args) {
+    MapDump d = {"", kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, kMapDumpKeep};
+    char *tok = strtok(args, " \t");
+    if (tok) d.file = tok;
+    while ((tok = strtok(NULL, " \t"))) {
+        if (!strncmp(tok, "viewer=", 7)) d.viewer = atoi(tok + 7);
+        else if (!strncmp(tok, "zoom=", 5)) d.zoom = atoi(tok + 5);
+        else if (!strncmp(tok, "center=", 7)) sscanf(tok + 7, "%d,%d", &d.cx, &d.cy);
+        else if (!strncmp(tok, "scrollfrom=", 11)) sscanf(tok + 11, "%d,%d", &d.fx, &d.fy);
+    }
+    if (d.file.empty()) logf_("mapdump: no file\n");
+    else g_mapdumps.push_back(d);
+}
+
+static void run_map_dumps() {
+    uint8_t *win = MainConsoleObj;
+    int vbase = *(int *)(*(uintptr_t *)win + 4);
+    for (const MapDump &d : g_mapdumps) {
+        int old_viewer = CurrentPlayerFaction;
+        uint32_t crt = crt_state(), game = GameRandomState;
+        if (d.viewer != kMapDumpKeep) CurrentPlayerFaction = d.viewer;
+        if (d.zoom != kMapDumpKeep) *(int32_t *)(win + 0x1DD98) = d.zoom;
+        if (d.cx != kMapDumpKeep) {
+            *(int32_t *)(win + 0x1DD9C) = d.cx;
+            *(int32_t *)(win + 0x1DDA0) = d.cy;
+        }
+        *(int32_t *)(win + 0x21A44) = 0; /* full redraw, not the scroll shortcut */
+        if (d.fx != kMapDumpKeep) {
+            /* the scrolled redraw (MapWin_focus): full redraw at the start, then pfncMoveMap with
+             * the scroll flag set */
+            typedef void(__thiscall * f_move)(void *, int, int, int);
+            int tx = *(int32_t *)(win + 0x1DD9C), ty = *(int32_t *)(win + 0x1DDA0);
+            *(int32_t *)(win + 0x1DD9C) = d.fx;
+            *(int32_t *)(win + 0x1DDA0) = d.fy;
+            o_pfncRedrawMap(win, 0);
+            *(int32_t *)(win + 0x21A44) = 1;
+            ((f_move)0x46B1F0)(win, tx, ty, 0);
+            *(int32_t *)(win + 0x21A44) = 0;
+        } else {
+            o_pfncRedrawMap(win, 0);
+        }
+        crt_set_state(crt);
+        GameRandomState = game;
+        const uint8_t *buf = win + vbase + 0x444;
+        const uint8_t *bits = *(uint8_t *const *)(buf + 0x54);
+        int32_t hdr[8] = {*(const int32_t *)(buf + 0x80), -*(const int32_t *)(buf + 0x84), CurrentPlayerFaction,
+                          *(int32_t *)(win + 0x1DD98), *(int32_t *)(win + 0x1DD9C), *(int32_t *)(win + 0x1DDA0),
+                          CurrentTurn, (int32_t)G(uint32_t, 0x94A30C)};
+        int stride = *(const int32_t *)(buf + 0x4A8);
+        char path[MAX_PATH];
+        snprintf(path, sizeof(path), "%s\\%s", g_outdir, d.file.c_str());
+        FILE *df = bits && hdr[0] > 0 && hdr[1] > 0 ? fopen(path, "wb") : NULL;
+        if (df) {
+            fwrite("SMXMAP1", 1, 8, df);
+            fwrite(hdr, 4, 8, df);
+            for (int i = 0; i < 256; i++) fwrite(GamePaletteObj + i * 4, 1, 3, df);
+            for (int y = 0; y < hdr[1]; y++) fwrite(bits + (size_t)y * stride, 1, hdr[0], df);
+            fclose(df);
+        }
+        /* <file>.pt: pfncPtToTile (0x463040) for every 4th pixel: int32 result, x, y. */
+        {
+            typedef int(__thiscall * f_pt)(void *, int, int, int *, int *);
+            f_pt pt = (f_pt)0x463040;
+            char ptpath[MAX_PATH];
+            snprintf(ptpath, sizeof(ptpath), "%s.pt", path);
+            if (FILE *pf = fopen(ptpath, "wb")) {
+                for (int py = 0; py < hdr[1]; py += 4)
+                    for (int px = 0; px < hdr[0]; px += 4) {
+                        int32_t r[3] = {0, -1, -1};
+                        r[0] = pt(win, px, py, &r[1], &r[2]);
+                        fwrite(r, 4, 3, pf);
+                    }
+                fclose(pf);
+            }
+            /* <file>.co: pfncMapGetCornerYOffset (0x46FE70) of every tile, corners 0..4. */
+            typedef int(__thiscall * f_co)(void *, int, int, int);
+            f_co co = (f_co)0x46FE70;
+            snprintf(ptpath, sizeof(ptpath), "%s.co", path);
+            if (FILE *cf = fopen(ptpath, "wb")) {
+                for (int ty = 0; ty < MapAreaY; ty++)
+                    for (int tx = ty & 1; tx < MapAreaX; tx += 2)
+                        for (int c = 0; c < 5; c++) {
+                            int32_t v = co(win, tx, ty, c);
+                            fwrite(&v, 4, 1, cf);
+                        }
+                fclose(cf);
+            }
+        }
+        logf_("mapdump %s -> %d: %dx%d viewer=%d zoom=%d center=%d,%d origin=%d,%d q=%d\n", d.file.c_str(),
+              df != NULL, hdr[0], hdr[1], hdr[2], hdr[3], hdr[4], hdr[5], *(int32_t *)(win + 0x1DDA4),
+              *(int32_t *)(win + 0x1DDA8), *(int32_t *)(win + 0x1DDC8));
+        CurrentPlayerFaction = old_viewer;
+    }
+    g_mapdumps.clear();
+}
+
+static void run_at_commands();
 static int __cdecl hook_turn_upkeep() {
     g_progress++;
     char name[64];
     apply_observer_prefs();
+    run_at_commands();
     snprintf(name, sizeof(name), "turn_%03d", CurrentTurn);
     snapshot(name);
+    if (!g_mapdumps.empty()) run_map_dumps();
     FCOMPARE_HOOK("turn", 0);
     if (g_turn_limit >= 0 && CurrentTurn >= g_turn_limit) {
         FCOMPARE_FINISH();
@@ -1089,6 +1241,92 @@ static int cmd_newgame(char *args) {
     return 0;
 }
 
+/* ---- setup commands (mirrored in src/app/headless.cpp; harness/README.md "Setup commands") ----
+ * poke / poketile / call edit the game state; `at <turn> <command>` runs one of them before the
+ * snapshot of that turn (before turn_upkeep). `call` calls the original address: in hybrid.dll a
+ * patched function runs as the reconstruction. */
+struct ScriptCall {
+    const char *name;
+    uint32_t addr;
+    bool has_result; /* false: void, EAX is not logged */
+};
+static const ScriptCall kScriptCalls[] = {
+#define SCRIPT_CALL(name, addr, has_result) {#name, addr, has_result},
+#include "script_calls.h"
+#undef SCRIPT_CALL
+};
+typedef int(__cdecl *f_call8)(int, int, int, int, int, int, int, int);
+#define MapHalfX G(int32_t, 0x68FAF0)
+#define MapTilesPtr G(uintptr_t, 0x94A30C)
+static const int kMapTileSize = 44;
+
+static void poke_bytes(uint8_t *p, int size, long long v) {
+    for (int i = 0; i < size; i++) p[i] = (uint8_t)((unsigned long long)v >> (8 * i));
+}
+
+static bool setup_command(const char *cmd, char *args) {
+    if (!strcmp(cmd, "poke")) {
+        unsigned addr = 0;
+        int size = 0;
+        long long v = 0;
+        if (sscanf(args, "%x %d %lli", &addr, &size, &v) == 3 && size >= 1 && size <= 4 && addr >= 0x682000 &&
+            addr + size <= 0x9CA000) {
+            poke_bytes((uint8_t *)(uintptr_t)addr, size, v);
+            logf_("poke %08X %d %lld\n", addr, size, v);
+        } else {
+            logf_("poke: bad arguments %s\n", args);
+        }
+    } else if (!strcmp(cmd, "poketile")) {
+        int x = 0, y = 0, off = 0, size = 0;
+        long long v = 0;
+        if (sscanf(args, "%d %d %i %d %lli", &x, &y, &off, &size, &v) == 5 && size >= 1 && size <= 4 && off >= 0 &&
+            off + size <= kMapTileSize && x >= 0 && x < MapAreaX && y >= 0 && y < MapAreaY) {
+            poke_bytes((uint8_t *)MapTilesPtr + (MapHalfX * y + (x >> 1)) * kMapTileSize + off, size, v);
+            logf_("poketile %d %d %d %d %lld\n", x, y, off, size, v);
+        } else {
+            logf_("poketile: bad arguments %s\n", args);
+        }
+    } else if (!strcmp(cmd, "call")) {
+        char name[64] = "";
+        int a[8] = {};
+        int n = sscanf(args, "%63s %i %i %i %i %i %i %i %i", name, &a[0], &a[1], &a[2], &a[3], &a[4], &a[5], &a[6],
+                       &a[7]);
+        for (const ScriptCall &c : kScriptCalls) {
+            if (strcmp(c.name, name)) continue;
+            int r = ((f_call8)c.addr)(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
+            if (c.has_result) logf_("call %s (%d args) -> %d\n", name, n - 1, r);
+            else logf_("call %s (%d args)\n", name, n - 1);
+            return true;
+        }
+        logf_("call: unknown function %s\n", name);
+    } else {
+        return false;
+    }
+    return true;
+}
+
+struct AtCommand {
+    int turn;
+    std::string line;
+    bool done;  // run once: turn_upkeep can run again for the same turn
+};
+static std::vector<AtCommand> g_at;
+
+static void run_at_commands() {
+    for (AtCommand &c : g_at) {
+        if (c.turn != CurrentTurn || c.done) continue;
+        c.done = true;
+        std::vector<char> buf(c.line.begin(), c.line.end());
+        buf.push_back(0);
+        char *cmd = buf.data();
+        char *args = cmd + strcspn(cmd, " \t");
+        if (*args) *args++ = 0;
+        args += strspn(args, " \t");
+        logf_("at %d> %s %s\n", c.turn, cmd, args);
+        if (!setup_command(cmd, args)) logf_("at: not a setup command %s\n", cmd);
+    }
+}
+
 /* ---- script ---- */
 static int __cdecl oracle_top_menu() {
     FILE *f = fopen("oracle.cmd", "r");
@@ -1123,6 +1361,16 @@ static int __cdecl oracle_top_menu() {
         } else if (!strcmp(cmd, "load")) {
             int r = o_load_daemon(args, 0);
             logf_("load %s -> %d\n", args, r);
+            if (r == 0) {
+                /* As load_game: the save's faction art (base sprites, colours, flags). load_daemon
+                 * alone keeps the art loaded at boot for the default factions. UI only; the
+                 * random generators are saved around it. */
+                uint32_t crt = crt_state(), game = GameRandomState;
+                for (int i = 1; i < 8; i++) o_load_faction_art(i);
+                o_load_flags();
+                crt_set_state(crt);
+                GameRandomState = game;
+            }
         } else if (!strcmp(cmd, "save")) {
             uint32_t crt = crt_state(), game = GameRandomState;
             int r = o_save_daemon(args);
@@ -1168,6 +1416,10 @@ static int __cdecl oracle_top_menu() {
             install_slotlog(prologue);
         } else if (!strcmp(cmd, "steptrace")) {
             sscanf(args, "%d %d %d", &g_st_turn, &g_st_veh, &g_st_max);
+        } else if (!strcmp(cmd, "fontmetrics")) {
+            cmd_fontmetrics(args);
+        } else if (!strcmp(cmd, "mapdump")) {
+            cmd_mapdump(args);
         } else if (!strcmp(cmd, "dumpmem")) {
             /* dumpmem <hexaddr> <hexsize> <file>: raw bytes of the original's memory, now */
             uint32_t addr = 0, size = 0;
@@ -1197,6 +1449,10 @@ static int __cdecl oracle_top_menu() {
 #endif
         } else if (!strcmp(cmd, "quit")) {
             break;
+        } else if (!strcmp(cmd, "at")) {
+            char *rest = args + strcspn(args, " \t");
+            g_at.push_back({atoi(args), std::string(rest + strspn(rest, " \t")), false});
+        } else if (setup_command(cmd, args)) {
         } else {
             logf_("unknown command %s\n", cmd);
         }

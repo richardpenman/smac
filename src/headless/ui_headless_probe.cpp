@@ -6,7 +6,6 @@
 
 #include <cstring>
 
-int32_t GAMEAPI X_pops(const char*, const char*, int32_t) { return 0; }
 void GAMEAPI report_intel(int32_t) {}
 // The text effect (HisHerBuffer), as get_his_her: labels 199/200 by the leader's gender.
 char* GAMEAPI get_him_her(int32_t faction_id, int32_t mode) {

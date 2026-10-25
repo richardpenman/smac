@@ -1,0 +1,91 @@
+// smacx's replacement of the headless "mapview" area: the map drawing entry points the engine calls
+// (engine/ui_bridge.h). pfncRedrawMap and pfncMoveMap are in mapwin.cpp. The original draws the
+// changed tiles at once (draw_tile, draw_radius, ...); here every request marks the main view for
+// a full redraw at the next presentation (wait_task / do_non_input), which is enough while the
+// partial redraws are not reconstructed (UI_PLAN.md phase 2). MapWin_focus is reconstructed.
+#include "engine/map.h"
+#include "engine/ui_bridge.h"
+#include "ui/console.h"
+#include "ui/mapwin.h"
+#include "ui/win.h"
+
+void GAMEAPI draw_radius(int32_t, int32_t, int32_t, int32_t) { ui_invalidate_map(); }
+void GAMEAPI draw_tile(int32_t, int32_t, int32_t) { ui_invalidate_map(); }
+void GAMEAPI draw_tiles(int32_t, int32_t, int32_t) { ui_invalidate_map(); }
+void GAMEAPI draw_tile_fixup(int32_t, int32_t, int32_t, int32_t) { ui_invalidate_map(); }
+void GAMEAPI draw_tile_fixup_2(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t) { ui_invalidate_map(); }
+void GAMEAPI draw_map(int32_t) { ui_invalidate_map(); }
+// The caption is shown by the placeholder console panel.
+void THISCALL MapWin_main_caption(uint8_t*) { ui_invalidate(); }
+// The native terrain cache is cleared whole (the original clears the tile's entries).
+void THISCALL MapWin_clear_alt(uint8_t* win, int32_t, int32_t, int32_t) {
+    if (ui_mapwin_native(win)) ui_mapwin_clear_cache(win);
+    ui_invalidate_map();
+}
+void THISCALL MapWin_clear_terrain(uint8_t* win) {
+    if (ui_mapwin_native(win)) ui_mapwin_clear_cache(win);
+    ui_invalidate_map();
+}
+void ui_mapwins_clear_terrain() {
+    for_each_mapwin([](int32_t, uint8_t* w) { MapWin_clear_terrain(w); });
+}
+void ui_mapwins_clear_alt(int32_t x, int32_t y) {
+    for_each_mapwin([&](int32_t, uint8_t* w) {
+        mw(w, kMwScrolling) = 0;  // full redraw
+        MapWin_clear_alt(w, x, y, 0);
+    });
+}
+
+int32_t THISCALL MapWin_focus(uint8_t* win, int32_t x, int32_t y) {
+    if (win == &MainConsole) {
+        // The main view keeps the tile when it is inside the visible range (pfncZoomProcessing).
+        if (x >= VisibleTiles.left && x < VisibleTiles.right && y >= VisibleTiles.top && y < VisibleTiles.bottom)
+            return 0;
+        if (!mw(win, 0x1DD78)) {
+            mw(win, kConCursorShown) = MapWinInVehMode == 0;
+            mw(win, kConCursorOn) = 1;
+        }
+        mw(win, kMwScrolling) = 1;
+        pfncMoveMap(win, x, y, 1);
+        mw(win, kMwScrolling) = 0;
+        return 1;
+    }
+    int32_t changed = 0;
+    int32_t ox = mw(win, kMwOriginX);
+    int32_t right = ox - 2 + mw(win, kMwColsEven) * 2;
+    bool wrap = !(MapToggleFlat & 1);
+    if (wrap) {
+        if (right < 0) right += MapAreaX;
+        else if (MapAreaX <= right) right -= MapAreaX;
+    }
+    if (wrap && x <= mw(win, kMwColsOdd) * 2 && MapAreaX - mw(win, kMwColsOdd) * 2 <= ox) x += MapAreaX;
+    int32_t margin = (mw(win, kMwOptions) & 0x80000000) ? 4 : 2;
+    if (!mw(win, kMwPixelX)) {
+        if (!wrap) {
+            int32_t hi = MapAreaX - margin - 1;
+            int32_t c = margin;
+            if (margin <= x && margin <= hi) c = x > hi ? hi : x;
+            x = c;
+            if (x & 1) x--;
+            if (y & 1) x++;
+        }
+        if (x <= ox + margin || right - margin <= x) changed = 1;
+    }
+    if (!mw(win, kMwPixelY)) {
+        int32_t hi = MapAreaY - margin - 1;
+        int32_t c = margin;
+        if (margin <= y && margin <= hi) c = y > hi ? hi : y;
+        y = c;
+        if (x & 1) x--;
+        if (y & 1) x++;
+        int32_t oy = mw(win, kMwOriginY);
+        if (y <= oy + margin || oy - 2 + mw(win, kMwRowsBelow) * 2 - margin <= y) changed = 1;
+    }
+    if (!changed) return 0;
+    if (!mw(win, 0x1DD78)) {
+        mw(&MainConsole, kConCursorShown) = MapWinInVehMode == 0;
+        mw(&MainConsole, kConCursorOn) = 1;
+    }
+    pfncMoveMap(win, x, y, 1);
+    return changed;
+}

@@ -14,6 +14,7 @@
 #include <cstring>
 #include <map>
 #include <string>
+#include <vector>
 
 namespace platform {
 namespace {
@@ -134,8 +135,53 @@ bool translate(const SDL_Event& e, Event* ev) {
 // ---- fonts ----
 struct FontEntry {
     TTF_Font* font = nullptr;
+    TTF_Font* measure = nullptr;  // the same font hinted for the normal target (text extents)
     int32_t pixels = 0;  // em height (-lfHeight)
+    // GDI text metrics (computed as Wine's GDI does from the OS/2 and hhea tables).
+    int32_t ascent = 0, descent = 0, internal_leading = 0, external_leading = 0;
 };
+
+// The font's vertical metrics in font units (OS/2 usWinAscent/usWinDescent, hhea ascender,
+// descender and line gap, head unitsPerEm). False when the file can't be parsed.
+struct FontUnits {
+    int32_t upem = 0, win_ascent = 0, win_descent = 0, ascender = 0, descender = 0, line_gap = 0;
+};
+bool read_font_units(const std::string& path, FontUnits* u) {
+    FILE* f = std::fopen(path.c_str(), "rb");
+    if (!f) return false;
+    std::vector<uint8_t> d;
+    uint8_t buf[65536];
+    size_t n;
+    while ((n = std::fread(buf, 1, sizeof(buf), f)) > 0) d.insert(d.end(), buf, buf + n);
+    std::fclose(f);
+    auto u16 = [&](size_t o) { return o + 2 <= d.size() ? (int32_t)(d[o] << 8 | d[o + 1]) : 0; };
+    auto s16 = [&](size_t o) { return (int32_t)(int16_t)u16(o); };
+    auto u32 = [&](size_t o) { return o + 4 <= d.size() ? (uint32_t)(d[o] << 24 | d[o + 1] << 16 | d[o + 2] << 8 | d[o + 3]) : 0u; };
+    int32_t tables = u16(4);
+    size_t head = 0, hhea = 0, os2 = 0;
+    for (int32_t i = 0; i < tables; i++) {
+        size_t rec = 12 + (size_t)i * 16;
+        uint32_t tag = u32(rec), off = u32(rec + 8);
+        if (tag == 0x68656164) head = off;       // 'head'
+        else if (tag == 0x68686561) hhea = off;  // 'hhea'
+        else if (tag == 0x4F532F32) os2 = off;   // 'OS/2'
+    }
+    if (!head || !hhea || !os2) return false;
+    u->upem = u16(head + 18);
+    u->ascender = s16(hhea + 4);
+    u->descender = s16(hhea + 6);
+    u->line_gap = s16(hhea + 8);
+    u->win_ascent = u16(os2 + 74);
+    u->win_descent = u16(os2 + 76);
+    return u->upem > 0;
+}
+
+// FreeType's FT_DivFix / FT_MulFix (16.16, rounded) as Wine uses them for text metrics.
+int64_t ft_divfix(int64_t a, int64_t b) { return (a * 65536 + b / 2) / b; }
+int64_t ft_mulfix(int64_t a, int64_t b) {
+    int64_t p = a * b;
+    return p >= 0 ? (p + 0x8000) >> 16 : -((-p + 0x8000) >> 16);
+}
 std::map<int32_t, FontEntry> g_fonts;
 int32_t g_next_font = 1;
 
@@ -287,7 +333,16 @@ int32_t font_open(const char* face, int32_t pixels, bool bold, bool italic, bool
     if (path.empty() || pixels <= 0) return 0;
     TTF_Font* f = TTF_OpenFont(path.c_str(), pixels);
     if (!f) return 0;
+    // Under Wine, TextOut's glyphs (shapes and advances) match FreeType's mono hinting, while
+    // GetTextExtentPoint32 sums the advances of the normal hinting target: a second instance
+    // measures.
     TTF_SetFontHinting(f, TTF_HINTING_MONO);
+    TTF_Font* measure = TTF_OpenFont(path.c_str(), pixels);
+    if (measure) {
+        TTF_SetFontHinting(measure, TTF_HINTING_NORMAL);
+        TTF_SetFontKerning(measure, 0);
+    }
+    TTF_SetFontKerning(f, 0);  // GDI TextOut does not kern
     int style = TTF_STYLE_NORMAL;
     // Bold/italic come from the file when a matching one exists; synthesise them otherwise.
     if (bold && path.find("old") == std::string::npos && path.find("bd") == std::string::npos &&
@@ -297,9 +352,28 @@ int32_t font_open(const char* face, int32_t pixels, bool bold, bool italic, bool
         style |= TTF_STYLE_ITALIC;
     if (underline) style |= TTF_STYLE_UNDERLINE;
     TTF_SetFontStyle(f, style);
+    if (measure) TTF_SetFontStyle(measure, style);
     int32_t h = g_next_font++;
     g_fonts[h].font = f;
     g_fonts[h].pixels = pixels;
+    g_fonts[h].measure = measure;
+    FontUnits u;
+    if (read_font_units(path, &u)) {
+        // Wine (freetype.c get_text_metrics) for lfHeight = -pixels: everything scaled by
+        // ppem / unitsPerEm in 26.6 and rounded.
+        int64_t scale = ft_divfix((int64_t)pixels << 6, u.upem);
+        auto px = [&](int64_t v) { return (int32_t)((ft_mulfix(v, scale) + 32) >> 6); };
+        FontEntry& e = g_fonts[h];
+        e.ascent = px(u.win_ascent);
+        e.descent = px(u.win_descent);
+        e.internal_leading = px(u.win_ascent + u.win_descent - u.upem);
+        int64_t gap = u.line_gap - ((u.win_ascent + u.win_descent) - (u.ascender - u.descender));
+        e.external_leading = gap > 0 ? px(gap) : 0;
+        if (e.external_leading < 0) e.external_leading = 0;
+    } else {
+        g_fonts[h].ascent = TTF_FontAscent(f);
+        g_fonts[h].descent = -TTF_FontDescent(f);
+    }
     return h;
 }
 
@@ -307,30 +381,33 @@ void font_close(int32_t handle) {
     auto it = g_fonts.find(handle);
     if (it == g_fonts.end()) return;
     if (it->second.font) TTF_CloseFont(it->second.font);
+    if (it->second.measure) TTF_CloseFont(it->second.measure);
     g_fonts.erase(it);
 }
 
 bool font_metrics(int32_t handle, FontMetrics* out) {
     auto it = g_fonts.find(handle);
     if (it == g_fonts.end()) return false;
-    TTF_Font* f = it->second.font;
-    out->ascent = TTF_FontAscent(f);
-    out->descent = -TTF_FontDescent(f);
-    out->height = out->ascent + out->descent;
-    // GDI: lfHeight = -pixels gives an em height of `pixels`; the rest of the cell is internal leading.
-    out->internal_leading = out->height - it->second.pixels;
-    if (out->internal_leading < 0) out->internal_leading = 0;
-    out->external_leading = TTF_FontLineSkip(f) - TTF_FontHeight(f);
-    if (out->external_leading < 0) out->external_leading = 0;
+    const FontEntry& e = it->second;
+    out->ascent = e.ascent;
+    out->descent = e.descent;
+    out->height = e.ascent + e.descent;
+    out->internal_leading = e.internal_leading;
+    out->external_leading = e.external_leading;
     return true;
 }
 
 int32_t font_text_width(int32_t handle, const char* text, int32_t len) {
     auto it = g_fonts.find(handle);
     if (it == g_fonts.end() || !text) return 0;
-    std::string s(text, (size_t)len);
-    int w = 0, h = 0;
-    TTF_SizeText(it->second.font, s.c_str(), &w, &h);
+    // GetTextExtentPoint32: the sum of the (hinted) advance widths. TTF_SizeText would also count
+    // the last glyph's ink beyond its advance.
+    int32_t w = 0;
+    for (int32_t i = 0; i < len; i++) {
+        int minx, maxx, miny, maxy, advance;
+        TTF_Font* m = it->second.measure ? it->second.measure : it->second.font;
+        if (TTF_GlyphMetrics(m, (uint8_t)text[i], &minx, &maxx, &miny, &maxy, &advance) == 0) w += advance;
+    }
     return w;
 }
 
@@ -343,12 +420,19 @@ bool font_render(int32_t handle, const char* text, int32_t len, std::vector<uint
     SDL_Color white = {255, 255, 255, 255};
     SDL_Surface* surf = TTF_RenderText_Solid(it->second.font, s.c_str(), white);
     if (!surf) return false;
+    // The cell as GDI lays it out: the baseline at the GDI ascent (SDL_ttf puts it at
+    // FreeType's ascender, which can differ by a pixel).
+    const FontEntry& e = it->second;
+    int32_t shift = TTF_FontAscent(e.font) - e.ascent;  // surface row = cell row + shift
+    int32_t cell_h = e.ascent + e.descent > 0 ? e.ascent + e.descent : surf->h;
     *w = surf->w;
-    *h = surf->h;
-    mask->assign((size_t)surf->w * surf->h, 0);
+    *h = cell_h;
+    mask->assign((size_t)surf->w * cell_h, 0);
     SDL_LockSurface(surf);
-    for (int32_t y = 0; y < surf->h; y++) {
-        const uint8_t* row = (const uint8_t*)surf->pixels + (size_t)y * surf->pitch;
+    for (int32_t y = 0; y < cell_h; y++) {
+        int32_t sy = y + shift;
+        if (sy < 0 || sy >= surf->h) continue;
+        const uint8_t* row = (const uint8_t*)surf->pixels + (size_t)sy * surf->pitch;
         for (int32_t x = 0; x < surf->w; x++) (*mask)[(size_t)y * surf->w + x] = row[x] ? 1 : 0;
     }
     SDL_UnlockSurface(surf);

@@ -233,9 +233,19 @@ Tools for finding more: oracle commands `steptrace`, `slotlog`, `poison rand`, a
 Engine functions call UI code (popups, `draw_map`, sound, `Console_*`, window classes). Functions
 in UI/system modules (`kind` ui/sys in `re/modules.tsv`) are not reconstructed by engine work.
 Declare the ones you need in `src/engine/ui_bridge.h` with `ADDR_NATIVE`, grouped by original
-class, and add a headless implementation to `src/headless/ui_headless.cpp` that behaves as for an
-unattended AI observer: no drawing, popups return the default/first choice (document the value).
-If a UI function also changes game state, reconstruct that part faithfully or flag it.
+class, and add a headless implementation to src/headless that behaves as for an unattended AI
+observer: no drawing, popups return the default/first choice (document the value). If a UI
+function also changes game state, reconstruct that part faithfully or flag it.
+
+src/headless is the static library `smacx_ui_headless`, one object file per UI area
+(`ui_headless_<area>.cpp`; general functions in `ui_headless.cpp`). smacx_headless uses all of it;
+smacx (the SDL UI, src/ui) replaces whole areas by defining their functions under the original
+names in its own objects, so the linker does not pull those areas' objects (docs/UI_PLAN.md,
+"Bridge switch"). Put a new headless function into the file of its area; if smacx already
+replaces that area, smacx must define it too (otherwise the link fails with duplicate symbols).
+A function declared with `ADDR` (not `ADDR_NATIVE`) in an engine header must be defined in
+src/engine: gen_bindings.py counts a definition anywhere under src/, and hybrid builds do not
+compile src/ui.
 
 ## Verification
 

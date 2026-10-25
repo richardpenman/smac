@@ -57,11 +57,13 @@ file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS src/engine/*.cpp src/platform
 list(FILTER ENGINE_SOURCES EXCLUDE REGEX "/src/platform/sdl/")  # native UI backend (smacx only)
 file(GLOB_RECURSE ENGINE_HEADERS CONFIGURE_DEPENDS src/engine/*.h src/platform/*.h)
 file(GLOB HEADLESS_SOURCES_FOR_GEN CONFIGURE_DEPENDS src/headless/*.cpp)
+# gen_bindings also reads the UI's declarations and definitions (src/ui: ADDR_NATIVE functions).
+file(GLOB UI_FILES_FOR_GEN CONFIGURE_DEPENDS src/ui/*.cpp src/ui/*.h)
 set(GEN_DIR ${CMAKE_BINARY_DIR}/generated)
 add_custom_command(
   OUTPUT ${GEN_DIR}/native_stubs.cpp ${GEN_DIR}/hybrid_bindings.cpp ${GEN_DIR}/status.tsv
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/src/tools/gen_bindings.py ${GEN_DIR} ${CMAKE_SOURCE_DIR}/src
-  DEPENDS ${ENGINE_SOURCES} ${ENGINE_HEADERS} ${HEADLESS_SOURCES_FOR_GEN} ${CMAKE_SOURCE_DIR}/src/tools/gen_bindings.py
+  DEPENDS ${ENGINE_SOURCES} ${ENGINE_HEADERS} ${HEADLESS_SOURCES_FOR_GEN} ${UI_FILES_FOR_GEN} ${CMAKE_SOURCE_DIR}/src/tools/gen_bindings.py
   COMMENT "Generating original-function bindings")
 
 if(SMACX_HYBRID)
@@ -84,8 +86,16 @@ if(SMACX_HYBRID)
 else()
   add_library(smacx_engine STATIC ${ENGINE_SOURCES} ${GEN_DIR}/native_stubs.cpp)
   target_include_directories(smacx_engine PUBLIC src)
+  # The headless UI (src/headless) is the default implementation of the engine's UI bridge
+  # (engine/ui_bridge.h): a static library with one object file per UI area, linked after the
+  # executable's own objects. An executable that defines every function of an area (smacx: src/ui)
+  # replaces it, as the linker then never pulls that object in; replacing an area only in part is
+  # a duplicate-symbol link error. Engine and headless UI call each other (static library cycle).
   file(GLOB HEADLESS_SOURCES CONFIGURE_DEPENDS src/headless/*.cpp)
-  add_executable(smacx_headless src/app/headless.cpp ${HEADLESS_SOURCES})
+  add_library(smacx_ui_headless STATIC ${HEADLESS_SOURCES})
+  target_link_libraries(smacx_ui_headless PUBLIC smacx_engine)
+  target_link_libraries(smacx_engine PUBLIC smacx_ui_headless)
+  add_executable(smacx_headless src/app/headless.cpp)
   target_link_libraries(smacx_headless PRIVATE smacx_engine)
   target_include_directories(smacx_headless PRIVATE harness)
   # Portability smoke test (no game data needed): ctest, or run smacx_smoke.
@@ -98,7 +108,7 @@ else()
   find_package(SDL2_ttf CONFIG QUIET HINTS ${CMAKE_SOURCE_DIR}/tools/sdl2/lib/cmake/SDL2_ttf)
   if(SDL2_FOUND AND SDL2_ttf_FOUND)
     file(GLOB UI_SOURCES CONFIGURE_DEPENDS src/ui/*.cpp src/platform/sdl/*.cpp)
-    add_executable(smacx src/app/smacx.cpp ${UI_SOURCES} ${HEADLESS_SOURCES})
+    add_executable(smacx src/app/smacx.cpp ${UI_SOURCES})
     target_link_libraries(smacx PRIVATE smacx_engine SDL2::SDL2 SDL2_ttf::SDL2_ttf)
   else()
     message(STATUS "SDL2 or SDL2_ttf not found: smacx (native UI) is not built")

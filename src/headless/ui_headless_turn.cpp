@@ -33,12 +33,7 @@ void GAMEAPI interlude(int32_t id, int32_t, int32_t, int32_t) {
         GameInterludeState |= 1 << (id & 31);
     }
 }
-void THISCALL MapWin_main_caption(uint8_t*) {}
-int32_t THISCALL MapWin_focus(uint8_t*, int32_t, int32_t) { return 0; }
-int32_t GAMEAPI do_non_input() { return 0; }
 int32_t GAMEAPI energy_limit(int32_t) { return 10; }
-// No human player is ever interactive headless.
-int32_t THISCALL Console_human_turn(uint8_t*) { return 0; }
 void THISCALL MessageWin_clear(uint8_t*) {}
 void GAMEAPI clear_council_notify(int32_t faction_id) {
     CouncilProposal[faction_id] = 0;
@@ -69,8 +64,4 @@ bool ui_directplay_registered() { return false; }
 void ui_main_mapwin_set_options(uint32_t) {}
 int32_t ui_hotseat_switch(int32_t) { return 0; }
 void ui_hotseat_show(int32_t) {}
-void ui_council_menu_open(int32_t) {}
-void ui_council_menu_add(const char*, int32_t) {}
-int32_t ui_council_menu_exec() { return -1; }
-void ui_council_menu_close() {}
 #endif

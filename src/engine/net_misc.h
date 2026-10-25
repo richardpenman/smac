@@ -1,8 +1,8 @@
 // Tamper detection, checksums and network wait loops (original module around 0x51E000-0x51F2E0).
 //
 // Not reconstructed here (network/UI): clear_all_player_messages (0x51E3C0), 0x51E480 and
-// 0x51E530 (per-faction message lists of heap objects), help_spock/check_spock/wait_loop/wait_2
-// (0x51F0C0-0x51F2C0, network waits). read_tamper/set_tamper (registry) are in ui_bridge.h.
+// 0x51E530 (per-faction message lists of heap objects), help_spock/check_spock/wait_2
+// (0x51F0C0-0x51F2C0, network waits). wait_loop (0x51F200) is declared in turn.h. read_tamper/set_tamper (registry) are in ui_bridge.h.
 #pragma once
 #include "engine/globals.h"
 
