@@ -7,6 +7,7 @@
 #include "engine/base.h"
 #include "engine/clock.h"
 #include "engine/crt.h"
+#include "engine/design.h"
 #include "engine/diplomacy.h"
 #include "engine/log.h"
 #include "engine/map.h"
@@ -612,4 +613,23 @@ void GAMEAPI capture_base(int32_t base_id, int32_t faction_id, int32_t is_probe)
             BaseWin_zoom(&BaseWin, base_id, 0);
         }
     }
+}
+
+// ---- small wrappers (0x50B8D0-0x50B9E0) and mandate_color --------------------------------------
+
+int32_t GAMEAPI POP3_2(const char* label, int32_t faction_id, int32_t x, int32_t y) {
+    return POP3(label, 0, faction_id, x, y);
+}
+
+int32_t GAMEAPI veh_stack_next(int32_t veh_id) { return veh_id >= 0 ? Vehs[veh_id].next_veh_id_stack : veh_id; }
+
+void GAMEAPI say_stats_3_2(int32_t unit_id) { say_stats_3(StrBuffer, unit_id); }
+
+int32_t GAMEAPI NetMsg_pop_3(const char* label, const char* pcx) { return NetMsg_pop(&NetMsg, label, 5000, 0, pcx); }
+
+int32_t GAMEAPI mandate_color(int32_t mandate) {
+    if (mandate == 0) return MandateColors[0];
+    if (mandate == 1) return MandateColors[2];
+    if (mandate == 2) return MandateColors[4];
+    return MandateColors[6];
 }

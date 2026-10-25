@@ -65,9 +65,6 @@ ADDR(0x5395F0) void GAMEAPI net_tech(int32_t faction_id, int32_t tech_id, int32_
 
 // ---- callees of other modules (not reconstructed) ----------------------------------------------
 
-// diplomacy: re-evaluates the AI's diplomatic stance of faction_id towards faction_id_with.
-ADDR(0x53A980) void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_t a3);
-// diplomacy: sets the diplomacy dialog globals (Diplo*) for faction_id and faction_id_with.
-ADDR(0x5399A0) void GAMEAPI diplomacy_caption(int32_t faction_id, int32_t faction_id_with);
+// diplomacy_check, diplomacy_caption: engine/diplomacy.h.
 // net: waits for a diplomatic message to be acknowledged (NetDaemon object NetState).
 ADDR(0x5315C0) void THISCALL NetDaemon_await_diplo(uint8_t* net, int32_t type);

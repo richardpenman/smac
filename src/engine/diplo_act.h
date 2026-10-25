@@ -24,3 +24,12 @@ ADDR(0x50DD90) void GAMEAPI clock_wait(int32_t msec);
 ADDR(0x50DDC0) int32_t GAMEAPI sea_coast(int32_t region_land, int32_t region_sea);
 // Whether a port base can reach the coast of land region region by sea.
 ADDR(0x50E030) int32_t GAMEAPI port_to_coast(int32_t base_id, int32_t region);
+// Small wrappers at the start of the module: POP3 with no picture, the next vehicle of veh_id's
+// stack (-1 for -1; FUN_0050B8F0), say_stats_3 into StrBuffer, NetMsg_pop with a 5 s delay
+// (FUN_0050B9C0).
+ADDR(0x50B8D0) int32_t GAMEAPI POP3_2(const char* label, int32_t faction_id, int32_t x, int32_t y);
+ADDR(0x50B8F0) int32_t GAMEAPI veh_stack_next(int32_t veh_id);
+ADDR(0x50B9A0) void GAMEAPI say_stats_3_2(int32_t unit_id);
+ADDR(0x50B9C0) int32_t GAMEAPI NetMsg_pop_3(const char* label, const char* pcx);
+// Colour of mandate n (0-3) in the reports (MandateColors, engine/ui_bridge.h).
+ADDR(0x50E820) int32_t GAMEAPI mandate_color(int32_t mandate);

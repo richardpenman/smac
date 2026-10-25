@@ -35,8 +35,7 @@ GLOBAL(int32_t, CouncilWinActive, 0x703DE4);
 extern int32_t (*g_harness_council_modal)(uint8_t* win);
 
 // ---- callees of other modules ------------------------------------------------------------------------
-// diplomacy: the best two technologies faction_id_with could give faction_id (DiploTradeOfferTech1/2).
-ADDR(0x53E800) void GAMEAPI tech_analysis(int32_t faction_id, int32_t faction_id_with);
+// tech_analysis: engine/diplomacy.h.
 
 // ---- council -------------------------------------------------------------------------------------
 // faction_id calls a session of the Planetary Council on proposal (candidate: the governor

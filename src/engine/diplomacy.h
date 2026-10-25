@@ -125,3 +125,169 @@ ADDR(0x55D2A0) void GAMEAPI enemies_team_up(int32_t faction_id, int32_t faction_
 // Two AI factions that do not want war improve relations: truce, treaty, or a pact against a
 // common enemy (else an existing pact ends). trade_tech: first trade technologies.
 ADDR(0x55D760) void GAMEAPI enemies_treaty(int32_t faction_id, int32_t faction_id_with, int32_t trade_tech);
+
+// ---- first half of the module (0x538F30-0x54B140; diplomacy.cpp) ----
+// In these functions faction_id is usually the player who talks (often human) and
+// faction_id_with the AI faction answering (the "rival" of the Diplo* globals, globals.h).
+
+// Whether human players always contact each other (multiplayer / hotseat-PBEM rules options).
+ADDR(0x539160) int32_t GAMEAPI auto_contact();
+// Multiplayer-aware variants of agenda, energy, loan, map, pact, withdrawal, base and double
+// cross changes: single player makes the change directly; multiplayer sends the message (and,
+// with wait, waits until it is acknowledged). Treaty and technology variants: engine/probe.h.
+ADDR(0x539310) void GAMEAPI net_agenda_on(int32_t faction_id, int32_t faction_id_with, uint32_t agenda, int32_t wait);
+ADDR(0x539380) void GAMEAPI net_agenda_off(int32_t faction_id, int32_t faction_id_with, uint32_t agenda, int32_t wait);
+ADDR(0x5393F0) void GAMEAPI net_set_agenda(int32_t faction_id, int32_t faction_id_with, uint32_t agenda, int32_t add,
+                                           int32_t wait);
+// Adds energy to faction_id (amount) and faction_id_with (amount_with); faction 0 is skipped.
+ADDR(0x539460) void GAMEAPI net_energy(int32_t faction_id, int32_t amount, int32_t faction_id_with,
+                                       int32_t amount_with, int32_t wait);
+// Sets the loan faction_id owes faction_id_with (balance, payment per turn).
+ADDR(0x539510) void GAMEAPI net_loan(int32_t faction_id, int32_t faction_id_with, int32_t balance, int32_t payment);
+ADDR(0x539580) void GAMEAPI net_maps(int32_t faction_id, int32_t faction_id_with, int32_t wait);
+ADDR(0x539660) void GAMEAPI net_pact_ends(int32_t faction_id, int32_t faction_id_with, int32_t wait);
+// do_withdrawal; multiplayer: 1.
+ADDR(0x5396D0) int32_t GAMEAPI net_withdrawal(int32_t faction_id, int32_t faction_id_with, int32_t wait);
+// give_a_base(base_id, faction_id).
+ADDR(0x539740) void GAMEAPI net_cede_base(int32_t base_id, int32_t faction_id, int32_t wait);
+ADDR(0x5397B0) void GAMEAPI net_double_cross(int32_t faction_id, int32_t faction_id_with, int32_t a3, int32_t wait);
+// X_pops_11 wait callbacks (passed by address): multiplayer: run the wait loop once; 0 when the
+// popup must close (turn ended; pop_expire also when the game is over), else 1.
+ADDR(0x5398E0) int32_t GAMEAPI pop_wait();
+GLOBAL(int32_t, PopWaitActive, 0x93FAC4);  // set while pop_wait/pop_expire run the wait loop
+ADDR(0x539920) int32_t GAMEAPI pop_expire();
+// Mood of faction_id_with toward faction_id (from DiploFriction, set by diplomacy_check) as the
+// caption of the diplomacy dialog (parse slot 7); redraws the dialog's info pane when it is open.
+// Clamps DiploFriction to 15 for a vendetta with friction <= 14.
+ADDR(0x5399A0) void GAMEAPI diplomacy_caption(int32_t faction_id, int32_t faction_id_with);
+// Mood index (Mood[], 0 best .. 8 worst) of a friction value.
+ADDR(0x53A090) int32_t GAMEAPI get_mood(int32_t friction);
+// How many proposals faction_id_with listens to from faction_id (vendetta 1, pact 6 or 500 when
+// surrendered, else from treaty and DiploFriction).
+ADDR(0x53A150) int32_t GAMEAPI get_patience(int32_t faction_id, int32_t faction_id_with);
+// Value of an amount of energy in a trade (diminishing per 50 / 100 credits).
+ADDR(0x53A1C0) int32_t GAMEAPI energy_value(int32_t energy);
+// faction_id_with (if it wants to speak) mentions its prototype DiploMentionUnitID: with a pact
+// both exchange all their prototypes (with the "PROTO"+"RIVAL" popup's consent otherwise).
+ADDR(0x53A230) void GAMEAPI mention_prototypes(int32_t faction_id, int32_t faction_id_with);
+// DiploBestUnitID: faction_id_with's best prototype that faction_id has no equal of;
+// DiploMentionUnitID: the one it would mention (not yet mentioned/traded, not a probe/transport).
+ADDR(0x53A4A0) void GAMEAPI scan_prototypes(int32_t faction_id, int32_t faction_id_with);
+// Evaluates faction_id_with's attitude toward faction_id into the Diplo* globals (friction,
+// hostility, fear, tribute demand, attack chances, enemies and allies, betrayal). is_full: also
+// the dialog extras (spoke turn, factions to mention, prototypes, betrayal). Uses
+// wants_to_attack at a first-call site (wants_to_attack_fresh).
+ADDR(0x53A980) void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_t is_full);
+// Technologies faction_id and faction_id_with could trade: DiploTradeWantTech1-4 (faction_id
+// has, faction_id_with wants), DiploTradeOfferTech1/2 (faction_id_with has; projects in
+// production halve their value: DiploTradeOfferProject1/2, DiploTradeTechProject).
+ADDR(0x53E800) void GAMEAPI tech_analysis(int32_t faction_id, int32_t faction_id_with);
+
+// faction_id_with (AI) asks faction_id (human) to talk: the COMM popup (or URGENTCOMM when it
+// has planet busters not yet announced) until the human accepts, declines or ends the caption;
+// on acceptance the dialog opens with introduce. Returns DiploCaptionMode (non-zero: talking).
+// Humans and aliens need Xenoempathy/Centauri Psi first.
+ADDR(0x53DCE0) int32_t GAMEAPI wants_to_speak(int32_t faction_id, int32_t faction_id_with);
+// faction_id_with's opening words (INTRONEW/INTROMAD/INTRO popups, random variants); a first
+// warning about faction_id's planet busters sets status 0x4000.
+ADDR(0x53D360) void GAMEAPI introduce(int32_t faction_id, int32_t faction_id_with);
+// Treaties agreed in the dialog: faction_id_with signs a pact (maps exchanged, prototypes
+// mentioned), a treaty (units in each other's territory are asked to leave) or a truce (show:
+// the MAKETRUCE message) with faction_id. Reputation of both rises.
+ADDR(0x53CAF0) void GAMEAPI pact_of_brotherhood(int32_t faction_id, int32_t faction_id_with);
+ADDR(0x53CE10) void GAMEAPI make_treaty(int32_t faction_id, int32_t faction_id_with);
+ADDR(0x53D160) void GAMEAPI pledge_truce(int32_t faction_id, int32_t faction_id_with, int32_t show);
+// Closes the diplomacy dialog state (DiploWinState, caption flags, map focus).
+ADDR(0x53E470) void GAMEAPI diplomacy_ends(int32_t faction_id, int32_t faction_id_with);
+GLOBAL(int32_t, DiploTalkActive, 0x93FAB8);  // cleared by diplomacy_ends
+GLOBAL(int32_t, DiploFocusX, 0x68D43C);      // map location shown during the dialog (-1 none)
+GLOBAL(int32_t, DiploFocusY, 0x68D440);
+// faction_id (human) demands that faction_id_with withdraws its units from its territory
+// (commlink checks first; sunspots: only a message about the answer).
+ADDR(0x53E4C0) void GAMEAPI demands_withdrawal(int32_t faction_id, int32_t faction_id_with);
+// faction_id (human) renounces its pact with faction_id_with: blemish, pact ends.
+ADDR(0x53E5C0) void GAMEAPI renounce_pact(int32_t faction_id, int32_t faction_id_with);
+// faction_id_with's units leave faction_id's land territory (to an own base, transports to an
+// adjacent own tile or ship). Returns the number of moves (agenda 2 and status 0x100000 set).
+ADDR(0x548F80) int32_t GAMEAPI do_withdrawal(int32_t faction_id, int32_t faction_id_with);
+// The ally of faction_id whose base faction_id_with's units in faction_id's territory are heading
+// for (so it refuses to withdraw them), 0 if none.
+ADDR(0x548DD0) int32_t GAMEAPI dont_withdrawal(int32_t faction_id, int32_t faction_id_with);
+// The answer of faction_id_with to faction_id's demand to withdraw: 0 units withdrawn (or none to
+// withdraw), 1 refused, 2 refused with a vendetta or broken treaty.
+ADDR(0x549270) int32_t GAMEAPI demand_withdrawal(int32_t faction_id, int32_t faction_id_with);
+// Base of a common enemy that faction_id_with suggests attacking together with faction_id (the
+// current target if it is one), -1 none.
+ADDR(0x54ACC0) int32_t GAMEAPI suggest_plan(int32_t faction_id, int32_t faction_id_with);
+// faction_id's base closest to base_id (same region preferred; the faction's target location
+// counts as distance 0), 0 if none.
+ADDR(0x54AFA0) int32_t GAMEAPI attack_from(int32_t base_id, int32_t faction_id);
+
+// faction_id (human) buys DiploTradeOfferTech1 from faction_id_with (mode 5: its best prototype
+// DiploBestUnitID; mode 13: a commlink to DiploProposalFaction): the BUY... popup with the price
+// (eager: 1.5 times; offer 1: no purchase; offer 5 or mode 5: offered even when unaffordable).
+// Returns 1 if an offer was made.
+ADDR(0x5401A0) int32_t GAMEAPI buy_tech(int32_t faction_id, int32_t faction_id_with, int32_t offer, int32_t eager,
+                                        int32_t mode);
+// faction_id (human) and faction_id_with exchange technologies (or maps, 9999): the AI's refusals
+// (hate, fear, its lead, projects), gifts of surrendered or strong pact partners, else the
+// TRADETECH offer; offer 2/4: the human proposes the trade; mode 5: prototypes, 13: a commlink
+// frequency for a technology; counter: repeat while trades succeed. Returns 1 if a trade was made.
+ADDR(0x541100) int32_t GAMEAPI tech_trade(int32_t faction_id, int32_t faction_id_with, int32_t counter, int32_t offer,
+                                          int32_t mode);
+// faction_id (human) asks faction_id_with for energy (by DiploCounterProposal): a gift from a rich
+// pact partner, technology sold for energy, or a loan. Returns 1 if energy changed hands.
+ADDR(0x540630) int32_t GAMEAPI energy_trade(int32_t faction_id, int32_t faction_id_with);
+// faction_id (human) proposes to exchange maps with faction_id_with (accepted with a pact or low
+// friction: DiploMapMsg set).
+ADDR(0x545D60) void GAMEAPI propose_trade_maps(int32_t faction_id, int32_t faction_id_with);
+
+// The human (faction_id) proposes a treaty / a pact to faction_id_with, possibly with a counter
+// offer (DiploCounterProposal): its acceptance, a requested bribe (technology or energy) or help
+// against an enemy, then make_treaty / pact_of_brotherhood. Return 0 when a counter proposal
+// (DiploCounterProposal 1 or 3) was not taken up, else 1.
+ADDR(0x544E40) int32_t GAMEAPI propose_treaty(int32_t faction_id, int32_t faction_id_with);
+ADDR(0x543BC0) int32_t GAMEAPI propose_pact(int32_t faction_id, int32_t faction_id_with);
+// The human (faction_id) threatens faction_id_with to obtain DiploCurrentProposal (energy,
+// technology, a commlink, a base, war on DiploProposalFaction): given in fear, ignored, or answered
+// with a vendetta / the end of the pact.
+ADDR(0x549930) void GAMEAPI threaten(int32_t faction_id, int32_t faction_id_with);
+// The human (faction_id) asks for base DiploAskBaseSwapID (for energy, technology or base
+// DiploBidBaseSwapID). Returns 0 if a base changed hands.
+ADDR(0x54D410) int32_t GAMEAPI base_swap(int32_t faction_id, int32_t faction_id_with);
+// The human (faction_id) gives faction_id_with technology (DiploCounterProposal 4: one, 7: all),
+// energy (5: amount from the OFFERENERGY menu) or base DiploBidBaseSwapID (8): friction falls,
+// large gifts end revenge moods and count against integrity blemishes.
+ADDR(0x547C10) void GAMEAPI make_gift(int32_t faction_id, int32_t faction_id_with);
+// The human (faction_id) asks faction_id_with for its council vote on proposal (0: governor
+// election of candidate; candidate -1/-2/-3: YEA/NAY/ABSTAIN): its price in energy or
+// technology (BUYVOTEMENU); the promise is kept in faction_id_with's unk_29/unk_30 and cast at
+// once when the council is in session.
+ADDR(0x53EB50) void GAMEAPI buy_council_vote(int32_t faction_id, int32_t faction_id_with, int32_t proposal,
+                                             int32_t candidate);
+// The human (faction_id) asks faction_id_with to declare war on DiploProposalFaction: refused,
+// done at once by a pact partner, or for technology / energy; the target may learn who incited
+// it. Returns 0 when a counter proposal (DiploCounterProposal 3) was not taken up, else 1.
+ADDR(0x545E80) int32_t GAMEAPI propose_attack(int32_t faction_id, int32_t faction_id_with);
+// The human (faction_id) asks faction_id_with to end its vendetta with a faction of the CALLOFF
+// menu.
+ADDR(0x54BEC0) void GAMEAPI call_off_vendetta(int32_t faction_id, int32_t faction_id_with);
+
+// ---- callees of other modules reconstructed here ----
+// ui module (0x445130): faction_id's energy budget for the reports (FactionCurrent* globals,
+// EnergyBaseMaint, EnergyFacilityCount); with recompute, base_compute of each base first.
+// diplomacy_check reads FactionCurrentNetIncome.
+ADDR(0x445130) void GAMEAPI energy_compute(int32_t faction_id, int32_t recompute);
+GLOBAL(int32_t[512], EnergyBaseMaint, 0x7492E0);    // per base: facility maintenance
+GLOBAL(int32_t, FactionCurrentLabs, 0x749AE0);      // labs total (then research points per turn)
+GLOBAL(int32_t[70], EnergyFacilityCount, 0x749AEC); // facilities 0-64 built in the faction's bases
+// game module text helpers (0x58F700-0x58FAF0): "$<M1:text>" gender/number markup of
+// faction_id's noun around text appended to buffer; leader file phrases (#<filename> of
+// faction_id: line 9 + n; get_noun_phrase sets the gender defaults from its 2nd/3rd items);
+// pact brother/sister label(s) (get_pacts_2: of two factions).
+ADDR(0x58F700) void GAMEAPI say_fac_special(char* buffer, const char* text, int32_t faction_id);
+ADDR(0x58F810) const char* GAMEAPI get_phrase(int32_t faction_id, int32_t n);
+ADDR(0x58F8B0) const char* GAMEAPI get_noun_phrase(int32_t faction_id, int32_t n);
+ADDR(0x58F9D0) const char* GAMEAPI get_pact(int32_t faction_id);
+ADDR(0x58FA20) const char* GAMEAPI get_pacts(int32_t faction_id);
+ADDR(0x58FA70) const char* GAMEAPI get_pacts_2(int32_t faction_id, int32_t faction_id_with);

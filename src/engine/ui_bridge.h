@@ -500,6 +500,56 @@ ADDR_NATIVE(0x4ACBD0) void GAMEAPI report_intel(int32_t faction_id);
 // "him"/"her" of faction_id's leader in HisHerBuffer (mode as get_his_her). Returns HisHerBuffer.
 ADDR_NATIVE(0x58FC50) char* GAMEAPI get_him_her(int32_t faction_id, int32_t mode);
 
+// ---- diplomacy module, first half (diplomacy.cpp) ----
+// The diplomacy dialog window (DiploPop object) and its info pane rectangle.
+GLOBAL(uint8_t, DiploPopWin, 0x733990);
+GLOBAL(uint8_t, DiploPopInfoRect, 0x735A84);
+// Redraws the info pane (portrait, mood caption) of the open diplomacy dialog. Headless: nothing.
+ADDR_NATIVE(0x43FA90) void THISCALL DiploPop_draw_info(uint8_t* pop);
+// Copies a rectangle of a window to the screen. Headless: nothing.
+ADDR_NATIVE(0x5D5930) void THISCALL GraphicWin_soft_update_3(uint8_t* win, uint8_t* rect);
+// Opens the diplomacy dialog with faction_id_with's portrait. Headless: nothing.
+ADDR_NATIVE(0x43F2B0) void THISCALL DiploPop_start(uint8_t* pop, int32_t faction_id_with);
+// Sets the status/info pane's display state. Headless: nothing.
+ADDR_NATIVE(0x458F10) void THISCALL InfoWin_set_state(uint8_t* win, int32_t state, int32_t a2);
+// Not original functions: the diplomacy menus, Popup objects on the original functions' stacks
+// (wants_to_speak COMM, make_gift OFFERENERGY, call_off_vendetta CALLOFF, propose_attack
+// MAYBEWARENERGY / MAYBEWARPRICE, buy_council_vote BUYVOTEMENU, tech_trade TRADETECH). The engine
+// parses the item texts (script lookups into TextBuffer / StrBuffer, as the original). start runs
+// Popup_start on the script file's section label with the given flags (a second start appends
+// to the same menu); item adds an entry with its value; exec shows the menu with
+// faction_id_with's portrait and returns the chosen value (the meaning is per caller); close
+// discards it. Hybrid builds: the Popup is a heap object (BasePopAlloc) started by the original
+// Popup_start, so the section lookup sets the same text and file search state; exec is not
+// shown and returns 0 (BasePop_exec_3's no-display value, forced by the oracle). Headless:
+// nothing is shown, exec returns 0.
+void ui_diplo_menu_start(const char* label, int32_t flags);
+void ui_diplo_menu_item(const char* text, int32_t value);
+int32_t ui_diplo_menu_exec(int32_t faction_id_with);
+void ui_diplo_menu_close();
+// The human side of the diplomacy dialog (UI, called from communicate and the diplomacy panel;
+// never by the engine): the DIPLOMACY menu (returns the chosen topic), the proposal menus that
+// dispatch to the reconstructed propose_* / tech_trade / energy_trade / make_gift / base_swap /
+// threaten / buy_council_vote, the BATTLEPLANS map dialog (agrees on a common target: trade_maps,
+// the partner's base_id_attack_target and target location) and a click on a faction's commlink
+// button. Headless: nothing happens (0).
+ADDR_NATIVE(0x54C560) int32_t GAMEAPI diplomacy_menu(int32_t faction_id, int32_t faction_id_with);
+ADDR_NATIVE(0x54F420) void GAMEAPI make_a_proposal(int32_t faction_id, int32_t faction_id_with, int32_t a3);
+ADDR_NATIVE(0x54DCF0) int32_t GAMEAPI proposal_menu(int32_t faction_id, int32_t faction_id_with);
+ADDR_NATIVE(0x54B1C0) void GAMEAPI battle_plans(int32_t faction_id, int32_t faction_id_with);
+ADDR_NATIVE(0x558C60) void GAMEAPI commlink_attempt(int32_t faction_id_with);
+// Closes the diplomacy dialog's interface mode. Headless: nothing.
+ADDR_NATIVE(0x43F5C0) void THISCALL DiploPop_stop(uint8_t* pop);
+// Checks before a human opens a commlink or acts on the diplomacy panel: faction_id_with | 0x10
+// marks a faction not met or eradicated (message, refused), Ctrl/Shift with debug mode opens the
+// debug dialog, multiplayer locks and open channels refuse. 0: go ahead. Headless: the single
+// player path without keys (0, or 1 with the message for faction_id_with | 0x10).
+ADDR_NATIVE(0x5589E0) int32_t GAMEAPI commlink_attempter(int32_t faction_id, int32_t faction_id_with);
+// InfoWindow field cleared after a technology changes hands in the dialog (status pane, UI).
+GLOBAL(int32_t, InfoWindowTechReset, 0x7AD330);
+// Colours of the four mandates (reports), at [0], [2], [4], [6] (palette values).
+GLOBAL(int32_t[8], MandateColors, 0x8C6DE4);
+
 // ---- diplomacy module, second half (diplomacy_b.cpp) ----
 // "he"/"she" of faction_id's leader in HisHerBuffer (labels 209/210; mode as get_his_her).
 ADDR_NATIVE(0x58FCE0) char* GAMEAPI get_he_she(int32_t faction_id, int32_t mode);

@@ -25,3 +25,5 @@ ADDR(0x51E6F0) void GAMEAPI say_checksum(const char* label, int32_t value);
 // after world regeneration, 4 beginning of turn: also stored in MasterChecksum). Only with
 // MultiDebugActive, except stage 4.
 ADDR(0x51E760) void GAMEAPI do_checksums(int32_t stage);
+// Multiplayer wait helper (0x51F1B0, not reconstructed): lets the host take over a stalled turn.
+ADDR(0x51F1B0) void GAMEAPI check_spock();

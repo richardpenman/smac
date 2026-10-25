@@ -41,3 +41,13 @@ GLOBAL(char[32], NetBaseName, 0x93FC30);  // base name buffer sent by enemy_move
 ADDR(0x530320) int32_t THISCALL NetDaemon_receive(uint8_t* net);
 // Multiplayer: performs veh_id's current order through the network daemon (1: unit done).
 ADDR(0x532570) int32_t THISCALL NetDaemon_action(uint8_t* net, int32_t veh_id, int32_t a2);
+// Multiplayer: takes the global (diplomatic) lock, processing messages while waiting; non-zero
+// while it is not obtained (0 at once in single player) / releases it (nothing in single player).
+ADDR(0x530AA0) int32_t THISCALL NetDaemon_add_global(uint8_t* net);
+ADDR(0x530D00) void THISCALL NetDaemon_unlock(uint8_t* net);
+// Multiplayer: closes the diplomacy channel (nothing in single player).
+ADDR(0x530600) void THISCALL NetDaemon_close_channel(uint8_t* net);
+// Multiplayer: sends the diplomatic state of two factions (NetDaemon_synch 0x16).
+ADDR(0x593450) void GAMEAPI synch_diplo(int32_t faction_id, int32_t faction_id_with);
+// Multiplayer: sends faction_id's leader state (council promises) to the other players.
+ADDR(0x5932E0) void GAMEAPI synch_leader(int32_t faction_id);
