@@ -49,7 +49,11 @@ void GAMEAPI show_credits() {}
 void GAMEAPI report_score(int32_t) {}
 void GAMEAPI quayle(int32_t) {}
 void GAMEAPI hall_of_fame(int32_t) {}
-void GAMEAPI show_replay() {}
+// The end of the game for the harness (g_harness_game_end: final snapshot, exit), as the oracle
+// does at the original's show_replay.
+void GAMEAPI show_replay() {
+    if (g_harness_game_end) g_harness_game_end();
+}
 // The script runner of the headless app takes the place of the main menu (see g_harness_top_menu);
 // without it the game quits.
 int32_t GAMEAPI top_menu(int32_t) { return 1; }

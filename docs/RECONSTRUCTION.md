@@ -193,11 +193,15 @@ The original reads stack memory it never wrote in these places. The oracle makes
 
 6. **`call_council` (0x52C880), local `[ebp-0x14]`** ("aliens alive" flag): written only when
    proposal 1 (Supreme Leader) is examined (Diplomatic Victory on, not yet passed, caller among
-   the two largest voters). Otherwise it holds the residue of the previous call at that depth: in
-   `faction_upkeep`, `corner_market`'s pushed argument `1` for `mind_control` (whenever a foreign
-   base exists), so AIs then never propose anything but governor elections. Native: the flag
-   starts at 1 (`call_council` from `faction_upkeep`). Hybrid: a naked entry thunk reads
-   `[esp-0x18]` at entry (turn.cpp). Marked `BUG(original)`.
+   the two largest voters). Otherwise it holds what the prologue left there: the large frame is
+   probed by `_chkstk` (0x645550), whose first instruction `push ecx` stores the caller's ECX in
+   exactly this slot (the residue of earlier calls, e.g. `corner_market`'s pushed `1`, is
+   overwritten; `slotlog` at the function entry sees that residue, not the final value).
+   `faction_upkeep` calls with ECX = the human players' mask (`mov cl, FactionStatus[0]` of its
+   `is_human` test, upper bytes 0): in observer games 0 (AIs propose anything), with a human
+   player non-zero (AIs only call governor elections). Native: `faction_upkeep` passes
+   `FactionStatus[0]`; other callers 1. Hybrid: a naked entry thunk stores ECX (turn.cpp).
+   Marked `BUG(original)`. (late147: faction 4's Global Trade Pact, turn 148, needs the 0.)
 
 7. **`alien_move` (0x566810), local `[ebp-0x10]`** (score): the movement scoring keeps a score
    marker 0x3039 from a previous tile and is read before any write when the unit is no artillery

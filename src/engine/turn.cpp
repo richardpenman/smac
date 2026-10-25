@@ -10,6 +10,7 @@
 #include "engine/base.h"
 #include "engine/battle.h"
 #include "engine/clock.h"
+#include "engine/council.h"
 #include "engine/crt.h"
 #include "engine/diplo_act.h"
 #include "engine/diplomacy.h"
@@ -1485,8 +1486,9 @@ void GAMEAPI faction_upkeep(int32_t faction_id) {
             GameState |= STATE_DISPLAYED_COUNCIL_AVAIL_MSG;
             popp(ScriptFileName, "COUNCILOPEN", 0, "council_sm.pcx", 0);
         }
-        // call_council's uninitialised flag: corner_market's residue (see call_council).
-        if (!is_human(faction_id)) call_council_body(faction_id, 1);
+        // call_council's uninitialised flag: ECX at the call, the human players' mask (see
+        // call_council).
+        if (!is_human(faction_id)) call_council_body(faction_id, FactionStatus[0]);
     }
     if (!MultiplayerActive && (GamePreferences & PREF_BSC_AUTOSAVE_EACH_TURN) && faction_id == CurrentPlayerFaction)
         auto_save();
@@ -2272,9 +2274,10 @@ int32_t GAMEAPI can_call_council(int32_t faction_id, int32_t show_reason) {
 }
 
 // call_council's [ebp-0x14] (the "aliens alive" flag) is only written when proposal 1 is
-// considered. BUG(original): otherwise it holds the residue of the previous call at that stack
-// depth: in faction_upkeep, corner_market's pushed argument 1 (it calls mind_control for foreign
-// bases), so AI factions then never propose anything but governor elections.
+// considered. BUG(original): otherwise it holds what the prologue's _chkstk (0x645550, `push ecx`)
+// stored there: the caller's ECX. faction_upkeep calls with ECX = the human players' mask
+// (FactionStatus[0], loaded by its is_human test), so AI factions propose anything only in games
+// without human players (observer games); with a human, only governor elections.
 namespace {
 void call_council_body(int32_t faction_id, int32_t aliens_residue) {
     if (ExpansionEnabled && (MFactions[faction_id].rule_flags & RFLAG_ALIEN)) return;
@@ -2463,11 +2466,12 @@ extern "C" {
 int32_t call_council_residue_in;
 void __cdecl call_council_entry(int32_t faction_id) { call_council_body(faction_id, call_council_residue_in); }
 }
-// The original's [ebp-0x14] is [esp-0x18] at entry.
+// The original's [ebp-0x14] is ECX at entry (stored by _chkstk).
 __attribute__((naked)) void GAMEAPI call_council(int32_t) {
-    __asm__("mov -0x18(%esp), %eax\n mov %eax, _call_council_residue_in\n jmp _call_council_entry\n");
+    __asm__("mov %ecx, _call_council_residue_in\n jmp _call_council_entry\n");
 }
 #else
+// Other callers (the human's council menu): ECX is not known; non-zero assumed.
 void GAMEAPI call_council(int32_t faction_id) { call_council_body(faction_id, 1); }
 #endif
 

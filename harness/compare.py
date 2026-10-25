@@ -172,6 +172,8 @@ def main():
     def key(n):
         m = re.match(r"(turn|step)_(\d+)(?:_(\d+)_(\w+))?", n)
         if not m:
+            if n == "game_end":  # the final snapshot (end of game) sorts last
+                return (1 << 30, 0, 0, n)
             return (-1, 0, 0, n)  # other names (e.g. "boot") sort first, alphabetically
         return (int(m.group(2)), 0 if m.group(1) == "turn" else 1, int(m.group(3) or 0), m.group(4) or "")
     snaps = sorted(names(a) & names(b), key=key)

@@ -39,6 +39,8 @@ extern int (*g_harness_top_menu)();
 extern int (*g_harness_enemy_veh)(int);
 extern void (*g_harness_enemy_veh_pump)();
 static void hook_enemy_veh_pump_void();
+/* Reconstructed CouncilWin_session -> the window's modal loop (engine/council.h). */
+extern int (*g_harness_council_modal)(unsigned char *);
 #endif
 
 /* ---- original functions ---- */
@@ -398,6 +400,13 @@ static int __thiscall hook_council_modal(void *self, int a, int b, int c) {
     logf_("council result=%d proposal=%d winner=%d governor=%d\n", result, proposal, winner, G(int32_t, 0x9A6614));
     return 0;
 }
+#ifdef ORACLE_WITH_ENGINE
+/* The same for the reconstructed FUN_00427230 (CouncilWin_session), whose modal loop call is
+ * ui_councilwin_modal (hybrid: this hook). */
+static int council_modal_engine(unsigned char *win) {
+    return hook_council_modal(win, 0, 0x5398E0, 0x7AE820);
+}
+#endif
 static void install_council_hook() {
     const uint32_t site = 0x4282F2; /* FUN_00427230: call [eax+0xE4] (Win_set_modal) */
     const uint8_t expect[6] = {0xFF, 0x90, 0xE4, 0x00, 0x00, 0x00};
@@ -1166,6 +1175,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         g_harness_top_menu = oracle_top_menu;
         g_harness_enemy_veh = hook_enemy_veh;
         g_harness_enemy_veh_pump = hook_enemy_veh_pump_void;
+        g_harness_council_modal = council_modal_engine;
         engine_set_deterministic(true);
         patches_init();
         /* oracle.patch: patch spec applied before the game boots, so reconstructed boot code

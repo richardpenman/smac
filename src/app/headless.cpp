@@ -355,6 +355,12 @@ int main(int argc, char** argv) {
     g_script = f;
     g_harness_turn_upkeep = harness_turn_upkeep;
     g_harness_top_menu = run_script;
+    // end_of_game -> show_replay: final snapshot and exit, as the oracle (harness/README.md "End of game").
+    g_harness_game_end = [] {
+        snapshot("game_end");
+        logf_("game over: turn=%d GameState=%08X, exiting\nexit=0\n", CurrentTurn, (uint32_t)GameState);
+        std::exit(0);
+    };
     // pfncWinMain -> control_game: boot (system_init, game_init, preferences), then the script in
     // place of the main menu; "turns" returns into the game loop.
     control_game();

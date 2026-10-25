@@ -137,7 +137,9 @@ alternative of closing the window without voting, which skips the tally and `cou
 human viewers keep the original modal loop. Each session is logged in `oracle.log`
 (`council turn=... proposal=... votes=...` and `council result=...`). A native reconstruction of
 `council` must reproduce this: AI votes, the extra three `council_get_vote` passes, the tally and
-`council_action` when passed.
+`council_action` when passed. The reconstruction (engine/council.cpp) runs the modal loop through
+`ui_councilwin_modal`: hybrid builds call the oracle's hook there (`g_harness_council_modal`),
+`smacx_headless` does the same two steps itself.
 
 ## End of game
 
@@ -150,8 +152,10 @@ the main menu. All of these are UI with modal loops; `report_score` even crashes
 (ReportIf_on_status, 0x4A5C7E, calls a per-faction button indexed by faction 0). The oracle
 replaces the first four with no-ops and, when `show_replay` is called, writes the snapshot
 `game_end` (state after the victory processing, `GameState` with STATE_GAME_DONE) and exits with
-code 0. The `turns` limit is then not reached; the run ends at the game's end. A reconstruction
-run should write the same `game_end` snapshot at that point.
+code 0. The `turns` limit is then not reached; the run ends at the game's end. `smacx_headless`
+does the same: its `show_replay` calls `g_harness_game_end` (engine/turn.h), which writes
+`game_end` and exits; the other end screens are no-ops headless. `compare.py` compares `game_end`
+after the turn snapshots.
 
 ## Hang diagnosis
 

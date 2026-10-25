@@ -369,10 +369,6 @@ ADDR_NATIVE(0x4717A0) void THISCALL MessageWin_clear(uint8_t* win);
 ADDR_NATIVE(0x4243D0) void GAMEAPI clear_council_notify(int32_t faction_id);
 // Hotseat/PBEM diplomacy between two human players (DiploWin). Headless: nothing.
 ADDR_NATIVE(0x444D90) void GAMEAPI diplo(int32_t faction_id, int32_t faction_id_with);
-// The Planetary Council session (CouncilWin): votes on proposal by faction_id (candidate for the
-// governor elections) and applies the result (council_action). UI code that holds the vote logic:
-// not reconstructed yet (native builds abort when an AI calls the council).
-ADDR(0x428350) void GAMEAPI council(int32_t faction_id, int32_t proposal, int32_t candidate);
 // End of game screens: credits, score report, rating (quayle), hall of fame, replay.
 ADDR_NATIVE(0x428DF0) void GAMEAPI show_credits();
 ADDR_NATIVE(0x4ACB80) void GAMEAPI report_score(int32_t a1);

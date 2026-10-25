@@ -15,6 +15,9 @@ extern int32_t (*g_harness_enemy_turn)(int32_t);          // control_turn -> ene
 extern int32_t (*g_harness_human_turn)();                 // control_turn -> Console_human_turn (human)
 extern int32_t (*g_harness_observer_pause)();             // control_turn -> Console_human_turn (round end)
 extern int32_t (*g_harness_top_menu)();                   // control_game -> top_menu
+// Headless builds: end_of_game -> show_replay calls this (final snapshot; the oracle does the same
+// with the original show_replay, see harness/README.md "End of game").
+extern void (*g_harness_game_end)();
 
 // ---- globals -----------------------------------------------------------------------------------------
 GLOBAL(int32_t[8], CouncilVoteFor, 0x6FF6D4);        // council: the candidate each faction voted for

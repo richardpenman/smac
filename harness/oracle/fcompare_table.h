@@ -432,6 +432,10 @@ static const FcFunc kFcFuncs[] = {
     {"council_get_vote", 0, {A(FACTION1), R(0, 10), A(FACTION)}},
     {"council_action", FC_MUTATES | FC_VOID, {R(0, 10), A(FACTION1)}},
     {"can_call_council", 0, {A(FACTION1), A(BOOL)}},
+    /* council and its CouncilWin methods (FUN_00427230 etc., THISCALL): not here. A session opens
+     * the council window, whose Spot_init frees the window's previous heap block; after the image
+     * restore the second call frees it again (crash in free). Verified by the hybrid scenarios
+     * council131, late147, end300 and long300. */
     /* ---- action (unit orders; any vehicle, the functions do not check the unit type) ---- */
     {"terraform_cost", FC_MUTATES, {XY, A(FACTION1)}}, /* base_find sets BaseFindDist */
     {"road_rate", 0, {XY}},
