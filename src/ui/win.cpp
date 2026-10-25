@@ -186,6 +186,10 @@ bool run_command(const std::string& cmd) {
         screens_log_state();
         return true;
     }
+    if (cmd == "protostate") {  // test aid: the viewer's prototypes (techwin.h)
+        designwin_log_protos();
+        return true;
+    }
     if (cmd == "techstate") {  // test aid: the viewer's research (techwin.h)
         techwin_log_state();
         return true;

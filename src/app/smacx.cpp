@@ -28,7 +28,7 @@
 // base's production, queue, workers and stores on stderr), SCREENSTATE (the open report / social
 // engineering / monuments screen: its texts and state), FACTIONSTATE (the viewer's social choice,
 // energy allocation, credits and upheaval paid), TECHSTATE (the viewer's research goal and
-// points, blind research priorities), and the commands SHOT[:FILE]
+// points, blind research priorities), PROTOSTATE (the viewer's prototypes), and the commands SHOT[:FILE]
 // (screenshot), SAVE:FILE (save the game
 // and its generators in FILE.rng, relative to --outdir), UNITS (list the human's units on
 // stderr), QUIT. --exit-after-keys (default with --hidden) quits when they run out.
@@ -431,6 +431,10 @@ bool parse_key(std::string tok, ScriptedKey* out) {
     }
     if (tok == "SCREENSTATE" || tok == "FACTIONSTATE") {  // the open screen / the viewer's faction (test aids)
         out->command = tok == "SCREENSTATE" ? "screenstate" : "factionstate";
+        return true;
+    }
+    if (tok == "PROTOSTATE") {  // the viewer's prototypes (designwin.cpp, test aid)
+        out->command = "protostate";
         return true;
     }
     if (tok == "TECHSTATE") {  // the viewer's research (techwin.h, test aid)

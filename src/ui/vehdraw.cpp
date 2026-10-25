@@ -914,6 +914,11 @@ void GAMEAPI vehdraw_construct_vehicle(int32_t veh_id, VoxelScene* sc) {
     vehdraw_construct_weapon(f, chassis, weapon, sc);
     vehdraw_construct_abil(abil, sc, f);
     vehdraw_construct_armor(f, chassis, weapon, armor, 0, sc);
+    vehdraw_construct_reactor(f, chassis, weapon, reactor, abil, sc);
+}
+
+void GAMEAPI vehdraw_construct_reactor(int32_t, int32_t chassis, int32_t weapon, int32_t reactor, uint32_t abil,
+                                       VoxelScene* sc) {
     if (!reactor) return;
     if (chassis == 0) {
         const uint8_t mode = Weapon[weapon].mode;

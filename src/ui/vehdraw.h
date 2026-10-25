@@ -63,6 +63,10 @@ ADDR_NATIVE(0x4C2030) void GAMEAPI vehdraw_construct_abil(uint32_t abilities, Vo
 // overlay: the second pass of armour 5 (its transparent shield).
 ADDR_NATIVE(0x4C3090) void GAMEAPI vehdraw_construct_armor(int32_t faction_id, int32_t chassis_id, int32_t weapon_id,
                                                           int32_t armor_id, int32_t overlay, VoxelScene* scene);
+// The reactor's model (none for reactor 0; infantry with a weapon / probe, the chassis 8, others;
+// the heavy-transport ability's part).
+ADDR_NATIVE(0x4C3800) void GAMEAPI vehdraw_construct_reactor(int32_t faction_id, int32_t chassis_id, int32_t weapon_id,
+                                                            int32_t reactor_id, uint32_t abilities, VoxelScene* scene);
 // The unit colour tables of colortables_init (0x423570; system.txt VEHICLECOLORING,
 // ARMORCOLORING, ARMORCOLORING_TRANS): per faction (0x79A7EC) and per armour (0x792664) the
 // shading table of VBP.CVR recoloured with a base colour, the light level table (0x788250) and

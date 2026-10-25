@@ -8,7 +8,8 @@
 // picker (FUN_00494700, a full-screen grid of item pictures built by FUN_00492fa0) is replaced by a
 // text popup listing the same items in the same order (units in proto_sort order filtered by
 // veh_avail, then facilities 1..0x85 filtered by facility_avail) with the same return codes
-// (-9999 cancel, unit id, 0x200 + facility id).
+// (-9999 cancel, unit id, 0x200 + facility id); a last item opens the design workshop (the
+// picker's DESIGN mode) and shows the picker again.
 #include <cstdio>
 #include <cstring>
 #include "engine/action.h"
@@ -70,6 +71,8 @@ void pick_item(BasePop* pop, int32_t item, int32_t code, int32_t prod_at_open, i
     BasePop_item(pop, StrBuffer, code);
 }
 
+constexpr int32_t kPickDesign = 0x7FFF;  // the stand-in's design workshop item
+
 // FUN_00494700 stand-in: the choice for queue slot `slot` (0 = current production).
 int32_t production_pick(int32_t faction, int32_t slot, int32_t prod_at_open) {
     BasePop* pop = popup_new();
@@ -89,6 +92,8 @@ int32_t production_pick(int32_t faction, int32_t slot, int32_t prod_at_open) {
         if (-fac == current) active = 0x200 + fac;
         pick_item(pop, -fac, 0x200 + fac, prod_at_open, slot);
     }
+    // The picker's DESIGN mode (the original's button beside the grid), as a last item.
+    BasePop_item(pop, label_get(915), kPickDesign);
     if (active != -9999) BasePop_set_active(pop, active);
     int32_t r = BasePop_exec_3(pop, 0, 0);
     popup_delete(pop);
@@ -127,6 +132,13 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
     for (;;) {
         refresh_base(self);
         int32_t item = production_pick(faction, slot, bwf(kBwProdAtOpen));
+        if (item == kPickDesign) {
+            // The picker's design mode (BaseWin_production's mode 3: DesignWin_exec for a new
+            // design, set_base), then the picker again.
+            DesignWin_exec(&DesignWin, faction, -1);
+            set_base(bwf(kBwBase));
+            continue;
+        }
         if (slot != 0 && item == -9999) {
             for (int32_t i = 0; i < 10; i++) cur_base().queue_items[i] = saved[i];
             cur_base().queue_size = saved_size;

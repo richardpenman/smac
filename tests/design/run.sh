@@ -95,4 +95,85 @@ has newtech "design question" "^popup ASKSEEDESIGN answer: 0"
 check "newtech next choice" "$(line newtech techwin 1 | cut -d' ' -f1-4)" "techwin faction 1 count"
 check "newtech research" "$(ts newtech 1)" "techstate f1 research 36 accumulated 7 cost -1 ai -1 1 0 0"
 
+# 4. The design workshop (turn_147, faction 3: University). Window at (216, 168), 623 x 387; the
+#    component boxes (weapon at 320,320), the picker's grid (Resonance Laser at 513,407), the
+#    buttons RENAME (403,525) and APPLY (296,499), the INFANTRY preset (842,631), the prototype
+#    list in the bottom pane (second box at 339,729).
+#    a) u opens a new design in the first empty slot (208: Chaos Foil from consider_designs); the
+#       weapon picker gives Resonance Laser; Enter (DONE) makes the prototype (R-Laser Foil) and
+#       prune_protos makes AAA Gatling Foil obsolete; the save keeps them.
+run design147 --save work/saves_late/turn_147.sav --human 3 --keys "u,SHOT:design.bmp,SCREENSTATE,CLICK:320x320,\
+SHOT:picker.bmp,SCREENSTATE,CLICK:513x407,SCREENSTATE,ENTER,PROTOSTATE,SAVE:after.sav"
+nocrash design147
+ds() { line "$1" designstate "$2" | sed 's/ stack.*//'; }
+pr() { grep -a "^proto $2 " "$OUT/$1.log" | sed -n "${3:-1}p"; }
+check "design147 new design" "$(ds design147 1)" \
+    "designstate f3 unit 208 chassis 3 weapon 5 armor 11 reactor 2 abil 0x2 slots 1 -1 name '' cost 40 proto -1"
+has design147 "title" "^screentext DESIGN WORKSHOP"
+has design147 "slot text" "^screentext DESIGNING NEW UNIT \(SLOT #17\)"
+has design147 "picker lists the weapons" "^picker kind 1 sel 5 items 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 23 24 25"
+has design147 "unavailable weapon" "^screentext item 6 Fusion Laser \(unavailable\)"
+check "design147 weapon chosen" "$(ds design147 2)" \
+    "designstate f3 unit 208 chassis 3 weapon 12 armor 11 reactor 2 abil 0x2 slots 1 -1 name '' cost 40 proto -1"
+has design147 "name" "^screentext name R-LASER FOIL"
+check "design147 prototype" "$(pr design147 208)" \
+    "proto 208 name 'R-Laser Foil' chassis 3 weapon 12 armor 11 reactor 2 abil 0x2 flags 0x10d obsolete 0 cost 5"
+check "design147 pruned" "$(pr design147 215)" \
+    "proto 215 name 'AAA Gatling Foil' chassis 3 weapon 3 armor 11 reactor 2 abil 0x100 flags 0x5 obsolete 1 cost 4"
+run design147r --save "$OUT/design147/after.sav" --human 3 --keys "PROTOSTATE"
+check "design147 reload" "$(pr design147r 208)" \
+    "proto 208 name 'R-Laser Foil' chassis 3 weapon 12 armor 11 reactor 2 abil 0x2 flags 0x10d obsolete 0 cost 5"
+
+#    b) the INFANTRY preset (consider_designs) gives the existing Chaos Infantry's design; RENAME
+#       (DESIGNNAME: "Test"), APPLY reuses prototype 204 with the custom name (flag 2).
+run preset147 --save work/saves_late/turn_147.sav --human 3 --keys "u,CLICK:842x631,SCREENSTATE,CLICK:403x525,\
+T,e,s,t,ENTER,SCREENSTATE,CLICK:296x499,SCREENSTATE,ESC,PROTOSTATE,SAVE:after.sav"
+nocrash preset147
+check "preset147 infantry" "$(ds preset147 1)" \
+    "designstate f3 unit 208 chassis 0 weapon 5 armor 11 reactor 2 abil 0 slots -1 -1 name '' cost 40 proto -1"
+has preset147 "rename popup" "^popup DESIGNNAME answer: 0"
+check "preset147 renamed" "$(ds preset147 2)" \
+    "designstate f3 unit 208 chassis 0 weapon 5 armor 11 reactor 2 abil 0 slots -1 -1 name 'Test' cost 40 proto -1"
+check "preset147 applied (existing design)" "$(line preset147 designstate 3 | sed 's/.* result //')" "1"
+check "preset147 prototype" "$(pr preset147 204)" \
+    "proto 204 name 'Test' chassis 0 weapon 5 armor 11 reactor 2 abil 0 flags 0x7 obsolete 0 cost 5"
+run preset147r --save "$OUT/preset147/after.sav" --human 3 --keys "PROTOSTATE"
+check "preset147 reload" "$(pr preset147r 204)" \
+    "proto 204 name 'Test' chassis 0 weapon 5 armor 11 reactor 2 abil 0 flags 0x7 obsolete 0 cost 5"
+
+#    c) a click on Chaos Squad in the list, o: obsolete (the next design is shown); five Left and a
+#       click on Sea Colony Pod, U: the only upgrade (Fusion Sea Colony Pod, YESUPGRADE: no units).
+run obsolete147 --save work/saves_late/turn_147.sav --human 3 --keys "u,CLICK:339x729,SCREENSTATE,o,SCREENSTATE,\
+LEFT,LEFT,LEFT,LEFT,LEFT,CLICK:480x729,SCREENSTATE,U,ENTER,SCREENSTATE,ESC,PROTOSTATE"
+nocrash obsolete147
+check "obsolete147 selected" "$(line obsolete147 designstate 1 | cut -d' ' -f2-4)" "f3 unit 214"
+check "obsolete147 next" "$(line obsolete147 designstate 2 | cut -d' ' -f2-4)" "f3 unit 215"
+check "obsolete147 obsolete" "$(pr obsolete147 214 | sed 's/.* obsolete //')" "1 cost 3"
+check "obsolete147 colony pod" "$(line obsolete147 designstate 3 | cut -d' ' -f2-4)" "f3 unit 200"
+has obsolete147 "upgrade done" "^popup YESUPGRADE answer: 0"
+check "obsolete147 upgraded to" "$(line obsolete147 designstate 4 | cut -d' ' -f2-4)" "f3 unit 197"
+
+# 5. The other late saves: the workshop opens and Esc leaves the prototypes unchanged (turn_100
+#    faction 1, turn_300 faction 6 after its popups and base window).
+run design100 --save work/saves_late/turn_100.sav --human 1 --keys "PROTOSTATE,u,SHOT:design.bmp,SCREENSTATE,ESC,\
+SCREENSTATE,PROTOSTATE"
+nocrash design100
+has design100 "opened" "^designstate f1 unit "
+check "design100 closed" "$(grep -a '^screenstate' "$OUT/design100.log" | tail -1)" "screenstate none"
+check "design100 unchanged" "$(grep -a '^proto ' "$OUT/design100.log" | sort | uniq -u | wc -l)" "0"
+run design300 --save work/saves_late/turn_300.sav --human 6 --keys "ENTER,ENTER,ENTER,ESC,PROTOSTATE,u,SCREENSTATE,ESC,\
+PROTOSTATE"
+nocrash design300
+has design300 "opened" "^designstate f6 unit "
+check "design300 unchanged" "$(grep -a '^proto ' "$OUT/design300.log" | sort | uniq -u | wc -l)" "0"
+
+# 6. From the base window (turn_147, University Base): the build menu's last item opens the design
+#    workshop, Esc returns to the build menu.
+D40=$(printf 'DOWN,%.0s' $(seq 1 40))
+run basedesign147 --save work/saves_late/turn_147.sav --human 3 --keys "BASE:2,c,${D40}ENTER,SCREENSTATE,ESC,ESC,ESC"
+nocrash basedesign147
+has basedesign147 "design item" "^popup  answer: 32767"
+has basedesign147 "workshop open" "^designstate f3 unit 208 "
+check "basedesign147 build menu again" "$(grep -a '^popup  answer' "$OUT/basedesign147.log" | sed -n 2p)" "popup  answer: -1 (button 0)"
+
 exit $FAIL

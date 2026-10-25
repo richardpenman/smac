@@ -29,6 +29,8 @@ ADDR(0x52F8E0) void THISCALL NetDaemon_game_checksum(uint8_t* net, FullChecksum*
 // priorities (synch_ai, type 8) to the other players.
 ADDR(0x593340) void GAMEAPI synch_research(int32_t faction_id);
 ADDR(0x593310) void GAMEAPI synch_ai(int32_t faction_id);
+// Multiplayer: sends prototype unit_id (type 0xE).
+ADDR(0x5933F0) void GAMEAPI synch_proto(int32_t unit_id);
 // Multiplayer: sends faction_id's research goal to the other players.
 ADDR(0x5932B0) void GAMEAPI synch_researching(int32_t faction_id);
 // Processes pending network messages (multiplayer wait loops).
