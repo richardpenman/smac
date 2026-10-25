@@ -114,6 +114,8 @@ src/app/smacx.cpp the native game executable
   | `techwin` | tech_pick (the research dialog), NewTechWin_exec | techwin.cpp |
   | `design` | DesignWin_exec | designwin.cpp |
   | `help` | help_topic, help_project (Datalink_exec) | help.cpp, datalink.cpp |
+  | `diplomacy` | communicate, diplomacy_menu, proposal_menu, make_a_proposal, battle_plans, commlink_attempt, commlink_attempter, DiploPop_start/stop/draw_info, InfoWin_set_state, GraphicWin_soft_update_3, get_he_she | diplo_comm.cpp, diplowin.cpp |
+  | `council` | ui_councilwin_* (the council window's operations, engine/council.h) | councilwin.cpp |
 
   To replace another function: move its headless definition into an area file of its own (or
   into the area it belongs to, if smacx implements the whole area), then define it in src/ui
@@ -141,7 +143,7 @@ src/app/smacx.cpp the native game executable
 | 5 (mostly done: src/ui/basewin*.cpp, tests/basewin/) | BaseWin (base screen): layout and art, panes, city map, clicks, build menu (text popup stand-in for the picker grid), queue, hurry, governor, specialists, rename, recycling; headless stubs in src/headless/ui_headless_basewin.cpp | `basedump` canvases vs oracle (tests/basewin/compare.sh), scripted keys (tests/basewin/run.sh) |
 | 6 (done, section 6) | popups: BasePop on the game's script files (Script.txt, xscript.txt etc.: `#LABEL`, `^` lines, `$STR` parsing via the reconstructed text module), `popp/popb/X_pop*`, NetMsg, choice lists | popups by label vs oracle |
 | 7 (done, section 9) | design workshop (DesignWin), tech pick (research window, Console_set_tech / set_ai), NewTechWin, datalinks (help); social engineering was done with the reports (section 8) | tests/design/run.sh, tests/datalinks/run.sh; tests/design/compare.sh vs the original |
-| 8 | diplomacy (DiploWin, commlink), council window, reports (ReportWin/ReportIf), monuments | |
+| 8 (done, section 10; reports and monuments in section 8) | diplomacy (communicate and the human's menus, DiploPop), council window (CouncilWin); hotseat/PBEM `diplo` (DiploWin) not reconstructed | tests/diplo/run.sh |
 | 9 | main menu, game setup (top_menu, setup dialogs), file dialogs (FileBox), preferences | new game from the menu |
 | 10 | sound (FX, voices, music), movies (FLC/WVE: openings, interludes, secret projects) | |
 
@@ -282,7 +284,8 @@ win_popup.cpp, popup_menus.cpp); every engine popup call opens the original's di
   lines into paragraphs (Buffer_write_strings and its measuring twin), as the gfx module does.
   Glyphs come from platform::font_render (the one place where GDI is approximated).
 * **Not reconstructed**: sounds (`#wave` etc.), the main interface's frame arms and the slide
-  animation (slide_show), DiploPop (diplomacy menus are shown as plain popups with the portrait),
+  animation (slide_show), DiploPop's own popup look (the diplomacy dialog's popups are the plain popups, with the leader
+  portrait: section 10),
   the help texts and tech icons of the tech popup, scroll bars of list boxes, hyperlink spots,
   `~` colour runs, sprite boxes (popups with several pictures), NetMsg's timed message window
   (multiplayer), the full-screen windows (they are not popups: sections 8 and 9).
@@ -451,3 +454,64 @@ F10 hall of fame, F11 menu detail, F12 the commlink panel (MainInterface_on_ifac
   research window and the new technology window are not reached by the original's QUICK START
   (blind research) and are not compared.
 
+
+
+## 10. Diplomacy and the Planetary Council (phase 8)
+
+* **communicate** (0x54FFD0, src/ui/diplo_comm.cpp): the 34 KB dialog between the human
+  (faction_id) and a computer player (faction_id_with), reconstructed from the disassembly with the
+  original's control flow (labels L_<address>, the stack slots it reuses): the computer player's
+  topics (withdrawal demands GETOUT / GOAWAY / INOURTERRITORY2, pleas and requests for help PLEA /
+  PROPOSE / DEMANDATTACK, introductions and betrayals INTRODUCEENEMY / BETRAYFRIEND, map and
+  commlink trades ENEMYMAP / METFRIEND / BOTHFRIEND / ANYNEWS, RANSOMDEMAND, tribute DEMANDBRIBE
+  (WEASELOUT / HALFBRIBE), technology demands DEMANDTECH with the energy / technology counter-offer
+  menu, ASKFORLOAN, social priorities, BREAKPACT, COLLABORATOR, BULLY, VENDETTA, SWEARAPACT /
+  GIMMEHELP, RANSOMTREATY, truces (WANTTOTRUCE, FACTIONTRUCE of the faction's own file through
+  X_pops_13, TECHTRUCE / ENERGYTRUCE, surrender TRUCEPLEASE with the diplomatic victory check),
+  treaties (FACTIONTREATY / OFFERTREATY / ENERGYTREATY), greetings, atrocities, the allies' war
+  reports, TEAMTECH, TERRITORY, QUISLING), then the human's DIPLO menu until the patience runs out
+  (TIMESUP), and the end (agendas, patience, diplomacy_ends, RENEWTRUCE / ENDTRUCE). Every change
+  goes through the engine (treaty_on/off, pact_of_brotherhood, make_treaty, pledge_truce,
+  double_cross, net_energy / net_tech / net_maps / net_loan / net_cede_base, ...). The
+  multiplayer paths are the engine's net_* functions (the plain change in single player).
+  Original bugs kept (marked BUG(original)): INTRODUCEENEMY's alien text chosen by
+  DiploHelpFaction; PROPOSEATTACK's check of diplo_status[8]; REPORTWINNING's region test.
+* **The human's menus** (src/ui/diplowin.cpp): diplomacy_menu (DIPLO / DIPLOMENU), proposal_menu
+  (PROPOSAL, PROPOSEATTACK / PROPOSECOMMLINK / PROPOSEBASE, COUNTER, COUNTERBASE), make_a_proposal
+  (propose_pact / propose_treaty / threaten / propose_attack / base_swap / tech_trade /
+  energy_trade / make_gift, TRADEMAPS, the loan repaid, COUNCILMATTER / COUNCILVOTE /
+  COUNCILVOTEGOV with buy_council_vote), battle_plans (BATTLEPLANS / BATTLEPLAN, the target's
+  acceptance: base_id_attack_target, the old target dropped), commlink_attempt (F12's commlink
+  panel; SUNSPOTSNO, ALIENHATRED2, the psych technologies, PBEM `diplo`, communicate, then the
+  commlink and contact bits) and commlink_attempter (single player). The menus are popups of the
+  script sections (ui_diplo_menu_*).
+* **DiploPop** (diplowin.cpp): while the commlink is open the main interface's left pane shows the
+  bioscan animation (dip_<a|f|m>_<mood>.flc at 0x1A, 0x5A) and, in DiploPop_init's rectangle, the
+  leader's animation (<faction>.flc) under the leader's name, REPUTATION and MOOD
+  (DiploPop_draw_portrait). The FLC files are decoded natively (colour, BRUN, COPY, BLACK, SS2,
+  LC chunks), their colours mapped to the game palette. They animate in interactive play only
+  (scripted and hidden runs show the first frames). DiploPop_start runs diplomacy_check as the
+  original. The popups' leader picture is now the faction art's sprite 28 (FactionPortraits,
+  load_faction_art), so every popup that passes FactionPortraits shows it.
+* **The council window** (src/ui/councilwin.cpp, the engine's council.cpp for the session): the
+  window (0x32C wide over the main interface, as the original's layout), the seven faction columns
+  (portrait, leader, council votes, GOVERNOR, the vote cast), the title and the result (MEASURE
+  PASSES / FAILS, EXECUTIVE VETO, the elected governor), the buttons on the main interface: YEA /
+  NAY (VETO for the governor) / ABSTAIN for proposals, VOTE (GOVVOTE: abstain or a candidate) for
+  elections, OK once decided (FUN_00424870's ids 1-5); Enter / Esc go to CouncilWin_key. A viewer
+  that is not human (observer mode) gets the unattended behaviour of the headless window.
+* **Not reconstructed (placeholders)**: hotseat/PBEM `diplo` (0x444D90 -> FUN_00443F10 and the
+  DiploWin message window, ~20 KB; still headless), DiploPop_draw_info / draw_hq (the info and HQ
+  panes stay empty), DiploPop's popup style (PopupDialogState 6 while the interface mode is on),
+  the PlanWin map previews of the base swap and battle plan menus (battle_routine), the commlink
+  debug dialog, multiplayer channels and the council's multiplayer timer. The council window's
+  panel art is approximated (box sprites, faction art sprite 26).
+* **Testing**: tests/diplo/run.sh (DIPLOSTATE and the council window's councilstate): turn_147 as
+  faction 3, the Hive's call (a pact and a vendetta accepted); the human's call to the Spartans
+  with a gift of all technologies and a gift of 75 credits; turn_300 as faction 6, a council
+  election with the human's vote (governor 3 -> 5); every change saved and loaded again. On
+  turn_147 (faction 3) and turn_300 (faction 6) a computer player now calls at the start of the
+  turn, as in the original (the headless communicate did nothing), so the other tests answer its
+  COMM popup "not now" first (DOWN,ENTER).
+* **Not compared with the original**: QUICK START has no contacts, so the original's commlink and
+  council cannot be reached there. The late saves are observer games and have no human player.

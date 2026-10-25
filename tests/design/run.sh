@@ -18,6 +18,8 @@ SMACX="$(realpath "${SMACX:-$ROOT/build/p7-native/smacx}")"
 OUT="$(realpath -m "${1:-$ROOT/work/design_test}")"
 mkdir -p "$OUT"
 FAIL=0
+# turn_147 as faction 3 and turn_300 as faction 6 start with a computer player's call (communicate):
+# DOWN,ENTER answers its COMM popup "not now".
 
 run() {  # run CASE ARGS... : runs smacx, log in OUT/CASE.log
     local name="$1"; shift
@@ -102,7 +104,7 @@ check "newtech research" "$(ts newtech 1)" "techstate f1 research 36 accumulated
 #    a) u opens a new design in the first empty slot (208: Chaos Foil from consider_designs); the
 #       weapon picker gives Resonance Laser; Enter (DONE) makes the prototype (R-Laser Foil) and
 #       prune_protos makes AAA Gatling Foil obsolete; the save keeps them.
-run design147 --save work/saves_late/turn_147.sav --human 3 --keys "u,SHOT:design.bmp,SCREENSTATE,CLICK:320x320,\
+run design147 --save work/saves_late/turn_147.sav --human 3 --keys "DOWN,ENTER,u,SHOT:design.bmp,SCREENSTATE,CLICK:320x320,\
 SHOT:picker.bmp,SCREENSTATE,CLICK:513x407,SCREENSTATE,ENTER,PROTOSTATE,SAVE:after.sav"
 nocrash design147
 ds() { line "$1" designstate "$2" | sed 's/ stack.*//'; }
@@ -126,7 +128,7 @@ check "design147 reload" "$(pr design147r 208)" \
 
 #    b) the INFANTRY preset (consider_designs) gives the existing Chaos Infantry's design; RENAME
 #       (DESIGNNAME: "Test"), APPLY reuses prototype 204 with the custom name (flag 2).
-run preset147 --save work/saves_late/turn_147.sav --human 3 --keys "u,CLICK:842x631,SCREENSTATE,CLICK:403x525,\
+run preset147 --save work/saves_late/turn_147.sav --human 3 --keys "DOWN,ENTER,u,CLICK:842x631,SCREENSTATE,CLICK:403x525,\
 T,e,s,t,ENTER,SCREENSTATE,CLICK:296x499,SCREENSTATE,ESC,PROTOSTATE,SAVE:after.sav"
 nocrash preset147
 check "preset147 infantry" "$(ds preset147 1)" \
@@ -143,7 +145,7 @@ check "preset147 reload" "$(pr preset147r 204)" \
 
 #    c) a click on Chaos Squad in the list, o: obsolete (the next design is shown); five Left and a
 #       click on Sea Colony Pod, U: the only upgrade (Fusion Sea Colony Pod, YESUPGRADE: no units).
-run obsolete147 --save work/saves_late/turn_147.sav --human 3 --keys "u,CLICK:339x729,SCREENSTATE,o,SCREENSTATE,\
+run obsolete147 --save work/saves_late/turn_147.sav --human 3 --keys "DOWN,ENTER,u,CLICK:339x729,SCREENSTATE,o,SCREENSTATE,\
 LEFT,LEFT,LEFT,LEFT,LEFT,CLICK:480x729,SCREENSTATE,U,ENTER,SCREENSTATE,ESC,PROTOSTATE"
 nocrash obsolete147
 check "obsolete147 selected" "$(line obsolete147 designstate 1 | cut -d' ' -f2-4)" "f3 unit 214"
@@ -161,7 +163,7 @@ nocrash design100
 has design100 "opened" "^designstate f1 unit "
 check "design100 closed" "$(grep -a '^screenstate' "$OUT/design100.log" | tail -1)" "screenstate none"
 check "design100 unchanged" "$(grep -a '^proto ' "$OUT/design100.log" | sort | uniq -u | wc -l)" "0"
-run design300 --save work/saves_late/turn_300.sav --human 6 --keys "ENTER,ENTER,ENTER,ESC,PROTOSTATE,u,SCREENSTATE,ESC,\
+run design300 --save work/saves_late/turn_300.sav --human 6 --keys "DOWN,ENTER,ENTER,ENTER,ENTER,ESC,PROTOSTATE,u,SCREENSTATE,ESC,\
 PROTOSTATE"
 nocrash design300
 has design300 "opened" "^designstate f6 unit "
@@ -170,7 +172,7 @@ check "design300 unchanged" "$(grep -a '^proto ' "$OUT/design300.log" | sort | u
 # 6. From the base window (turn_147, University Base): the build menu's last item opens the design
 #    workshop, Esc returns to the build menu.
 D40=$(printf 'DOWN,%.0s' $(seq 1 40))
-run basedesign147 --save work/saves_late/turn_147.sav --human 3 --keys "BASE:2,c,${D40}ENTER,SCREENSTATE,ESC,ESC,ESC"
+run basedesign147 --save work/saves_late/turn_147.sav --human 3 --keys "DOWN,ENTER,BASE:2,c,${D40}ENTER,SCREENSTATE,ESC,ESC,ESC"
 nocrash basedesign147
 has basedesign147 "design item" "^popup  answer: 32767"
 has basedesign147 "workshop open" "^designstate f3 unit 208 "

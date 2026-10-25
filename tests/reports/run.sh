@@ -16,6 +16,8 @@ SMACX="$(realpath "${SMACX:-$ROOT/build/rp-native/smacx}")"
 OUT="$(realpath -m "${1:-$ROOT/work/reports_test}")"
 mkdir -p "$OUT"
 FAIL=0
+# turn_147 as faction 3 and turn_300 as faction 6 start with a computer player's call (communicate):
+# DOWN,ENTER answers its COMM popup "not now".
 
 run() {  # run CASE ARGS... : runs smacx, log in OUT/CASE.log
     local name="$1"; shift
@@ -103,7 +105,7 @@ check "alloc100 reload" "$(fs alloc100r 1 | sed 's/.* alloc //')" "6 1 3"
 #    NUTRIENT sort, the garrison view, a double click opens the base, its F-key closes), security
 #    nexus (the land units filter), score, projects, labs, energy, satellites; Right cycles.
 run reports147 --save work/saves_late/turn_147.sav --human 3 --keys \
-"F4,SHOT:ops.bmp,SCREENSTATE,CLICK:180x586,CLICK:30x628,SCREENSTATE,CLICK:740x40,SHOT:garrison.bmp,SCREENSTATE,CLICK:530x40,\
+"DOWN,ENTER,F4,SHOT:ops.bmp,SCREENSTATE,CLICK:180x586,CLICK:30x628,SCREENSTATE,CLICK:740x40,SHOT:garrison.bmp,SCREENSTATE,CLICK:530x40,\
 DCLICK:400x120,BASESTATE,ESC,SCREENSTATE,F4,SCREENSTATE,\
 F7,SHOT:security.bmp,SCREENSTATE,CLICK:50x605,SCREENSTATE,F8,SHOT:score.bmp,SCREENSTATE,F5,SHOT:projects.bmp,SCREENSTATE,\
 F2,SHOT:labs.bmp,SCREENSTATE,F3,SHOT:energy.bmp,SCREENSTATE,F6,SHOT:sat.bmp,SCREENSTATE,RIGHT,SCREENSTATE,ESC,SCREENSTATE"
@@ -135,7 +137,7 @@ check "esc closes" "$(grep -a '^screenstate' "$OUT/reports147.log" | tail -1)" "
 # 5. Monuments (F9): the faction's nine monuments in the order of their years; a click shows one
 #    and records it as the latest (saved); Hall of fame (F10) writes hallfame.jhh (in --outdir).
 run monuments147 --save work/saves_late/turn_147.sav --human 3 --keys \
-"F9,SHOT:monuments.bmp,SCREENSTATE,CLICK:700x475,SHOT:text.bmp,SCREENSTATE,ESC,ESC,SAVE:after.sav,F10,SHOT:fame.bmp,SCREENSTATE,ESC"
+"DOWN,ENTER,F9,SHOT:monuments.bmp,SCREENSTATE,CLICK:700x475,SHOT:text.bmp,SCREENSTATE,ESC,ESC,SAVE:after.sav,F10,SHOT:fame.bmp,SCREENSTATE,ESC"
 nocrash monuments147
 check "monuments order" "$(grep -a '^screentext monument' "$OUT/monuments147.log" | head -9 | cut -d' ' -f3 | tr '\n' ' ')" \
     "1 0 2 3 4 6 5 7 8 "
@@ -151,7 +153,7 @@ check "monuments reload" "$(line monuments147r monustate 1)" "monustate f3 count
 #    commlink panel (F12): the contacts, a right click's menu, Faction Profile (the intelligence
 #    report), the Council button (call_council: COUNCILNEEDALL here).
 run commlink147 --save work/saves_late/turn_147.sav --human 3 --keys \
-"F4,CLICK:500x75,CLICK:120x678,SCREENSTATE,CLICK:120x744,SCREENSTATE,ESC,F12,SHOT:commlink.bmp,SCREENSTATE,\
+"DOWN,ENTER,F4,CLICK:500x75,CLICK:120x678,SCREENSTATE,CLICK:120x744,SCREENSTATE,ESC,F12,SHOT:commlink.bmp,SCREENSTATE,\
 RCLICK:950x365,SHOT:menu.bmp,SCREENSTATE,CLICK:900x394,SHOT:intel.bmp,SCREENSTATE,ESC,CLICK:950x478,ENTER,SCREENSTATE,ESC,\
 SCREENSTATE"
 nocrash commlink147
@@ -167,7 +169,7 @@ check "commlink closed" "$(grep -a '^screenstate' "$OUT/commlink147.log" | tail 
 # 7. turn_300 as faction 6 (three popups first, the last one opens a base window: Esc): every
 #    screen opens and closes.
 run late300 --save work/saves_late/turn_300.sav --human 6 --keys \
-"ENTER,ENTER,ENTER,BASESTATE,ESC,F4,SCREENSTATE,ESC,F7,ESC,F8,SCREENSTATE,ESC,F5,ESC,F2,ESC,F3,ESC,F6,ESC,e,SCREENSTATE,ESC,\
+"DOWN,ENTER,ENTER,ENTER,ENTER,BASESTATE,ESC,F4,SCREENSTATE,ESC,F7,ESC,F8,SCREENSTATE,ESC,F5,ESC,F2,ESC,F3,ESC,F6,ESC,e,SCREENSTATE,ESC,\
 F9,ESC,F10,ESC,SCREENSTATE,F12,CLICK:950x478,SHOT:council.bmp,ESC,ESC"
 nocrash late300
 has late300 "council: the proposals" "^popup COUNCILISSUES shown"

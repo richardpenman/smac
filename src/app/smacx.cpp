@@ -76,6 +76,7 @@
 #include "engine/world.h"
 #include "platform/ui_platform.h"
 #include "ui/console.h"
+#include "ui/diplowin.h"
 #include "ui/gfx.h"
 #include "ui/mapwin.h"
 #include "ui/colortables.h"
@@ -437,6 +438,10 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         out->command = "protostate";
         return true;
     }
+    if (tok == "DIPLOSTATE") {  // the viewer's treaties, energy and techs (diplowin.h, test aid)
+        out->command = "diplostate";
+        return true;
+    }
     if (tok == "TECHSTATE") {  // the viewer's research (techwin.h, test aid)
         out->command = "techstate";
         return true;
@@ -622,6 +627,7 @@ int main(int argc, char** argv) {
     ui_screen_init(g_opt.width, g_opt.height);
     g_ui_outdir = g_opt.outdir;
     g_ui_exit_when_script_done = g_opt.exit_after_keys || g_opt.hidden;
+    diplowin_set_animate(!g_opt.seeded);
     ui_script_keys(g_opt.keys);
     g_harness_top_menu = start_game_menu;
     g_harness_turn_upkeep = harness_turn_upkeep;

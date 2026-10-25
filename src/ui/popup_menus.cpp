@@ -247,6 +247,9 @@ int32_t ui_diplo_menu_exec(int32_t faction_id_with) {
     if (faction_id_with > 0 && faction_id_with < 8) BasePop_set_picture(g_diplo, FactionPortraits[faction_id_with]);
     return BasePop_exec_3(g_diplo, 0, 0);
 }
+void ui_diplo_menu_set_active(int32_t value) {
+    if (g_diplo) BasePop_set_active(g_diplo, value);
+}
 void ui_diplo_menu_close() {
     popup_delete(g_diplo);
     g_diplo = nullptr;

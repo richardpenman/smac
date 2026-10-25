@@ -13,6 +13,8 @@ SMACX="$(realpath "${SMACX:-$ROOT/build/p7-native/smacx}")"
 OUT="$(realpath -m "${1:-$ROOT/work/datalinks_test}")"
 mkdir -p "$OUT"
 FAIL=0
+# turn_147 as faction 3 and turn_300 as faction 6 start with a computer player's call (communicate):
+# DOWN,ENTER answers its COMM popup "not now".
 
 run() {  # run CASE ARGS... : runs smacx, log in OUT/CASE.log
     local name="$1"; shift
@@ -45,7 +47,7 @@ nocrash() {
 # 1. turn_147 as faction 3: F1 opens the technologies at Biogenetics; a link opens Recycling Tanks
 #    (base facilities), BACK returns, a category button shows its first entry, Down the next one;
 #    EXIT closes.
-run browse147 --save work/saves_late/turn_147.sav --human 3 --keys "F1,SHOT:techs.bmp,SCREENSTATE,CLICK:618x78,\
+run browse147 --save work/saves_late/turn_147.sav --human 3 --keys "DOWN,ENTER,F1,SHOT:techs.bmp,SCREENSTATE,CLICK:618x78,\
 SHOT:facility.bmp,SCREENSTATE,CLICK:387x512,SCREENSTATE,CLICK:124x581,SCREENSTATE,DOWN,SHOT:concept.bmp,SCREENSTATE,\
 CLICK:124x653,DOWN,DOWN,DOWN,DOWN,SHOT:unit.bmp,SCREENSTATE,CLICK:124x725,SCREENSTATE,CLICK:636x512,SCREENSTATE"
 nocrash browse147
@@ -67,7 +69,7 @@ check "browse147 closed" "$(grep -a '^screenstate' "$OUT/browse147.log" | tail -
 
 # 2. The labs report's DATALINKS opens the research goal (Fusion Power, 81); Esc closes it, then the
 #    report. turn_100 as faction 1: F1, the factions (Down to the second), Esc.
-run reports147 --save work/saves_late/turn_147.sav --human 3 --keys "F2,CLICK:388x520,SCREENSTATE,ESC,SCREENSTATE,ESC,\
+run reports147 --save work/saves_late/turn_147.sav --human 3 --keys "DOWN,ENTER,F2,CLICK:388x520,SCREENSTATE,ESC,SCREENSTATE,ESC,\
 SCREENSTATE"
 nocrash reports147
 check "reports147 labs datalinks" "$(line reports147 datalink 1 | cut -d' ' -f1-5)" "datalink cat 14 index 81"

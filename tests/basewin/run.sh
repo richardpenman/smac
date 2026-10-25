@@ -81,7 +81,7 @@ check "reload" "$(grep '^basestate' "$OUT/reload.log" | head -1)" \
 #    --seed default 0,0; with the original's clock seed the turn's events, e.g. FUNGUSGROWS2, came
 #    and went between runs and took the scripted keys.)
 for t in 120 147 300; do
-    pre=""; [ $t == 300 ] && pre="ENTER,"
+    pre=""; [ $t == 300 ] && pre="ENTER,"; [ $t == 147 ] && pre="DOWN,ENTER,"  # 147: the Hive calls (COMM: not now)
     pay="DOWN,ENTER"; [ $t == 120 ] && pay="DOWN,ENTER,BACK,BACK,BACK,BACK,5,0,ENTER"
     run late$t --save work/saves_late/turn_$t.sav --human 3 --keys \
 "${pre}BASE:2,BASESTATE,SHOT:open.bmp,c,SHOT:pick.bmp,DOWN,ENTER,BASESTATE,h,SHOT:hurry.bmp,$pay,BASESTATE,\

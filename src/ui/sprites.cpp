@@ -1,3 +1,4 @@
+#include <cstdio>
 // Map art loading (see sprites.h).
 #include "ui/sprites.h"
 
@@ -5,6 +6,7 @@
 #include <map>
 #include <string>
 
+#include "engine/ui_bridge.h"
 #include "engine/globals.h"
 #include "engine/text.h"
 #include "ui/mapwin.h"
@@ -181,6 +183,13 @@ void GAMEAPI load_faction_art(int32_t faction_id) {
     std::string file = std::string(MFactions[faction_id].filename) + ".pcx";
     if (Buffer_load_pcx(&LoadingCanvas, file.c_str(), nullptr, 10, 0xEC))
         Buffer_load_pcx(&LoadingCanvas, "faction.pcx", nullptr, 10, 0xEC);
+    // FactionPortraits[faction_id] (0x6846D8) points to the faction's sprite 28 (0x130, 0x1C9,
+    // 0x83 x 0x9D), the popups' leader picture; here a name BasePop_set_picture recognises.
+    {
+        static char portrait[8][16];
+        std::snprintf(portrait[faction_id & 7], sizeof(portrait[0]), "faction:%d", faction_id);
+        FactionPortraits[faction_id & 7] = portrait[faction_id & 7];
+    }
     FactionColorFill[faction_id] = Buffer_get_pixel(&LoadingCanvas, 4, 0x2E3);
     FactionColorFrame[faction_id] = Buffer_get_pixel(&LoadingCanvas, 4, 0x2EB);
     FactionColorText[faction_id] = Buffer_get_pixel(&LoadingCanvas, 4, 0x2F3);

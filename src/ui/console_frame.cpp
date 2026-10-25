@@ -30,6 +30,7 @@
 #include "ui/basewin.h"
 #include "ui/colortables.h"
 #include "ui/console.h"
+#include "ui/diplowin.h"
 #include "platform/ui_platform.h"
 #include "ui/popup.h"
 #include "ui/sprites.h"
@@ -299,6 +300,12 @@ void console_frame_draw(Buffer* s) {
     write(s, line, 0x312, 0xDA, 12, 0, color(60, 148, 124));
     std::snprintf(line, sizeof(line), "%s: %d", label_get(36), Factions[CurrentPlayerFaction].energy_credits);
     write(s, line, 0x312, 0xE8, 12, 0, color(60, 148, 124));
+    // The diplomacy mode (DiploPop) replaces the status panes while a commlink is open.
+    if (diplowin_draw_console(s, g_ox, g_oy)) {
+        draw_info_pane(s);
+        draw_world(s);
+        return;
+    }
     int32_t v = mw(&MainConsole, kConVeh);
     int32_t cx = MapWinCursorX[MapWinCursorIndex], cy = MapWinCursorY[MapWinCursorIndex];
     if (MapWinInVehMode && v >= 0 && v < VehCount) {

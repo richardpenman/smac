@@ -674,6 +674,20 @@ void BasePop_set_picture(BasePop* self, const char* pcx) {
     if (!pcx || !*pcx) return;
     Buffer b;
     Buffer_ctor(&b);
+    int32_t faction = -1;
+    if (std::sscanf(pcx, "faction:%d", &faction) == 1 && faction >= 0 && faction < 8) {
+        // A leader portrait (FactionPortraits, load_faction_art): sprite 28 of the faction's art.
+        std::string file = std::string(MFactions[faction].filename) + ".pcx";
+        if (Buffer_load_pcx(&b, file.c_str(), nullptr, 10, 0xEC) && Buffer_load_pcx(&b, "faction.pcx", nullptr, 10, 0xEC))
+            return;
+        if (!pfncSpriteFromCanvasRectTrans(&self->picture, &b, 9, 0x130, 0x1C9, 0x83, 0x9D, 0) ||
+            self->picture.width) {
+            self->has_picture = true;
+            self->picture.full_width = 0x83;
+            self->picture.full_height = 0x9D;
+        }
+        return;
+    }
     if (Buffer_load_pcx(&b, pcx, nullptr, 10, 0xEC)) return;
     // Sprite_init: the whole picture (index 255 -> 9 transparent).
     if (!pfncSpriteFromCanvasRectTrans(&self->picture, &b, 0x109, 0, 0, b.width, b.height, 0) ||
