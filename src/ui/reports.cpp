@@ -50,6 +50,7 @@
 #include "ui/basewin.h"
 #include "ui/console.h"
 #include "ui/font_text.h"
+#include "ui/help.h"
 #include "ui/mapwin.h"
 #include "ui/popup.h"
 #include "ui/reports.h"
@@ -930,7 +931,22 @@ void ReportScreen::on_button(int32_t id) {
     // ReportWin_on_button_clicked: the views of base operations, DATALINKS (1), CLOSE (9).
     if (id >= 0x8B3 && id <= 0x8B5) g_ops_view = id - 0x8B3;
     if (id == 9) sw_close(this);
-    if (id == 1) console_not_reconstructed("Datalink_exec");
+    if (id == 1) {  // DATALINKS: the entry of the report's subject
+        switch (kind()) {
+        case kIntel: Datalink_exec(&DatalinkWin, 0xF, g_intel_target); break;
+        case kLabs: {
+            int32_t t = Factions[faction].tech_research_id;
+            Datalink_exec(&DatalinkWin, 0xE, t == -1 ? 0x3E : t);
+            break;
+        }
+        case kEnergy: Datalink_exec(&DatalinkWin, 0, 0x2B); break;
+        case kOps: Datalink_exec(&DatalinkWin, 10, 0x1D); break;
+        case kProjects: Datalink_exec(&DatalinkWin, 0xB, 0x47); break;
+        case kSat: Datalink_exec(&DatalinkWin, 0xE, Facility[65].preq_tech); break;
+        case kSecurity: Datalink_exec(&DatalinkWin, 3, 7); break;
+        case kScore: Datalink_exec(&DatalinkWin, 1, 4); break;
+        }
+    }
     if (id == 0xD0A || id == 0xD0B) ops_best = id == 0xD0B;
     if (id >= 0xCEF && id <= 0xCF5 && kind() == kOps && faction == CurrentPlayerFaction) ops_governor(this, id);
 }

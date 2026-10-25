@@ -909,6 +909,8 @@ int32_t facility_mandate(int32_t fac) {
 
 }  // namespace
 
+Sprite* basewin_facility_picture(int32_t fac) { return facility_picture(fac); }
+
 void THISCALL BaseWin_draw_production(uint8_t* self, int32_t flag) {
     Buffer* c = mic();
     Font fa, fb;

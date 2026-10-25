@@ -5,6 +5,7 @@
 // sounds, most orders) go to placeholders (console_placeholders.cpp) or the bridge's headless
 // versions; their game-state effects, where they have any, are noted at the call.
 #include "ui/console.h"
+#include "ui/help.h"
 #include "ui/techwin.h"
 #include "ui/reports.h"
 
@@ -1767,7 +1768,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         if (InfcList[InfcUsed] != 5) confirm_quit();
         else console_not_reconstructed("ReportIf_done");
         break;
-    case 0x70: console_not_reconstructed("Datalink_exec"); break;     // F1
+    case 0x70: Datalink_exec(&DatalinkWin, 0xE, 0); break;          // F1
     case 0x71: report_labs(); break;                                   // F2
     case 0x72: report_energy(); break;                                 // F3
     case 0x73: report_ops(); break;                                    // F4

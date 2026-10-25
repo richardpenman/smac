@@ -180,6 +180,8 @@ ADDR_NATIVE(0x5BFD10) int32_t GAMEAPI X_pop_ask_number(const char* label, int32_
 ADDR_NATIVE(0x593280) void GAMEAPI synch_energy(int32_t faction_id);
 
 // ---- not original functions ----
+// The facility / secret project picture (facs\facNNN.pcx, projs\projNNN.pcx; fac >= 0x46: project).
+Sprite* basewin_facility_picture(int32_t fac);
 // The keys of the base window (the part of Console_on_key_click 0x517FB8..0x518177 for a visible
 // base window, then ctrl+Enter / ctrl+space; the original's other console keys are not passed on).
 // key: the lower-cased character; net_busy: multiplayer input not ours. Returns 1.

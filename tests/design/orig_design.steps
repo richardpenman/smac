@@ -1,0 +1,27 @@
+; The plain original (terranx.exe, no oracle) under Xvfb: QUICK START, the start-of-game popups,
+; then the design workshop (u), the datalinks (F1) and the research priorities (shift+R: blind
+; research) (tests/popups/orig_drive.py).
+wait 10
+click 835 362
+wait 7
+key Return
+wait 4
+key Return
+wait 4
+shot main
+key u
+wait 4
+shot design
+key Escape
+wait 3
+key F1
+wait 4
+shot datalink
+key Escape
+wait 3
+key S+r
+wait 3
+shot priorities
+key Escape
+wait 2
+shot end

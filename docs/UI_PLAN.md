@@ -111,6 +111,9 @@ src/app/smacx.cpp the native game executable
   | `filebox` | FileDialog_*, FileBox_*, FileList_set_path/add_ext/close, ui_filebox_destroy (the dialogs of save_game / load_game) | console_filebox.cpp |
   | `socialwin` | SocialWin_exec, SocialWin_close | socialwin.cpp |
   | `reports` | report_score, report_intel, monument, hall_of_fame | reports.cpp, monuwin.cpp |
+  | `techwin` | tech_pick (the research dialog), NewTechWin_exec | techwin.cpp |
+  | `design` | DesignWin_exec | designwin.cpp |
+  | `help` | help_topic, help_project (Datalink_exec) | help.cpp, datalink.cpp |
 
   To replace another function: move its headless definition into an area file of its own (or
   into the area it belongs to, if smacx implements the whole area), then define it in src/ui
@@ -137,7 +140,7 @@ src/app/smacx.cpp the native game executable
 | 4 | Win/GraphicWin/z-order/message pump/modal loops on the platform events; MainInterface (console frame), StatusWin, InfoWin, WorldWin (mini map), MessageWin; Console key handling and `Console_human_turn`: a human player can move units and end turns | scripted key sequences, state compare with oracle (same keys) |
 | 5 (mostly done: src/ui/basewin*.cpp, tests/basewin/) | BaseWin (base screen): layout and art, panes, city map, clicks, build menu (text popup stand-in for the picker grid), queue, hurry, governor, specialists, rename, recycling; headless stubs in src/headless/ui_headless_basewin.cpp | `basedump` canvases vs oracle (tests/basewin/compare.sh), scripted keys (tests/basewin/run.sh) |
 | 6 (done, section 6) | popups: BasePop on the game's script files (Script.txt, xscript.txt etc.: `#LABEL`, `^` lines, `$STR` parsing via the reconstructed text module), `popp/popb/X_pop*`, NetMsg, choice lists | popups by label vs oracle |
-| 7 | design workshop (DesignWin), social engineering, tech pick/NewTechWin, datalinks (help) | |
+| 7 (done, section 9) | design workshop (DesignWin), tech pick (research window, Console_set_tech / set_ai), NewTechWin, datalinks (help); social engineering was done with the reports (section 8) | tests/design/run.sh, tests/datalinks/run.sh; tests/design/compare.sh vs the original |
 | 8 | diplomacy (DiploWin, commlink), council window, reports (ReportWin/ReportIf), monuments | |
 | 9 | main menu, game setup (top_menu, setup dialogs), file dialogs (FileBox), preferences | new game from the menu |
 | 10 | sound (FX, voices, music), movies (FLC/WVE: openings, interludes, secret projects) | |
@@ -209,7 +212,7 @@ computer players move with the engine.
 * **Save / load**: ctrl+S / ctrl+L (and the Game menu) run the engine's save_game / load_game with
   a simple file box (console_filebox.cpp): a name field, a list of saves; original naming.
 * **Placeholders** (src/ui/console_placeholders.cpp): the map cursor and selected unit are
-  diamonds; the datalinks (F1, Datalink_exec), preferences, landmarks, the scenario
+  diamonds; preferences, landmarks, the scenario
   editor, the unit menu of a right click, time controls, survey, assemble, tutorial hints log
   "not reconstructed". Multiplayer paths stop at the first network call.
 * **Testing**: `--keys` scripts input (characters, `C-`/`S-`/`A-` modifiers, `ALT`, `CLICK:XxY`,
@@ -282,7 +285,7 @@ win_popup.cpp, popup_menus.cpp); every engine popup call opens the original's di
   animation (slide_show), DiploPop (diplomacy menus are shown as plain popups with the portrait),
   the help texts and tech icons of the tech popup, scroll bars of list boxes, hyperlink spots,
   `~` colour runs, sprite boxes (popups with several pictures), NetMsg's timed message window
-  (multiplayer), NewTechWin and the other full-screen windows (they are not popups).
+  (multiplayer), the full-screen windows (they are not popups: sections 8 and 9).
 * **Observer mode** (no human player): popups take BasePop_exec_3's no-display path, as the
   oracle forces it, so observer games play as the oracle's (`smacx_headless` is unchanged).
 * **Testing**: `--keys` takes `CLICK:XxY` (a left click) and `POPUP:FILE/LABEL[/FLAGS[/PCX]]` (shows
@@ -361,7 +364,7 @@ functions, the unit colour tables), src/ui/x87.h (floating point helpers).
 The keys are the original's (Console_on_key_click): `e` social engineering, F2 labs, F3 energy,
 F4 base operations, F5 secret projects, F6 satellites, F7 security nexus, F8 score, F9 monuments,
 F10 hall of fame, F11 menu detail, F12 the commlink panel (MainInterface_on_iface_button_clicked
-0x3EC). F1 (Datalink_exec, the help browser: ~30 KB of the original) is not reconstructed.
+0x3EC). F1 opens the datalinks (section 9), as does the reports' DATALINKS button.
 
 * **Frame** (src/ui/screenwin.{h,cpp}, not an original class): a modal full-screen window with its
   canvas, a copy of the main interface's canvas (the console art and pane rectangles of MainInfc),
@@ -390,4 +393,61 @@ F10 hall of fame, F11 menu detail, F12 the commlink panel (MainInterface_on_ifac
 * **Testing**: tests/reports/run.sh (SCREENSTATE / FACTIONSTATE dumps, saves reloaded);
   tests/reports/compare.sh drives the plain original (orig_reports.steps, Difficulty=2) through
   QUICK START and the same keys and scores each screen against smacx's.
+
+
+## 9. Research, new technologies, design workshop and datalinks (phase 7)
+
+* **Research choice** (src/ui/techwin.cpp): tech_pick (0x5BEB70) runs the original's dialog
+  FUN_00486510: blind research (GameRules 0x200) asks the viewer for the research priorities
+  (Console_set_ai: TECHRANDOM, X_pop_6) on the original's turns, then tech_ai; otherwise the
+  candidates are listed by category with the original's filters, two game_random draws per listed
+  tech (display weights the original discards: they advance the game generator) and tech_val; a
+  computer player takes the best, a human chooses in the window: a grid of panels (columns by the
+  number of choices, panel size from the screen) with the name, category and level, the picture in
+  the category colour (techs\techNNN.pcx), the TECHSHORTS quote and what the tech leads to, as
+  FUN_00484C60 lays them out; keys / letters / mouse / right click (datalinks) as FUN_00486170,
+  FUN_00485FC0, FUN_004860B0, FUN_00486110. Console_set_tech: TECHCHANGE, half the points lost on a
+  change, synch_research. shift+R runs Console_set_ai under blind research.
+  smacx_headless's tech_pick (src/headless/ui_headless_techwin.cpp, unchanged) does not make the
+  game_random draws; smacx's does, as the original (they only matter for free / stolen picks of
+  computer players and for the human's dialog).
+* **New technology window** (techwin.cpp: NewTechWin_exec 0x483F90, FUN_00483950): the 550 x 600
+  window with its title (breakthrough / acquired), the tech's name and picture, help_tech_info's
+  four sections (base facilities, technologies, unit advances, miscellaneous) with their links,
+  the BLURBSX quote, OK; a link opens the datalinks, then the window again. help_tech_info and
+  tech_heck (helpx.txt TECHHECK) are in src/ui/help.cpp, with the help_* entry points. Not
+  reconstructed: the voice clip, the two picture buttons' function, scroll bars.
+* **Design workshop** (src/ui/designwin.cpp): DesignWin_exec and its methods with the original's
+  game state changes (setup_veh, design_it, check_abil, suggest_abil, the select_* rules, the
+  buttons APPLY / DONE / RENAME / OBSOLETE / UPGRADE / RETIRE / CANCEL / presets, the keys, the
+  prototype list; Units[63] used as the preview's fake unit, as the original), through the
+  engine (make_proto, name_proto, prune_protos, retire_proto, consider_designs, upgrade_prototype,
+  synch_proto / synch_obs). The component pickers (FUN_00433F70) are grids of names and values
+  (the original renders each component's model). The design is drawn with the voxel renderer
+  (vehdraw_construct_chassis / weapon / armor / reactor / abil; vehdraw_construct_reactor 0x4C3800
+  is now a function of its own). Reached by u (design_new_veh), the menu, tech_achieved's
+  ASKSEEDESIGN and the base window's build menu (a last item standing for the picker's DESIGN
+  mode). Multiplayer paths (diplo_lock, message_data) are not reconstructed.
+* **Datalinks** (src/ui/datalink.cpp): Datalink_exec with the 16 categories (lists, ids
+  category * 10000 + entry, sorting), the entries from the helpx.txt / conceptsx.txt / BLURBSX /
+  faction file sections the original uses, hyperlinks ($LINK<text=id>: the text writer now
+  registers their rectangles, font_text.h buffer_link_at), the 20-entry history (BACK), EXIT,
+  Enter / Esc, list keys; entry points: F1 (techs), the reports' DATALINKS button (per report
+  kind, as ReportWin_on_button_clicked), help_topic / help_project / help_any / help_tech, links
+  of NewTechWin, right clicks in the research window. Not reconstructed: the labs tree inside a
+  tech entry, scroll bars.
+* **Testing**: tests/design/run.sh (blind research priorities on turn_100; the research window,
+  TECHCHANGE and the letter / click choices on a new game without blind research, rules=0x180e,
+  since the late saves research blind; the new technology window on turn 8 of that game; the
+  workshop on turn_147: a new prototype through the weapon picker and DONE, a preset with RENAME
+  and APPLY, OBSOLETE, UPGRADE, saves reloaded; turn_100 / turn_300 open and cancel; the base
+  window's build menu) and tests/datalinks/run.sh (browsing, links, BACK, categories, the labs
+  report's DATALINKS, faction profiles); test tokens TECHSTATE and PROTOSTATE (src/app/smacx.cpp).
+  tests/design/compare.sh drives the plain original through QUICK START (orig_design.steps) to the
+  design workshop (u), the datalinks (F1) and the research priorities (shift+R) and scores them
+  against smacx's: 0.866, 0.846 and 0.767 of the pixels within tolerance (a random faction and
+  map in the original; differences: the component boxes' headers and models, the original's DATA
+  column, list fonts, the labs tree of a tech entry, popup text glyphs as in section 6). The
+  research window and the new technology window are not reached by the original's QUICK START
+  (blind research) and are not compared.
 
