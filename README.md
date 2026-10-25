@@ -43,10 +43,13 @@ and prove behavioural equivalence against the original binary with a differentia
 ## Builds
 
 ```sh
-cmake -S . -B build/native && cmake --build build/native -j2          # engine + smacx_headless
+cmake -S . -B build/native && cmake --build build/native -j2          # engine + smacx_headless (+ smacx with SDL2)
 cmake -S . -B build/hybrid -DSMACX_HYBRID=ON -DCMAKE_TOOLCHAIN_FILE=cmake/i686-mingw.cmake
 cmake --build build/hybrid -j2                                         # oracle.dll, hybrid.dll, oracle_launch.exe
 ```
+
+`smacx` (native game with the SDL2 UI, first slice: the map of a save; docs/UI_PLAN.md) is built
+when SDL2 and SDL2\_ttf are found (tools/sdl2 first): `build/native/smacx --save FILE.sav`.
 
 Reconstruction work follows `docs/RECONSTRUCTION.md`; the harness is described in `harness/README.md`.
 
