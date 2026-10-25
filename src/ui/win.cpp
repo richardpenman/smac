@@ -304,6 +304,14 @@ int32_t ui_key_state(int32_t vk) {
     return held ? 0x8000 : 0;
 }
 
+void ui_trace(const char* what) {
+    static int on = -1;
+    if (on < 0) on = std::getenv("SMACX_TRACE") ? 1 : 0;
+    if (!on) return;
+    std::fprintf(stderr, "trace %s: turn %d crt %08X game %08X clock %u\n", what, CurrentTurn, crt_rand_state(),
+                 game_random_state(), engine_logic_clock_state());
+}
+
 void ui_script_keys(const std::vector<ScriptedKey>& keys) {
     g_script.assign(keys.begin(), keys.end());
     g_script_given = !keys.empty();
@@ -323,6 +331,7 @@ void GAMEAPI wait_task() {
     if (!g_script.empty()) {
         ScriptedKey k = g_script.front();
         g_script.pop_front();
+        ui_trace(("wait_task key " + std::to_string(k.vk) + " " + k.command).c_str());
         int32_t x1, y1, x2, y2;
         if (std::sscanf(k.command.c_str(), "click %d %d", &x1, &y1) == 2) {
             ui_mouse(UiInput::MOVE, x1, y1);
@@ -389,6 +398,7 @@ int32_t ui_wait_key() {
         if (!g_script.empty()) {
             ScriptedKey k = g_script.front();
             g_script.pop_front();
+            ui_trace(("wait_key key " + std::to_string(k.vk) + " " + k.command).c_str());
             if (!k.command.empty()) {
                 run_command(k.command);
                 continue;
@@ -422,6 +432,7 @@ bool ui_wait_input(UiInput* in) {
         if (!g_script.empty()) {
             ScriptedKey k = g_script.front();
             g_script.pop_front();
+            ui_trace(("wait_input key " + std::to_string(k.vk) + " " + k.command).c_str());
             int32_t x, y;
             if (std::sscanf(k.command.c_str(), "click %d %d", &x, &y) == 2) {
                 in->type = UiInput::LDOWN;

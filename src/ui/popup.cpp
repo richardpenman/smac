@@ -1252,6 +1252,7 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
     ui_invalidate();
     std::fprintf(stderr, "popup %s shown: %dx%d at %d,%d (%d items)\n", p->label.c_str(), p->width, p->height,
                  p->win_x, p->win_y, (int32_t)p->items.size());
+    ui_trace("popup shown");
     // Test aid: SMACX_POPUP_SHOTS=DIR writes a screenshot of every popup when it opens.
     if (const char* dir = std::getenv("SMACX_POPUP_SHOTS")) {
         static int32_t count = 0;

@@ -43,6 +43,8 @@ struct ScriptedKey {
     std::string command;  // "shot FILE", "save FILE", "quit"
 };
 void ui_script_keys(const std::vector<ScriptedKey>& keys);
+// SMACX_TRACE=1: logs the random generators and the logic clock (determinism checks).
+void ui_trace(const char* what);
 // Called when the scripted keys run out with nothing left to do (no display): the game quits.
 extern bool g_ui_exit_when_script_done;
 extern std::string g_ui_outdir;

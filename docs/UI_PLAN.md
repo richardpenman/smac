@@ -214,7 +214,25 @@ computer players move with the engine.
   `RCLICK:XxY`, `MOVE:XxY`, `DRAG:X1xY1:X2xY2` (a held left button: the go-to drag), KP1..KP9, named keys, and
   the commands `SHOT[:file]`, `SAVE:file` (also writes `file.rng`), `UNITS`, `QUIT`);
   `--snapshots DIR` writes the harness's turn_NNN.state/.rng/.sav before every turn_upkeep and
-  `--rng FILE` restores a snapshot's generators after `--save`. Checks done:
+  `--rng FILE` restores a snapshot's generators after `--save`.
+  **Determinism**: a save plus scripted keys must play the same way every run. The original is not
+  reproducible here by itself: game_init seeds the CRT generator (`srand`) and the game LCG from
+  timeGetTime(), and load_daemon reseeds `srand` only under GameRules 0x400, so after a load the
+  engine's `rand()` calls (e.g. the human faction's turn_upkeep: fungus growth, events) depend on
+  the boot time. smacx therefore pins the generators as the harness's `seed` command does for
+  the oracle: `--seed CRT,GAME` defaults to 0,0 for scripted or hidden runs (--keys, --hidden; interactive play seeds from the clock) (before the load or the new game; the logic clock
+  starts at 0); `--seed clock` seeds from the clock as the original. This was the flakiness of
+  tests/basewin (late120 / late147: the turn's FUNGUSGROWS2 popup took the scripted keys in some
+  runs, turn_300's popups came in a different order). The engine's timeGetTime() randomness reads
+  use the logic clock (engine/clock.h, smacx runs the engine in deterministic mode). Scripted
+  input never depends on real time: wait_task / ui_wait_key / ui_wait_input take a scripted key
+  before pumping real input, and the go-to drag timer (console_ui_tick) is checked only when the
+  script is empty. The remaining real-time reads are cosmetic: presentation pacing, the double
+  click of real mouse input, the citizens' faces of the base window (the original's
+  `Random_reseed(timeGetTime())` there is UI code, which the oracle's hook leaves on real time),
+  so screenshots of those faces may differ between runs. `SMACX_TRACE=1` logs the generators and
+  the logic clock at every scripted key and popup (compare the logs of two runs).
+  Checks done:
   * observer mode (`--human 0`) with every smacx area replaced matches the oracle references
     (harness/compare.py): tiny20, small12, std8 (new games), late140 (load);
   * tests/console/run.sh: orders by key, go-to list and drag, menus, save / load, late saves;

@@ -76,8 +76,10 @@ check "reload" "$(grep '^basestate' "$OUT/reload.log" | head -1)" \
 
 # 2. turn_120 / turn_147 / turn_300 as faction 3 (University Base, base 2): the build menu's next
 #    item, a hurry (turn_120: a facility, partial payment of 50 credits; turn_147: a unit, in full),
-#    the next / previous base. turn_300: one popup first (Enter), then the turn's messages (their
-#    order varies between runs), so only the absence of aborts is checked there.
+#    the next / previous base. turn_300: one popup first (Enter), then the turn's messages, so only
+#    the absence of aborts is checked there. (The runs are reproducible: smacx seeds the generators,
+#    --seed default 0,0; with the original's clock seed the turn's events, e.g. FUNGUSGROWS2, came
+#    and went between runs and took the scripted keys.)
 for t in 120 147 300; do
     pre=""; [ $t == 300 ] && pre="ENTER,"
     pay="DOWN,ENTER"; [ $t == 120 ] && pay="DOWN,ENTER,BACK,BACK,BACK,BACK,5,0,ENTER"

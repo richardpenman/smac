@@ -1,6 +1,6 @@
 // smacx: the native game with the SDL2 UI.
 //
-//   smacx (--new [k=v ...] | --save FILE.sav) [--human N] [--viewer N] [--seed CRT,GAME]
+//   smacx (--new [k=v ...] | --save FILE.sav) [--human N] [--viewer N] [--seed CRT,GAME|clock]
 //         [--keys K1,K2,...] [--exit-after-keys] [--turns N] [--shot FILE.bmp] [--snapshots DIR]
 //         [--rng FILE] [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR]
 //         [--gamedir DIR] [--image FILE] [--ini FILE]
@@ -31,6 +31,12 @@
 // stderr), QUIT. --exit-after-keys (default with --hidden) quits when they run out.
 // Environment: SMACX_KEYLOG=1 logs every key dispatched to the console; SMACX_ALLUNITS=1 makes
 // UNITS list every faction's units.
+// --seed CRT,GAME: the generators' seeds (the harness's seed command); default 0,0 with --keys or
+// --hidden, otherwise the clock. The original
+// seeds both from the clock (game_init: timeGetTime), and a loaded save keeps the CRT generator's
+// state from that seed (load_daemon reseeds it only under GameRules 0x400): without a fixed seed
+// the same save and keys play differently. --seed clock seeds from the clock as the original.
+// SMACX_TRACE=1 logs the generators and the logic clock at every scripted key and popup.
 // --snapshots DIR: turn_NNN.state/.rng/.sav before every turn_upkeep, as the harness writes them
 // (compare runs with harness/compare.py); --rng FILE restores a snapshot's generators after --save.
 // --shot: observer mode: after --turns N turns (default 0) write the screenshot and exit (with
@@ -89,7 +95,7 @@ struct Options {
     std::string new_args;
     int human = -1, viewer = -1, zoom = 0x7FFF, cx = -1, cy = -1, width = 1024, height = 768, turns = 0;
     unsigned seed_crt = 0, seed_game = 0;
-    bool seeded = false, hidden = false, exit_after_keys = false;
+    bool seeded = false, seed_given = false, hidden = false, exit_after_keys = false;
     std::vector<ScriptedKey> keys;
 } g_opt;
 
@@ -498,7 +504,7 @@ bool parse_key(std::string tok, ScriptedKey* out) {
 
 int usage() {
     std::fprintf(stderr,
-                 "usage: smacx (--new [k=v ...] | --save FILE.sav) [--human N] [--viewer N] [--seed CRT,GAME]\n"
+                 "usage: smacx (--new [k=v ...] | --save FILE.sav) [--human N] [--viewer N] [--seed CRT,GAME|clock]\n"
                  "             [--keys K1,K2,..] [--exit-after-keys] [--turns N] [--shot FILE.bmp] [--snapshots DIR] [--rng FILE]\n"
                  "             [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR] [--gamedir DIR]\n"
                  "             [--image FILE] [--ini FILE] [--dump FILE.smxmap [--like REF.smxmap] [--scroll-from X,Y]]\n");
@@ -516,7 +522,15 @@ int main(int argc, char** argv) {
             g_opt.new_game = true;
             while (i + 1 < argc && std::strchr(argv[i + 1], '=') && argv[i + 1][0] != '-') g_opt.new_args += std::string(argv[++i]) + " ";
         } else if (a == "--human") g_opt.human = std::atoi(next().c_str());
-        else if (a == "--seed") g_opt.seeded = std::sscanf(next().c_str(), "%u,%u", &g_opt.seed_crt, &g_opt.seed_game) == 2;
+        else if (a == "--seed") {
+            std::string v = next();
+            g_opt.seed_given = true;
+            g_opt.seeded = v != "clock";
+            if (g_opt.seeded && std::sscanf(v.c_str(), "%u,%u", &g_opt.seed_crt, &g_opt.seed_game) != 2) {
+                std::fprintf(stderr, "--seed: CRT,GAME or clock\n");
+                return 2;
+            }
+        }
         else if (a == "--gamedir") g_opt.gamedir = next();
         else if (a == "--image") g_opt.image = next();
         else if (a == "--ini") g_opt.ini = next();
@@ -550,6 +564,8 @@ int main(int argc, char** argv) {
         else return usage();
     }
     if (g_opt.save.empty() == !g_opt.new_game) return usage();
+    // Scripted or hidden runs (tests) default to fixed seeds; interactive play seeds from the clock.
+    if (!g_opt.seed_given) g_opt.seeded = !g_opt.keys.empty() || g_opt.hidden;
     if (g_opt.new_game && g_opt.human < 0) g_opt.human = 1;
     if (!g_opt.save.empty()) g_opt.save = fs::absolute(g_opt.save).string();
     g_opt.outdir = fs::absolute(g_opt.outdir).string();
