@@ -14,6 +14,8 @@
 // approximated). Widths are GetTextExtentPoint32 (platform::font_text_width).
 #pragma once
 #include <cstdint>
+#include <string>
+#include <vector>
 
 #include "engine/memmap.h"
 #include "ui/gfx.h"
@@ -28,8 +30,20 @@ struct BufferText {
     int32_t width_font = 0;   // +0x518: font slot of the width scan
     int32_t link_state = 0;   // +0x51C: 1 inside "$LINK<", 2 at its "=target>"
     int32_t multi_font = 1;   // +0x520: {} [] $LINK markup is interpreted (0x696BF0: 1)
+    // The hyperlink spots the writers register (the original's Spot_add on the Buffer's spot
+    // list, cleared by Buffer_clear_links): the link text's rectangle and its target.
+    struct LinkSpot {
+        UiRect r;
+        std::string target;
+    };
+    std::vector<LinkSpot> link_spots;
+    int32_t link_x = 0, link_y = 0;  // where the link being written started
 };
 BufferText& buffer_text(Buffer* self);
+// Buffer_clear_links (0x5DC370 area): forgets the registered hyperlink spots.
+void buffer_clear_links(Buffer* self);
+// The target of the hyperlink at (x, y) of the canvas, or null.
+const std::string* buffer_link_at(Buffer* self, int32_t x, int32_t y);
 
 // A list of strings with a layout mode each, as the original's StringStruct/StringList (heap
 // lists of {text, mode}): mode 0 continues the paragraph, 1 starts a new line ("^"), 2 is a

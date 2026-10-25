@@ -5,6 +5,7 @@
 // sounds, most orders) go to placeholders (console_placeholders.cpp) or the bridge's headless
 // versions; their game-state effects, where they have any, are noted at the call.
 #include "ui/console.h"
+#include "ui/techwin.h"
 #include "ui/reports.h"
 
 #include <cctype>
@@ -1671,7 +1672,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         case 'J': Console_assemble(self); break;
         case 'j': Console_go_to(self, mw(self, kConVeh), ORDER_MOVE_TO, 1); break;
         case 'R':
-            if (GameRules & 0x200) console_not_reconstructed("Console_on_key_click: research priorities (blind research)");
+            if (GameRules & 0x200) Console_set_ai(self, mw(self, kConFaction));
             else Console_set_tech(self, mw(self, kConFaction));
             break;
         case 'v':

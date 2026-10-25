@@ -136,6 +136,10 @@ int32_t GAMEAPI X_pop_ask_6(const char* file, const char* label, int32_t active,
 }
 
 int32_t GAMEAPI X_pop(const char* label, int32_t a2) { return X_pop_9(ScriptFileName, label, -1, nullptr, 0, a2); }
+// X_pop_6 (0x5BF3F0): X_pop_9 of the main script with flags (check boxes from DialogChoices).
+int32_t GAMEAPI X_pop_6(const char* label, int32_t flags, int32_t a3) {
+    return X_pop_9(ScriptFileName, label, -1, nullptr, (uint32_t)flags, a3);
+}
 // X_pop_2 (0x5BF330): X_pop_9(a1, a2, -1, 0, 0, a3): the first argument is the file (alt_set's
 // BASESUBMERGED call passes the label and the picture instead, so the original shows nothing).
 int32_t GAMEAPI X_pop_2(const char* file, const char* label, int32_t a3) {

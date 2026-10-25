@@ -21,6 +21,7 @@
 #include "ui/mapwin.h"
 #include "ui/popup.h"
 #include "ui/screenwin.h"
+#include "ui/techwin.h"
 
 bool g_ui_exit_when_script_done = false;
 std::string g_ui_outdir = ".";
@@ -183,6 +184,10 @@ bool run_command(const std::string& cmd) {
     }
     if (cmd == "screenstate") {  // test aid: the open screen's texts and state (screenwin.h)
         screens_log_state();
+        return true;
+    }
+    if (cmd == "techstate") {  // test aid: the viewer's research (techwin.h)
+        techwin_log_state();
         return true;
     }
     if (cmd == "factionstate") {  // test aid: the viewer's social choice and allocation (screenwin.h)

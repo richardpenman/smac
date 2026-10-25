@@ -38,6 +38,7 @@ struct BoxDef {
     int32_t key;        // +0x24
 };
 BoxDef* box_def(int32_t index);  // 0x78D528 + index * 0x28
+BoxDef* box_def_large();         // 0x6846B0: the larger frame (interface windows)
 ADDR_NATIVE(0x453A70) void GAMEAPI load_box_sprites();
 ADDR_NATIVE(0x5E2DD3) void THISCALL Buffer_box_sprite(Buffer* self, const UiRect* rect, const BoxDef* box);
 // Tiles a sprite / canvas over (x, y, w, h) with the pattern origin at (x - sx % w, y - sy % h).
@@ -95,6 +96,8 @@ void BasePop_set_active(BasePop* self, int32_t id);
 int32_t Popup_start(BasePop* pop, const char* file, const char* label, int32_t active, const char* edit,
                     uint32_t flags);
 std::string BasePop_text(BasePop* self);
+// The #caption of the section(s) read (null for none).
+const char* BasePop_caption(BasePop* self);
 
 // ---- the pop module (0x627100..) and the veh module's wrappers (0x5BF310..) ----
 // pops_18: start `label` of `file` (initial selection `active`, edit default `edit`), the picture

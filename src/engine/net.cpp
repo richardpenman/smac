@@ -14,6 +14,14 @@ void GAMEAPI synch_soc(int32_t faction_id) {
     if (MultiplayerActive) NetDaemon_synch(&NetState, 0xD, faction_id, 0, 0, 0, 1, 0x2101);
 }
 
+void GAMEAPI synch_research(int32_t faction_id) {
+    if (MultiplayerActive) NetDaemon_synch(&NetState, 9, faction_id, 0, 0, 0, 1, 0x2101);
+}
+
+void GAMEAPI synch_ai(int32_t faction_id) {
+    if (MultiplayerActive) NetDaemon_synch(&NetState, 8, faction_id, 0, 0, 0, 1, 0x2101);
+}
+
 // Tiles are visited in storage order: row y holds x = (y & 1), (y & 1) + 2, ...
 void GAMEAPI rebuild_vehicle_bits() {
     MAP* sq = MapTiles;

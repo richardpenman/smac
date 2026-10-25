@@ -52,10 +52,12 @@ POPUP:SCRIPT/COUNCILISSUES/40/council_sm.pcx,ESC,\
 POPUP:SCRIPT/MENUSIMPLE,ESC,\
 POPUP:SCRIPT/REALLYQUIT/0/space_sm.pcx,DOWN,ESC,\
 C-ENTER,DOWN,ENTER,\
+ENTER,\
 C-q,ESC"
+# (Turn 2: blind research asks for the research priorities, TECHRANDOM: tech_pick, techwin.cpp.)
 expect newgame "FIRSTBASE answer: 0" "REALLYOVER answer: 0" "REALLYOVER answer: 0" "REALLYQUIT answer: 0" \
     "BASEWARNINGS answer: 10" "NEWBASE answer: -1" "NEWBASE answer: 0" "COUNCILISSUES answer: -1" \
-    "MENUSIMPLE answer: 0" "REALLYQUIT answer: 1" "REALLYOVER answer: 1" "REALLYQUIT answer: 0"
+    "MENUSIMPLE answer: 0" "REALLYQUIT answer: 1" "REALLYOVER answer: 1" "TECHRANDOM answer: 3" "REALLYQUIT answer: 0"
 
 # 2. Mouse: REALLYQUIT, click the second item, then OK (quits the game: answer 1).
 run mouse --new size=0 --human 1 --seed 1,2 --keys "ENTER,C-q,CLICK:400x452,CLICK:500x483"

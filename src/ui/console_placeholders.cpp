@@ -25,7 +25,6 @@ void THISCALL Console_assemble(uint8_t*) { console_not_reconstructed("Console_as
 void THISCALL Console_survey(uint8_t*) { console_not_reconstructed("Console_survey"); }
 void THISCALL Console_time_controls(uint8_t*) { console_not_reconstructed("Console_time_controls"); }
 void THISCALL Console_use_time_bonus(uint8_t*) { console_not_reconstructed("Console_use_time_bonus"); }
-void THISCALL Console_set_tech(uint8_t*, int32_t) { console_not_reconstructed("Console_set_tech"); }
 void THISCALL Console_zoom_to_upkeep_base(uint8_t*) { console_not_reconstructed("Console_zoom_to_upkeep_base"); }
 void THISCALL Console_show_scen_objectives(uint8_t*) { console_not_reconstructed("Console_show_scen_objectives"); }
 void THISCALL Console_custom_my_faction(uint8_t*) { console_not_reconstructed("Console_custom_my_faction"); }

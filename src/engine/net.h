@@ -25,6 +25,10 @@ ADDR(0x593390) void GAMEAPI synch_alloc(int32_t faction_id);
 ADDR(0x593250) void GAMEAPI synch_base(int32_t base_id);
 // Fills a FullChecksum of the game state (NetDaemon object NetState).
 ADDR(0x52F8E0) void THISCALL NetDaemon_game_checksum(uint8_t* net, FullChecksum* out);
+// Multiplayer: sends faction_id's research choice (synch_research, type 9) / blind research
+// priorities (synch_ai, type 8) to the other players.
+ADDR(0x593340) void GAMEAPI synch_research(int32_t faction_id);
+ADDR(0x593310) void GAMEAPI synch_ai(int32_t faction_id);
 // Multiplayer: sends faction_id's research goal to the other players.
 ADDR(0x5932B0) void GAMEAPI synch_researching(int32_t faction_id);
 // Processes pending network messages (multiplayer wait loops).

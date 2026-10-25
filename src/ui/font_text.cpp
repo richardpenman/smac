@@ -280,6 +280,19 @@ int32_t THISCALL Buffer_text_width_2(Buffer* self, const char* text, int32_t len
 
 int32_t THISCALL Buffer_text_line_height(Buffer* self) { return line_height(self); }
 
+void buffer_clear_links(Buffer* self) {
+    BufferText& bt = buffer_text(self);
+    bt.link_spots.clear();
+    bt.links = 0;
+}
+
+const std::string* buffer_link_at(Buffer* self, int32_t x, int32_t y) {
+    BufferText& bt = buffer_text(self);
+    for (const BufferText::LinkSpot& l : bt.link_spots)
+        if (x >= l.r.left && x < l.r.right && y >= l.r.top && y < l.r.bottom) return &l.target;
+    return nullptr;
+}
+
 int32_t THISCALL Buffer_text_height(Buffer* self) { return self->fonts[0] ? self->fonts[0]->ascent_above : 0; }
 
 // ---- writers ----
@@ -294,13 +307,17 @@ int32_t THISCALL Buffer_write_multi_font_raw_l(Buffer* self, const char* text, i
         bool doubled;
         int32_t next = self->font_index;
         int32_t s = markup_slot(bt, p, self->font_index, &doubled);
-        if (s == 3) bt.links++;  // the hyperlink spots (Spot_add) are not registered
+        if (s == 3) bt.links++;
         if (s >= 0) next = s;
         else if (doubled) {
             p++;
             len--;
         }
         x = write_raw(self, seg, x, y, (int32_t)(p - seg));
+        if (s == 3) {
+            bt.link_x = x;
+            bt.link_y = y;
+        }
         if (bt.link_state == 1) {
             p += 5;
             len -= 5;
@@ -310,6 +327,11 @@ int32_t THISCALL Buffer_write_multi_font_raw_l(Buffer* self, const char* text, i
         if (bt.link_state == 2) {
             const char* gt = std::strchr(p, '>');
             if (gt) {
+                // The link's spot: its text in the link font, from where it started.
+                BufferText::LinkSpot spot;
+                spot.r = {bt.link_x, bt.link_y, x, bt.link_y + line_height(self)};
+                spot.target.assign(p, gt);
+                bt.link_spots.push_back(spot);
                 len -= (int32_t)(gt + 1 - p);
                 seg = gt + 1;
             }

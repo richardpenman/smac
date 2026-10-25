@@ -102,6 +102,7 @@ bool intersect(UiRect* out, const UiRect& a, const UiRect& b) {
 }  // namespace
 
 BoxDef* box_def(int32_t index) { return (index >= 0 && index < 51) ? &g_boxes[index] : nullptr; }
+BoxDef* box_def_large() { return &g_box_large; }
 
 void GAMEAPI load_box_sprites() {
     Buffer canvas;
@@ -692,6 +693,8 @@ const char* BasePop_edit_text(BasePop* self, int32_t i) {
 int32_t BasePop_item_count(BasePop* self) { return (int32_t)self->items.size(); }
 void BasePop_set_mode(BasePop* self, int32_t mode) { self->mode = mode; }
 void BasePop_set_active(BasePop* self, int32_t id) { self->active = id; }
+const char* BasePop_caption(BasePop* self) { return self->caption; }
+
 std::string BasePop_text(BasePop* self) {
     std::string s;
     for (size_t i = 0; i < self->strings.size(); i++) {
