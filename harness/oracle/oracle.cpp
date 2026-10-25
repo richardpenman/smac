@@ -420,6 +420,39 @@ static void install_council_hook() {
     write_rel(site, 0xE8, (void *)hook_council_modal, 6);
 }
 
+/* ---- fresh map blocks ----
+ * map_init (0x590ED0) allocates MapTiles and MapAbstract with mem_get and does not clear them;
+ * map_wipe never writes tile bytes 6 (unk_1) and 7 (owner). When the allocator hands out a
+ * reused heap block (scenario rival6), tiles no base claims keep its residue until turn 1. The
+ * oracle clears both new blocks, so the state is the one of a fresh (zeroed) block, which is
+ * what native mem_get returns. Hooked at the entry of mapwin_terrain_fixup (0x471240), which
+ * only map_init calls, right after both allocations succeed and before anything writes the
+ * blocks; hybrid builds reach it too (the reconstructed map_init calls the original). */
+#define MapTilesPtr G(uint8_t *, 0x94A30C)
+#define MapAbstractPtr G(uint8_t *, 0x94A310)
+#define MapAreaTiles G(int32_t, 0x949884)
+#define MapAbstractCount G(int32_t, 0x94A29C)
+static uint8_t *g_terrain_fixup_tramp;
+static void __cdecl hook_mapwin_terrain_fixup() {
+    if (MapTilesPtr && MapAreaTiles > 0) memset(MapTilesPtr, 0, (size_t)MapAreaTiles * 0x2C);
+    if (MapAbstractPtr && MapAbstractCount > 0) memset(MapAbstractPtr, 0, (size_t)MapAbstractCount);
+    ((void(__cdecl *)())(void *)g_terrain_fixup_tramp)();
+}
+static void install_map_alloc_hook() {
+    const uint32_t site = 0x471240;
+    const uint8_t expect[6] = {0x56, 0xBE, 0x3C, 0x3C, 0x7D, 0x00}; /* push esi; mov esi, 0x7D3C3C */
+    if (memcmp((void *)site, expect, 6)) {
+        logf_("patch error: unexpected mapwin_terrain_fixup prologue at %08X\n", site);
+        ExitProcess(3);
+    }
+    g_terrain_fixup_tramp = (uint8_t *)VirtualAlloc(NULL, 16, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    memcpy(g_terrain_fixup_tramp, expect, 6);
+    g_terrain_fixup_tramp[6] = 0xE9;
+    int32_t rel = (int32_t)((site + 6) - ((uint32_t)(uintptr_t)g_terrain_fixup_tramp + 11));
+    memcpy(g_terrain_fixup_tramp + 7, &rel, 4);
+    write_rel(site, 0xE9, (void *)hook_mapwin_terrain_fixup, 6);
+}
+
 /* ---- end of game ----
  * When a game ends (time limit, victory), end_of_game (0x524870) shows the end screens after the
  * game-state part (victory type, monuments): show_credits, report_score(1), quayle (rating),
@@ -1210,6 +1243,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         for (uint32_t site : ui_sites_game_random) write_call(site, (void *)ui_game_random);
         install_popup_hook();
         install_council_hook();
+        install_map_alloc_hook();
         install_end_of_game_hooks();
         /* No cosmetic UI timers (cursor blink, status redraw): their WM_TIMER callbacks run at
          * wall-clock-dependent points inside engine message pumps and leave different stack

@@ -215,8 +215,8 @@ The original reads stack memory it never wrote in these places. The oracle makes
 Uninitialised heap memory, not stack: `map_init` allocates `MapTiles`/`MapAbstract` without
 clearing them and `map_wipe` leaves tile bytes 6 (`unk_1`) and 7 (`owner`) as they are; tiles no
 base claims keep the allocator's residue (e.g. scenario rival6, "look first": owner bytes 0x01,
-0x03, 0xFF in the oracle). Native `mem_get` returns zeroed blocks, which matches the oracle
-wherever the original's block was fresh (all other scenarios).
+0x03, 0xFF in the original). Native `mem_get` returns zeroed blocks; the oracle clears both new
+blocks right after `map_init` allocates them (harness/README.md), so the references match that.
 
 Hybrid tool for side-effect-free functions whose dead stack matters: define the body as
 `int32_t GAMEAPI SHADOWABLE(name)(...)` and add `HYBRID_SHADOW_THUNK(...)` (src/engine/hybrid_shadow.h;

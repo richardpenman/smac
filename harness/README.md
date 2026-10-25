@@ -54,6 +54,18 @@ random stream, and some engine code uses `timeGetTime()` as randomness. The orac
   and 0xFF give identical games. Native equivalent: `WantsToAttackResidue` is 0 at the start of
   every evaluation and keeps the first call's values for the second call of a pair. (`steptrace`
   treats the thunk as an external call, so a call entered through it is not traced.)
+* **clears the new map blocks**: `map_init` allocates `MapTiles` and `MapAbstract` with `mem_get`
+  without clearing them, and `map_wipe` never writes tile bytes 6 (`unk_1`) and 7 (`owner`). The
+  oracle zeroes both blocks at the entry of `mapwin_terrain_fixup` (0x471240), which only
+  `map_init` calls, right after both allocations succeed and before anything writes them (hybrid
+  builds reach it too: the reconstructed `map_init` calls the original). It touches only memory
+  the original has just allocated and not yet written. This is faithful: what an unclaimed tile
+  holds there is allocator residue, not game state. When the heap hands out a fresh block it reads
+  as zero; when it reuses a block (rival6, "look first": owner bytes 0x01, 0x03, 0xFF on turn 0)
+  the bytes depend on earlier allocations, so on the run and the environment (Wine, Windows heap
+  versions). They are overwritten by turn 1, and clearing them changes nothing else: with and
+  without the clearing, rival6's snapshots differ only in those 7 bytes on turn 0. Zero is the
+  fresh-block value, which native `mem_get` (calloc) returns.
 
 ## Reconstructed game loops
 
