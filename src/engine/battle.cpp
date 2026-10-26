@@ -1305,7 +1305,7 @@ int32_t GAMEAPI battle_fight(int32_t veh_id, int32_t dir, int32_t is_arty, int32
     }
     int32_t x = map_wrap_x(game().vehs[veh_id].x + dx);
     int32_t y = game().vehs[veh_id].y + dy;
-    return battle_fight_2(veh_id, dir, x, y, is_arty, is_real, def_out);
+    return battle_resolve(veh_id, dir, x, y, is_arty, is_real, def_out);
 }
 
 // ---- inline equivalents of the diplo_act text wrappers (0x50B8A0-0x50B9FE) -----------------------
@@ -1360,7 +1360,7 @@ void GAMEAPI mon_enemy_destroyed(int32_t faction_id, int32_t faction_id_killed) 
     if (faction_id == CurrentPlayerFaction) monument(1);
 }
 
-int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y, int32_t is_arty, int32_t is_real,
+int32_t GAMEAPI battle_resolve(int32_t veh_id, int32_t dir, int32_t x, int32_t y, int32_t is_arty, int32_t is_real,
                                int32_t* def_out) {
     int32_t report_type = 0;  // pact/vendetta battle report for the viewer
     int32_t disengaged = 0;  // the defender withdrew

@@ -154,7 +154,7 @@ Order (by how often a modder needs to touch it, then by risk):
 | # | Function(s) | Size | Notes |
 | --- | --- | --- | --- |
 | 1 | `base_production`, `base_growth`, base yields (base.cpp) | ~540 lines | most-modded rules |
-| 2 | `battle_fight_2`, combat odds (battle.cpp) | | combat rules; unit-test odds |
+| 2 | `battle_resolve`, combat odds (battle.cpp) | | combat rules; unit-test odds |
 | 3 | `base_build` (base_misc.cpp) | ~2.2k lines | AI production choice |
 | 4 | `goody_box`, `probe`, `random_events` | 550–650 lines | 22/25 gotos |
 | 5 | `order_veh` (move_order.cpp) | 1.3k lines, 176 gotos | movement rules; stack residue #5 |
@@ -224,7 +224,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 8 | Magic numbers → named constants/enums, module by module | M | first pass done (see note 8) |
 | 9 | `compat.h`: name and isolate all 173 `BUG(original)` sites | M | done (see note 9) |
 | 10 | Split `base_production` / yields + unit tests | M | done (see note 10) |
-| 11 | Split combat (`battle_fight_2`, odds) + unit tests | M | |
+| 11 | Split combat (`battle_resolve`, odds) + unit tests | M | |
 | 12 | Split `base_build` | L | |
 | 13 | Split `goody_box`, `probe`, `random_events` (gotos out) | M | |
 | 14 | Split `order_veh` (176 gotos) | L | |
@@ -253,7 +253,7 @@ Notes on the increments:
    `say_stats_3`/`say_stats_2` → `say_stats_short`/`say_stats_labeled`, `clear_council_notify_2` →
    `clear_council_notify_all`, `draw_tile_fixup_2` → `draw_tile_fixup_pair`, `amovie_project_2` →
    `amovie_project_name`. Left for later (no clearly better name yet, or a UI class method):
-   `battle_fight_2` (named when it is split, increment 11), the popup family (`X_pop_2`, `popp_2`,
+   `battle_fight_2` (renamed `battle_resolve` in increment 11), the popup family (`X_pop_2`, `popp_2`,
    `POP3_2`, `NetMsg_pop_2/3`), `say_tech_2`/`tech_name_2`, `say_stats_3_2`, `say_morale_2`,
    `say_orders_2`, `get_pacts_2`, `stack_sort_2`, and the methods of the UI classes (`Buffer_*`,
    `Sprite_*`, `Texture_*`, `Font_*`, `Palette_*`, `Wave_*`, `Sound_*`, `Console_*`, `MapWin_*`,

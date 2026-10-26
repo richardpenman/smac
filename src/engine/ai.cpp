@@ -2799,7 +2799,7 @@ int32_t GAMEAPI air_power(int32_t veh_id, int32_t dist_own, int32_t zoc, int32_t
                     }
                     if (veh_triad(j) == TRIAD_AIR && base_id < 0) continue;
                     int32_t odds =
-                        compute_odds(battle_fight_2(veh_id, 0, t.x, t.y, 0, 0, nullptr), faction_id, veh_id, j, -2);
+                        compute_odds(battle_resolve(veh_id, 0, t.x, t.y, 0, 0, nullptr), faction_id, veh_id, j, -2);
                     int32_t mult;
                     if (base_id < 0) {
                         odds /= 2;
@@ -2978,7 +2978,7 @@ int32_t GAMEAPI air_power(int32_t veh_id, int32_t dist_own, int32_t zoc, int32_t
             } else if (plan_of() != PLAN_AIR_SUPERIORITY || !(v.state & VSTATE_ON_ALERT) ||
                        v.order_auto_type != ORDERA_ON_ALERT) {
                 int32_t odds =
-                    compute_odds(battle_fight_2(veh_id, 0, t.x, t.y, 0, 0, nullptr), faction_id, veh_id, j, -2);
+                    compute_odds(battle_resolve(veh_id, 0, t.x, t.y, 0, 0, nullptr), faction_id, veh_id, j, -2);
                 MAP* sq = map_tile(t.x, t.y);
                 if (tile_base_owner(sq) >= 0) {
                     if (plan_of() == PLAN_OFFENSE) continue;
@@ -3124,7 +3124,7 @@ base_attack:
             if (top < 0) continue;
             if (!patrol) {
                 int32_t odds =
-                    compute_odds(battle_fight_2(veh_id, 0, game().vehs[top].x, game().vehs[top].y, 0, 0, nullptr),
+                    compute_odds(battle_resolve(veh_id, 0, game().vehs[top].x, game().vehs[top].y, 0, 0, nullptr),
                                  faction_id, veh_id, top, -2);
                 MAP* sq = map_tile(game().vehs[top].x, game().vehs[top].y);
                 if (tile_base_owner(sq) < 0) {

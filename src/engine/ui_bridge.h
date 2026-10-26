@@ -458,7 +458,7 @@ ADDR_NATIVE(0x4B43C0) void GAMEAPI say_morale_2(int32_t veh_id, int32_t a2);
 // Redraws the tiles around (x, y) on every open map window (radius by has_radar; viewer `a4`).
 ADDR_NATIVE(0x46AF90) void GAMEAPI draw_tile_fixup(int32_t x, int32_t y, int32_t has_radar, int32_t a4);
 
-// ---- battle module (battle_fight_2, planet_busting, interceptor, promote) ----
+// ---- battle module (battle_resolve, planet_busting, interceptor, promote) ----
 // Battle window (BattleWin) and the status/info pane (InfoWin) showing the combatants.
 ADDR_NATIVE(0x45D310) void THISCALL SubInterface_set_iface_mode(uint8_t* win);
 ADDR_NATIVE(0x422C50) void THISCALL BattleWin_clear(uint8_t* win);

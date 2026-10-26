@@ -503,7 +503,7 @@ addr	original	source	kind	header
 00506490	invasions	invasions	ADDR	engine/battle.h
 00506650	interceptor	interceptor	ADDR	engine/battle.h
 00506A60	battle_fight	battle_fight	ADDR	engine/battle.h
-00506AF0	battle_fight_2	battle_fight_2	ADDR	engine/battle.h
+00506AF0	battle_fight_2	battle_resolve	ADDR	engine/battle.h
 0050B8A0	say_num	say_num	ADDR	engine/probe.h
 0050B8D0	POP3_2	POP3_2	ADDR	engine/diplo_act.h
 0050B8F0	FUN_0050b8f0	veh_stack_next	ADDR	engine/diplo_act.h

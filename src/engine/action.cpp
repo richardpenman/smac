@@ -1119,9 +1119,9 @@ void GAMEAPI action_arty(int32_t veh_id, int32_t x, int32_t y) {
     }
     if (!NetDaemon_maybe_lock(&NetState, &veh_id, 0, 0, x, y, 4)) {
         VehAttackFlags = 1;
-        // battle_fight returns battle_fight_2's result (declared void in battle.h): its body inline
+        // battle_fight returns battle_resolve's result (declared void in battle.h): its body inline
         int32_t tx = map_wrap_x(game().vehs[veh_id].x + TableOffsetX[dir]);
-        if (battle_fight_2(veh_id, dir, tx, game().vehs[veh_id].y + TableOffsetY[dir], 1, 1, nullptr)) {
+        if (battle_resolve(veh_id, dir, tx, game().vehs[veh_id].y + TableOffsetY[dir], 1, 1, nullptr)) {
             NetDaemon_unlock_veh(&NetState);
             return;
         }

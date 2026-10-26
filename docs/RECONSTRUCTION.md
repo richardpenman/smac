@@ -116,7 +116,7 @@ Ghidra prints `game_random`'s scaling as a signed `>>`, but the code uses `shr` 
     globals happened to follow `Armor`.
   * `Vehs[-1]` (0x9527F4) is the Reactor table. `Vehs[-1].unit_id` is the high half of
     `Reactor[0].name_short` (0x01FC = 508), and `.faction_id` is `Reactor[0].power` (0). Readers:
-    `battle_fight_2` (pop loss of an undefended base: native probe131 diverged on turn 129), and
+    `battle_resolve` (pop loss of an undefended base: native probe131 diverged on turn 129), and
     the `veh_at` result in `ai.cpp`'s attack odds. `veh_init` writes `Vehs[-1].morale` (Reactor[2]
     preq_tech) when the table is full; native does not mirror that.
 

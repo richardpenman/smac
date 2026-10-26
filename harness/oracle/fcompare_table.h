@@ -398,7 +398,7 @@ static const FcFunc kFcFuncs[] = {
        reached through battle_fight with a buster) */
     {"mon_enemy_destroyed", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION)}}, /* viewer 0: window */
     /* odds only (is_real 0), then real battles in all directions */
-    {"battle_fight_2", FC_MUTATES, {A(VEH), R(0, 7), XY, A(BOOL), C(0), A(OUT)}},
+    {"battle_resolve", FC_MUTATES, {A(VEH), R(0, 7), XY, A(BOOL), C(0), A(OUT)}},
     {"battle_fight", FC_MUTATES, {A(VEH), R(0, 7), C(0), C(1), A(OUT)}},
     {"has_tech", 0, {A(TECH), A(FACTION_OPT)}},
     {"transport_val", 0, {R(0, 8), BITS(0, 28), R(1, 4)}},

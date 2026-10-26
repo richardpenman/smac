@@ -1,9 +1,9 @@
 // Combat (original module around 0x500120-0x50B8A0): battle odds and strengths, the battle itself
-// (battle_fight_2), casualties, promotions, interceptors, planet busters and their orbital defense.
+// (battle_resolve), casualties, promotions, interceptors, planet busters and their orbital defense.
 //
 // The battle display (BattleWin, StatusWin, sounds, the boom animation, veh_scoot) is UI and
-// bridged through ui_bridge.h; battle_fight_2 calls it only when the battle is shown to the viewer
-// (see battle_fight_2).
+// bridged through ui_bridge.h; battle_resolve calls it only when the battle is shown to the viewer
+// (see battle_resolve).
 #pragma once
 #include "engine/globals.h"
 
@@ -103,12 +103,12 @@ ADDR(0x506650) int32_t GAMEAPI interceptor(int32_t faction_id_def, int32_t facti
 // Monuments; shows the monuments window to the viewer).
 ADDR(0x477210) void GAMEAPI mon_enemy_destroyed(int32_t faction_id, int32_t faction_id_killed);
 // Attack by veh_id in direction dir (artillery: dir indexes TableOffset instead of NearOffset);
-// returns battle_fight_2's result.
+// returns battle_resolve's result.
 ADDR(0x506A60)
 int32_t GAMEAPI battle_fight(int32_t veh_id, int32_t dir, int32_t is_arty, int32_t is_real, int32_t* def_out);
 // Attack by veh_id on (x, y). is_real 0: returns the odds (x8, or x4 for artillery) without fighting
 // and the defender in def_out. Otherwise fights; returns 1 if the attacker cannot act any more...
 // (see battle.cpp).
 ADDR(0x506AF0)
-int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y, int32_t is_arty, int32_t is_real,
+int32_t GAMEAPI battle_resolve(int32_t veh_id, int32_t dir, int32_t x, int32_t y, int32_t is_arty, int32_t is_real,
                                int32_t* def_out);
