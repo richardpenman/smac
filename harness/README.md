@@ -51,7 +51,7 @@ random stream, and some engine code uses `timeGetTime()` as randomness. The orac
   `spot_all -> encounter` the frames of `draw_radius` / `MapWin_draw_radius` / `GraphicWin_redraw`
   and the Win32/DirectDraw code below them (late140, turn 142: 0x014101C1, 0x7A6D9ADF, ...),
   which a headless build cannot reproduce. Slot values 0 and -1 behave alike, so fill values 0x00
-  and 0xFF give identical games. Native equivalent: `WantsToAttackResidue` is 0 at the start of
+  and 0xFF give identical games. Native equivalent: `g_stack_residue.wants_to_attack` is 0 at the start of
   every evaluation and keeps the first call's values for the second call of a pair. (`steptrace`
   treats the thunk as an external call, so a call entered through it is not traced.)
 * **clears the new map blocks**: `map_init` allocates `MapTiles` and `MapAbstract` with `mem_get`

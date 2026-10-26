@@ -1,4 +1,5 @@
 #include "engine/path.h"
+#include "engine/stack_residue.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -673,7 +674,7 @@ int32_t THISCALL Path_move(Path* self, int32_t veh_id, int32_t faction_id) {
             // BUG(original): Path_find's start-ZOC flag is the dead stack value speed() leaves.
             COMPAT_ORIGINAL(residue.path_start_zoc);
             int32_t dir = path_find_core(self, x, y, tx, ty, veh.unit_id, faction_id, (int32_t)flags, prev_dir,
-                                         SpeedStackResidue != 0);
+                                         g_stack_residue.speed != 0);
             if (dir >= 0) return dir;
             if ((veh.state & 0x1000200) == 0x1000200) {
                 veh.order = ORDER_NONE;

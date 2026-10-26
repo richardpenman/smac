@@ -109,7 +109,7 @@ The constraints: savegames stay byte-compatible, and the `.state` snapshots stay
 * In the cleanup phase the `else` branch is left empty or asserts. Fixes come later, as
   deliberate changes. The gate proves only the on-path. Each fixed path gets its own unit test
   and, when it matters, a scenario.
-* The stack-residue emulations (`SpeedStackResidue`, `EM` slots) are compat items too. Keep them
+* The stack-residue emulations (`g_stack_residue`, `EM` slots) are compat items too. Keep them
   grouped in a `StackResidue` context, not scattered globals.
 * The catalogue is generated from the flags (`docs/COMPAT.md`). Later it can be exposed as ini
   options.
@@ -229,7 +229,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 13 | Split `goody_box`, `probe`, `random_events` (gotos out) | M | done (see note 13) |
 | 14 | Split `order_veh` (176 gotos) | L | done (see note 14) |
 | 15 | Methods on layout structs (`Base::`, `Faction::`, `Veh::`) with `ADDR` forwarders | L | first pass done (see note 15) |
-| 16 | Scratch globals → contexts/locals | L | |
+| 16 | Scratch globals → contexts/locals | L | native part done; image globals after the freeze (see note 16) |
 | 17 | Golden-record fcompare mode + data-dependent unit tests | M | |
 | 18 | `diffnative.sh` (native-vs-baseline on new seeds); tag `hybrid-final` | S | |
 | 19 | Split `enemy_move` and the AI (stack residues as explicit context) | XL | |
@@ -504,3 +504,33 @@ Notes on the increments:
     test_layout_methods.cpp checks `id()`, `sleep`, `wake`, `pop_goal`, `pop_goal_fac` and the
     treaty functions through both the forwarders and the methods. fcompare: all 27 moved
     functions.
+
+16. What can move before the hybrid freeze did; the rest waits for it (decision, below).
+    * The native emulations of stack residues, scattered globals until now (`SpeedStackResidue`,
+      `WantsToAttackResidue[8]`, base.cpp's `g_minerals_residue`), are the fields `speed`,
+      `wants_to_attack` and `minerals` of one `StackResidues` context, `g_stack_residue`
+      (engine/stack_residue.h; section 4), each documented with its uninitialised read and compat
+      flag. It stays one object rather than a parameter: the values pass between functions whose
+      signatures are the original's (speed() to Path_move, base_minerals to base_energy, one
+      wants_to_attack call to the next), which cannot take an extra argument while the hybrid
+      lives. The hybrid build keeps reading the real stack slots through its thunks
+      (`PathFindEntryResidue`, `base_*_residue_*`, `call_council_residue_in`), which are not
+      native state. enemy_move's slots already live in its `EM` frame and order_veh's in
+      `OrderVeh` (increments 14 and 19).
+    * base_build's three per-unit tables (`queued_region`, `queued_all`, `units_region`, 2 KB
+      each, cleared by every call) were native namespace-scope arrays; they are members of
+      `BaseBuild` now, like the original's frame.
+    * **Decision: the scratch globals in the memory image (129 `Base*`, `Diplo*`, `Veh*` globals,
+      and the others) stay globals until the hybrid freeze (increment 18).** Turning one into a
+      local or a context field means the reconstructed code stops writing it at its original
+      address, and before the freeze that breaks the proof: fcompare compares the whole image
+      (0x682000-0x9CA000) after every call, so the function that no longer writes the global
+      mismatches; in a hybrid run with some patches off (`none +fn`, fcompare's own setting) the
+      original's code that reads the global (its own callers and callees) sees a stale value. So
+      they move with the state itself, after `hybrid-final`, verified natively against that
+      build (section 2), group by group: the base cycle (`base_upkeep` → `base_yield` ... on
+      `CurrentBaseID`) and its `Base*` values first, which also gives note 15's second pass of
+      `Base::` methods; then the diplomacy dialog values (`Diplo*`); then `Veh*` /
+      `VehAttackFlags` of the move and combat code. Stale reads become named context fields.
+    Proof: the gate, with fcompare on `base_build`, `speed`, `Path_move`, `base_minerals`,
+    `base_energy`, `wants_to_attack`.

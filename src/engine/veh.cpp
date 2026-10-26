@@ -3,6 +3,7 @@
 #include "engine/compat.h"
 #include "engine/game_state.h"
 #include "engine/hybrid_shadow.h"
+#include "engine/stack_residue.h"
 #ifdef SMACX_HYBRID
 extern "C" int32_t GAMEAPI speed_impl_c(int32_t veh_id, int32_t skip_morale);
 extern "C" int32_t GAMEAPI speed_proto_impl_c(int32_t unit_id);
@@ -666,9 +667,7 @@ int32_t GAMEAPI SHADOWABLE(speed_proto)(int32_t unit_id) {
     return Rules.move_rate_roads * value;
 }
 
-int32_t SpeedStackResidue = 0;
-
-// What the original speed() leaves in the dead stack slot Path_find reads (see SpeedStackResidue):
+// What the original speed() leaves in the dead stack slot Path_find reads (g_stack_residue.speed):
 // has_abil's saved EDI (unit_id * 0x34, from speed_proto) unless morale_veh then calls something
 // (morale_alien, has_tech, bitmask), whose frame leaves a non-zero value there. speed_proto returns
 // before calling has_abil for unit 19, which leaves older content.
@@ -684,8 +683,8 @@ static void speed_note_stack_residue(int32_t veh_id) {
     } else if (!(unit_id < 64 && unit_psi_weapon(unit_id))) {
         morale_calls = veh.home_base_id >= 0;
     }
-    if (morale_calls) SpeedStackResidue = 1;
-    else if (unit_id != 19) SpeedStackResidue = unit_id * 0x34;
+    if (morale_calls) g_stack_residue.speed = 1;
+    else if (unit_id != 19) g_stack_residue.speed = unit_id * 0x34;
 }
 
 int32_t GAMEAPI SHADOWABLE(speed)(int32_t veh_id, int32_t skip_morale) {

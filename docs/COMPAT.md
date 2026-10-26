@@ -7,7 +7,7 @@ Every bug of the original that the reconstruction reproduces is behind one of th
 flag off stops the game at its first site (`compat_unfixed`). Sites are the `BUG(original)`
 comments; each names its flag with `COMPAT_ORIGINAL(flag)` next to it.
 
-128 flags, 175 sites.
+128 flags, 174 sites.
 
 ## bugs at several sites
 
@@ -322,7 +322,7 @@ comments; each names its flag with `COMPAT_ORIGINAL(flag)` next to it.
 | `residue.alien_bonus_energy` | The alien energy bonus starts from a local only the commerce loop writes (residue of base_minerals otherwise). Fix: start from 0. | `src/engine/base.cpp` |
 | `residue.base_list_frame` | A negative position reads values[] of the sort frame. Fix: reject negative positions. | `src/engine/base.cpp` |
 | `residue.revolt_shares` | Revolt shares of factions without the bonus are never written (stack residue, 0 under the oracle). Fix: initialise them to 0 (as now). | `src/engine/base.cpp` |
-| `residue.path_start_zoc` | Path_find's start-ZOC flag is an uninitialised local (the residue speed() leaves, SpeedStackResidue). Fix: 0. | `src/engine/path.cpp` (2), `src/engine/path.h`, `src/engine/veh.h` |
+| `residue.path_start_zoc` | Path_find's start-ZOC flag is an uninitialised local (the residue speed() leaves, g_stack_residue.speed). Fix: 0. | `src/engine/path.cpp` (2), `src/engine/path.h` |
 | `residue.council_aliens_ecx` | call_council's "aliens alive" flag is the caller's ECX unless proposal 1 is considered. Fix: compute it for every proposal. | `src/engine/turn.cpp` |
 | `residue.ai_score` | score is read before it is written (the 0x3039 test). Fix: initialise it. | `src/engine/ai.cpp` |
 | `residue.parse_gender` | gender is uninitialised when "$<#n" sets only the plurality. Fix: 0. | `src/engine/parse.cpp` |

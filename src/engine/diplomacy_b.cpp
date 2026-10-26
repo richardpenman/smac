@@ -21,6 +21,7 @@
 #include "engine/rules.h"
 #include "engine/score.h"
 #include "engine/stack.h"
+#include "engine/stack_residue.h"
 #include "engine/tech.h"
 #include "engine/turn.h"
 #include "engine/ui_bridge.h"
@@ -83,8 +84,8 @@ bool viewer_has_empath_guild() {
 // Native emulation of the uninitialised array at [ebp-0x134] (docs/RECONSTRUCTION.md, known
 // uninitialised read #4): index f is faction f's slot ([ebp-0x134+4f]); the original keeps
 // whatever its frame position held, so consecutive calls at the same stack depth see the previous
-// call's reduced values. Native code keeps them here between calls (canonical start: 0).
-int32_t WantsToAttackResidue[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+// call's reduced values. Native code keeps them in g_stack_residue.wants_to_attack between calls
+// (canonical start: 0).
 
 // The body of wants_to_attack; slots: the residue array (read, and updated as the original's
 // frame is when the region scan is reached).
@@ -215,7 +216,7 @@ HYBRID_SHADOW_THUNK(int32_t, wants_to_attack, (int32_t faction_id, int32_t facti
                     0x55BC89, "push %ebp\n mov %esp, %ebp\n sub $0x134, %esp")
 #else
 int32_t GAMEAPI wants_to_attack(int32_t faction_id, int32_t faction_id_tgt, int32_t odds_override) {
-    return wants_to_attack_core(faction_id, faction_id_tgt, odds_override, WantsToAttackResidue);
+    return wants_to_attack_core(faction_id, faction_id_tgt, odds_override, g_stack_residue.wants_to_attack);
 }
 #endif
 
@@ -224,7 +225,7 @@ int32_t(GAMEAPI* g_harness_wants_to_attack_fresh)(int32_t, int32_t, int32_t) = n
 int32_t wants_to_attack_fresh(int32_t faction_id, int32_t faction_id_tgt, int32_t odds_override) {
     if (g_harness_wants_to_attack_fresh)
         return g_harness_wants_to_attack_fresh(faction_id, faction_id_tgt, odds_override);
-    for (int32_t k = 0; k < 8; k++) WantsToAttackResidue[k] = 0;
+    for (int32_t k = 0; k < 8; k++) g_stack_residue.wants_to_attack[k] = 0;
     return wants_to_attack(faction_id, faction_id_tgt, odds_override);
 }
 

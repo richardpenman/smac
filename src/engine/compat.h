@@ -295,9 +295,8 @@ struct Compat {
     // For altitude 6 the upper bound is entry 10, not 7. Fix: entry alt + 1.
     bool alt_upper_bound_6 = true;
     // Emulated stack residues and uninitialised reads of the original (docs/RECONSTRUCTION.md,
-    // "Known uninitialised reads"). The values themselves still live where the emulation needs
-    // them (SpeedStackResidue, enemy_move's slots); they move into an explicit context with the
-    // scratch globals (increment 16).
+    // "Known uninitialised reads"). The native values live in g_stack_residue (stack_residue.h),
+    // enemy_move's slots in its EM frame (ai_move.cpp), order_veh's in OrderVeh (move_order.cpp).
     struct StackResidue {
         // The alien energy bonus starts from a local only the commerce loop writes (residue of base_minerals
         // otherwise). Fix: start from 0.
@@ -307,7 +306,7 @@ struct Compat {
         // Revolt shares of factions without the bonus are never written (stack residue, 0 under the oracle). Fix:
         // initialise them to 0 (as now).
         bool revolt_shares = true;
-        // Path_find's start-ZOC flag is an uninitialised local (the residue speed() leaves, SpeedStackResidue). Fix: 0.
+        // Path_find's start-ZOC flag is an uninitialised local (the residue speed() leaves, g_stack_residue.speed). Fix: 0.
         bool path_start_zoc = true;
         // call_council's "aliens alive" flag is the caller's ECX unless proposal 1 is considered. Fix: compute it for
         // every proposal.

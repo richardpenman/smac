@@ -1,4 +1,5 @@
 #include "engine/base.h"
+#include "engine/stack_residue.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -1627,13 +1628,7 @@ void GAMEAPI base_nutrient() {
 // base_energy reads a local it never writes for alien factions without trade partners (see
 // base_energy below): the slot holds base_minerals' last local (its eco-damage divisor), as every
 // caller runs base_minerals immediately before base_energy. Native builds pass the value through
-// this variable; hybrid builds capture/write the real stack slot with thunks.
-#ifndef SMACX_HYBRID
-namespace {
-int32_t g_minerals_residue = 0;  // base_minerals' [ebp-4] when it returns
-}  // namespace
-#endif
-
+// g_stack_residue.minerals; hybrid builds capture/write the real stack slot with thunks.
 #ifdef SMACX_HYBRID
 extern "C" {
 int32_t base_minerals_residue_out;
@@ -1655,8 +1650,8 @@ __attribute__((naked)) void GAMEAPI base_energy() {
 #else
 #define BASE_MINERALS_DEF       void GAMEAPI base_minerals()
 #define BASE_ENERGY_DEF         void GAMEAPI base_energy()
-#define MINERALS_RESIDUE_SET(v) (g_minerals_residue = (v))
-#define ENERGY_RESIDUE_GET()    (g_minerals_residue)
+#define MINERALS_RESIDUE_SET(v) (g_stack_residue.minerals = (v))
+#define ENERGY_RESIDUE_GET()    (g_stack_residue.minerals)
 #endif
 
 BASE_MINERALS_DEF {

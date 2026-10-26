@@ -75,10 +75,6 @@ uint8_t raw_chassis_speed(int32_t chassis_id) {
     return *mem::host(0x94A330 + chassis_id * 0x90 + 0x48);
 #endif
 }
-// Per-unit statistics of base_build (the original keeps them in its frame).
-int32_t queued_region[512];  // [ebp-0xF6C] own bases in the region building the unit
-int32_t queued_all[512];  // [ebp-0x1F6C] own other bases building the unit
-int32_t units_region[512];  // [ebp-0x176C] own vehicles in the region
 
 bool human(int32_t id) { return (FactionStatus[0] & (uint8_t)(1u << (id & 31))) != 0; }
 
@@ -101,6 +97,10 @@ struct BaseBuild {
     int32_t ai_growth = 0, ai_tech = 0, ai_wealth = 0, ai_power = 0, ai_fight = 0;
     int32_t gov_explore = 0, gov_discover = 0, gov_build = 0, gov_conquer = 0;
     int32_t regions_with_bases = 0;  // [ebp-0xfc]
+    // Per-unit statistics (cleared by scan_factions).
+    int32_t queued_region[512];  // [ebp-0xF6C] own bases in the region building the unit
+    int32_t queued_all[512];  // [ebp-0x1F6C] own other bases building the unit
+    int32_t units_region[512];  // [ebp-0x176C] own vehicles in the region
     // Production of the other bases and vehicles, per plan/triad.
     int32_t veh_region[kPlanTriads];  // [ebp-0x4BC]
     int32_t veh_all[kPlanTriads];  // [ebp-0x2EC]

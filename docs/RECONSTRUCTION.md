@@ -131,15 +131,15 @@ The original reads stack memory it never wrote in these places. The oracle makes
    this; the slot holds what `speed()` (called just before) left behind: has_abil's saved EDI
    (= `unit_id*0x34`), overwritten by `morale_veh`'s callees (morale_alien / has_tech loop: a stack
    address; bitmask: 0x5C105A). Canonical value is 0 only for unit 0 when `morale_veh` makes no call.
-   * Native: `speed()` sets an emulation global `SpeedStackResidue` (1 if morale_veh made a call:
+   * Native: `speed()` sets an emulation global `g_stack_residue.speed` (1 if morale_veh made a call:
      faction==0, or plan==11 probe with any Tech flag 2, or (!(unit<64 && psi weapon) &&
      home_base_id>=0); else `unit_id*0x34` unless unit_id==19 → unchanged). `Path_move` passes
-     `SpeedStackResidue != 0` as the initial ZOC flag into `Path_find`. Mark `BUG(original)`.
+     `g_stack_residue.speed != 0` as the initial ZOC flag into `Path_find`. Mark `BUG(original)`.
    * Hybrid: a reconstructed `Path_find` needs a naked entry thunk capturing `*(uint32_t*)(esp-0x30)`;
      reconstructed `speed`/`speed_proto`/`morale_veh` need a thunk writing the residue to
      `[entry_esp-0x48]` (the existing `has_abil` thunk works because it pushes EDI as the original).
    * Implemented (src/engine/path.cpp): `path_find_core(..., start_zoc)` holds the body; native
-     `Path_find` passes 0, `Path_move` passes `SpeedStackResidue != 0`; the hybrid `Path_find` is a
+     `Path_find` passes 0, `Path_move` passes `g_stack_residue.speed != 0`; the hybrid `Path_find` is a
      naked thunk storing `[esp-0x30]` in `PathFindEntryResidue`. fcompare (flag `FC_PATHS`) writes
      0 / 0x5C105A into that slot on alternate calls, so both values are compared.
 2. **`enemy_move` (0x56B5B0), local `[ebp-0x48]`** (Ghidra `local_4c`, passenger keep-sentried limit
@@ -173,7 +173,7 @@ The original reads stack memory it never wrote in these places. The oracle makes
    Implemented (src/engine/diplomacy_b.cpp, `wants_to_attack_core(..., slots)`): hybrid builds use a
    shadow thunk (`HYBRID_SHADOW_THUNK`): the body reads the slots from the stack image saved at
    entry (`[entry ESP - 0x138 + 4f]` for faction f) and the original re-runs to leave its frame, so
-   hybrid games are exact. Native builds keep the slots in `WantsToAttackResidue[8]`, updated as
+   hybrid games are exact. Native builds keep the slots in `g_stack_residue.wants_to_attack[8]` (stack_residue.h), updated as
    the frame is, so the second call of an `(a, b)` / `(b, a)` pair sees the first call's values.
    Marked `BUG(original)`.
    **Canonical start value.** The residue the first call of an evaluation sees comes from
@@ -182,7 +182,7 @@ The original reads stack memory it never wrote in these places. The oracle makes
    headless code cannot reproduce. The oracle therefore poisons the 8 slots before every first or
    single call (harness/README.md, "poisons `wants_to_attack`'s slot array"; sites
    `kWantsToAttackFirstSites`); 0 and -1 behave alike. Reconstructed callers make these calls
-   through `wants_to_attack_fresh` (diplomacy.h): native code clears `WantsToAttackResidue`
+   through `wants_to_attack_fresh` (diplomacy.h): native code clears `g_stack_residue.wants_to_attack`
    first, hybrid code calls the oracle's poisoning thunk through
    `g_harness_wants_to_attack_fresh`, so it fills the slots at the same entry ESP. The second
    call of a pair stays a plain `wants_to_attack` call. Callers: `enemy_strategy` (ai.cpp),
@@ -226,7 +226,7 @@ Hybrid tool for side-effect-free functions whose dead stack matters: define the 
 example: speed/speed_proto/morale_veh in veh.cpp). In hybrid builds the thunk computes the result
 with the reconstruction, then re-runs the original code from the same stack position so the stack
 image is the original's. Native builds are unaffected; native code must emulate the read instead
-(e.g. `SpeedStackResidue`, set by speed()).
+(e.g. `g_stack_residue.speed`, set by speed()).
 
 Tools for finding more: oracle commands `steptrace`, `slotlog`, `poison rand`, and
 `harness/scripts/uninit_reads.py` (see harness/README.md).
