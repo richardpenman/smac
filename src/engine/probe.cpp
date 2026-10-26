@@ -17,6 +17,7 @@
 #include "engine/map.h"
 #include "engine/net.h"
 #include "engine/parse.h"
+#include "engine/probe_rules.h"
 #include "engine/proto.h"
 #include "engine/random.h"
 #include "engine/rules.h"
@@ -331,26 +332,85 @@ int32_t GAMEAPI success_rates(int32_t n, int32_t morale, int32_t difficulty, int
 
 // ---- probe ----------------------------------------------------------------------------------------------
 
-int32_t GAMEAPI probe(int32_t veh_id, int32_t base_id, int32_t veh_id_tgt, int32_t commit) {
+namespace {
+// Next step of probe: the original's jump targets (choose the action, the AI's choice, resolve the
+// mission, its success, the team's return, the diplomatic consequences) or the end.
+enum class Step { dispatch, actions, ai_choose, resolve, success, survive, after, diplomacy, done };
+
+// State of one probe call: the probe team, its target (a base, or a unit with base_id -1), the
+// action and its risk, and what the mission does (the stolen technology, the sabotaged facility,
+// the cost of mind control, the framed faction, the team's way home).
+struct Probe {
+    int32_t veh_id, base_id, veh_id_tgt, commit;
     int32_t busted_action = 0;  // action shown to a human target that caught the probe
     int32_t refined = 0;  // the AI choice has been refined once (headquarters checks)
     int32_t freed = -1;  // captured leader to free
-    int32_t f = game().vehs[veh_id].faction_id;
-    int32_t t = base_id < 0 ? game().vehs[veh_id_tgt].faction_id : (uint8_t)game().bases[base_id].faction_id;
-    ProbeTargetFactionID = t;
-    bool alien = (game().mfactions[f].rule_flags & 0x80) != 0;
-    bool human = is_human(f);
-    auto shown = [&]() { return f == CurrentPlayerFaction && human && (VehAttackFlags & 1); };
-    int32_t tx = base_id < 0 ? game().vehs[veh_id_tgt].x : game().bases[base_id].x;
-    int32_t ty = base_id < 0 ? game().vehs[veh_id_tgt].y : game().bases[base_id].y;
-    // amphibious probes only between land and sea
+    int32_t f, t;
+    bool alien, human;
+    int32_t tx, ty;
+    int32_t has_plague_tech = 0;  // knows a technology with flag 0x10 (genetic warfare)
+    int32_t plague_techs = 0;  // technologies with flag 0x20 / those the target knows
+    int32_t plague_known = 0;
+    int32_t tech = 0;
+    int32_t action = 0;
+    int32_t risk = 0;
+    int32_t sab = 0;
+    char production[256];
+    int32_t frame = 0;
+    int32_t dest = 0;
+    int32_t cost = 0;
+    int32_t tgt_mod = 0;
+    int32_t result = 0;  // probe's result once the step is done
+
+    Probe(int32_t veh, int32_t base, int32_t veh_tgt, int32_t commit_)
+        : veh_id(veh),
+          base_id(base),
+          veh_id_tgt(veh_tgt),
+          commit(commit_),
+          f(game().vehs[veh].faction_id),
+          t(base < 0 ? game().vehs[veh_tgt].faction_id : (uint8_t)game().bases[base].faction_id),
+          alien((game().mfactions[f].rule_flags & 0x80) != 0),
+          human(is_human(f)),
+          tx(base < 0 ? game().vehs[veh_tgt].x : game().bases[base].x),
+          ty(base < 0 ? game().vehs[veh_tgt].y : game().bases[base].y) {
+        production[0] = 0;
+    }
+    bool shown() const { return f == CurrentPlayerFaction && human && (VehAttackFlags & 1); }
+    Step finish(int32_t value) {
+        result = value;
+        return Step::done;
+    }
+    bool out_of_reach();
+    int32_t hunter_seeker();
+    void count_plague_techs();
+    Step choose_action();
+    Step dispatch();
+    Step infiltrate();
+    Step drain_energy();
+    Step sabotage();
+    Step assassinate();
+    Step free_leader();
+    Step subvert_unit();
+    Step mind_control_base();
+    Step ai_choose();
+    Step resolve();
+    Step bust();
+    Step success();
+    void survive();
+    void return_home();
+    int32_t diplomacy();
+};
+
+// Amphibious probes only between land and sea: true when the target is out of reach (the
+// mission returns 0).
+bool Probe::out_of_reach() {
     if (map_is_ocean(game().vehs[veh_id].x, game().vehs[veh_id].y)) {
         if (!map_is_ocean(tx, ty) && veh_triad(veh_id) != 1 && !has_abil(game().vehs[veh_id].unit_id, 8)) {
             if (f == CurrentPlayerFaction && commit && human && (VehAttackFlags & 1)) {
                 parse_say(0, Ability[abil_index(8)].name, -1, -1);
                 NetMsg_pop(&NetMsg, "PROBEABILAMPHIBIOUS", 5000, 0, nullptr);
             }
-            return 0;
+            return true;
         }
     }
     if (map_is_ocean(tx, ty) && !map_is_ocean(game().vehs[veh_id].x, game().vehs[veh_id].y) &&
@@ -359,9 +419,13 @@ int32_t GAMEAPI probe(int32_t veh_id, int32_t base_id, int32_t veh_id_tgt, int32
             parse_say(0, Ability[abil_index(8)].name, -1, -1);
             NetMsg_pop(&NetMsg, "PROBEABILAMPHIBIOUS2", 5000, 0, nullptr);
         }
-        return 0;
+        return true;
     }
-    // Hunter-Seeker Algorithm
+    return false;
+}
+// The Hunter-Seeker Algorithm stops the probe (or, against Algorithmic Enhancement, makes the
+// mission riskier). Returns the mission's result, or -1 to go on.
+int32_t Probe::hunter_seeker() {
     ProbeTargetHasHSA = 0;
     ProbeHasAlgoEnhancement = 0;
     if (!has_abil(game().vehs[veh_id].unit_id, 0x10000000)) {
@@ -388,10 +452,10 @@ int32_t GAMEAPI probe(int32_t veh_id, int32_t base_id, int32_t veh_id_tgt, int32
             ProbeTargetHasHSA = 1;
         }
     }
-    int32_t has_plague_tech = 0;  // knows a technology with flag 0x10 (genetic warfare)
-    int32_t plague_techs = 0;  // technologies with flag 0x20 / those the target knows
-    int32_t plague_known = 0;
-    int32_t tech = 0;
+    return -1;
+}
+// Technologies of genetic warfare: whether the faction knows one, how many the target knows.
+void Probe::count_plague_techs() {
     for (; tech < 89; tech++) {
         if ((Tech[tech].flags & 0x10) && has_tech(tech, f)) has_plague_tech = 1;
         if (Tech[tech].flags & 0x20) {
@@ -399,15 +463,10 @@ int32_t GAMEAPI probe(int32_t veh_id, int32_t base_id, int32_t veh_id_tgt, int32
             if (has_tech(tech, t)) plague_known++;
         }
     }
-    int32_t action;
-    int32_t risk = 0;
-    int32_t sab = 0;
-    char production[256];
-    production[0] = 0;
-    int32_t frame = 0;
-    int32_t dest = 0;
-    int32_t cost = 0;
-    int32_t tgt_mod = 0;
+}
+// The action: subverting a unit, the human player's menu choice (stored with the team for the
+// replay of the attack), or the AI's.
+Step Probe::choose_action() {
     if (base_id < 0) {
         action = -1;
     } else if (shown()) {
@@ -424,13 +483,31 @@ int32_t GAMEAPI probe(int32_t veh_id, int32_t base_id, int32_t veh_id_tgt, int32
             if (any) items |= 0x100;
         }
         action = ui_probe_menu(t, items, alien);
-        if (action < 0) return 0;
+        if (action < 0) return finish(0);
         game().vehs[veh_id].probe_action = (uint8_t)action;
     } else {
-        if (!human) goto ai_choose;
+        if (!human) return Step::ai_choose;
         action = game().vehs[veh_id].probe_action & 7;
     }
-dispatch:
+    return Step::dispatch;
+}
+// Carries out the chosen action up to its resolution (dispatch loops when an action falls back
+// to another one).
+Step Probe::dispatch() {
+    Step next = infiltrate();
+    if (next != Step::actions) return next;
+    if (action == 3) return drain_energy();
+    if (action == 2) return sabotage();
+    if (action == 5) return assassinate();
+    if (action == 8) return free_leader();
+    if (action == -1) return subvert_unit();
+    if (action != 6) return Step::resolve;
+    return mind_control_base();
+}
+// Infiltration of the datalinks (action 0) and the RISKEXCUSE question, then procuring research
+// data (action 1; the AI falls back to sabotage or infiltration when there is nothing to steal).
+// Returns Step::actions for the other actions.
+Step Probe::infiltrate() {
     while (true) {
         if (action == 0 && (VehAttackFlags & 2)) {
             if (!(dstat(f, t) & 0x1000)) {
@@ -457,19 +534,19 @@ dispatch:
             GenderDefault = game().mfactions[t].is_leader_female;
             PluralDefault = 0;
             parse_says(1, game().mfactions[t].name_leader, -1, -1);
-            if (!popp(ScriptFileName, "RISKEXCUSE", 0, infil_pcx(alien), 0)) return 0;
+            if (!popp(ScriptFileName, "RISKEXCUSE", 0, infil_pcx(alien), 0)) return finish(0);
         }
         risk = 0;
-        if (action != 1) break;
+        if (action != 1) return Step::actions;
         // procure research data
         if ((game().bases[base_id].state_flags & BSTATE_RESEARCH_DATA_STOLEN) && (risk = 1, shown())) {
             parse_says(0, game().bases[base_id].name, -1, -1);
             success_rates(1, morale_veh(veh_id, 1, 0), -1, base_id);
             if (!success_rates(2, morale_veh(veh_id, 1, 0), 1, base_id)) {
                 NetMsg_pop(&NetMsg, "ADVDECIPHER1", -5000, 0, nullptr);
-                return 0;
+                return finish(0);
             }
-            if (!popp(ScriptFileName, "ADVDECIPHER", 0, infil_pcx(alien), 0)) return 0;
+            if (!popp(ScriptFileName, "ADVDECIPHER", 0, infil_pcx(alien), 0)) return finish(0);
         }
         int32_t r;
         if (!MultiplayerActive || !human) {
@@ -494,7 +571,7 @@ dispatch:
                 int32_t choice;
                 if (!(VehAttackFlags & 2)) {
                     choice = popp(ScriptFileName, "DECIPHER", 0x40, infil_pcx(alien), 0);
-                    if (choice < 0) return 0;
+                    if (choice < 0) return finish(0);
                     game().vehs[veh_id].probe_action |= (uint8_t)(choice << 3);
                 } else {
                     choice = (game().vehs[veh_id].probe_action & 8) >> 3;
@@ -502,496 +579,480 @@ dispatch:
                 if (choice == 1) {
                     tech = -1;
                     risk = level + 1;
-                    goto resolve;
+                    return Step::resolve;
                 }
             }
         }
-        if (tech != 9999 || !(game().factions[f].player_flags & PFLAG_MAP_REVEALED)) goto resolve;
+        if (tech != 9999 || !(game().factions[f].player_flags & PFLAG_MAP_REVEALED)) return Step::resolve;
         if (human) {
-            if (f != CurrentPlayerFaction || !(VehAttackFlags & 2)) goto resolve;
+            if (f != CurrentPlayerFaction || !(VehAttackFlags & 2)) return Step::resolve;
             NetMsg_pop(&NetMsg, "STOLENOTHING", -5000, 0, nullptr);
-            return 0;
+            return finish(0);
         }
         action = (dstat(f, t) & 0x30) ? 2 : 0;
     }
-    if (action == 3) {
-        // drain energy reserves
-        if (!(game().bases[base_id].state_flags & BSTATE_ENERGY_RESERVES_DRAINED) ||
-            (risk = 1, f != CurrentPlayerFaction) || !human || !(VehAttackFlags & 1))
-            goto resolve;
-        parse_says(0, game().bases[base_id].name, -1, -1);
-        success_rates(1, morale_veh(veh_id, 1, 0), -1, base_id);
-        if (!success_rates(2, morale_veh(veh_id, 1, 0), 1, base_id)) {
-            NetMsg_pop(&NetMsg, "ADVENERGY1", -5000, 0, nullptr);
-            return 0;
-        }
-        if (popp(ScriptFileName, "ADVENERGY", 0, infil_pcx(alien), 0)) goto resolve;
-        return 0;
+}
+// Drain energy reserves (action 3): asked again when the base was drained already.
+Step Probe::drain_energy() {
+    // drain energy reserves
+    if (!(game().bases[base_id].state_flags & BSTATE_ENERGY_RESERVES_DRAINED) ||
+        (risk = 1, f != CurrentPlayerFaction) || !human || !(VehAttackFlags & 1))
+        return Step::resolve;
+    parse_says(0, game().bases[base_id].name, -1, -1);
+    success_rates(1, morale_veh(veh_id, 1, 0), -1, base_id);
+    if (!success_rates(2, morale_veh(veh_id, 1, 0), 1, base_id)) {
+        NetMsg_pop(&NetMsg, "ADVENERGY1", -5000, 0, nullptr);
+        return finish(0);
     }
-    if (action == 2) {
-        // activate sabotage virus
-        sab = 0;
-        production[0] = 0;
-        int32_t item = game().bases[base_id].queue_items[0];
-        int32_t item_cost;
-        if (item < 0) {
-            std::strcat(production, Strings_get(&StringTable, Facility[-item].name));
-            item_cost = Facility[-game().bases[base_id].queue_items[0]].cost;
-        } else {
-            std::strcat(production, Units[item].name);
-            item_cost = Units[game().bases[base_id].queue_items[0]].cost;
-        }
-        int32_t r;
-        if (!MultiplayerActive || !human) {
-            int32_t m = morale_veh(veh_id, 1, 0) / 2;
-            r = (m == -1 || m + 1 < 0) ? 0 : game_rand() % (m + 2);
-        } else {
-            game_reseed(MapRandomSeed + CurrentTurn + f);
-            r = game_random(0, morale_veh(veh_id, 1, 0) / 2 + 2);
-            game_reseed(engine_logic_time());
-        }
-        int32_t cf = cost_factor(f, 1, -1);
-        if (game().bases[base_id].minerals_accumulated < cf * item_cost || r != 0) {
-            int32_t rr = game_rand() % 69;
-            bool chosen = false;
-            for (int32_t k = 1; k < 70; k++) {
-                int32_t fid = (k + rr) % 69 + 1;
-                if (fid == 1) {
-                    if (stack_check(veh_at(game().bases[base_id].x, game().bases[base_id].y), 2, 5, -1, -1)) {
-                        sab = 98;
-                        chosen = true;
-                        break;
-                    }
-                } else if ((fid != 26 || !map_is_ocean(game().bases[base_id].x, game().bases[base_id].y)) && fid < 65) {
-                    if (base_fac(base_id, fid)) {
-                        sab = fid;
-                        chosen = true;
-                        break;
-                    }
-                }
-            }
-            if (!chosen && !human) {
-                action = game().bases[base_id].pop_size < 4 ? 0 : 4;
-                goto dispatch;
-            }
-        }
-        if (!human) {
-            if (morale_veh(veh_id, 1, 0) > 4) {
+    if (popp(ScriptFileName, "ADVENERGY", 0, infil_pcx(alien), 0)) return Step::resolve;
+    return finish(0);
+}
+// Activate sabotage virus (action 2): the production, a facility, or (AI) a defense facility.
+Step Probe::sabotage() {
+    // activate sabotage virus
+    sab = 0;
+    production[0] = 0;
+    int32_t item = game().bases[base_id].queue_items[0];
+    int32_t item_cost;
+    if (item < 0) {
+        std::strcat(production, Strings_get(&StringTable, Facility[-item].name));
+        item_cost = Facility[-game().bases[base_id].queue_items[0]].cost;
+    } else {
+        std::strcat(production, Units[item].name);
+        item_cost = Units[game().bases[base_id].queue_items[0]].cost;
+    }
+    int32_t r;
+    if (!MultiplayerActive || !human) {
+        int32_t m = morale_veh(veh_id, 1, 0) / 2;
+        r = (m == -1 || m + 1 < 0) ? 0 : game_rand() % (m + 2);
+    } else {
+        game_reseed(MapRandomSeed + CurrentTurn + f);
+        r = game_random(0, morale_veh(veh_id, 1, 0) / 2 + 2);
+        game_reseed(engine_logic_time());
+    }
+    int32_t cf = cost_factor(f, 1, -1);
+    if (game().bases[base_id].minerals_accumulated < cf * item_cost || r != 0) {
+        int32_t rr = game_rand() % 69;
+        bool chosen = false;
+        for (int32_t k = 1; k < 70; k++) {
+            int32_t fid = (k + rr) % 69 + 1;
+            if (fid == 1) {
                 if (stack_check(veh_at(game().bases[base_id].x, game().bases[base_id].y), 2, 5, -1, -1)) {
                     sab = 98;
-                    risk = 1;
-                } else if (base_fac(base_id, 5)) {
-                    sab = 5;
-                    risk = 1;
-                } else if (base_fac(base_id, 4)) {
-                    sab = 4;
-                    risk = 1;
-                } else if (base_fac(base_id, 2)) {
-                    sab = 2;
-                    risk = 1;
-                } else if (base_fac(base_id, 27)) {
-                    sab = 27;
-                    risk = 1;
+                    chosen = true;
+                    break;
                 }
-            }
-            goto resolve;
-        }
-        success_rates(1, morale_veh(veh_id, 1, 0), 0, base_id);
-        int32_t choice;
-        if (f == CurrentPlayerFaction && (VehAttackFlags & 1)) {
-            if (!success_rates(2, morale_veh(veh_id, 1, 0), 1, base_id)) choice = 0;
-            else choice = popp(ScriptFileName, "ADVVIRUS", 0, infil_pcx(alien), 0);
-            game().vehs[veh_id].probe_action |= (uint8_t)(choice << 3);
-        } else {
-            choice = (game().vehs[veh_id].probe_action & 8) >> 3;
-        }
-        if (choice == 0) goto resolve;
-        risk = 1;
-        if (f == CurrentPlayerFaction && (VehAttackFlags & 1)) {
-            bool buster = stack_check(veh_at(game().bases[base_id].x, game().bases[base_id].y), 2, 5, -1, -1) != 0;
-            sab = ui_probe_sabotage_menu(base_id, buster, production);
-            if (sab < 0) return 0;
-            game().vehs[veh_id].probe_sabotage_id = (uint8_t)sab;
-        } else {
-            sab = (int8_t)game().vehs[veh_id].probe_sabotage_id;
-        }
-        if (sab != 99) {
-            if (!base_fac(base_id, 1)) {
-                if (sab != 4 && sab != 5) goto resolve;
-                if (shown()) {
-                    parse_says(0, game().bases[base_id].name, -1, -1);
-                    parse_say(1, Facility[sab].name, -1, -1);
-                    success_rates(2, morale_veh(veh_id, 1, 0), 2, base_id);
-                    if (!popp(ScriptFileName, "MILVIRUS", 0, infil_pcx(alien), 0)) return 0;
-                }
-            } else if (shown()) {
-                parse_says(0, game().bases[base_id].name, -1, -1);
-                parse_says(1, game().mfactions[t].adj_name_faction, -1, -1);
-                success_rates(2, morale_veh(veh_id, 1, 0), 2, base_id);
-                if (!popp(ScriptFileName, "HQVIRUS", 0, infil_pcx(alien), 0)) return 0;
-            }
-            risk = 2;
-        }
-        goto resolve;
-    }
-    if (action == 5) {
-        // assassinate prominent researchers
-        risk = 1;
-        if (!success_rates(1, morale_veh(veh_id, 1, 0), 1, base_id)) {
-            if (shown()) NetMsg_pop(&NetMsg, "NOASSASSIN", -5000, 0, nullptr);
-        } else {
-            if (!shown()) goto resolve;
-            if (popp(ScriptFileName, "ASSASSIN", 0, infil_pcx(alien), 0)) goto resolve;
-        }
-        return 0;
-    }
-    if (action == 8) {
-        // free captured faction leader
-        risk = 1;
-        if (!success_rates(1, morale_veh(veh_id, 1, 0), 1, base_id)) {
-            if (f == CurrentPlayerFaction && human) NetMsg_pop(&NetMsg, "NOFREEWILLY", -5000, 0, nullptr);
-        } else {
-            if (!shown()) goto resolve;
-            if (popp(ScriptFileName, "FREEWILLY", 0, infil_pcx(alien), 0)) goto resolve;
-        }
-        return 0;
-    }
-    if (action == -1) {
-        // mind control unit
-        if (stack_check(veh_id_tgt, 1, -1, -1, -1) > 1) return 0;
-        if (veh_triad(veh_id_tgt) == 2 && !has_abil(game().vehs[veh_id].unit_id, 0x20)) {
-            if (f == CurrentPlayerFaction && commit && human && (VehAttackFlags & 1)) {
-                parse_say(0, Ability[abil_index(0x20)].name, -1, -1);
-                NetMsg_pop(&NetMsg, "PROBEABILSUPERIORITY", 5000, 0, nullptr);
-            }
-            return 0;
-        }
-        int32_t unit = game().vehs[veh_id_tgt].unit_id;
-        if (t == 0 || (unit <= 63 && (Weapon[Units[unit].weapon_id].offense_value < 0 || unit == 15))) {
-            if (f == CurrentPlayerFaction && commit && human && (VehAttackFlags & 1))
-                NetMsg_pop(&NetMsg, "ALIENPROBE", -5000, 0, nullptr);
-            return 0;
-        }
-        int32_t uy = game().vehs[veh_id_tgt].y;
-        int32_t ux = game().vehs[veh_id_tgt].x;
-        int32_t dist = 12;
-        for (int32_t i = 0; i < game().base_count; i++) {
-            if ((uint8_t)game().bases[i].faction_id == t && has_fac(FAC_HEADQUARTERS, i, 0)) {
-                dist = tile_vector_dist(ux, uy, game().bases[i].x, game().bases[i].y);
-                break;
-            }
-        }
-        int32_t home = game().vehs[veh_id_tgt].home_base_id;
-        if (home >= 0 && base_fac(home, 23)) dist /= 2;
-        cost = ((game().factions[t].energy_credits + 800) / (dist + 2)) * Units[game().vehs[veh_id_tgt].unit_id].cost;
-        if (!human && is_human(t) && game().factions[t].diff_level > 3)
-            cost = (cost * 3) / game().factions[t].diff_level;
-        if (game().mfactions[t].rule_flags & 0x800) {
-            if (f == CurrentPlayerFaction && human && commit && (VehAttackFlags & 1)) {
-                parse_says(0, game().mfactions[t].adj_name_faction, -1, -1);
-                NetMsg_pop(&NetMsg, "MINDIMMUNITY2", -5000, 0, nullptr);
-            }
-            return 0;
-        }
-        for (int32_t i = 0; i < game().mfactions[f].faction_bonus_count; i++)
-            if (game().mfactions[f].faction_bonus_id[i] == 16)
-                cost = (cost * game().mfactions[f].faction_bonus_val1[i]) / 100;
-        if (SecretProjects[FAC_NETHACK_TERMINUS - SP_ID_First] >= 0 &&
-            (uint8_t)game().bases[SecretProjects[FAC_NETHACK_TERMINUS - SP_ID_First]].faction_id == f)
-            cost = (cost * 3) / 4;
-        int32_t p = game().factions[t].SE_probe;
-        if ((uint32_t)(p + 6) <= 15) {
-            switch (p) {
-            case 0: break;
-            case 1: cost += cost / 2; break;
-            case 2: cost *= 2; break;
-            case -6:
-            case -5:
-            case -4:
-            case -3:
-            case -2: cost /= 2; break;
-            case -1: cost += -(cost / 4); break;
-            default:
-                if (f == CurrentPlayerFaction && human && commit && (VehAttackFlags & 1)) {
-                    parse_says(0, game().mfactions[t].adj_name_faction, -1, -1);
-                    NetMsg_pop(&NetMsg, "IMMUNITY", -5000, 0, nullptr);
-                }
-                return 0;
-            }
-        }
-        int32_t c = cost;
-        if (has_abil(game().vehs[veh_id_tgt].unit_id, 0x1000)) {
-            c *= 2;
-            cost = c;
-        }
-        int32_t tplan = Units[game().vehs[veh_id_tgt].unit_id].plan;
-        if (tplan != 8 && tplan != 9) cost = c / 2;
-        parse_says(0, Units[game().vehs[veh_id_tgt].unit_id].name, -1, -1);
-        if (!human || (game().vehs[veh_id].state & VSTATE_ON_ALERT)) {
-            // AI: worth it?
-            Faction& F = game().factions[f];
-            int32_t w = ((F.AI_power - F.AI_wealth) + 2) * cost * 4;
-            if (is_human(t)) w /= 2;
-            int32_t ws = weap_strat(Units[game().vehs[veh_id_tgt].unit_id].weapon_id, f);
-            int32_t as = arm_strat(Units[game().vehs[veh_id_tgt].unit_id].armor_id, f);
-            int32_t region = map_tile(game().vehs[veh_id_tgt].x, game().vehs[veh_id_tgt].y)->region;
-            if (F.region_total_bases[region] &&
-                (uint32_t)(F.region_force_rating[region] >> 1) + F.region_total_combat_units[region] <
-                    game().factions[t].region_force_rating[region])
-                w /= 2;
-            if (game().factions[t].region_total_combat_units[region] < F.region_force_rating[region]) w *= 2;
-            if (F.best_weapon_value < ws) w /= 2;
-            if (F.best_armor_value < as) w /= 2;
-            if (F.best_land_speed < (int32_t)Chassis[Units[game().vehs[veh_id_tgt].unit_id].chassis_id].speed)
-                w = (w * 2) / 3;
-            uint32_t ds = dstat(f, t);
-            if (ds & 2) w *= 2;
-            if (!(ds & 0x20) && !(GameState & 0x200) && !at_climax(f) && (ds & 0x1000000) && (ds & 6) &&
-                whose_territory(f, game().vehs[veh_id_tgt].x, game().vehs[veh_id_tgt].y, nullptr, 0) != f)
-                return 0;
-            if (ws < F.best_weapon_value && as < F.best_armor_value) w *= 2;
-            if (F.best_weapon_value < ws) w /= 2;
-            MAP* sq = map_tile(game().vehs[veh_id_tgt].x, game().vehs[veh_id_tgt].y);
-            if ((sq->val3 & 0xC0) > 0x7F || ((sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40) ||
-                (sq->items & 0x800))
-                w /= 2;
-            if ((uint8_t)Units[game().vehs[veh_id_tgt].unit_id].plan < 2) w /= 2;
-            else w *= 3;
-            if (F.energy_credits < w || cost > F.energy_credits) return 0;
-        }
-        if (!commit) return 1;
-        if (human) {
-            int32_t choice;
-            if (f == CurrentPlayerFaction && (VehAttackFlags & 1)) {
-                parse_num(0, cost);
-                parse_num(1, game().factions[f].energy_credits);
-                success_rates(1, morale_veh(veh_id, 1, 0), 0, -1);
-                success_rates(2, morale_veh(veh_id, 1, 0), 1, -1);
-                choice = ui_probe_confirm_menu("SUBVERT", "SUBVERTMENU", cost <= game().factions[f].energy_credits);
-                if (choice == 0) return 0;
-                game().vehs[veh_id].probe_action |= (uint8_t)((choice + 31) * 8);
-            } else {
-                choice = ((game().vehs[veh_id].probe_action & 8) != 0) + 1;
-            }
-            risk = choice - 1;
-        }
-        if (VehAttackFlags & 2) {
-            game().factions[f].energy_credits -= cost;
-            if (f == CurrentPlayerFaction) Console_update_data(&MainConsole, 0);
-        }
-        goto resolve;
-    }
-    if (action != 6) goto resolve;
-    {
-        // mind control city
-        cost = mind_control(base_id, f, 0);
-        if (cost < 0) {
-            if (human) return 0;
-            action = 1;
-            goto dispatch;
-        }
-        if (game().mfactions[t].rule_flags & 0x800) {
-            if (!human) goto ai_choose;
-            if (f == CurrentPlayerFaction && (VehAttackFlags & 1)) {
-                parse_says(0, game().mfactions[t].adj_name_faction, -1, -1);
-                NetMsg_pop(&NetMsg, "MINDIMMUNITY", -5000, 0, nullptr);
-            }
-            return 0;
-        }
-        for (int32_t i = 0; i < game().mfactions[f].faction_bonus_count; i++)
-            if (game().mfactions[f].faction_bonus_id[i] == 16)
-                cost = (cost * game().mfactions[f].faction_bonus_val1[i]) / 100;
-        if (SecretProjects[FAC_NETHACK_TERMINUS - SP_ID_First] >= 0 &&
-            (uint8_t)game().bases[SecretProjects[FAC_NETHACK_TERMINUS - SP_ID_First]].faction_id == f)
-            cost = (cost * 3) / 4;
-        int32_t p = game().factions[t].SE_probe;
-        if (base_fac(base_id, 22)) p--;
-        if (base_fac(base_id, 34)) p += 2;
-        if ((uint32_t)(p + 2) <= 5) {
-            switch (p) {
-            case 1: cost += cost / 2; break;
-            case 2: cost *= 2; break;
-            case 3:
-                if (!human) {
-                    action = 1;
-                    goto dispatch;
-                }
-                if (f == CurrentPlayerFaction && (VehAttackFlags & 1)) {
-                    parse_says(0, game().mfactions[t].adj_name_faction, -1, -1);
-                    NetMsg_pop(&NetMsg, "IMMUNITY", -5000, 0, nullptr);
-                }
-                return 0;
-            case -2: cost /= 2; break;
-            case -1: cost += -(cost / 4); break;
-            }
-        }
-        if (!human) {
-            bool afford;
-            if (!is_human(t)) {
-                afford = (((game().factions[f].AI_power - game().factions[f].AI_wealth) + 3) * cost * 2) / 3 <=
-                         game().factions[f].energy_credits;
-            } else {
-                int32_t e = game().factions[f].energy_credits / 10;
-                if (e < 0) e = 0;
-                else if (e > 50) e = 50;
-                afford = cost + 2 + e <= game().factions[f].energy_credits;
-            }
-            if (!afford) goto ai_choose;
-        } else {
-            int32_t choice;
-            if (f == CurrentPlayerFaction && (VehAttackFlags & 1)) {
-                parse_says(0, game().bases[base_id].name, -1, -1);
-                parse_num(0, cost);
-                parse_num(1, game().factions[f].energy_credits);
-                success_rates(1, morale_veh(veh_id, 1, 0), 0, -1);
-                success_rates(2, morale_veh(veh_id, 1, 0), 1, -1);
-                if (game().factions[f].energy_credits < cost) {
-                    wave_it(9);
-                    NetMsg_pop(&NetMsg, "THOUGHTCONTROL", -5000, 0, nullptr);
-                    return 0;
-                }
-                wave_it(0x20);
-                choice = ui_probe_confirm_menu("THOUGHTCONTROL", "THOUGHTMENU", true);
-                if (choice < 1) return 0;
-                game().vehs[veh_id].probe_action |= (uint8_t)((choice + 31) * 8);
-            } else {
-                choice = ((game().vehs[veh_id].probe_action & 8) != 0) + 1;
-            }
-            if (choice > 1) risk = 1;
-        }
-        if (!(VehAttackFlags & 2)) goto resolve;
-        game().factions[f].energy_credits -= cost;
-        game().factions[f].mind_control_total += 4;
-        game().factions[t].diplo_mind_control[f] += 4;
-        if (f == CurrentPlayerFaction) Console_update_data(&MainConsole, 0);
-        goto resolve;
-    }
-
-ai_choose:
-    {
-        // the AI's choice of action against the base
-        uint32_t ds = dstat(f, t);
-        action = (ds & 0x30) ? 2 : 0;
-        BASE& b = game().bases[base_id];
-        uint8_t region = map_tile(b.x, b.y)->region;
-        if ((ds & 0x30) && game().factions[f].region_base_plan[region] && b.talent_total == b.drone_total) {
-            if (game_rand() % 2 == 0 && b.pop_size > 3) action = 4;
-        }
-        if (has_plague_tech) {
-            if (b.pop_size > 5 && ((ds & 0x40000) || (ProposalPassCount[9] < ProposalPassCount[8] && (ds & 0x20))) &&
-                game().factions[f].region_base_plan[region] == 2)
-                action = 7;
-            if (b.pop_size > 3 && (game().factions[f].player_flags & PFLAG_COMMIT_ATROCITIES_WANTONLY) &&
-                (!(ds & 7) || (ds & 0x20)))
-                action = 7;
-        }
-        int32_t near = 0;
-        if ((uint8_t)ds & 0x30) {
-            for (int32_t i = 0; i < 21; i++) {
-                int32_t x2 = map_wrap_x(TableOffsetX[i] + b.x);
-                int32_t y2 = TableOffsetY[i] + b.y;
-                if (!map_in_bounds(x2, y2) || map_is_ocean(x2, y2)) continue;
-                int32_t s = stack_fix(veh_at(x2, y2));
-                if (s >= 0 && game().vehs[s].faction_id == f && stack_check(s, 4, f, -1, -1)) {
-                    near = 1;
-                    action = 2;
+            } else if ((fid != 26 || !map_is_ocean(game().bases[base_id].x, game().bases[base_id].y)) && fid < 65) {
+                if (base_fac(base_id, fid)) {
+                    sab = fid;
+                    chosen = true;
                     break;
                 }
             }
         }
-        if (Rules.tgl_probe_steal_tech &&
-            (!(b.state_flags & BSTATE_RESEARCH_DATA_STOLEN) || morale_veh(veh_id, 1, 0) > 3 ||
-             (action == 0 && (ds & 0x1000))) &&
-            !near && game().factions[t].region_base_plan[region] != 2)
+        if (!chosen && !human) {
+            action = game().bases[base_id].pop_size < 4 ? 0 : 4;
+            return Step::dispatch;
+        }
+    }
+    if (!human) {
+        if (morale_veh(veh_id, 1, 0) > 4) {
+            if (stack_check(veh_at(game().bases[base_id].x, game().bases[base_id].y), 2, 5, -1, -1)) {
+                sab = 98;
+                risk = 1;
+            } else if (base_fac(base_id, 5)) {
+                sab = 5;
+                risk = 1;
+            } else if (base_fac(base_id, 4)) {
+                sab = 4;
+                risk = 1;
+            } else if (base_fac(base_id, 2)) {
+                sab = 2;
+                risk = 1;
+            } else if (base_fac(base_id, 27)) {
+                sab = 27;
+                risk = 1;
+            }
+        }
+        return Step::resolve;
+    }
+    success_rates(1, morale_veh(veh_id, 1, 0), 0, base_id);
+    int32_t choice;
+    if (f == CurrentPlayerFaction && (VehAttackFlags & 1)) {
+        if (!success_rates(2, morale_veh(veh_id, 1, 0), 1, base_id)) choice = 0;
+        else choice = popp(ScriptFileName, "ADVVIRUS", 0, infil_pcx(alien), 0);
+        game().vehs[veh_id].probe_action |= (uint8_t)(choice << 3);
+    } else {
+        choice = (game().vehs[veh_id].probe_action & 8) >> 3;
+    }
+    if (choice == 0) return Step::resolve;
+    risk = 1;
+    if (f == CurrentPlayerFaction && (VehAttackFlags & 1)) {
+        bool buster = stack_check(veh_at(game().bases[base_id].x, game().bases[base_id].y), 2, 5, -1, -1) != 0;
+        sab = ui_probe_sabotage_menu(base_id, buster, production);
+        if (sab < 0) return finish(0);
+        game().vehs[veh_id].probe_sabotage_id = (uint8_t)sab;
+    } else {
+        sab = (int8_t)game().vehs[veh_id].probe_sabotage_id;
+    }
+    if (sab != 99) {
+        if (!base_fac(base_id, 1)) {
+            if (sab != 4 && sab != 5) return Step::resolve;
+            if (shown()) {
+                parse_says(0, game().bases[base_id].name, -1, -1);
+                parse_say(1, Facility[sab].name, -1, -1);
+                success_rates(2, morale_veh(veh_id, 1, 0), 2, base_id);
+                if (!popp(ScriptFileName, "MILVIRUS", 0, infil_pcx(alien), 0)) return finish(0);
+            }
+        } else if (shown()) {
+            parse_says(0, game().bases[base_id].name, -1, -1);
+            parse_says(1, game().mfactions[t].adj_name_faction, -1, -1);
+            success_rates(2, morale_veh(veh_id, 1, 0), 2, base_id);
+            if (!popp(ScriptFileName, "HQVIRUS", 0, infil_pcx(alien), 0)) return finish(0);
+        }
+        risk = 2;
+    }
+    return Step::resolve;
+}
+// Assassinate prominent researchers (action 5).
+Step Probe::assassinate() {
+    // assassinate prominent researchers
+    risk = 1;
+    if (!success_rates(1, morale_veh(veh_id, 1, 0), 1, base_id)) {
+        if (shown()) NetMsg_pop(&NetMsg, "NOASSASSIN", -5000, 0, nullptr);
+    } else {
+        if (!shown()) return Step::resolve;
+        if (popp(ScriptFileName, "ASSASSIN", 0, infil_pcx(alien), 0)) return Step::resolve;
+    }
+    return finish(0);
+}
+// Free captured faction leader (action 8).
+Step Probe::free_leader() {
+    // free captured faction leader
+    risk = 1;
+    if (!success_rates(1, morale_veh(veh_id, 1, 0), 1, base_id)) {
+        if (f == CurrentPlayerFaction && human) NetMsg_pop(&NetMsg, "NOFREEWILLY", -5000, 0, nullptr);
+    } else {
+        if (!shown()) return Step::resolve;
+        if (popp(ScriptFileName, "FREEWILLY", 0, infil_pcx(alien), 0)) return Step::resolve;
+    }
+    return finish(0);
+}
+// Mind control of a unit (base_id -1): the cost, the AI's judgement of the unit, the payment.
+Step Probe::subvert_unit() {
+    // mind control unit
+    if (stack_check(veh_id_tgt, 1, -1, -1, -1) > 1) return finish(0);
+    if (veh_triad(veh_id_tgt) == 2 && !has_abil(game().vehs[veh_id].unit_id, 0x20)) {
+        if (f == CurrentPlayerFaction && commit && human && (VehAttackFlags & 1)) {
+            parse_say(0, Ability[abil_index(0x20)].name, -1, -1);
+            NetMsg_pop(&NetMsg, "PROBEABILSUPERIORITY", 5000, 0, nullptr);
+        }
+        return finish(0);
+    }
+    int32_t unit = game().vehs[veh_id_tgt].unit_id;
+    if (t == 0 || (unit <= 63 && (Weapon[Units[unit].weapon_id].offense_value < 0 || unit == 15))) {
+        if (f == CurrentPlayerFaction && commit && human && (VehAttackFlags & 1))
+            NetMsg_pop(&NetMsg, "ALIENPROBE", -5000, 0, nullptr);
+        return finish(0);
+    }
+    int32_t uy = game().vehs[veh_id_tgt].y;
+    int32_t ux = game().vehs[veh_id_tgt].x;
+    int32_t dist = 12;
+    for (int32_t i = 0; i < game().base_count; i++) {
+        if ((uint8_t)game().bases[i].faction_id == t && has_fac(FAC_HEADQUARTERS, i, 0)) {
+            dist = tile_vector_dist(ux, uy, game().bases[i].x, game().bases[i].y);
+            break;
+        }
+    }
+    int32_t home = game().vehs[veh_id_tgt].home_base_id;
+    if (home >= 0 && base_fac(home, 23)) dist /= 2;
+    cost = ((game().factions[t].energy_credits + 800) / (dist + 2)) * Units[game().vehs[veh_id_tgt].unit_id].cost;
+    if (!human && is_human(t) && game().factions[t].diff_level > 3) cost = (cost * 3) / game().factions[t].diff_level;
+    if (game().mfactions[t].rule_flags & 0x800) {
+        if (f == CurrentPlayerFaction && human && commit && (VehAttackFlags & 1)) {
+            parse_says(0, game().mfactions[t].adj_name_faction, -1, -1);
+            NetMsg_pop(&NetMsg, "MINDIMMUNITY2", -5000, 0, nullptr);
+        }
+        return finish(0);
+    }
+    for (int32_t i = 0; i < game().mfactions[f].faction_bonus_count; i++)
+        if (game().mfactions[f].faction_bonus_id[i] == 16)
+            cost = (cost * game().mfactions[f].faction_bonus_val1[i]) / 100;
+    if (SecretProjects[FAC_NETHACK_TERMINUS - SP_ID_First] >= 0 &&
+        (uint8_t)game().bases[SecretProjects[FAC_NETHACK_TERMINUS - SP_ID_First]].faction_id == f)
+        cost = (cost * 3) / 4;
+    if (!probe_rules::adjust_unit_subvert_cost(cost, game().factions[t].SE_probe)) {
+        if (f == CurrentPlayerFaction && human && commit && (VehAttackFlags & 1)) {
+            parse_says(0, game().mfactions[t].adj_name_faction, -1, -1);
+            NetMsg_pop(&NetMsg, "IMMUNITY", -5000, 0, nullptr);
+        }
+        return finish(0);
+    }
+    int32_t c = cost;
+    if (has_abil(game().vehs[veh_id_tgt].unit_id, 0x1000)) {
+        c *= 2;
+        cost = c;
+    }
+    int32_t tplan = Units[game().vehs[veh_id_tgt].unit_id].plan;
+    if (tplan != 8 && tplan != 9) cost = c / 2;
+    parse_says(0, Units[game().vehs[veh_id_tgt].unit_id].name, -1, -1);
+    if (!human || (game().vehs[veh_id].state & VSTATE_ON_ALERT)) {
+        // AI: worth it?
+        Faction& F = game().factions[f];
+        int32_t w = ((F.AI_power - F.AI_wealth) + 2) * cost * 4;
+        if (is_human(t)) w /= 2;
+        int32_t ws = weap_strat(Units[game().vehs[veh_id_tgt].unit_id].weapon_id, f);
+        int32_t as = arm_strat(Units[game().vehs[veh_id_tgt].unit_id].armor_id, f);
+        int32_t region = map_tile(game().vehs[veh_id_tgt].x, game().vehs[veh_id_tgt].y)->region;
+        if (F.region_total_bases[region] &&
+            (uint32_t)(F.region_force_rating[region] >> 1) + F.region_total_combat_units[region] <
+                game().factions[t].region_force_rating[region])
+            w /= 2;
+        if (game().factions[t].region_total_combat_units[region] < F.region_force_rating[region]) w *= 2;
+        if (F.best_weapon_value < ws) w /= 2;
+        if (F.best_armor_value < as) w /= 2;
+        if (F.best_land_speed < (int32_t)Chassis[Units[game().vehs[veh_id_tgt].unit_id].chassis_id].speed)
+            w = (w * 2) / 3;
+        uint32_t ds = dstat(f, t);
+        if (ds & 2) w *= 2;
+        if (!(ds & 0x20) && !(GameState & 0x200) && !at_climax(f) && (ds & 0x1000000) && (ds & 6) &&
+            whose_territory(f, game().vehs[veh_id_tgt].x, game().vehs[veh_id_tgt].y, nullptr, 0) != f)
+            return finish(0);
+        if (ws < F.best_weapon_value && as < F.best_armor_value) w *= 2;
+        if (F.best_weapon_value < ws) w /= 2;
+        MAP* sq = map_tile(game().vehs[veh_id_tgt].x, game().vehs[veh_id_tgt].y);
+        if ((sq->val3 & 0xC0) > 0x7F || ((sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40) ||
+            (sq->items & 0x800))
+            w /= 2;
+        if ((uint8_t)Units[game().vehs[veh_id_tgt].unit_id].plan < 2) w /= 2;
+        else w *= 3;
+        if (F.energy_credits < w || cost > F.energy_credits) return finish(0);
+    }
+    if (!commit) return finish(1);
+    if (human) {
+        int32_t choice;
+        if (f == CurrentPlayerFaction && (VehAttackFlags & 1)) {
+            parse_num(0, cost);
+            parse_num(1, game().factions[f].energy_credits);
+            success_rates(1, morale_veh(veh_id, 1, 0), 0, -1);
+            success_rates(2, morale_veh(veh_id, 1, 0), 1, -1);
+            choice = ui_probe_confirm_menu("SUBVERT", "SUBVERTMENU", cost <= game().factions[f].energy_credits);
+            if (choice == 0) return finish(0);
+            game().vehs[veh_id].probe_action |= (uint8_t)((choice + 31) * 8);
+        } else {
+            choice = ((game().vehs[veh_id].probe_action & 8) != 0) + 1;
+        }
+        risk = choice - 1;
+    }
+    if (VehAttackFlags & 2) {
+        game().factions[f].energy_credits -= cost;
+        if (f == CurrentPlayerFaction) Console_update_data(&MainConsole, 0);
+    }
+    return Step::resolve;
+}
+// Mind control of the base (action 6): its cost; the AI falls back to stealing research or to
+// another choice when it is immune or too expensive.
+Step Probe::mind_control_base() {
+    // mind control city
+    cost = mind_control(base_id, f, 0);
+    if (cost < 0) {
+        if (human) return finish(0);
+        action = 1;
+        return Step::dispatch;
+    }
+    if (game().mfactions[t].rule_flags & 0x800) {
+        if (!human) return Step::ai_choose;
+        if (f == CurrentPlayerFaction && (VehAttackFlags & 1)) {
+            parse_says(0, game().mfactions[t].adj_name_faction, -1, -1);
+            NetMsg_pop(&NetMsg, "MINDIMMUNITY", -5000, 0, nullptr);
+        }
+        return finish(0);
+    }
+    for (int32_t i = 0; i < game().mfactions[f].faction_bonus_count; i++)
+        if (game().mfactions[f].faction_bonus_id[i] == 16)
+            cost = (cost * game().mfactions[f].faction_bonus_val1[i]) / 100;
+    if (SecretProjects[FAC_NETHACK_TERMINUS - SP_ID_First] >= 0 &&
+        (uint8_t)game().bases[SecretProjects[FAC_NETHACK_TERMINUS - SP_ID_First]].faction_id == f)
+        cost = (cost * 3) / 4;
+    int32_t p = game().factions[t].SE_probe;
+    if (base_fac(base_id, 22)) p--;
+    if (base_fac(base_id, 34)) p += 2;
+    if (!probe_rules::adjust_base_mind_control_cost(cost, p)) {
+        if (!human) {
             action = 1;
-        if (has_plague_tech && b.pop_size > 3 && aah_ooga(f, f) == t && climactic_battle() &&
-            (game().factions[f].AI_fight > 0 || (game().factions[f].AI_fight == 0 && ((uint8_t)ds & 0x20))) &&
-            (ds & 0xC30))
+            return Step::dispatch;
+        }
+        if (f == CurrentPlayerFaction && (VehAttackFlags & 1)) {
+            parse_says(0, game().mfactions[t].adj_name_faction, -1, -1);
+            NetMsg_pop(&NetMsg, "IMMUNITY", -5000, 0, nullptr);
+        }
+        return finish(0);
+    }
+    if (!human) {
+        bool afford;
+        if (!is_human(t)) {
+            afford = (((game().factions[f].AI_power - game().factions[f].AI_wealth) + 3) * cost * 2) / 3 <=
+                     game().factions[f].energy_credits;
+        } else {
+            int32_t e = game().factions[f].energy_credits / 10;
+            if (e < 0) e = 0;
+            else if (e > 50) e = 50;
+            afford = cost + 2 + e <= game().factions[f].energy_credits;
+        }
+        if (!afford) return Step::ai_choose;
+    } else {
+        int32_t choice;
+        if (f == CurrentPlayerFaction && (VehAttackFlags & 1)) {
+            parse_says(0, game().bases[base_id].name, -1, -1);
+            parse_num(0, cost);
+            parse_num(1, game().factions[f].energy_credits);
+            success_rates(1, morale_veh(veh_id, 1, 0), 0, -1);
+            success_rates(2, morale_veh(veh_id, 1, 0), 1, -1);
+            if (game().factions[f].energy_credits < cost) {
+                wave_it(9);
+                NetMsg_pop(&NetMsg, "THOUGHTCONTROL", -5000, 0, nullptr);
+                return finish(0);
+            }
+            wave_it(0x20);
+            choice = ui_probe_confirm_menu("THOUGHTCONTROL", "THOUGHTMENU", true);
+            if (choice < 1) return finish(0);
+            game().vehs[veh_id].probe_action |= (uint8_t)((choice + 31) * 8);
+        } else {
+            choice = ((game().vehs[veh_id].probe_action & 8) != 0) + 1;
+        }
+        if (choice > 1) risk = 1;
+    }
+    if (!(VehAttackFlags & 2)) return Step::resolve;
+    game().factions[f].energy_credits -= cost;
+    game().factions[f].mind_control_total += 4;
+    game().factions[t].diplo_mind_control[f] += 4;
+    if (f == CurrentPlayerFaction) Console_update_data(&MainConsole, 0);
+    return Step::resolve;
+}
+// The AI's choice of action against the base (refined once with the headquarters checks).
+Step Probe::ai_choose() {
+    // the AI's choice of action against the base
+    uint32_t ds = dstat(f, t);
+    action = (ds & 0x30) ? 2 : 0;
+    BASE& b = game().bases[base_id];
+    uint8_t region = map_tile(b.x, b.y)->region;
+    if ((ds & 0x30) && game().factions[f].region_base_plan[region] && b.talent_total == b.drone_total) {
+        if (game_rand() % 2 == 0 && b.pop_size > 3) action = 4;
+    }
+    if (has_plague_tech) {
+        if (b.pop_size > 5 && ((ds & 0x40000) || (ProposalPassCount[9] < ProposalPassCount[8] && (ds & 0x20))) &&
+            game().factions[f].region_base_plan[region] == 2)
             action = 7;
+        if (b.pop_size > 3 && (game().factions[f].player_flags & PFLAG_COMMIT_ATROCITIES_WANTONLY) &&
+            (!(ds & 7) || (ds & 0x20)))
+            action = 7;
+    }
+    int32_t near = 0;
+    if ((uint8_t)ds & 0x30) {
+        for (int32_t i = 0; i < 21; i++) {
+            int32_t x2 = map_wrap_x(TableOffsetX[i] + b.x);
+            int32_t y2 = TableOffsetY[i] + b.y;
+            if (!map_in_bounds(x2, y2) || map_is_ocean(x2, y2)) continue;
+            int32_t s = stack_fix(veh_at(x2, y2));
+            if (s >= 0 && game().vehs[s].faction_id == f && stack_check(s, 4, f, -1, -1)) {
+                near = 1;
+                action = 2;
+                break;
+            }
+        }
+    }
+    if (Rules.tgl_probe_steal_tech &&
+        (!(b.state_flags & BSTATE_RESEARCH_DATA_STOLEN) || morale_veh(veh_id, 1, 0) > 3 ||
+         (action == 0 && (ds & 0x1000))) &&
+        !near && game().factions[t].region_base_plan[region] != 2)
+        action = 1;
+    if (has_plague_tech && b.pop_size > 3 && aah_ooga(f, f) == t && climactic_battle() &&
+        (game().factions[f].AI_fight > 0 || (game().factions[f].AI_fight == 0 && ((uint8_t)ds & 0x20))) && (ds & 0xC30))
+        action = 7;
+    if (!refined) {
+        refined = base_fac(base_id, 1);
         if (!refined) {
-            refined = base_fac(base_id, 1);
-            if (!refined) {
-                if (((uint8_t)ds & 0x30) && (game().factions[t].diff_level > 2 || !is_human(t)) &&
-                    game().factions[t].SE_probe < 3)
-                    action = 6;
-            } else {
-                if (action != 1 && game().factions[t].tech_cost / 2 <= game().factions[t].tech_accumulated &&
-                    (((uint8_t)ds & 0x30) ||
-                     game().factions[f].tech_ranking / 2 + 4 < game().factions[t].tech_ranking / 2))
-                    action = 5;
-                if (ExpansionEnabled && !MultiplayerActive && base_fac(base_id, 1)) {
-                    bool any = false;
-                    for (int32_t k = 0; k < 7; k++) {
-                        uint32_t st = game().factions[f].diplo_status[k + 1];
-                        if (mon_field(t, 15 + k, 0x10) && !(st & 0x10)) {
-                            any = true;
-                            // BUG(original): compares with the status of faction freed + 1
-                            COMPAT_ORIGINAL(probe_freed_status_offset);
-                            if (freed == -1 || (st & 1) ||
-                                ((st & 2) && !((uint8_t)(&game().factions[f].diplo_status[1])[freed] & 1)))
-                                freed = k + 1;
-                        }
+            if (((uint8_t)ds & 0x30) && (game().factions[t].diff_level > 2 || !is_human(t)) &&
+                game().factions[t].SE_probe < 3)
+                action = 6;
+        } else {
+            if (action != 1 && game().factions[t].tech_cost / 2 <= game().factions[t].tech_accumulated &&
+                (((uint8_t)ds & 0x30) || game().factions[f].tech_ranking / 2 + 4 < game().factions[t].tech_ranking / 2))
+                action = 5;
+            if (ExpansionEnabled && !MultiplayerActive && base_fac(base_id, 1)) {
+                bool any = false;
+                for (int32_t k = 0; k < 7; k++) {
+                    uint32_t st = game().factions[f].diplo_status[k + 1];
+                    if (mon_field(t, 15 + k, 0x10) && !(st & 0x10)) {
+                        any = true;
+                        // BUG(original): compares with the status of faction freed + 1
+                        COMPAT_ORIGINAL(probe_freed_status_offset);
+                        if (freed == -1 || (st & 1) ||
+                            ((st & 2) && !((uint8_t)(&game().factions[f].diplo_status[1])[freed] & 1)))
+                            freed = k + 1;
                     }
-                    if (any) {
-                        action = 8;
-                        refined = 1;
-                        goto dispatch;
-                    }
+                }
+                if (any) {
+                    action = 8;
+                    refined = 1;
+                    return Step::dispatch;
                 }
             }
-            refined = 1;
         }
-        goto dispatch;
+        refined = 1;
     }
-
-resolve:
-    {
-        // framing another faction
-        frame = 0;
-        if ((action < 6 && action > 0) || action == 8) {
-            if (!human) {
-                if (morale_veh(veh_id, 1, 0) > 4 && risk == 0 && !is_human(t)) {
-                    for (int32_t k = 1; k < 8; k++) {
-                        if (k != f && k != t && is_human(k) && is_alive(k) && k == RankingFactionIDUnk1 &&
-                            !(dstat(t, k) & 0x10) && (dstat(t, k) & 8)) {
-                            frame = k;
-                            break;
-                        }
+    return Step::dispatch;
+}
+// Resolution: framing another faction raises the risk; the roll against the team's morale (and
+// the Hunter-Seeker Algorithm) decides between success and capture.
+Step Probe::resolve() {
+    // framing another faction
+    frame = 0;
+    if ((action < 6 && action > 0) || action == 8) {
+        if (!human) {
+            if (morale_veh(veh_id, 1, 0) > 4 && risk == 0 && !is_human(t)) {
+                for (int32_t k = 1; k < 8; k++) {
+                    if (k != f && k != t && is_human(k) && is_alive(k) && k == RankingFactionIDUnk1 &&
+                        !(dstat(t, k) & 0x10) && (dstat(t, k) & 8)) {
+                        frame = k;
+                        break;
                     }
-                    if (frame) risk++;
-                }
-            } else if (!is_human(t)) {
-                if (f == CurrentPlayerFaction && (VehAttackFlags & 1)) {
-                    success_rates(2, morale_veh(veh_id, 1, 0), risk, base_id);
-                    if (success_rates(3, morale_veh(veh_id, 1, 0), risk + 1, base_id))
-                        frame = ui_probe_frame_menu(f, t);
-                    game().vehs[veh_id].probe_action |= (uint8_t)(frame << 5);
-                } else {
-                    frame = game().vehs[veh_id].probe_action >> 5;
                 }
                 if (frame) risk++;
             }
+        } else if (!is_human(t)) {
+            if (f == CurrentPlayerFaction && (VehAttackFlags & 1)) {
+                success_rates(2, morale_veh(veh_id, 1, 0), risk, base_id);
+                if (success_rates(3, morale_veh(veh_id, 1, 0), risk + 1, base_id)) frame = ui_probe_frame_menu(f, t);
+                game().vehs[veh_id].probe_action |= (uint8_t)(frame << 5);
+            } else {
+                frame = game().vehs[veh_id].probe_action >> 5;
+            }
+            if (frame) risk++;
         }
-        if (!(VehAttackFlags & 2)) return 1;
-        tgt_mod = action + 1;
-        int32_t defense = tgt_mod == 0 ? 0 : (has_fac(FAC_COVERT_OPS_CENTER, base_id, 0) ? 2 : 0);
-        int32_t morale = morale_veh(veh_id, 1, 0) < 1 ? 1 : morale_veh(veh_id, 1, 0);
-        int32_t p = range(defense + game().factions[t].SE_probe, -2, 0);
-        if (rnd((morale / 2 - p) + 1) < risk) {
-            if (!ProbeHasAlgoEnhancement || ProbeTargetHasHSA || probe_clock_odd()) goto busted;
-        } else if (ProbeTargetHasHSA && probe_clock_odd()) {
-            goto busted;
-        }
-        goto success;
-    busted:
-        frame = -frame;
-        if (f == CurrentPlayerFaction) NetMsg_pop_2("BUSTED", capture_pcx(game().mfactions[f].rule_flags & 0x80));
-        if (t == CurrentPlayerFaction) busted_action = action;
-        kill(veh_id);
-        goto after;
     }
-
-success:
+    if (!(VehAttackFlags & 2)) return finish(1);
+    tgt_mod = action + 1;
+    int32_t defense = tgt_mod == 0 ? 0 : (has_fac(FAC_COVERT_OPS_CENTER, base_id, 0) ? 2 : 0);
+    int32_t morale = morale_veh(veh_id, 1, 0) < 1 ? 1 : morale_veh(veh_id, 1, 0);
+    int32_t p = range(defense + game().factions[t].SE_probe, -2, 0);
+    if (rnd((morale / 2 - p) + 1) < risk) {
+        if (!ProbeHasAlgoEnhancement || ProbeTargetHasHSA || probe_clock_odd()) return bust();
+    } else if (ProbeTargetHasHSA && probe_clock_odd()) {
+        return bust();
+    }
+    return Step::success;
+}
+// The team is caught.
+Step Probe::bust() {
+    frame = -frame;
+    if (f == CurrentPlayerFaction) NetMsg_pop_2("BUSTED", capture_pcx(game().mfactions[f].rule_flags & 0x80));
+    if (t == CurrentPlayerFaction) busted_action = action;
+    kill(veh_id);
+    return Step::after;
+}
+// The mission succeeds: its effect per action.
+Step Probe::success() {
     switch (action) {
     case 1:
         game().factions[t].diplo_stolen_techs[f]++;
@@ -1016,11 +1077,11 @@ success:
             tech_achieved(f, tech, t, 0);
         }
         game().bases[base_id].state_flags |= BSTATE_RESEARCH_DATA_STOLEN;
-        goto survive;
+        return Step::survive;
     case 2:
         if (sab == 99) {
             NetMsg_pop_2("VIRUSABORT", nullptr);
-            return 1;
+            return finish(1);
         }
         clear();
         if (sab == 0) {
@@ -1034,7 +1095,7 @@ success:
             if (f == CurrentPlayerFaction || t == CurrentPlayerFaction) NetMsg_pop_2(StrBuffer, infil_pcx(alien));
         } else if (sab == 98) {
             int32_t v = veh_at(game().bases[base_id].x, game().bases[base_id].y);
-            if (v < 0) return 1;
+            if (v < 0) return finish(1);
             do {
                 if (Units[game().vehs[v].unit_id].plan == 5) {
                     if (game().vehs[v].faction_id == CurrentPlayerFaction) {
@@ -1063,7 +1124,7 @@ success:
         }
         BaseWin_check_base(&BaseWin, base_id);
         draw_tile(game().bases[base_id].x, game().bases[base_id].y, 2);
-        goto survive;
+        return Step::survive;
     case 3: {
         int32_t e = steal_energy(base_id);
         int32_t a = (morale_veh(veh_id, 1, 0) * e) / 6;
@@ -1085,7 +1146,7 @@ success:
             parse_says(2, get_adjective(f), -1, -1);
             NetMsg_pop_2(e == 0 ? "TOOKNOENERGY" : "TOOKENERGY", infil_pcx(alien));
         }
-        goto survive;
+        return Step::survive;
     }
     case 4: {
         BASE& b = game().bases[base_id];
@@ -1110,7 +1171,7 @@ success:
         } else if (show) {
             NetMsg_pop_2("DRONEINCITE1", "ALdrone_sm.pcx");
         }
-        goto survive;
+        return Step::survive;
     }
     case 5: {
         int32_t lost = rnd(game().factions[t].tech_accumulated);
@@ -1121,14 +1182,14 @@ success:
             parse_says(1, get_adjective(t), -1, -1);
             NetMsg_pop_2("ASSASSINATED", infil_pcx(alien));
         }
-        goto survive;
+        return Step::survive;
     }
     case 8: {
         int32_t lid = freed;
         if (human && f == CurrentPlayerFaction) {
             parse_says(1, get_adjective(t), -1, -1);
             lid = ui_probe_free_menu(t, alien);
-            if (lid < 0) return 0;
+            if (lid < 0) return finish(0);
         }
         if (lid != -1) {
             dest = game().vehs[veh_id].home_base_id;
@@ -1161,7 +1222,7 @@ success:
             game().factions[f].diplo_reputation++;
             game().factions[lid].diplo_reputation++;
         }
-        goto survive;
+        return Step::survive;
     }
     case 7: {
         atrocity(f, t, 1, 0);
@@ -1197,7 +1258,7 @@ success:
             says(f == CurrentPlayerFaction ? "0" : "1");
             popp_2(StrBuffer, infil_pcx(alien), 0);
         }
-        goto survive;
+        return Step::survive;
     }
     case -1: {
         VEH& u = game().vehs[veh_id_tgt];
@@ -1224,290 +1285,326 @@ success:
             parse_says(1, get_noun(f), -1, -1);
             NetMsg_pop_2("SUBVERTED", infil_pcx(alien));
         }
-        if (risk) return 1;
-        goto diplomacy;
+        if (risk) return finish(1);
+        return Step::diplomacy;
     }
-    default: goto survive;
+    default: return Step::survive;
     }
-
-survive:
-    {
-        int32_t defense = tgt_mod == 0 ? 0 : (has_fac(FAC_COVERT_OPS_CENTER, base_id, 0) ? 2 : 0);
-        int32_t p = range(defense + game().factions[t].SE_probe, -2, 0);
-        if (risk < rnd(morale_veh(veh_id, 1, 0) - p)) {
-            // the probe team returns home
-            dest = base_find_faction(game().vehs[veh_id].x, game().vehs[veh_id].y, f);
-            if (veh_triad(veh_id) == 1) {
-                if (dest < 0) goto lost;
-                if (!is_port(dest, 0)) {
-                    dest = sea_return_base(veh_id, f);
-                    if (ProbeTargetHasHSA && probe_clock_odd()) goto caught;
-                }
+}
+// After a successful mission: the team returns home or is lost; a mind-controlled base changes
+// sides with the units in and next to it.
+void Probe::survive() {
+    int32_t defense = tgt_mod == 0 ? 0 : (has_fac(FAC_COVERT_OPS_CENTER, base_id, 0) ? 2 : 0);
+    int32_t p = range(defense + game().factions[t].SE_probe, -2, 0);
+    // The team returns home (to the nearest own base, a port for ships), is lost, or is caught.
+    enum class Fate { home, caught, lost } fate = Fate::home;
+    if (risk < rnd(morale_veh(veh_id, 1, 0) - p)) {
+        dest = base_find_faction(game().vehs[veh_id].x, game().vehs[veh_id].y, f);
+        if (veh_triad(veh_id) == 1) {
+            if (dest < 0) {
+                fate = Fate::lost;
+            } else if (!is_port(dest, 0)) {
+                dest = sea_return_base(veh_id, f);
+                if (ProbeTargetHasHSA && probe_clock_odd()) fate = Fate::caught;
             }
-            if (dest < 0) goto lost;
-        home:
-            veh_put(veh_id, game().bases[dest].x, game().bases[dest].y);
-            game().vehs[veh_id].movement_turns = 0;
-            draw_tiles(game().bases[base_id].x, game().bases[base_id].y, 2);
-            draw_tile(game().bases[dest].x, game().bases[dest].y, 2);
-            parse_says(1, game().bases[dest].name, -1, -1);
-            int32_t before = morale_veh(veh_id, 1, 0);
-            game().vehs[veh_id].morale = (uint8_t)range(game().vehs[veh_id].morale + 1, 0, 6);
-            veh_skip(veh_id);
-            if (f == CurrentPlayerFaction) {
-                parse_says(0, Units[game().vehs[veh_id].unit_id].name, -1, -1);
-                parse_say(2, Morale[morale_veh(veh_id, 1, 0)].name, -1, -1);
-                clear();
-                says("PROBESURVIVAL");
-                if (action == 8) {
-                    says("X");
-                } else {
-                    int32_t up = (before == morale_veh(veh_id, 1, 0) || morale_veh(veh_id, 1, 0) < 1) ? 0 : 1;
-                    say_num(up);
-                }
-                if (f == CurrentPlayerFaction) NetMsg_pop_2(StrBuffer, infil_pcx(alien));
-            }
-        } else {
-            if (!ProbeTargetHasHSA && ProbeHasAlgoEnhancement && probe_clock_odd()) {
-                dest = base_find_faction(game().vehs[veh_id].x, game().vehs[veh_id].y, f);
-                if (veh_triad(veh_id) == 1 && dest >= 0 && !is_port(dest, 0)) dest = sea_return_base(veh_id, f);
-                if (dest >= 0) goto home;
-                goto lost;
-            }
-        caught:
-            frame = -frame;
-            dest = -1;
-        lost:
-            if (action == 8 && Units[game().vehs[veh_id].unit_id].weapon_id != 21)
-                dest = game().vehs[veh_id].home_base_id;
-            if (dest >= 0) goto home;
-            veh_kill(veh_id);
         }
-        if (action == 6) {
-            if (f == CurrentPlayerFaction || t == CurrentPlayerFaction || spying(f) || spying(t) ||
-                (GameState & STATE_OMNISCIENT_VIEW)) {
-                if ((GameState & STATE_OMNISCIENT_VIEW) ||
-                    (uint8_t)game().bases[base_id].faction_id == CurrentPlayerFaction ||
-                    (game().bases[base_id].visibility & (uint8_t)(1 << (CurrentPlayerFaction & 31))))
-                    Console_focus(&MainConsole, game().bases[base_id].x, game().bases[base_id].y,
-                                  (uint8_t)game().bases[base_id].faction_id);
-                parse_says(0, get_title(f), -1, -1);
-                parse_says(1, get_name(f), -1, -1);
-                parse_says(2, get_noun(f), -1, -1);
-                parse_says(3, game().bases[base_id].name, -1, -1);
-                parse_says(4, get_title(t), -1, -1);
-                parse_says(5, get_name(t), -1, -1);
-                clear();
-                says("MINDCONTROL");
-                says(f == CurrentPlayerFaction ? "0" : (t == CurrentPlayerFaction ? "1" : "2"));
-                popp_2(StrBuffer, infil_pcx(alien), 0);
-            }
-            // the units in and next to the base change sides
-            for (int32_t v = game().veh_count - 1; v >= 0; v--) {
-                if (v >= game().veh_count || game().vehs[v].faction_id != t) continue;
-                int32_t d =
-                    tile_distance(game().vehs[v].x, game().vehs[v].y, game().bases[base_id].x, game().bases[base_id].y);
-                if (d >= 2 || (d != 0 && base_who(game().vehs[v].x, game().vehs[v].y) >= 0)) continue;
-                VEH& u = game().vehs[v];
-                int32_t unit = u.unit_id;
-                game().factions[t].units_active[unit]--;
-                if (unit > 64) {
-                    int32_t nu = propose_proto(f, Units[unit].chassis_id, Units[unit].weapon_id, Units[unit].armor_id,
-                                               Units[unit].ability_flags, Units[unit].reactor_id, -2, Units[unit].name);
-                    if (nu >= 0) u.unit_id = (int16_t)nu;
-                }
-                uint8_t count = game().factions[f].units_active[u.unit_id];
-                u.faction_id = (uint8_t)f;
-                u.home_base_id = (int16_t)base_id;
-                u.moves_spent = 0;
-                game().factions[f].units_active[u.unit_id] = (uint8_t)(count + 1);
-                if (Chassis[Units[u.unit_id].chassis_id].range) u.movement_turns = 0;
-                if (u.order != 2) u.order = 0;
-                owner_set(u.x, u.y, f);
-                u.visibility |= (uint8_t)(1 << (t & 31));
-            }
-            if (risk == 0) act_of_aggression(f, t);
-            capture_base(base_id, f, 1);
-        }
-        if (f == CurrentPlayerFaction && dest < 0) {
-            if (!(game().mfactions[f].rule_flags & 0x80))
-                NetMsg_pop_2(action != 6 ? "PROBECAUGHT" : "PROBESUCCUMB", "capture_sm.pcx");
-            else NetMsg_pop_2(action != 6 ? "PROBECAUGHT" : "PROBESUCCUMB", "al_cap_sm.pcx");
-        }
+        if (fate == Fate::home && dest < 0) fate = Fate::lost;
+    } else if (!ProbeTargetHasHSA && ProbeHasAlgoEnhancement && probe_clock_odd()) {
+        dest = base_find_faction(game().vehs[veh_id].x, game().vehs[veh_id].y, f);
+        if (veh_triad(veh_id) == 1 && dest >= 0 && !is_port(dest, 0)) dest = sea_return_base(veh_id, f);
+        fate = dest >= 0 ? Fate::home : Fate::lost;
+    } else {
+        fate = Fate::caught;
     }
-
-after:
-    if (action == 0) return 1;
-diplomacy:
-    {
-        // diplomatic consequences
-        if (!has_treaty(f, t, 7) || (has_treaty(t, f, 1) && has_treaty(t, f, 0x2000000))) return 1;
-        int32_t fr = frame;
-        if (action == 6 && risk != 0) {
-            set_treaty(t, f, 0x420, 1);
-            return 1;
-        }
-        if (fr < 0) {
-            int32_t k = -fr;
-            if (!is_human(k)) {
-                if (f == CurrentPlayerFaction) {
-                    parse_says(0, get_title(k), -1, -1);
-                    parse_says(1, get_name(k), -1, -1);
-                    NetMsg_pop_2("FRAMEFLOP", capture_pcx(game().mfactions[f].rule_flags & 0x80));
-                }
-                treaty_on(k, f, 0x10);
-            }
-            if (is_human(k)) {
-                parse_says(0, get_title(f), -1, -1);
-                parse_says(1, get_name(f), -1, -1);
-                parse_says(2, get_pact_hood(f, k), -1, -1);
-                parse_says(3, get_noun(f), -1, -1);
-                parse_says(4, get_his_her(f, 0), -1, -1);
-                parse_says(5, get_him_her(f, 0), -1, -1);
-                parse_says(6, get_title(t), -1, -1);
-                parse_says(7, get_name(t), -1, -1);
-                parse_says(8, get_noun(t), -1, -1);
-                if (!MultiplayerActive) {
-                    if (!has_treaty(k, f, 1)) {
-                        if (popp_2("FRAMEEXCUSE", capture_pcx(game().mfactions[f].rule_flags & 0x80), 0)) {
-                            treaty_on(f, k, 0x10);
-                            game().factions[k].diplo_spoke[f] = CurrentTurn;
-                        }
-                    } else if (popp_2("PACTFRAMEEXCUSE", capture_pcx(game().mfactions[f].rule_flags & 0x80), 0)) {
-                        pact_ends(f, k);
-                        game().factions[k].diplo_spoke[f] = CurrentTurn;
-                    }
-                } else {
-                    agenda_on(k, f, 0x20);
-                    if (-CurrentPlayerFaction == fr) NetMsg_pop_2("HAVEFRAMEEXCUSE", nullptr);
-                    if (f == CurrentPlayerFaction) {
-                        parse_says(0, get_title(k), -1, -1);
-                        parse_says(1, get_name(k), -1, -1);
-                        parse_says(2, get_noun(k), -1, -1);
-                        NetMsg_pop_2("HASFRAMEEXCUSE", capture_pcx(game().mfactions[f].rule_flags & 0x80));
-                    }
-                }
-            }
-        }
-        if (is_human(t)) {
+    if (fate == Fate::caught) {
+        frame = -frame;
+        dest = -1;
+        fate = Fate::lost;
+    }
+    if (fate == Fate::lost) {
+        if (action == 8 && Units[game().vehs[veh_id].unit_id].weapon_id != 21) dest = game().vehs[veh_id].home_base_id;
+        if (dest >= 0) fate = Fate::home;
+        else veh_kill(veh_id);
+    }
+    if (fate == Fate::home) return_home();
+    if (action == 6) {
+        if (f == CurrentPlayerFaction || t == CurrentPlayerFaction || spying(f) || spying(t) ||
+            (GameState & STATE_OMNISCIENT_VIEW)) {
+            if ((GameState & STATE_OMNISCIENT_VIEW) ||
+                (uint8_t)game().bases[base_id].faction_id == CurrentPlayerFaction ||
+                (game().bases[base_id].visibility & (uint8_t)(1 << (CurrentPlayerFaction & 31))))
+                Console_focus(&MainConsole, game().bases[base_id].x, game().bases[base_id].y,
+                              (uint8_t)game().bases[base_id].faction_id);
             parse_says(0, get_title(f), -1, -1);
             parse_says(1, get_name(f), -1, -1);
-            parse_says(2, get_pact_hood(f, t), -1, -1);
+            parse_says(2, get_noun(f), -1, -1);
+            parse_says(3, game().bases[base_id].name, -1, -1);
+            parse_says(4, get_title(t), -1, -1);
+            parse_says(5, get_name(t), -1, -1);
+            clear();
+            says("MINDCONTROL");
+            says(f == CurrentPlayerFaction ? "0" : (t == CurrentPlayerFaction ? "1" : "2"));
+            popp_2(StrBuffer, infil_pcx(alien), 0);
+        }
+        // the units in and next to the base change sides
+        for (int32_t v = game().veh_count - 1; v >= 0; v--) {
+            if (v >= game().veh_count || game().vehs[v].faction_id != t) continue;
+            int32_t d =
+                tile_distance(game().vehs[v].x, game().vehs[v].y, game().bases[base_id].x, game().bases[base_id].y);
+            if (d >= 2 || (d != 0 && base_who(game().vehs[v].x, game().vehs[v].y) >= 0)) continue;
+            VEH& u = game().vehs[v];
+            int32_t unit = u.unit_id;
+            game().factions[t].units_active[unit]--;
+            if (unit > 64) {
+                int32_t nu = propose_proto(f, Units[unit].chassis_id, Units[unit].weapon_id, Units[unit].armor_id,
+                                           Units[unit].ability_flags, Units[unit].reactor_id, -2, Units[unit].name);
+                if (nu >= 0) u.unit_id = (int16_t)nu;
+            }
+            uint8_t count = game().factions[f].units_active[u.unit_id];
+            u.faction_id = (uint8_t)f;
+            u.home_base_id = (int16_t)base_id;
+            u.moves_spent = 0;
+            game().factions[f].units_active[u.unit_id] = (uint8_t)(count + 1);
+            if (Chassis[Units[u.unit_id].chassis_id].range) u.movement_turns = 0;
+            if (u.order != 2) u.order = 0;
+            owner_set(u.x, u.y, f);
+            u.visibility |= (uint8_t)(1 << (t & 31));
+        }
+        if (risk == 0) act_of_aggression(f, t);
+        capture_base(base_id, f, 1);
+    }
+    if (f == CurrentPlayerFaction && dest < 0) {
+        if (!(game().mfactions[f].rule_flags & 0x80))
+            NetMsg_pop_2(action != 6 ? "PROBECAUGHT" : "PROBESUCCUMB", "capture_sm.pcx");
+        else NetMsg_pop_2(action != 6 ? "PROBECAUGHT" : "PROBESUCCUMB", "al_cap_sm.pcx");
+    }
+}
+// The team is back at base dest, one morale level higher.
+void Probe::return_home() {
+    veh_put(veh_id, game().bases[dest].x, game().bases[dest].y);
+    game().vehs[veh_id].movement_turns = 0;
+    draw_tiles(game().bases[base_id].x, game().bases[base_id].y, 2);
+    draw_tile(game().bases[dest].x, game().bases[dest].y, 2);
+    parse_says(1, game().bases[dest].name, -1, -1);
+    int32_t before = morale_veh(veh_id, 1, 0);
+    game().vehs[veh_id].morale = (uint8_t)range(game().vehs[veh_id].morale + 1, 0, 6);
+    veh_skip(veh_id);
+    if (f == CurrentPlayerFaction) {
+        parse_says(0, Units[game().vehs[veh_id].unit_id].name, -1, -1);
+        parse_say(2, Morale[morale_veh(veh_id, 1, 0)].name, -1, -1);
+        clear();
+        says("PROBESURVIVAL");
+        if (action == 8) {
+            says("X");
+        } else {
+            int32_t up = (before == morale_veh(veh_id, 1, 0) || morale_veh(veh_id, 1, 0) < 1) ? 0 : 1;
+            say_num(up);
+        }
+        if (f == CurrentPlayerFaction) NetMsg_pop_2(StrBuffer, infil_pcx(alien));
+    }
+}
+// Diplomatic consequences of the mission for the target, the framed faction and the faction
+// whose team was caught. Returns probe's result (1).
+int32_t Probe::diplomacy() {
+    // diplomatic consequences
+    if (!has_treaty(f, t, 7) || (has_treaty(t, f, 1) && has_treaty(t, f, 0x2000000))) return 1;
+    int32_t fr = frame;
+    if (action == 6 && risk != 0) {
+        set_treaty(t, f, 0x420, 1);
+        return 1;
+    }
+    if (fr < 0) {
+        int32_t k = -fr;
+        if (!is_human(k)) {
+            if (f == CurrentPlayerFaction) {
+                parse_says(0, get_title(k), -1, -1);
+                parse_says(1, get_name(k), -1, -1);
+                NetMsg_pop_2("FRAMEFLOP", capture_pcx(game().mfactions[f].rule_flags & 0x80));
+            }
+            treaty_on(k, f, 0x10);
+        }
+        if (is_human(k)) {
+            parse_says(0, get_title(f), -1, -1);
+            parse_says(1, get_name(f), -1, -1);
+            parse_says(2, get_pact_hood(f, k), -1, -1);
             parse_says(3, get_noun(f), -1, -1);
             parse_says(4, get_his_her(f, 0), -1, -1);
             parse_says(5, get_him_her(f, 0), -1, -1);
-            bool al = (game().mfactions[f].rule_flags & 0x80) != 0;
+            parse_says(6, get_title(t), -1, -1);
+            parse_says(7, get_name(t), -1, -1);
+            parse_says(8, get_noun(t), -1, -1);
             if (!MultiplayerActive) {
-                if (!has_treaty(t, f, 1)) {
-                    if (busted_action != 0) {
-                        clear();
-                        says("BUSTED");
-                        say_num(busted_action);
+                if (!has_treaty(k, f, 1)) {
+                    if (popp_2("FRAMEEXCUSE", capture_pcx(game().mfactions[f].rule_flags & 0x80), 0)) {
+                        treaty_on(f, k, 0x10);
+                        game().factions[k].diplo_spoke[f] = CurrentTurn;
                     }
-                    if (ui_probe_excuse("EXCUSE", busted_action, al)) {
-                        if (action < 6) treaty_on(f, t, 0x10);
-                        else double_cross(f, t, -1);
-                        game().factions[t].diplo_spoke[f] = CurrentTurn;
-                    }
-                } else {
-                    if (busted_action != 0) {
-                        clear();
-                        says("BUSTED");
-                        say_num(busted_action);
-                    }
-                    if (ui_probe_excuse("PACTEXCUSE", busted_action, al)) {
-                        pact_ends(f, t);
-                        game().factions[t].diplo_spoke[f] = CurrentTurn;
-                    }
+                } else if (popp_2("PACTFRAMEEXCUSE", capture_pcx(game().mfactions[f].rule_flags & 0x80), 0)) {
+                    pact_ends(f, k);
+                    game().factions[k].diplo_spoke[f] = CurrentTurn;
                 }
             } else {
-                agenda_on(t, f, 0x20);
-                if (action > 5) game().factions[f].integrity_blemishes++;
-                if (t == CurrentPlayerFaction) {
-                    if (busted_action != 0) {
-                        clear();
-                        says("BUSTED");
-                        say_num(busted_action);
-                    }
-                    ui_probe_excuse("NETEXCUSE", busted_action, al);
-                }
+                agenda_on(k, f, 0x20);
+                if (-CurrentPlayerFaction == fr) NetMsg_pop_2("HAVEFRAMEEXCUSE", nullptr);
                 if (f == CurrentPlayerFaction) {
-                    parse_says(0, get_title(t), -1, -1);
-                    parse_says(1, get_name(t), -1, -1);
-                    parse_says(2, get_noun(t), -1, -1);
-                    NetMsg_pop_2("HASNETEXCUSE", nullptr);
+                    parse_says(0, get_title(k), -1, -1);
+                    parse_says(1, get_name(k), -1, -1);
+                    parse_says(2, get_noun(k), -1, -1);
+                    NetMsg_pop_2("HASFRAMEEXCUSE", capture_pcx(game().mfactions[f].rule_flags & 0x80));
                 }
             }
-            return 1;
         }
-        if (fr > 0) {
-            treaty_on(t, fr, 0x58);
-            set_treaty(t, fr, 0x20, 1);
-            if (fr == CurrentPlayerFaction) {
-                parse_says(0, get_title(t), -1, -1);
-                parse_says(1, get_name(t), -1, -1);
-                parse_says(2, get_noun(t), -1, -1);
-                NetMsg_pop_2("FRAMEJOB", infil_pcx(alien));
-            }
-            if (f != CurrentPlayerFaction) return 1;
-            parse_says(0, get_title(t), -1, -1);
-            parse_says(1, get_name(t), -1, -1);
-            parse_says(2, get_noun(t), -1, -1);
-            parse_says(3, get_title(fr), -1, -1);
-            parse_says(4, get_name(fr), -1, -1);
-            parse_says(5, get_noun(fr), -1, -1);
-            NetMsg_pop_2("FRAMED", infil_pcx(alien));
-            return 1;
-        }
-        diplomacy_check(f, t, 0);
-        diplomacy_caption(f, t);
+    }
+    if (is_human(t)) {
         parse_says(0, get_title(f), -1, -1);
         parse_says(1, get_name(f), -1, -1);
         parse_says(2, get_pact_hood(f, t), -1, -1);
-        if (!has_treaty(f, t, 1)) {
-            if (!has_treaty(t, f, 0x20) && action < 6 &&
-                (((action == 1 || action == 5) && game().factions[f].tech_ranking < game().factions[t].tech_ranking &&
-                  game().factions[f].ranking < 6 && !DiploGreatSatan && rnd(8)) ||
-                 ((action == 2 || action == 4) &&
-                  ((DiploFearScale && !DiploGreatSatan) ||
-                   (game().factions[f].ranking < game().factions[t].ranking && !DiploTributeDemand && rnd(8)))))) {
-                cause_friction(t, f, rnd(4));
-                if (f == CurrentPlayerFaction) {
+        parse_says(3, get_noun(f), -1, -1);
+        parse_says(4, get_his_her(f, 0), -1, -1);
+        parse_says(5, get_him_her(f, 0), -1, -1);
+        bool al = (game().mfactions[f].rule_flags & 0x80) != 0;
+        if (!MultiplayerActive) {
+            if (!has_treaty(t, f, 1)) {
+                if (busted_action != 0) {
                     clear();
-                    says("KEPT");
-                    say_num(action);
-                    X_pops(StrBuffer, FactionPortraits[t], 0);
+                    says("BUSTED");
+                    say_num(busted_action);
+                }
+                if (ui_probe_excuse("EXCUSE", busted_action, al)) {
+                    if (action < 6) treaty_on(f, t, 0x10);
+                    else double_cross(f, t, -1);
+                    game().factions[t].diplo_spoke[f] = CurrentTurn;
                 }
             } else {
-                if (f == CurrentPlayerFaction) X_pops("USEDEXCUSE", FactionPortraits[t], 0);
-                if (action < 6) treaty_on(f, t, 0x10);
-                else double_cross(f, t, -1);
-            }
-            return 1;
-        }
-        if (action == 1) {
-            if (game().factions[f].tech_ranking < game().factions[t].tech_ranking && game().factions[f].ranking < 6 &&
-                !DiploGreatSatan) {
-                cause_friction(t, f, rnd(4));
-                if (f == CurrentPlayerFaction) {
+                if (busted_action != 0) {
                     clear();
-                    says("KEPTPACT");
-                    say_num(1);
-                    X_pops(StrBuffer, FactionPortraits[t], 0);
+                    says("BUSTED");
+                    say_num(busted_action);
                 }
-                return 1;
+                if (ui_probe_excuse("PACTEXCUSE", busted_action, al)) {
+                    pact_ends(f, t);
+                    game().factions[t].diplo_spoke[f] = CurrentTurn;
+                }
             }
-        }
-        if (action < 6 && game().factions[f].ranking < game().factions[t].ranking && game().factions[f].ranking < 5) {
-            if (f == CurrentPlayerFaction) X_pops("EXCUSEDPACT", FactionPortraits[t], 0);
-            return 1;
-        }
-        if (f == CurrentPlayerFaction) X_pops("USEDEXCUSE", FactionPortraits[t], 0);
-        if (action < 6) pact_ends(f, t);
-        else {
-            double_cross(f, t, -1);
-            treaty_on(f, t, 0x10);
+        } else {
+            agenda_on(t, f, 0x20);
+            if (action > 5) game().factions[f].integrity_blemishes++;
+            if (t == CurrentPlayerFaction) {
+                if (busted_action != 0) {
+                    clear();
+                    says("BUSTED");
+                    say_num(busted_action);
+                }
+                ui_probe_excuse("NETEXCUSE", busted_action, al);
+            }
+            if (f == CurrentPlayerFaction) {
+                parse_says(0, get_title(t), -1, -1);
+                parse_says(1, get_name(t), -1, -1);
+                parse_says(2, get_noun(t), -1, -1);
+                NetMsg_pop_2("HASNETEXCUSE", nullptr);
+            }
         }
         return 1;
+    }
+    if (fr > 0) {
+        treaty_on(t, fr, 0x58);
+        set_treaty(t, fr, 0x20, 1);
+        if (fr == CurrentPlayerFaction) {
+            parse_says(0, get_title(t), -1, -1);
+            parse_says(1, get_name(t), -1, -1);
+            parse_says(2, get_noun(t), -1, -1);
+            NetMsg_pop_2("FRAMEJOB", infil_pcx(alien));
+        }
+        if (f != CurrentPlayerFaction) return 1;
+        parse_says(0, get_title(t), -1, -1);
+        parse_says(1, get_name(t), -1, -1);
+        parse_says(2, get_noun(t), -1, -1);
+        parse_says(3, get_title(fr), -1, -1);
+        parse_says(4, get_name(fr), -1, -1);
+        parse_says(5, get_noun(fr), -1, -1);
+        NetMsg_pop_2("FRAMED", infil_pcx(alien));
+        return 1;
+    }
+    diplomacy_check(f, t, 0);
+    diplomacy_caption(f, t);
+    parse_says(0, get_title(f), -1, -1);
+    parse_says(1, get_name(f), -1, -1);
+    parse_says(2, get_pact_hood(f, t), -1, -1);
+    if (!has_treaty(f, t, 1)) {
+        if (!has_treaty(t, f, 0x20) && action < 6 &&
+            (((action == 1 || action == 5) && game().factions[f].tech_ranking < game().factions[t].tech_ranking &&
+              game().factions[f].ranking < 6 && !DiploGreatSatan && rnd(8)) ||
+             ((action == 2 || action == 4) &&
+              ((DiploFearScale && !DiploGreatSatan) ||
+               (game().factions[f].ranking < game().factions[t].ranking && !DiploTributeDemand && rnd(8)))))) {
+            cause_friction(t, f, rnd(4));
+            if (f == CurrentPlayerFaction) {
+                clear();
+                says("KEPT");
+                say_num(action);
+                X_pops(StrBuffer, FactionPortraits[t], 0);
+            }
+        } else {
+            if (f == CurrentPlayerFaction) X_pops("USEDEXCUSE", FactionPortraits[t], 0);
+            if (action < 6) treaty_on(f, t, 0x10);
+            else double_cross(f, t, -1);
+        }
+        return 1;
+    }
+    if (action == 1) {
+        if (game().factions[f].tech_ranking < game().factions[t].tech_ranking && game().factions[f].ranking < 6 &&
+            !DiploGreatSatan) {
+            cause_friction(t, f, rnd(4));
+            if (f == CurrentPlayerFaction) {
+                clear();
+                says("KEPTPACT");
+                say_num(1);
+                X_pops(StrBuffer, FactionPortraits[t], 0);
+            }
+            return 1;
+        }
+    }
+    if (action < 6 && game().factions[f].ranking < game().factions[t].ranking && game().factions[f].ranking < 5) {
+        if (f == CurrentPlayerFaction) X_pops("EXCUSEDPACT", FactionPortraits[t], 0);
+        return 1;
+    }
+    if (f == CurrentPlayerFaction) X_pops("USEDEXCUSE", FactionPortraits[t], 0);
+    if (action < 6) pact_ends(f, t);
+    else {
+        double_cross(f, t, -1);
+        treaty_on(f, t, 0x10);
+    }
+    return 1;
+}
+}  // namespace
+
+// Probe team veh_id on a mission against base_id (or, with base_id -1, the unit veh_id_tgt).
+// commit 0 only checks whether the mission is possible. Returns 1 when the probe team acted.
+int32_t GAMEAPI probe(int32_t veh_id, int32_t base_id, int32_t veh_id_tgt, int32_t commit) {
+    Probe p(veh_id, base_id, veh_id_tgt, commit);
+    ProbeTargetFactionID = p.t;
+    if (p.out_of_reach()) return 0;
+    int32_t r = p.hunter_seeker();
+    if (r >= 0) return r;
+    p.count_plague_techs();
+    Step step = p.choose_action();
+    for (;;) {
+        switch (step) {
+        case Step::dispatch: step = p.dispatch(); break;
+        case Step::ai_choose: step = p.ai_choose(); break;
+        case Step::resolve: step = p.resolve(); break;
+        case Step::success: step = p.success(); break;
+        case Step::survive:
+            p.survive();
+            step = Step::after;
+            break;
+        case Step::after:
+            if (p.action == 0) return 1;
+            step = Step::diplomacy;
+            break;
+        case Step::diplomacy: return p.diplomacy();
+        case Step::actions:  // only inside dispatch
+        case Step::done: return p.result;
+        }
     }
 }

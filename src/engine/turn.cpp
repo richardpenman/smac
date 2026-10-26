@@ -278,35 +278,516 @@ void sea_wipe(int32_t base_id, uint32_t item, const char* label) {
 }
 }  // namespace
 
-void GAMEAPI random_events(int32_t is_extra) {
-    if (!is_extra) {
-        if (SolarFlaresEvent & 2) SolarFlaresEvent = 0;
-        else if (SolarFlaresEvent & 1) SolarFlaresEvent = 2;
-        int32_t sunspots = SunspotDuration < -1000 ? -1000 : SunspotDuration;
-        if (DustCloudDuration < 0) DustCloudDuration = 0;
-        SunspotDuration = sunspots - 1;
-        if (!SunspotDuration) POP2("NOMORESPOTS", "space_sm.pcx", -1);
-        // AIs forget betrayal plans against humans they are not fighting.
-        for (int32_t human = 1; human < 8; human++) {
-            if (!is_human(human)) continue;
-            for (int32_t ai = 1; ai < 8; ai++) {
-                if (!is_human(ai) && !(game().factions[ai].diplo_status[human] & (DIPLO_VENDETTA | DIPLO_WANT_REVENGE)))
-                    set_treaty(ai, human, 0xC00, 0);
-            }
+namespace {
+// The random event of one turn at one base (random_events): the base and its faction.
+struct RandomEvent {
+    int32_t base_id;
+    BASE& base;
+    int32_t faction_id;
+    Faction& f;
+    int32_t bx, by;
+    explicit RandomEvent(int32_t id)
+        : base_id(id),
+          base(game().bases[id]),
+          faction_id((uint8_t)game().bases[id].faction_id),
+          f(game().factions[faction_id]),
+          bx(base.x),
+          by(base.y) {}
+    void plague();
+    void resource_change();
+    void solar_flare();
+    void asteroid_belt();
+    void energy_market();
+    void hail();
+    void volcano();
+    void meteor();
+    void blight();
+    void mining_accident();
+    void datalinks();
+    void population_boom();
+};
+// Plague: hospitals protect the base; the genetic secret projects protect the faction.
+void RandomEvent::plague() {
+    if (base_has_facility(base_id, FAC_RESEARCH_HOSPITAL) || base_has_facility(base_id, FAC_NANOHOSPITAL)) {
+        bool nano = base_has_facility(base_id, FAC_NANOHOSPITAL);
+        parse_say(1, Facility[nano ? FAC_NANOHOSPITAL : FAC_RESEARCH_HOSPITAL].name, -1, -1);
+        if (faction_id == CurrentPlayerFaction) {
+            Console_focus(&MainConsole, base.x, base.y, CurrentPlayerFaction);
+            POP2("PROMETHEUS1", "biohazd_sm.pcx", base_id);
+        } else if (PbemActive) {
+            POP2("PROMETHEUS1", "biohazd_sm.pcx", base_id);
         }
-        if (DustCloudDuration > 0 && --DustCloudDuration == 0) POP2("NOMOREDUST", "stars_sm.pcx", -1);
-        for (int32_t i = 0; i < game().base_count; i++) {
-            BASE& base = game().bases[i];
-            if (!(base.event_flags & 0x7E00)) continue;
-            if (base.random_event_turns >= 0) base.random_event_turns--;
-            if (base.random_event_turns == 0) base.event_flags &= 0xFFFF81FF;
+        return;
+    }
+    if (has_sp(0, faction_id) || has_sp(14, faction_id) || has_sp(26, faction_id)) {
+        int32_t project = has_sp(0, faction_id) ? 70 : !has_sp(14, faction_id) ? 96 : 84;
+        parse_say(1, Facility[project].name, -1, -1);
+        if (faction_id == CurrentPlayerFaction) {
+            Console_focus(&MainConsole, base.x, base.y, CurrentPlayerFaction);
+            POP2("PROMETHEUS2", "biohazd_sm.pcx", base_id);
+        } else if (PbemActive) {
+            POP2("PROMETHEUS2", "biohazd_sm.pcx", base_id);
         }
-        if ((GameState & STATE_PERIHELION_ACTIVE) && (game_year(CurrentTurn) - 2210) % 80 == 0) {
-            GameState &= ~STATE_PERIHELION_ACTIVE;
-            POP2("PERIHELIONENDS", "stars_sm.pcx", -1);
-            return;
+        return;
+    }
+    if (!event_rank_ok(faction_id)) return;
+    int32_t radius = (base.pop_size + 1) / 2;
+    parse_num(1, radius);
+    // shown: 1 + the last affected base the viewer sees (BUG(original): 1, i.e. base 0, when
+    // only the event base's visibility counts).
+    COMPAT_ORIGINAL(event_shown_base_0);
+    int32_t shown = 0;
+    if (base.faction_id == CurrentPlayerFaction || (base.visibility & (uint8_t)(1 << (CurrentPlayerFaction & 31)))) {
+        shown = 1;
+        Console_focus(&MainConsole, base.x, base.y, CurrentPlayerFaction);
+    }
+    for (int32_t i = 0; i < game().base_count; i++) {
+        BASE& b = game().bases[i];
+        int32_t dx = std::abs(b.x - base.x);
+        if (!(game().map.flat & 1) && dx > game().map.half_x) dx = game().map.x - dx;
+        int32_t dy = std::abs(b.y - base.y);
+        if ((dx + dy) >> 1 > radius) continue;
+        if (base_has_facility(i, FAC_RESEARCH_HOSPITAL) || base_has_facility(i, FAC_NANOHOSPITAL)) continue;
+        uint8_t owner = (uint8_t)b.faction_id;
+        if (SecretProjects[FAC_HUMAN_GENOME_PROJECT - SP_ID_First] >= 0 &&
+            (uint8_t)game().bases[SecretProjects[FAC_HUMAN_GENOME_PROJECT - SP_ID_First]].faction_id == owner)
+            continue;
+        if (SecretProjects[FAC_LONGEVITY_VACCINE - SP_ID_First] >= 0 &&
+            (uint8_t)game().bases[SecretProjects[FAC_LONGEVITY_VACCINE - SP_ID_First]].faction_id == owner)
+            continue;
+        if (SecretProjects[FAC_CLINICAL_IMMORTALITY - SP_ID_First] >= 0 &&
+            (uint8_t)game().bases[SecretProjects[FAC_CLINICAL_IMMORTALITY - SP_ID_First]].faction_id == owner)
+            continue;
+        b.pop_size = (int8_t)((b.pop_size + 1) / 2);
+        draw_tile(b.x, b.y, 2);
+        if (owner == CurrentPlayerFaction) {
+            Console_focus(&MainConsole, b.x, b.y, CurrentPlayerFaction);
+            shown = i + 1;
+        } else if (PbemActive) {
+            shown = i + 1;
         }
     }
+    if (shown) POP2("PROMETHEUS0", "biohazd_sm.pcx", shown - 1);
+}
+// A resource appears (or, near the base, one runs out after turn 75).
+void RandomEvent::resource_change() {
+    if (PbemActive) return;
+    int32_t offset = game_random(0, 20) + 1;
+    bool nearby = false;
+    for (int32_t k = 0; k < 9; k++) {
+        int32_t x = map_wrap_x(bx + TableOffsetX[k]);
+        int32_t y = by + TableOffsetY[k];
+        if (!map_in_bounds(x, y) || !bonus_at(x, y)) continue;
+        MAP* sq = map_tile(x, y);
+        if (!tile_known(faction_id, sq)) continue;
+        if ((sq->climate & 0xE0) < 0x60 || tile_claimable(faction_id, x, y)) {
+            offset = k;
+            nearby = true;
+            break;
+        }
+    }
+    int32_t x = map_wrap_x(bx + TableOffsetX[offset]);
+    int32_t y = by + TableOffsetY[offset];
+    if (!map_in_bounds(x, y)) return;
+    MAP* sq = map_tile(x, y);
+    if (!tile_known(faction_id, sq)) return;
+    if ((sq->climate & 0xE0) >= 0x60 && !tile_claimable(faction_id, x, y)) return;
+    if (nearby && bonus_at(x, y)) {
+        if (CurrentTurn < 75) return;
+        parse_say(1, ResName[bonus_at(x, y) - 1].name_plural, -1, -1);
+        bit_set(x, y, BIT_BONUS_RES, 0);
+        synch_bit(x, y, faction_id);
+        draw_tile(x, y, 2);
+        if (bonus_at(x, y) || faction_id != CurrentPlayerFaction) return;
+        pfncMoveMap(MapWins[0], x, y, 1);
+        if (!ui_shift_pressed()) {
+            for (int32_t i = 10; i; i--) {
+                bit_set(x, y, BIT_BONUS_RES, 1);
+                synch_bit(x, y, faction_id);
+                draw_tile(x, y, 2);
+                event_wait(20);
+                bit_set(x, y, BIT_BONUS_RES, 0);
+                synch_bit(x, y, faction_id);
+                draw_tile(x, y, 2);
+                event_wait(20);
+            }
+        }
+        event_wait(100);
+        POP2("PETERSOUT", "genwarning_sm.pcx", -1);
+        return;
+    }
+    bit_set(x, y, BIT_BONUS_RES, 1);
+    synch_bit(x, y, faction_id);
+    draw_tile(x, y, 2);
+    int32_t resource = bonus_at(x, y) - 1;
+    if (resource < 0 || faction_id != CurrentPlayerFaction) return;
+    pfncMoveMap(MapWins[0], x, y, 1);
+    if (!ui_shift_pressed()) {
+        for (int32_t i = 10; i; i--) {
+            bit_set(x, y, BIT_BONUS_RES, 0);
+            synch_bit(x, y, faction_id);
+            draw_tile(x, y, 2);
+            event_wait(20);
+            bit_set(x, y, BIT_BONUS_RES, 1);
+            synch_bit(x, y, faction_id);
+            draw_tile(x, y, 2);
+            event_wait(20);
+        }
+    }
+    parse_say(1, ResName[resource].name_plural, -1, -1);
+    bool ocean = (map_tile(x, y)->climate & 0xE0) < 0x60;
+    if (resource == 0) POP2("NEWRESOURCE", ocean ? "rdneuw_sm.pcx" : "rdneul_sm.pcx", -1);
+    else POP2("NEWRESOURCE", ocean ? "rdminw_sm.pcx" : "rdminl_sm.pcx", -1);
+}
+// Solar flare (a storm when it destroys orbital power and defense satellites).
+void RandomEvent::solar_flare() {
+    if (SolarFlaresEvent || game_random(0, 5)) return;
+    bool hit = false;
+    for (int32_t i = 1; i < 8; i++) {
+        if (game().factions[i].satellites_energy || game().factions[i].satellites_ODP) {
+            game().factions[i].satellites_energy = 0;
+            game().factions[i].satellites_ODP = 0;
+            hit = true;
+        }
+    }
+    SolarFlaresEvent = 1;
+    if (hit) POP2("SOLARSTORM", "sun_sm.pcx", -1);
+    else POP2("SOLARFLARE", "heat_sm.pcx", -1);
+}
+// Asteroids destroy the orbital mining satellites.
+void RandomEvent::asteroid_belt() {
+    if (game_random(0, 5)) return;
+    bool hit = false;
+    for (int32_t i = 1; i < 8; i++) {
+        if (game().factions[i].satellites_mineral) {
+            game().factions[i].satellites_mineral = 0;
+            hit = true;
+        }
+    }
+    if (hit) POP2("ASTEROID", "astm_sm.pcx", -1);
+}
+// Energy market boom (poor factions double their reserves) or inflation (rich ones lose 3/4).
+void RandomEvent::energy_market() {
+    int32_t credits = f.energy_credits;
+    if (credits <= 1000) {
+        if (f.ranking > 4 || credits > 500) return;
+        f.energy_credits = credits * 2;
+        if (faction_id != CurrentPlayerFaction) return;
+        parse_num(0, credits * 2);
+        Console_update_data(&MainConsole, 0);
+        POP2("ENERGYBOOM", "markbm_sm.pcx", -1);
+        return;
+    }
+    if (!is_human(faction_id) && credits <= 2000) return;
+    f.energy_credits = credits / 4;
+    if (faction_id == CurrentPlayerFaction) {
+        parse_num(0, credits / 4);
+        Console_update_data(&MainConsole, 0);
+        POP2("INFLATION", "markbm_sm.pcx", -1);
+    } else if (PbemActive) {
+        parse_num(0, credits / 4);
+        POP2("INFLATION", "markbm_sm.pcx", -1 - faction_id);
+    }
+}
+// Hail: solar collectors in the base radius destroyed.
+void RandomEvent::hail() {
+    if (CurrentTurn < 75 || !event_rank_ok(faction_id)) return;
+    int32_t shown = 0;
+    for (int32_t k = 0; k < 21; k++) {
+        int32_t x = map_wrap_x(base.x + TableOffsetX[k]);
+        int32_t y = base.y + TableOffsetY[k];
+        if (!map_in_bounds(x, y)) continue;
+        MAP* sq = map_tile(x, y);
+        if (!(sq->items & BIT_SOLAR) || !tile_known(faction_id, sq)) continue;
+        if (!tile_claimable(faction_id, x, y) || (sq->climate & 0xE0) < 0x60) continue;
+        if (PbemActive) {
+            shown = 1;
+        } else if (event_base_seen(faction_id, base)) {
+            if (!shown) {
+                Console_focus(&MainConsole, bx, by, CurrentPlayerFaction);
+                event_wait(200);
+            }
+            shown |= (faction_id == CurrentPlayerFaction) + 1;
+        }
+        bit_set(x, y, BIT_SOLAR, 0);
+        synch_bit(x, y, faction_id);
+        for (int32_t i = 1; i < 8; i++) sq->visible_items[i - 1] &= ~BIT_SOLAR;
+        if (shown) {
+            draw_tile(x, y, 2);
+            if (!ui_shift_pressed() && !MultiplayerActive && !PbemActive) clock_wait(50);
+        }
+    }
+    if (shown) POP2("HAIL", "hail_sm.pcx", base_id);
+}
+// Mount Planet erupts near the base.
+void RandomEvent::volcano() {
+    if (PbemActive || CurrentTurn < 75 || f.base_count < 8 || (GameState & STATE_IS_SCENARIO)) return;
+    if (MountPlanetY < 0 || MountPlanetY >= game().map.y || MountPlanetX < 0 || MountPlanetX >= game().map.x) return;
+    MAP* mount = map_tile(MountPlanetX, MountPlanetY);
+    if ((mount->landmarks & 0x80000002) != 2) return;
+    int32_t dx = std::abs(base.x - MountPlanetX);
+    if (!(game().map.flat & 1) && dx > game().map.half_x) dx = game().map.x - dx;
+    int32_t dy = std::abs(base.y - MountPlanetY);
+    if ((int32_t)((uint32_t)(dx + dy) & ~1u) > 10) return;
+    if (!tile_known(faction_id, mount) || f.ranking < 6) return;
+    bool shown = tile_known(CurrentPlayerFaction, mount);
+    int32_t shown_base = base_id;
+    for (int32_t k = 0; k < 81; k++) {
+        int32_t x = map_wrap_x(MountPlanetX + TableOffsetX[k]);
+        int32_t y = MountPlanetY + TableOffsetY[k];
+        if (!map_in_bounds(x, y)) continue;
+        bit_set(x, y, 0x81E8887C, 0);
+        synch_bit(x, y, CurrentPlayerFaction);
+        rocky_set(x, y, 2);
+        if ((map_tile(x, y)->landmarks & 0x80000002) == 2) {
+            for (int32_t v = game().veh_count - 1; v >= 0; v--)
+                if (game().vehs[v].x == x && game().vehs[v].y == y) veh_kill(v);
+        } else {
+            for (int32_t v = game().veh_count - 1; v >= 0; v--) {
+                VEH& veh = game().vehs[v];
+                if (veh.x != x || veh.y != y) continue;
+                const UNIT& u = Units[veh.unit_id];
+                int32_t hp = u.plan == 12 ? 1 : (u.reactor_id < 1 ? 1 : u.reactor_id > 100 ? 100 : u.reactor_id) * 10;
+                int32_t left = hp - veh.damage_taken;
+                left = left < 0 ? 0 : (left > 9999 ? 9999 : left);
+                veh.damage_taken = (uint8_t)(veh.damage_taken + left / 2);
+            }
+        }
+        int32_t hit = base_at(x, y);
+        if (hit < 0) continue;
+        if (game().bases[hit].faction_id == CurrentPlayerFaction &&
+            game().bases[shown_base].faction_id != CurrentPlayerFaction) {
+            parse_says(0, game().bases[hit].name, -1, -1);
+            shown_base = hit;
+            shown = true;
+        }
+        if (k < 9 && !is_objective(hit)) {
+            base_kill(hit);
+        } else if (k < 25) {
+            game().bases[hit].pop_size = (int8_t)((game().bases[hit].pop_size + 3) / 4);
+        } else if (k < 49) {
+            game().bases[hit].pop_size = (int8_t)((game().bases[hit].pop_size + 1) / 2);
+        } else {
+            game().bases[hit].pop_size = (int8_t)((game().bases[hit].pop_size + 1) * 3 / 4);
+        }
+    }
+    if (!shown || !Console_focus(&MainConsole, MountPlanetX, MountPlanetY, CurrentPlayerFaction)) draw_map(1);
+    DustCloudDuration = 10;
+    popp(ScriptFileName, "BIGFATVOLCANO", 0, "volc_sm.pcx", 0);
+}
+// Asteroid impact on an inland base.
+void RandomEvent::meteor() {
+    if (PbemActive || CurrentTurn < 75 || f.base_count < 8 || (GameState & STATE_IS_SCENARIO)) return;
+    if (near_landmark(bx, by)) return;
+    bool shown = tile_known(CurrentPlayerFaction, map_tile(bx, by));
+    int32_t ocean = 0;
+    for (int32_t k = 0; k < 49; k++) {
+        int32_t x = map_wrap_x(bx + TableOffsetX[k]);
+        int32_t y = by + TableOffsetY[k];
+        if (!map_in_bounds(x, y) || (map_tile(x, y)->climate & 0xE0) >= 0x60) continue;
+        if (k < 25) return;
+        if (++ocean > 5) return;
+    }
+    if (f.ranking < 7) return;
+    int32_t shown_base = base_id;
+    for (int32_t k = 0; k < 49; k++) {
+        int32_t x = map_wrap_x(bx + TableOffsetX[k]);
+        int32_t y = by + TableOffsetY[k];
+        if (!map_in_bounds(x, y)) continue;
+        bit_set(x, y, 0x81E8887C, 0);
+        synch_bit(x, y, CurrentPlayerFaction);
+        int32_t hit = base_at(x, y);
+        if (hit >= 0) {
+            if (game().bases[hit].faction_id == CurrentPlayerFaction &&
+                game().bases[shown_base].faction_id != CurrentPlayerFaction) {
+                shown_base = hit;
+                parse_says(0, game().bases[hit].name, -1, -1);
+                shown = true;
+            }
+            base_kill(hit);
+        }
+        for (int32_t v = game().veh_count - 1; v >= 0; v--) {
+            if (game().vehs[v].x != x || game().vehs[v].y != y) continue;
+            if (game().vehs[v].faction_id == (uint32_t)CurrentPlayerFaction) shown = true;
+            veh_kill(v);
+        }
+    }
+    world_crater(bx, by);
+    world_climate();
+    if (!shown || !Console_focus(&MainConsole, bx, by, CurrentPlayerFaction)) draw_map(1);
+    DustCloudDuration = 10;
+    popp(ScriptFileName, "EATTHIS", 0, "astp_sm.pcx", 0);
+}
+// Blight: forests and farms in the base radius lost (a Biology Lab protects: golden age).
+void RandomEvent::blight() {
+    if (!has_tech(Facility[FAC_BIOLOGY_LAB].preq_tech, faction_id)) return;
+    bool shown = false;
+    bool lab = base_has_facility(base_id, FAC_BIOLOGY_LAB);
+    if (!lab && !event_rank_ok(faction_id)) return;
+    for (int32_t k = 0; k < 21; k++) {
+        int32_t x = map_wrap_x(bx + TableOffsetX[k]);
+        int32_t y = by + TableOffsetY[k];
+        if (!map_in_bounds(x, y)) continue;
+        MAP* sq = map_tile(x, y);
+        if ((sq->climate & 0xE0) < 0x60 || !(sq->items & (BIT_FARM | BIT_FOREST))) continue;
+        if (!tile_known(faction_id, sq) || !tile_claimable(faction_id, x, y)) continue;
+        if (!lab) {
+            if (!shown) {
+                Console_focus(&MainConsole, bx, by, CurrentPlayerFaction);
+                event_wait(200);
+            }
+            bit_set(x, y, 0x288000, 0);
+            synch_bit(x, y, faction_id);
+            // BUG(original): clears the viewer's memory seven times instead of every
+            // faction's (with viewer 0 the landmark bits).
+            COMPAT_ORIGINAL(landmark_memory_viewer);
+            for (int32_t i = 7; i; i--) {
+                uint32_t& seen = tile_seen_items(sq, CurrentPlayerFaction);
+                if (seen & 0x288000) seen &= 0xFFD77FFF;
+            }
+            draw_tile(x, y, 2);
+            event_wait(50);
+        }
+        shown = true;
+    }
+    if (!shown) return;
+    if (lab) {
+        base.event_flags |= 0x200;
+        base.random_event_turns = 10;
+    }
+    if (faction_id == CurrentPlayerFaction) {
+        if (!Console_focus(&MainConsole, base.x, base.y, faction_id)) draw_radius(base.x, base.y, 2, 2);
+    } else if (!PbemActive) {
+        return;
+    }
+    POP2(lab ? "BLIGHT1" : "BLIGHT", "biohazd_sm.pcx", base_id);
+}
+// Mining accident: mines in the base radius destroyed (an Energy Bank or project 36 turns
+// it into a +50 energy surge).
+void RandomEvent::mining_accident() {
+    if (!has_tech(Facility[FAC_ENERGY_BANK].preq_tech, faction_id)) return;
+    bool shown = false;
+    bool protect = base_has_facility(base_id, FAC_ENERGY_BANK) || has_sp(36, faction_id);
+    if (!protect && !event_rank_ok(faction_id)) return;
+    for (int32_t k = 0; k < 21; k++) {
+        int32_t x = map_wrap_x(bx + TableOffsetX[k]);
+        int32_t y = by + TableOffsetY[k];
+        if (!map_in_bounds(x, y)) continue;
+        MAP* sq = map_tile(x, y);
+        if ((sq->climate & 0xE0) < 0x60 || !(sq->items & BIT_MINE)) continue;
+        if (!tile_known(faction_id, sq) || !tile_claimable(faction_id, x, y)) continue;
+        if (!protect) {
+            if (!shown) {
+                Console_focus(&MainConsole, bx, by, CurrentPlayerFaction);
+                event_wait(200);
+            }
+            bit_set(x, y, BIT_MINE, 0);
+            synch_bit(x, y, faction_id);
+            for (int32_t i = 1; i < 8; i++)
+                if (sq->visible_items[i - 1] & BIT_MINE) sq->visible_items[i - 1] &= ~BIT_MINE;
+            draw_tile(x, y, 2);
+            event_wait(50);
+        }
+        shown = true;
+    }
+    if (!shown) return;
+    if (protect) f.energy_credits += 50;
+    if (faction_id == CurrentPlayerFaction) {
+        if (!Console_focus(&MainConsole, base.x, base.y, faction_id)) draw_radius(base.x, base.y, 2, 2);
+    } else if (!PbemActive) {
+        return;
+    }
+    POP2(protect ? "SURGE1" : "SURGE", "markbm_sm.pcx", base_id);
+}
+// Datalinks: research lost (bonus with a Network Node).
+void RandomEvent::datalinks() {
+    if (!has_tech(Facility[FAC_NETWORK_NODE].preq_tech, faction_id)) return;
+    if (f.tech_accumulated < tech_rate(faction_id) / 4) return;
+    if (!base_has_facility(base_id, FAC_NETWORK_NODE)) {
+        if (!event_rank_ok(faction_id)) return;
+        f.tech_accumulated = 0;
+        f.net_random_event = 0;
+        if (faction_id == CurrentPlayerFaction) {
+            Console_focus(&MainConsole, base.x, base.y, faction_id);
+            POP2("NETCRASH", "netcr_sm.pcx", base_id);
+        } else if (PbemActive) {
+            POP2("NETCRASH", "netcr_sm.pcx", base_id);
+        }
+        return;
+    }
+    f.tech_accumulated = tech_rate(faction_id);
+    if (faction_id == CurrentPlayerFaction) {
+        Console_focus(&MainConsole, base.x, base.y, faction_id);
+        POP2("NETBONUS", "markbm_sm.pcx", base_id);
+    } else if (PbemActive) {
+        POP2("NETBONUS", "markbm_sm.pcx", base_id);
+    }
+}
+// Population boom (with a Children's Creche: up to two citizens at once).
+void RandomEvent::population_boom() {
+    if (!has_tech(Facility[FAC_CHILDREN_CRECHE].preq_tech, faction_id)) return;
+    const char* pcx = (game().mfactions[faction_id].rule_flags & RFLAG_ALIEN) ? "al_pop_sm.pcx" : "pop_sm.pcx";
+    if (!base_has_facility(base_id, FAC_CHILDREN_CRECHE)) {
+        if (!event_rank_ok(faction_id) || base.assimilation_turns_left) return;
+        base.assimilation_turns_left = 5;
+        if (faction_id == CurrentPlayerFaction) {
+            Console_focus(&MainConsole, base.x, base.y, faction_id);
+        } else if (!PbemActive) {
+            return;
+        }
+        POP2("CRECHE", pcx, base_id);
+        return;
+    }
+    if (base.nutrient_surplus < 1) return;
+    for (int32_t n = 1; n <= 2; n++) {
+        base.pop_size++;
+        set_base(base_id);
+        base_compute(1);
+        if (base.nutrient_surplus <= 0) break;
+    }
+    if (faction_id == CurrentPlayerFaction) {
+        if (!Console_focus(&MainConsole, base.x, base.y, faction_id)) draw_tile(base.x, base.y, 2);
+    } else if (!PbemActive) {
+        return;
+    }
+    POP2("CRECHE1", pcx, base_id);
+}
+// The events of the previous turns run out: solar flares, sunspots, dust clouds, AI betrayal
+// plans against humans, base events, Perihelion. Returns false when Perihelion ended (no new
+// event this turn).
+bool expire_events() {
+    if (SolarFlaresEvent & 2) SolarFlaresEvent = 0;
+    else if (SolarFlaresEvent & 1) SolarFlaresEvent = 2;
+    int32_t sunspots = SunspotDuration < -1000 ? -1000 : SunspotDuration;
+    if (DustCloudDuration < 0) DustCloudDuration = 0;
+    SunspotDuration = sunspots - 1;
+    if (!SunspotDuration) POP2("NOMORESPOTS", "space_sm.pcx", -1);
+    // AIs forget betrayal plans against humans they are not fighting.
+    for (int32_t human = 1; human < 8; human++) {
+        if (!is_human(human)) continue;
+        for (int32_t ai = 1; ai < 8; ai++) {
+            if (!is_human(ai) && !(game().factions[ai].diplo_status[human] & (DIPLO_VENDETTA | DIPLO_WANT_REVENGE)))
+                set_treaty(ai, human, 0xC00, 0);
+        }
+    }
+    if (DustCloudDuration > 0 && --DustCloudDuration == 0) POP2("NOMOREDUST", "stars_sm.pcx", -1);
+    for (int32_t i = 0; i < game().base_count; i++) {
+        BASE& base = game().bases[i];
+        if (!(base.event_flags & 0x7E00)) continue;
+        if (base.random_event_turns >= 0) base.random_event_turns--;
+        if (base.random_event_turns == 0) base.event_flags &= 0xFFFF81FF;
+    }
+    if ((GameState & STATE_PERIHELION_ACTIVE) && (game_year(CurrentTurn) - 2210) % 80 == 0) {
+        GameState &= ~STATE_PERIHELION_ACTIVE;
+        POP2("PERIHELIONENDS", "stars_sm.pcx", -1);
+        return false;
+    }
+    return true;
+}
+}  // namespace
+
+void GAMEAPI random_events(int32_t is_extra) {
+    if (!is_extra && !expire_events()) return;
     if (CurrentTurn > 50 && !is_extra && (game_year(CurrentTurn) - 2190) % 80 == 0) {
         GameState |= STATE_PERIHELION_ACTIVE;
         POP2("PERIHELION", "heat_sm.pcx", -1);
@@ -324,11 +805,10 @@ void GAMEAPI random_events(int32_t is_extra) {
     if (f.base_count <= 1) return;
     if (base.event_flags & 0x7E00) return;
     int32_t event = game_random(0, 22);
-    int32_t bx = base.x;
-    int32_t by = base.y;
     parse_num(0, 10);
     parse_says(0, base.name, -1, -1);
     StrBuffer[0] = 0;
+    RandomEvent e(base_id);
     switch (event) {
     case 0:
         if (event_lead_ok(faction_id)) base_event(base_id, 0x200, "BUMPER", "bump_sm.pcx");
@@ -350,170 +830,11 @@ void GAMEAPI random_events(int32_t is_extra) {
     case 5:
         if (event_rank_ok(faction_id)) base_event(base_id, 0x4000, "CLOUDCOVER", "cloud_sm.pcx");
         return;
-    case 6: {
-        // Plague: hospitals protect the base; the genetic secret projects protect the faction.
-        if (base_has_facility(base_id, FAC_RESEARCH_HOSPITAL) || base_has_facility(base_id, FAC_NANOHOSPITAL)) {
-            bool nano = base_has_facility(base_id, FAC_NANOHOSPITAL);
-            parse_say(1, Facility[nano ? FAC_NANOHOSPITAL : FAC_RESEARCH_HOSPITAL].name, -1, -1);
-            if (faction_id == CurrentPlayerFaction) {
-                Console_focus(&MainConsole, base.x, base.y, CurrentPlayerFaction);
-                POP2("PROMETHEUS1", "biohazd_sm.pcx", base_id);
-            } else if (PbemActive) {
-                POP2("PROMETHEUS1", "biohazd_sm.pcx", base_id);
-            }
-            return;
-        }
-        if (has_sp(0, faction_id) || has_sp(14, faction_id) || has_sp(26, faction_id)) {
-            int32_t project = has_sp(0, faction_id) ? 70 : !has_sp(14, faction_id) ? 96 : 84;
-            parse_say(1, Facility[project].name, -1, -1);
-            if (faction_id == CurrentPlayerFaction) {
-                Console_focus(&MainConsole, base.x, base.y, CurrentPlayerFaction);
-                POP2("PROMETHEUS2", "biohazd_sm.pcx", base_id);
-            } else if (PbemActive) {
-                POP2("PROMETHEUS2", "biohazd_sm.pcx", base_id);
-            }
-            return;
-        }
-        if (!event_rank_ok(faction_id)) return;
-        int32_t radius = (base.pop_size + 1) / 2;
-        parse_num(1, radius);
-        // shown: 1 + the last affected base the viewer sees (BUG(original): 1, i.e. base 0, when
-        // only the event base's visibility counts).
-        COMPAT_ORIGINAL(event_shown_base_0);
-        int32_t shown = 0;
-        if (base.faction_id == CurrentPlayerFaction ||
-            (base.visibility & (uint8_t)(1 << (CurrentPlayerFaction & 31)))) {
-            shown = 1;
-            Console_focus(&MainConsole, base.x, base.y, CurrentPlayerFaction);
-        }
-        for (int32_t i = 0; i < game().base_count; i++) {
-            BASE& b = game().bases[i];
-            int32_t dx = std::abs(b.x - base.x);
-            if (!(game().map.flat & 1) && dx > game().map.half_x) dx = game().map.x - dx;
-            int32_t dy = std::abs(b.y - base.y);
-            if ((dx + dy) >> 1 > radius) continue;
-            if (base_has_facility(i, FAC_RESEARCH_HOSPITAL) || base_has_facility(i, FAC_NANOHOSPITAL)) continue;
-            uint8_t owner = (uint8_t)b.faction_id;
-            if (SecretProjects[FAC_HUMAN_GENOME_PROJECT - SP_ID_First] >= 0 &&
-                (uint8_t)game().bases[SecretProjects[FAC_HUMAN_GENOME_PROJECT - SP_ID_First]].faction_id == owner)
-                continue;
-            if (SecretProjects[FAC_LONGEVITY_VACCINE - SP_ID_First] >= 0 &&
-                (uint8_t)game().bases[SecretProjects[FAC_LONGEVITY_VACCINE - SP_ID_First]].faction_id == owner)
-                continue;
-            if (SecretProjects[FAC_CLINICAL_IMMORTALITY - SP_ID_First] >= 0 &&
-                (uint8_t)game().bases[SecretProjects[FAC_CLINICAL_IMMORTALITY - SP_ID_First]].faction_id == owner)
-                continue;
-            b.pop_size = (int8_t)((b.pop_size + 1) / 2);
-            draw_tile(b.x, b.y, 2);
-            if (owner == CurrentPlayerFaction) {
-                Console_focus(&MainConsole, b.x, b.y, CurrentPlayerFaction);
-                shown = i + 1;
-            } else if (PbemActive) {
-                shown = i + 1;
-            }
-        }
-        if (shown) POP2("PROMETHEUS0", "biohazd_sm.pcx", shown - 1);
-        return;
-    }
+    case 6: e.plague(); return;
     case 7:
-    case 8: {
-        // A resource appears (or, near the base, one runs out after turn 75).
-        if (PbemActive) return;
-        int32_t offset = game_random(0, 20) + 1;
-        bool nearby = false;
-        for (int32_t k = 0; k < 9; k++) {
-            int32_t x = map_wrap_x(bx + TableOffsetX[k]);
-            int32_t y = by + TableOffsetY[k];
-            if (!map_in_bounds(x, y) || !bonus_at(x, y)) continue;
-            MAP* sq = map_tile(x, y);
-            if (!tile_known(faction_id, sq)) continue;
-            if ((sq->climate & 0xE0) < 0x60 || tile_claimable(faction_id, x, y)) {
-                offset = k;
-                nearby = true;
-                break;
-            }
-        }
-        int32_t x = map_wrap_x(bx + TableOffsetX[offset]);
-        int32_t y = by + TableOffsetY[offset];
-        if (!map_in_bounds(x, y)) return;
-        MAP* sq = map_tile(x, y);
-        if (!tile_known(faction_id, sq)) return;
-        if ((sq->climate & 0xE0) >= 0x60 && !tile_claimable(faction_id, x, y)) return;
-        if (nearby && bonus_at(x, y)) {
-            if (CurrentTurn < 75) return;
-            parse_say(1, ResName[bonus_at(x, y) - 1].name_plural, -1, -1);
-            bit_set(x, y, BIT_BONUS_RES, 0);
-            synch_bit(x, y, faction_id);
-            draw_tile(x, y, 2);
-            if (bonus_at(x, y) || faction_id != CurrentPlayerFaction) return;
-            pfncMoveMap(MapWins[0], x, y, 1);
-            if (!ui_shift_pressed()) {
-                for (int32_t i = 10; i; i--) {
-                    bit_set(x, y, BIT_BONUS_RES, 1);
-                    synch_bit(x, y, faction_id);
-                    draw_tile(x, y, 2);
-                    event_wait(20);
-                    bit_set(x, y, BIT_BONUS_RES, 0);
-                    synch_bit(x, y, faction_id);
-                    draw_tile(x, y, 2);
-                    event_wait(20);
-                }
-            }
-            event_wait(100);
-            POP2("PETERSOUT", "genwarning_sm.pcx", -1);
-            return;
-        }
-        bit_set(x, y, BIT_BONUS_RES, 1);
-        synch_bit(x, y, faction_id);
-        draw_tile(x, y, 2);
-        int32_t resource = bonus_at(x, y) - 1;
-        if (resource < 0 || faction_id != CurrentPlayerFaction) return;
-        pfncMoveMap(MapWins[0], x, y, 1);
-        if (!ui_shift_pressed()) {
-            for (int32_t i = 10; i; i--) {
-                bit_set(x, y, BIT_BONUS_RES, 0);
-                synch_bit(x, y, faction_id);
-                draw_tile(x, y, 2);
-                event_wait(20);
-                bit_set(x, y, BIT_BONUS_RES, 1);
-                synch_bit(x, y, faction_id);
-                draw_tile(x, y, 2);
-                event_wait(20);
-            }
-        }
-        parse_say(1, ResName[resource].name_plural, -1, -1);
-        bool ocean = (map_tile(x, y)->climate & 0xE0) < 0x60;
-        if (resource == 0) POP2("NEWRESOURCE", ocean ? "rdneuw_sm.pcx" : "rdneul_sm.pcx", -1);
-        else POP2("NEWRESOURCE", ocean ? "rdminw_sm.pcx" : "rdminl_sm.pcx", -1);
-        return;
-    }
-    case 9: {
-        if (SolarFlaresEvent || game_random(0, 5)) return;
-        bool hit = false;
-        for (int32_t i = 1; i < 8; i++) {
-            if (game().factions[i].satellites_energy || game().factions[i].satellites_ODP) {
-                game().factions[i].satellites_energy = 0;
-                game().factions[i].satellites_ODP = 0;
-                hit = true;
-            }
-        }
-        SolarFlaresEvent = 1;
-        if (hit) POP2("SOLARSTORM", "sun_sm.pcx", -1);
-        else POP2("SOLARFLARE", "heat_sm.pcx", -1);
-        return;
-    }
-    case 10: {
-        if (game_random(0, 5)) return;
-        bool hit = false;
-        for (int32_t i = 1; i < 8; i++) {
-            if (game().factions[i].satellites_mineral) {
-                game().factions[i].satellites_mineral = 0;
-                hit = true;
-            }
-        }
-        if (hit) POP2("ASTEROID", "astm_sm.pcx", -1);
-        return;
-    }
+    case 8: e.resource_change(); return;
+    case 9: e.solar_flare(); return;
+    case 10: e.asteroid_belt(); return;
     case 11:
         if (CurrentTurn < 50 || SunspotDuration > -40) return;
         if (SunspotDuration > -80 && CurrentTurn >= 80 && game_random(0, 3)) return;
@@ -521,304 +842,14 @@ void GAMEAPI random_events(int32_t is_extra) {
         parse_num(0, 20);
         POP2("SUNSPOTS", "solar_sm.pcx", -1);
         return;
-    case 12: {
-        int32_t credits = f.energy_credits;
-        if (credits <= 1000) {
-            if (f.ranking > 4 || credits > 500) return;
-            f.energy_credits = credits * 2;
-            if (faction_id != CurrentPlayerFaction) return;
-            parse_num(0, credits * 2);
-            Console_update_data(&MainConsole, 0);
-            POP2("ENERGYBOOM", "markbm_sm.pcx", -1);
-            return;
-        }
-        if (!is_human(faction_id) && credits <= 2000) return;
-        f.energy_credits = credits / 4;
-        if (faction_id == CurrentPlayerFaction) {
-            parse_num(0, credits / 4);
-            Console_update_data(&MainConsole, 0);
-            POP2("INFLATION", "markbm_sm.pcx", -1);
-        } else if (PbemActive) {
-            parse_num(0, credits / 4);
-            POP2("INFLATION", "markbm_sm.pcx", -1 - faction_id);
-        }
-        return;
-    }
-    case 13: {
-        // Hail: solar collectors in the base radius destroyed.
-        if (CurrentTurn < 75 || !event_rank_ok(faction_id)) return;
-        int32_t shown = 0;
-        for (int32_t k = 0; k < 21; k++) {
-            int32_t x = map_wrap_x(base.x + TableOffsetX[k]);
-            int32_t y = base.y + TableOffsetY[k];
-            if (!map_in_bounds(x, y)) continue;
-            MAP* sq = map_tile(x, y);
-            if (!(sq->items & BIT_SOLAR) || !tile_known(faction_id, sq)) continue;
-            if (!tile_claimable(faction_id, x, y) || (sq->climate & 0xE0) < 0x60) continue;
-            if (PbemActive) {
-                shown = 1;
-            } else if (event_base_seen(faction_id, base)) {
-                if (!shown) {
-                    Console_focus(&MainConsole, bx, by, CurrentPlayerFaction);
-                    event_wait(200);
-                }
-                shown |= (faction_id == CurrentPlayerFaction) + 1;
-            }
-            bit_set(x, y, BIT_SOLAR, 0);
-            synch_bit(x, y, faction_id);
-            for (int32_t i = 1; i < 8; i++) sq->visible_items[i - 1] &= ~BIT_SOLAR;
-            if (shown) {
-                draw_tile(x, y, 2);
-                if (!ui_shift_pressed() && !MultiplayerActive && !PbemActive) clock_wait(50);
-            }
-        }
-        if (shown) POP2("HAIL", "hail_sm.pcx", base_id);
-        return;
-    }
-    case 14: {
-        // Mount Planet erupts near the base.
-        if (PbemActive || CurrentTurn < 75 || f.base_count < 8 || (GameState & STATE_IS_SCENARIO)) return;
-        if (MountPlanetY < 0 || MountPlanetY >= game().map.y || MountPlanetX < 0 || MountPlanetX >= game().map.x)
-            return;
-        MAP* mount = map_tile(MountPlanetX, MountPlanetY);
-        if ((mount->landmarks & 0x80000002) != 2) return;
-        int32_t dx = std::abs(base.x - MountPlanetX);
-        if (!(game().map.flat & 1) && dx > game().map.half_x) dx = game().map.x - dx;
-        int32_t dy = std::abs(base.y - MountPlanetY);
-        if ((int32_t)((uint32_t)(dx + dy) & ~1u) > 10) return;
-        if (!tile_known(faction_id, mount) || f.ranking < 6) return;
-        bool shown = tile_known(CurrentPlayerFaction, mount);
-        int32_t shown_base = base_id;
-        for (int32_t k = 0; k < 81; k++) {
-            int32_t x = map_wrap_x(MountPlanetX + TableOffsetX[k]);
-            int32_t y = MountPlanetY + TableOffsetY[k];
-            if (!map_in_bounds(x, y)) continue;
-            bit_set(x, y, 0x81E8887C, 0);
-            synch_bit(x, y, CurrentPlayerFaction);
-            rocky_set(x, y, 2);
-            if ((map_tile(x, y)->landmarks & 0x80000002) == 2) {
-                for (int32_t v = game().veh_count - 1; v >= 0; v--)
-                    if (game().vehs[v].x == x && game().vehs[v].y == y) veh_kill(v);
-            } else {
-                for (int32_t v = game().veh_count - 1; v >= 0; v--) {
-                    VEH& veh = game().vehs[v];
-                    if (veh.x != x || veh.y != y) continue;
-                    const UNIT& u = Units[veh.unit_id];
-                    int32_t hp = u.plan == 12 ? 1
-                                              : (u.reactor_id < 1     ? 1
-                                                 : u.reactor_id > 100 ? 100
-                                                                      : u.reactor_id) *
-                                                    10;
-                    int32_t left = hp - veh.damage_taken;
-                    left = left < 0 ? 0 : (left > 9999 ? 9999 : left);
-                    veh.damage_taken = (uint8_t)(veh.damage_taken + left / 2);
-                }
-            }
-            int32_t hit = base_at(x, y);
-            if (hit < 0) continue;
-            if (game().bases[hit].faction_id == CurrentPlayerFaction &&
-                game().bases[shown_base].faction_id != CurrentPlayerFaction) {
-                parse_says(0, game().bases[hit].name, -1, -1);
-                shown_base = hit;
-                shown = true;
-            }
-            if (k < 9 && !is_objective(hit)) {
-                base_kill(hit);
-            } else if (k < 25) {
-                game().bases[hit].pop_size = (int8_t)((game().bases[hit].pop_size + 3) / 4);
-            } else if (k < 49) {
-                game().bases[hit].pop_size = (int8_t)((game().bases[hit].pop_size + 1) / 2);
-            } else {
-                game().bases[hit].pop_size = (int8_t)((game().bases[hit].pop_size + 1) * 3 / 4);
-            }
-        }
-        if (!shown || !Console_focus(&MainConsole, MountPlanetX, MountPlanetY, CurrentPlayerFaction)) draw_map(1);
-        DustCloudDuration = 10;
-        popp(ScriptFileName, "BIGFATVOLCANO", 0, "volc_sm.pcx", 0);
-        return;
-    }
-    case 15: {
-        // Asteroid impact on an inland base.
-        if (PbemActive || CurrentTurn < 75 || f.base_count < 8 || (GameState & STATE_IS_SCENARIO)) return;
-        if (near_landmark(bx, by)) return;
-        bool shown = tile_known(CurrentPlayerFaction, map_tile(bx, by));
-        int32_t ocean = 0;
-        for (int32_t k = 0; k < 49; k++) {
-            int32_t x = map_wrap_x(bx + TableOffsetX[k]);
-            int32_t y = by + TableOffsetY[k];
-            if (!map_in_bounds(x, y) || (map_tile(x, y)->climate & 0xE0) >= 0x60) continue;
-            if (k < 25) return;
-            if (++ocean > 5) return;
-        }
-        if (f.ranking < 7) return;
-        int32_t shown_base = base_id;
-        for (int32_t k = 0; k < 49; k++) {
-            int32_t x = map_wrap_x(bx + TableOffsetX[k]);
-            int32_t y = by + TableOffsetY[k];
-            if (!map_in_bounds(x, y)) continue;
-            bit_set(x, y, 0x81E8887C, 0);
-            synch_bit(x, y, CurrentPlayerFaction);
-            int32_t hit = base_at(x, y);
-            if (hit >= 0) {
-                if (game().bases[hit].faction_id == CurrentPlayerFaction &&
-                    game().bases[shown_base].faction_id != CurrentPlayerFaction) {
-                    shown_base = hit;
-                    parse_says(0, game().bases[hit].name, -1, -1);
-                    shown = true;
-                }
-                base_kill(hit);
-            }
-            for (int32_t v = game().veh_count - 1; v >= 0; v--) {
-                if (game().vehs[v].x != x || game().vehs[v].y != y) continue;
-                if (game().vehs[v].faction_id == (uint32_t)CurrentPlayerFaction) shown = true;
-                veh_kill(v);
-            }
-        }
-        world_crater(bx, by);
-        world_climate();
-        if (!shown || !Console_focus(&MainConsole, bx, by, CurrentPlayerFaction)) draw_map(1);
-        DustCloudDuration = 10;
-        popp(ScriptFileName, "EATTHIS", 0, "astp_sm.pcx", 0);
-        return;
-    }
-    case 16: {
-        // Blight: forests and farms in the base radius lost (a Biology Lab protects: golden age).
-        if (!has_tech(Facility[FAC_BIOLOGY_LAB].preq_tech, faction_id)) return;
-        bool shown = false;
-        bool lab = base_has_facility(base_id, FAC_BIOLOGY_LAB);
-        if (!lab && !event_rank_ok(faction_id)) return;
-        for (int32_t k = 0; k < 21; k++) {
-            int32_t x = map_wrap_x(bx + TableOffsetX[k]);
-            int32_t y = by + TableOffsetY[k];
-            if (!map_in_bounds(x, y)) continue;
-            MAP* sq = map_tile(x, y);
-            if ((sq->climate & 0xE0) < 0x60 || !(sq->items & (BIT_FARM | BIT_FOREST))) continue;
-            if (!tile_known(faction_id, sq) || !tile_claimable(faction_id, x, y)) continue;
-            if (!lab) {
-                if (!shown) {
-                    Console_focus(&MainConsole, bx, by, CurrentPlayerFaction);
-                    event_wait(200);
-                }
-                bit_set(x, y, 0x288000, 0);
-                synch_bit(x, y, faction_id);
-                // BUG(original): clears the viewer's memory seven times instead of every
-                // faction's (with viewer 0 the landmark bits).
-                COMPAT_ORIGINAL(landmark_memory_viewer);
-                for (int32_t i = 7; i; i--) {
-                    uint32_t& seen = tile_seen_items(sq, CurrentPlayerFaction);
-                    if (seen & 0x288000) seen &= 0xFFD77FFF;
-                }
-                draw_tile(x, y, 2);
-                event_wait(50);
-            }
-            shown = true;
-        }
-        if (!shown) return;
-        if (lab) {
-            base.event_flags |= 0x200;
-            base.random_event_turns = 10;
-        }
-        if (faction_id == CurrentPlayerFaction) {
-            if (!Console_focus(&MainConsole, base.x, base.y, faction_id)) draw_radius(base.x, base.y, 2, 2);
-        } else if (!PbemActive) {
-            return;
-        }
-        POP2(lab ? "BLIGHT1" : "BLIGHT", "biohazd_sm.pcx", base_id);
-        return;
-    }
-    case 17: {
-        // Mining accident: mines in the base radius destroyed (an Energy Bank or project 36
-        // turns it into a +50 energy surge).
-        if (!has_tech(Facility[FAC_ENERGY_BANK].preq_tech, faction_id)) return;
-        bool shown = false;
-        bool protect = base_has_facility(base_id, FAC_ENERGY_BANK) || has_sp(36, faction_id);
-        if (!protect && !event_rank_ok(faction_id)) return;
-        for (int32_t k = 0; k < 21; k++) {
-            int32_t x = map_wrap_x(bx + TableOffsetX[k]);
-            int32_t y = by + TableOffsetY[k];
-            if (!map_in_bounds(x, y)) continue;
-            MAP* sq = map_tile(x, y);
-            if ((sq->climate & 0xE0) < 0x60 || !(sq->items & BIT_MINE)) continue;
-            if (!tile_known(faction_id, sq) || !tile_claimable(faction_id, x, y)) continue;
-            if (!protect) {
-                if (!shown) {
-                    Console_focus(&MainConsole, bx, by, CurrentPlayerFaction);
-                    event_wait(200);
-                }
-                bit_set(x, y, BIT_MINE, 0);
-                synch_bit(x, y, faction_id);
-                for (int32_t i = 1; i < 8; i++)
-                    if (sq->visible_items[i - 1] & BIT_MINE) sq->visible_items[i - 1] &= ~BIT_MINE;
-                draw_tile(x, y, 2);
-                event_wait(50);
-            }
-            shown = true;
-        }
-        if (!shown) return;
-        if (protect) f.energy_credits += 50;
-        if (faction_id == CurrentPlayerFaction) {
-            if (!Console_focus(&MainConsole, base.x, base.y, faction_id)) draw_radius(base.x, base.y, 2, 2);
-        } else if (!PbemActive) {
-            return;
-        }
-        POP2(protect ? "SURGE1" : "SURGE", "markbm_sm.pcx", base_id);
-        return;
-    }
-    case 18: {
-        // Datalinks: research lost (bonus with a Network Node).
-        if (!has_tech(Facility[FAC_NETWORK_NODE].preq_tech, faction_id)) return;
-        if (f.tech_accumulated < tech_rate(faction_id) / 4) return;
-        if (!base_has_facility(base_id, FAC_NETWORK_NODE)) {
-            if (!event_rank_ok(faction_id)) return;
-            f.tech_accumulated = 0;
-            f.net_random_event = 0;
-            if (faction_id == CurrentPlayerFaction) {
-                Console_focus(&MainConsole, base.x, base.y, faction_id);
-                POP2("NETCRASH", "netcr_sm.pcx", base_id);
-            } else if (PbemActive) {
-                POP2("NETCRASH", "netcr_sm.pcx", base_id);
-            }
-            return;
-        }
-        f.tech_accumulated = tech_rate(faction_id);
-        if (faction_id == CurrentPlayerFaction) {
-            Console_focus(&MainConsole, base.x, base.y, faction_id);
-            POP2("NETBONUS", "markbm_sm.pcx", base_id);
-        } else if (PbemActive) {
-            POP2("NETBONUS", "markbm_sm.pcx", base_id);
-        }
-        return;
-    }
-    case 19: {
-        // Population boom (with a Children's Creche: up to two citizens at once).
-        if (!has_tech(Facility[FAC_CHILDREN_CRECHE].preq_tech, faction_id)) return;
-        const char* pcx = (game().mfactions[faction_id].rule_flags & RFLAG_ALIEN) ? "al_pop_sm.pcx" : "pop_sm.pcx";
-        if (!base_has_facility(base_id, FAC_CHILDREN_CRECHE)) {
-            if (!event_rank_ok(faction_id) || base.assimilation_turns_left) return;
-            base.assimilation_turns_left = 5;
-            if (faction_id == CurrentPlayerFaction) {
-                Console_focus(&MainConsole, base.x, base.y, faction_id);
-            } else if (!PbemActive) {
-                return;
-            }
-            POP2("CRECHE", pcx, base_id);
-            return;
-        }
-        if (base.nutrient_surplus < 1) return;
-        for (int32_t n = 1; n <= 2; n++) {
-            base.pop_size++;
-            set_base(base_id);
-            base_compute(1);
-            if (base.nutrient_surplus <= 0) break;
-        }
-        if (faction_id == CurrentPlayerFaction) {
-            if (!Console_focus(&MainConsole, base.x, base.y, faction_id)) draw_tile(base.x, base.y, 2);
-        } else if (!PbemActive) {
-            return;
-        }
-        POP2("CRECHE1", pcx, base_id);
-        return;
-    }
+    case 12: e.energy_market(); return;
+    case 13: e.hail(); return;
+    case 14: e.volcano(); return;
+    case 15: e.meteor(); return;
+    case 16: e.blight(); return;
+    case 17: e.mining_accident(); return;
+    case 18: e.datalinks(); return;
+    case 19: e.population_boom(); return;
     case 20:
         if (PbemActive || CurrentTurn < 75 || !event_rank_ok(faction_id)) return;
         sea_wipe(base_id, 0x8000, "KELPWIPE");

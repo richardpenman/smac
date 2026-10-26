@@ -226,7 +226,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 10 | Split `base_production` / yields + unit tests | M | done (see note 10) |
 | 11 | Split combat (`battle_resolve`, odds) + unit tests | M | done (see note 11) |
 | 12 | Split `base_build` | L | done (see note 12) |
-| 13 | Split `goody_box`, `probe`, `random_events` (gotos out) | M | |
+| 13 | Split `goody_box`, `probe`, `random_events` (gotos out) | M | done (see note 13) |
 | 14 | Split `order_veh` (176 gotos) | L | |
 | 15 | Methods on layout structs (`Base::`, `Faction::`, `Veh::`) with `ADDR` forwarders | L | |
 | 16 | Scratch globals → contexts/locals | L | |
@@ -404,3 +404,39 @@ Notes on the increments:
     from the code), tested in tests/unit/test_base_rules.cpp. Coverage before the split: 91% of
     the function's lines run in the 29 scenarios; the rest are governor (human) branches and rare
     plan/facility cases, moved verbatim. fcompare: `none +base_build`.
+
+13. The three functions keep their `ADDR`; their 66 gotos are gone (engine: 334 → 257). Same
+    pattern as note 12: a state object whose members are the original's locals and whose member
+    functions hold the blocks verbatim, and a small driver loop where the original had labels.
+    * `goody_box` (goody.cpp): `GoodyBox` with one function per outcome (`energy`, `river`,
+      `map_view`, `earthquake`, `teleport`, `production`, `artifact`, `fungus`, `place_monolith`,
+      `unity_vehicle`, `tech`, `terraform`, `native_life`, `clone`) plus `first_kind`, `dispatch`,
+      `resource`, `reroll`. Each returns the next `GoodyStep` (`dispatch`, `reroll`, `resource`,
+      `vanish`, `done`): `goto reroll` and a `break` out of the outcome switch became `return
+      GoodyStep::reroll`, `kind = n; goto dispatch` became `kind = n; return GoodyStep::dispatch`,
+      `goto artifact` a call of `artifact()`.
+    * `probe` (probe.cpp): `Probe` with `out_of_reach`, `hunter_seeker`, `count_plague_techs`,
+      `choose_action`, `dispatch` (`infiltrate`, then `drain_energy`, `sabotage`, `assassinate`,
+      `free_leader`, `subvert_unit`, `mind_control_base`), `ai_choose`, `resolve` (`bust`),
+      `success`, `survive` (`return_home`), `diplomacy`; the driver steps through `Step` values
+      named after the original's labels. The labels inside the return of the team (`home`,
+      `caught`, `lost`) became a `Fate` computed in the original's order (each random draw and
+      `probe_clock_odd` read happens on the same paths). The PROBE rating's effect on mind
+      control costs went to `engine/probe_rules.h` (`adjust_unit_subvert_cost`,
+      `adjust_base_mind_control_cost`), tested in tests/unit/test_probe_rules.cpp (values recorded
+      from cov_probes, probe131, late140, cov_late300, the rest from the code).
+    * `random_events` (turn.cpp) had no gotos left; it now runs `expire_events`, picks the base and
+      the event as before, and calls one `RandomEvent` member per long event (`plague`,
+      `resource_change`, `solar_flare`, `asteroid_belt`, `energy_market`, `hail`, `volcano`,
+      `meteor`, `blight`, `mining_accident`, `datalinks`, `population_boom`); the one-line events
+      stay in the switch.
+    Coverage before the split (29 scenarios): `goody_box` 81% of its lines, `probe` 62%,
+    `random_events` 64%; the rest are human-player menus and messages, multiplayer paths and rare
+    events (volcano, meteor), moved verbatim. fcompare: `random_events` passes on tiny20, small12
+    and std8. `probe` passes on late100 with `FCOMPARE_OPTS="limit=2000,10"` (50 calls); with the
+    default limits the original's own `probe` call opens a modal window for the viewer (tiny20
+    turn 1, late100 turn 101) and the run hangs until its timeout, as it already did in increment 9's
+    runs, so the gate's fcompare step was stopped and replaced by these two runs. `goody_box` is
+    left out as in increment 9 (fcompare_table.h: called with a native vehicle it can give a
+    technology to the viewer, whose window blocks the run); it is proven by the hybrid games (all
+    patches) and the native scenarios, cov_goody among them.
