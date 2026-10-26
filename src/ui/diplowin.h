@@ -25,6 +25,8 @@ bool diplowin_hq_shown();
 int32_t diplowin_faction();
 // The diplomacy menu's initial selection (COUNCILVOTEGOV: the human's own entry; popup_menus.cpp).
 void ui_diplo_menu_set_active(int32_t value);
+// The menu's selection callback (Popup +0x3280: battle_routine).
+void ui_diplo_menu_set_callback(void (*fn)(int32_t));
 // Test aid (DIPLOSTATE): "diplostate fV credits C techs N bases B" and, for each other living
 // faction, "diplo I status S agenda A friction F patience P loan BAL/PAY credits C bases B" on stderr.
 void diplowin_log_state();

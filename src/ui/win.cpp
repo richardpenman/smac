@@ -3,6 +3,7 @@
 #include "ui/tutwin.h"
 #include "ui/diplowin.h"
 #include "ui/win.h"
+#include "ui/planwin.h"
 #include "ui/pulldown.h"
 #include "ui/texture.h"
 #include "ui/sprites.h"
@@ -222,6 +223,10 @@ bool run_command(const std::string& cmd) {
     }
     if (cmd.rfind("infotick", 0) == 0) {  // test aid: N steps of the info pane's timer (infowin.h)
         for (int32_t i = std::atoi(arg.c_str()); i > 0; i--) infowin_tick();
+        return true;
+    }
+    if (cmd == "planstate") {  // test aid: the go-to list's map preview (planwin.h)
+        planwin_log_state();
         return true;
     }
     if (cmd.rfind("paltick", 0) == 0) {  // test aid: N steps of the palette cycles (gfx.h)
@@ -648,6 +653,7 @@ int32_t ui_wait_key() {
         if (g_script_given && g_ui_exit_when_script_done) return 0;
         if (ControlTurnA) return 0;
         if (g_input.empty()) pump_platform(50);
+        planwin_tick(platform::ticks_ms());  // the modal popup's timers: PlanWin_blink, line_timer
         if (g_input.empty()) continue;
         platform::Event ev = g_input.front();
         g_input.pop_front();
@@ -706,6 +712,7 @@ bool ui_wait_input(UiInput* in) {
         if (g_script_given && g_ui_exit_when_script_done) return false;
         if (ControlTurnA) return false;
         if (g_input.empty()) pump_platform(50);
+        planwin_tick(platform::ticks_ms());  // the modal popup's timers: PlanWin_blink, line_timer
         if (g_input.empty()) continue;
         platform::Event ev = g_input.front();
         g_input.pop_front();

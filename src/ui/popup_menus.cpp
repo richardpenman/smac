@@ -250,6 +250,9 @@ int32_t ui_diplo_menu_exec(int32_t faction_id_with) {
 void ui_diplo_menu_set_active(int32_t value) {
     if (g_diplo) BasePop_set_active(g_diplo, value);
 }
+void ui_diplo_menu_set_callback(void (*fn)(int32_t)) {
+    if (g_diplo) BasePop_set_select_callback(g_diplo, fn);
+}
 void ui_diplo_menu_close() {
     popup_delete(g_diplo);
     g_diplo = nullptr;

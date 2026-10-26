@@ -18,7 +18,7 @@
 // (DATALINKS: the faction's datalink entry, PROFILE: report_intel, HQINFO: DiploPop_draw_hq's pane
 // in place of the world map until a globe button is clicked), clickable while the dialog's popups
 // are open (DiploPop_set_modal: the interface belongs to the modal set). Not reconstructed:
-// the PlanWin map previews of the base and battle plan menus (FUN_0048b3f0.., battle_routine),
+// the PlanWin map previews of the base trade menus (proposal_menu, FUN_0054DC90),
 // the multiplayer paths (channels, diplo lock messages, PBEM diplo).
 #include "ui/diplowin.h"
 #include "ui/flic.h"
@@ -55,6 +55,7 @@
 #include "ui/help.h"
 #include "ui/colortables.h"
 #include "ui/popup.h"
+#include "ui/planwin.h"
 #include "ui/sprites.h"
 #include "ui/font_text.h"
 #include "ui/win.h"
@@ -932,14 +933,25 @@ void GAMEAPI make_a_proposal(int32_t f, int32_t fw, int32_t direct) {
 // partners), each side's suggested target (suggest_plan), then a common target (BATTLEPLAN menu)
 // that faction_id_with accepts (base_id_attack_target; its current target dropped when in
 // another region) or not (BATTLENO).
+// battle_routine (0x54B140, the BATTLEPLAN list's selection callback): PlanWin shows the routes
+// from each side's attacking base to the target.
+void battle_routine(int32_t target) {
+    int32_t a = attack_from(target, DiploBattlePlayer);
+    int32_t b = attack_from(target, DiploBattleRival);
+    planwin_clear_lines();
+    planwin_add_base_line(a, target, FactionColorFill[DiploBattlePlayer]);
+    planwin_add_base_line(b, target, FactionColorFill[DiploBattleRival]);
+    planwin_draw();
+}
+
 void GAMEAPI battle_plans(int32_t f, int32_t fw) {
     DiploSecondFaction = fw;
     DiploBattlePlayer = f;
     DiploBattleRival = fw;
     int32_t tf = suggest_plan(f, fw);
     int32_t tw = suggest_plan(fw, f);
-    attack_from(tf, f);
-    attack_from(tw, fw);
+    int32_t af = attack_from(tf, f);
+    int32_t aw = attack_from(tw, fw);
     if (!(ds(f, fw) & 1)) {
         if ((ds(fw, f) & 0x8020) || DiploCapturedBases || DiploFriction >= 0x12 || DiploHostility) {
             pop("NEVERBATTLEPLANS", fw);
@@ -952,6 +964,18 @@ void GAMEAPI battle_plans(int32_t f, int32_t fw) {
         pop("NOBATTLEPLANS", fw);
         return;
     }
+    // PlanWin (FUN_0048BC60) between the two targets and their attacking bases: each side's route
+    // in its colour; it stays shown until battle_plans returns (FUN_0048BC50).
+    struct PlanGuard {
+        ~PlanGuard() { planwin_close(); }
+    } plan_guard;
+    planwin_open();
+    planwin_center_between(Bases[tf].x, Bases[tf].y, Bases[tw].x, Bases[tw].y, Bases[af < 0 ? tf : af].x,
+                           Bases[af < 0 ? tf : af].y, Bases[aw < 0 ? tw : aw].x, Bases[aw < 0 ? tw : aw].y);
+    planwin_redraw_back();
+    planwin_add_base_line(af, tf, FactionColorFill[f]);
+    planwin_add_base_line(aw, tw, FactionColorFill[fw]);
+    planwin_draw();
     Faction& W = Factions[fw];
     W.base_id_attack_target = tw;
     parse_says(0, Bases[tw].name, -1, -1);
@@ -975,12 +999,10 @@ void GAMEAPI battle_plans(int32_t f, int32_t fw) {
         uint8_t vis = Bases[b].visibility;
         if (!(vis & (1 << f)) && !(vis & (1 << fw))) continue;
         ui_diplo_menu_item(Bases[b].name, b);
-        if (!n) {
-            attack_from(b, DiploBattlePlayer);
-            attack_from(b, DiploBattleRival);
-        }
+        if (!n) battle_routine(b);  // the first target's routes
         n++;
     }
+    ui_diplo_menu_set_callback(battle_routine);  // Popup +0x3280: the routes of the selection
     if (!n) {
         ui_diplo_menu_close();
         return;

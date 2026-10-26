@@ -111,6 +111,11 @@ void popup_draw_check(Buffer* b, int32_t x, int32_t y, int32_t state);
 void BasePop_set_mode(BasePop* self, int32_t mode);
 // The initial selection (+0xA44) set after Popup_start (Console_go_to): the item with this id.
 void BasePop_set_active(BasePop* self, int32_t id);
+// The list's selection callback (Popup +0x3280, e.g. Console_goto_routine): called with the item's
+// id when the selection changes while the popup is open.
+void BasePop_set_select_callback(BasePop* self, void (*fn)(int32_t));
+// Dialog_get_selected_id before the popup is shown: the active item's id, else the first item's.
+int32_t BasePop_selected_id(BasePop* self);
 // Popup_start (0x406380, win_popup.cpp): BasePop_start with the expansion's alien scripts tried
 // first.
 int32_t Popup_start(BasePop* pop, const char* file, const char* label, int32_t active, const char* edit,

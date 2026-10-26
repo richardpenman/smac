@@ -37,7 +37,8 @@
 // points, blind research priorities), PROTOSTATE (the viewer's prototypes), MENUSTATE (the open
 // menu column of the opening screens: caption, items, selection), INFOSTATE (the info pane's
 // displays and texts), INFOTICK:N (N steps of the info pane's 50 ms timer), PALTICK:N (N steps of
-// every palette cycle's timer, then the cycles' colours on stderr), and the commands SHOT[:FILE]
+// every palette cycle's timer, then the cycles' colours on stderr), PLANSTATE (the go-to list's
+// map preview: its zoom, centre and route lines), and the commands SHOT[:FILE]
 // (screenshot), SAVE:FILE (save the game
 // and its generators in FILE.rng, relative to --outdir), UNITS (list the human's units on
 // stderr), QUIT. --exit-after-keys (default with --hidden) quits when they run out.
@@ -519,6 +520,10 @@ bool parse_key(std::string tok, ScriptedKey* out) {
     }
     if (tok.rfind("PALTICK:", 0) == 0) {  // PALTICK:N, N steps of every palette cycle, then their colours (test aid)
         out->command = "paltick " + tok.substr(8);
+        return true;
+    }
+    if (tok == "PLANSTATE") {  // the go-to list's map preview (planwin.h, test aid)
+        out->command = "planstate";
         return true;
     }
     if (tok == "MENUSTATE") {  // the open menu column of the opening screens (topmenu.h, test aid)

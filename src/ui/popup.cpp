@@ -442,6 +442,9 @@ public:
     Buffer canvas;                     // the GraphicWin's Buffer (+0x444)
     bool shown = false;
     bool scroll_shown = false;         // scroll_show ran (the rail is in the window)
+    void (*select_cb)(int32_t) = nullptr;  // +0x3280: called with the item's id when the selection changes
+    int32_t select_seen = -1;
+    bool select_fired = false;
     struct Button {
         UiRect r;
         int32_t id;
@@ -559,6 +562,7 @@ int32_t BasePop_start(BasePop* self, const char* file, const char* label, int32_
                       uint32_t flags, uint8_t*) {
     bool text_mode = true;
     if (!(flags & 0x80)) basepop_init(self, flags);
+    self->select_cb = nullptr;
     if (flags & 1) self->item_type = 1;
     else if (flags & 2) self->item_type = 2;
     else if (flags & 4) self->item_type = 4;
@@ -756,6 +760,14 @@ void BasePop_edit(BasePop* self, const char* label, const char* text, int32_t) {
 }
 void BasePop_set_mode(BasePop* self, int32_t mode) { self->mode = mode; }
 void BasePop_set_active(BasePop* self, int32_t id) { self->active = id; }
+void BasePop_set_select_callback(BasePop* self, void (*fn)(int32_t)) { self->select_cb = fn; }
+int32_t BasePop_selected_id(BasePop* self) {
+    if (self->items.empty()) return -1;
+    if (self->active != -1)
+        for (const BasePop::Item& it : self->items)
+            if (it.id == self->active) return it.id;
+    return self->items[0].id;
+}
 const char* BasePop_caption(BasePop* self) { return self->caption; }
 
 std::string BasePop_text(BasePop* self) {
@@ -1335,6 +1347,8 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
     }
     // Initial selection (BasePop_calculate_dimensions).
     p->selected = 0;
+    p->select_seen = -1;
+    p->select_fired = false;
     if (p->active != -1 && p->item_type != 4 && p->item_type != 1) {
         for (size_t i = 0; i < p->items.size(); i++)
             if (p->items[i].id == p->active) p->selected = (int32_t)i;
@@ -1367,6 +1381,12 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
     bool done = false;
     int32_t n = (int32_t)p->items.size();
     while (!done) {
+        int32_t sel0 = p->selected;
+        if (sel0 != p->select_seen && p->select_cb) {  // the Dialog's selection callback
+            p->select_seen = sel0;
+            if (sel0 >= 0 && sel0 < (int32_t)p->items.size() && p->select_fired) p->select_cb(p->items[sel0].id);
+        }
+        p->select_fired = true;
         UiInput in;
         if (!ui_wait_input(&in)) {
             // No more input (scripted run ended / window closed): the OK button.

@@ -45,8 +45,19 @@ nocrash keys
 # 2. Go-to list (g: the base list; Enter: the preselected base, the unit's home) on a late save
 #    (Morgan's... faction 1 of turn_100: colony pod 91 selected first).
 if [ -f "$ROOT/work/saves_late/turn_100.sav" ]; then
-    run goto --save work/saves_late/turn_100.sav --human 1 --keys "g,SHOT:goto_list.bmp,ENTER,UNITS"
+    run goto --save work/saves_late/turn_100.sav --human 1 --keys "g,PLANSTATE,SHOT:goto_list.bmp,ENTER,UNITS,PLANSTATE"
     check goto "go-to list shown" "popup GOTO shown"
+    # PlanWin (planwin.cpp, Console_goto_routine): the world map pane shows the route from the pod
+    # to the selected base, zoomed in to -10 around both ends; hidden when the list closes.
+    check goto "PlanWin's route" "planwin shown 1 zoom -10 centre 6,42 lines 1 \\(6,42\\)-\\(3,43\\) c241"
+    check goto "PlanWin closed" "planwin shown 0 "
+    check goto "PlanWin set up" "planwin open 239x119"
+    # Find a base (ctrl+B, turn_147, faction 3): the selected base on PlanWin; Down moves the
+    # selection and the list's callback redraws it at the next base.
+    run findbase --save work/saves_late/turn_147.sav --human 3 --keys "DOWN,ENTER,C-b,PLANSTATE,DOWN,PLANSTATE,SHOT:find.bmp,ESC"
+    check findbase "the first base" "planwin shown 1 zoom -14 centre 24,24 lines 1 \\(37,21\\)-\\(37,21\\) c255"
+    check findbase "the next one" "planwin shown 1 zoom -14 centre 24,24 lines 1 \\(34,18\\)-\\(34,18\\) c255"
+    nocrash findbase
     check goto "a base chosen" "popup GOTO answer: [0-9]+"
     check goto "go-to order 24 given" "unit 91 f1 Colony Pod \([0-9]+,[0-9]+\) order 24"
     nocrash goto

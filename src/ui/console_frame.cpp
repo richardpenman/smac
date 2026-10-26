@@ -31,6 +31,7 @@
 #include "ui/colortables.h"
 #include "ui/console.h"
 #include "ui/diplowin.h"
+#include "ui/planwin.h"
 #include "ui/infowin.h"
 #include "platform/ui_platform.h"
 #include "ui/popup.h"
@@ -191,7 +192,8 @@ void console_frame_draw(Buffer* s) {
     if (!battlewin_shown()) statuswin_compose(mi);  // the stack row's scroll arrows
     // (In the diplomacy mode DiploPop's panes replace the info pane: InfoWin is hidden.)
     if (!battlewin_shown() && diplowin_faction() < 0) infowin_compose(mi);  // the info pane or the message list
-    if (!diplowin_hq_shown()) worldwin_draw();  // WorldWin hidden under DiploPop's HQ pane
+    if (planwin_shown()) planwin_compose(mi);  // the go-to list's PlanWin in the world map pane
+    else if (!diplowin_hq_shown()) worldwin_draw();  // WorldWin hidden under DiploPop's HQ pane
     maininfc_set_date();
     // The globe buttons (0x3EE pressed by ButtonGroup_set(0x3EE, 1), 0x3EF): their sprite centred.
     for (int32_t i = 0; i < 2; i++) {

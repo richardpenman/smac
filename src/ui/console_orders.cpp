@@ -5,8 +5,8 @@
 //
 // Every function follows the asm of the original (address in its declaration, console.h); the
 // object is MainConsole (THISCALL `self`). The net layer's single-player paths are the
-// net_* helpers of console.cpp. Drawing done by these functions in the original (the go-to list's
-// path preview on PlanWin, destination lines of group moves) is noted where it is left out.
+// net_* helpers of console.cpp. The go-to list's path preview is PlanWin (planwin.cpp); drawing
+// left out (destination lines of group moves) is noted where it is.
 #include <cstdio>
 #include <cstring>
 
@@ -36,6 +36,8 @@
 #include "ui/mapwin.h"
 #include "ui/vehdraw.h"
 #include "ui/popup.h"
+#include "ui/planwin.h"
+#include "ui/sprites.h"
 #include "ui/statuswin.h"
 #include "ui/win.h"
 
@@ -43,6 +45,8 @@ namespace {
 
 GLOBAL(int32_t, GotoToBase, 0x688348);    // the go-to list routes a unit (1) or finds a base (0)
 GLOBAL(int32_t, GotoLastBase, 0x68834C);  // base chosen last in a go-to list (-1: none)
+GLOBAL(int32_t, GotoFromX, 0x915680);     // the go-to list's route start (PlanWin)
+GLOBAL(int32_t, GotoFromY, 0x915650);
 
 uint8_t* main_view() { return MapWins[0]; }
 inline VEH& veh(int32_t id) { return Vehs[id]; }
@@ -981,9 +985,22 @@ void THISCALL Console_set_bombing_run(uint8_t*, int32_t veh_id, int32_t x, int32
 
 // ---- go to ------------------------------------------------------------------------------------------
 
-void GAMEAPI Console_goto_routine(int32_t) {
-    // The original draws the path from the unit to the highlighted base on PlanWin (the planning
-    // overlay) while the go-to list is open; not drawn here.
+// Console_goto_routine (0x4D6070, the go-to list's selection callback): PlanWin shows the route
+// from the unit (GotoFromX / Y) to the highlighted base, or for find-base the base itself.
+void GAMEAPI Console_goto_routine(int32_t base_id) {
+    planwin_clear_lines();
+    if (base_id < 0 || BaseCount <= base_id) {
+        planwin_redraw_back();
+    } else if (!GotoToBase) {
+        const BASE& b = Bases[base_id];
+        planwin_zoom_tile(b.x, b.y, 0);
+        planwin_add_line(b.x, b.y, b.x, b.y, FactionColorFill[CurrentPlayerFaction]);
+    } else {
+        const BASE& b = Bases[base_id];
+        planwin_zoom_route(GotoFromX, GotoFromY, b.x, b.y, 0);
+        planwin_add_line(GotoFromX, GotoFromY, b.x, b.y, FactionColorFill[CurrentPlayerFaction]);
+    }
+    planwin_draw();
 }
 
 void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t group) {
@@ -1118,7 +1135,6 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
     MAP* here = map_tile(x, y);
     int32_t region = here->region;                       // [ebp-0x50]
     int32_t is_sea = (here->climate & 0xE0) < 0x60;      // [ebp-0x60]
-    // PlanWin (the path preview) is set up here and shown (label 538); not drawn.
     std::vector<int32_t> order(BaseCount > 0 ? BaseCount : 0), key(BaseCount > 0 ? BaseCount : 0);
     for (;;) {
         StrBuffer[0] = 0;
@@ -1301,8 +1317,15 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
             return;
         }
         BasePop_set_active(pop.p, active);
-        Console_goto_routine(active);
+        // PlanWin (FUN_0048BC60) in the world map pane, from the route's start (DAT_00915680 /
+        // DAT_00915650); the list's selection callback (Popup +0x3280) redraws it.
+        GotoFromX = x;
+        GotoFromY = y;
+        planwin_open();
+        BasePop_set_select_callback(pop.p, Console_goto_routine);
+        Console_goto_routine(BasePop_selected_id(pop.p));  // Dialog_get_selected_id
         int32_t chosen = BasePop_exec_3(pop.p, 0, 0);
+        planwin_close();  // FUN_0048BC50
         if (chosen < 0) {
             finish();
             return;
