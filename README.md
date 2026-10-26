@@ -182,6 +182,14 @@ Screenshots of `smacx` (native, no original code):
 4. Build and run from the repository root:
 
 ```sh
+make run                                 # configure, build, start the game (main menu)
+```
+
+The `Makefile` wraps CMake (`make`, `make run`, `make test`, `make clean`; `BUILD=dir`,
+`CMAKE_ARGS=...`). It also works around macOS Command Line Tools betas whose compiler can't find
+its own C++ headers. The equivalent CMake commands:
+
+```sh
 cmake -S . -B build/native -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build/native -j8 --target smacx
 build/native/smacx                       # main menu; or: --new --human 1, --save FILE.SAV

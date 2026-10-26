@@ -22,6 +22,10 @@
 #include "ui/gfx.h"
 #include "ui/win.h"
 
+struct ScreenWin;
+// Removes s from the screens being composed (ScreenWin's destructor: windows can be locals).
+void sw_forget(ScreenWin* s);
+
 struct ScreenWin {
     const char* name = "";
     bool open = false;
@@ -40,7 +44,7 @@ struct ScreenWin {
     // on_status of the datalinks, reports, design workshop, social engineering, preferences).
     bool slide = false;
 
-    virtual ~ScreenWin() {}
+    virtual ~ScreenWin() { sw_forget(this); }
     virtual void redraw() = 0;
     virtual void on_button(int32_t /*id*/) {}
     // A key (virtual key with the modifier bits as ui_wait_input delivers them).

@@ -14,7 +14,8 @@
 #include "ui/popup.h"
 
 namespace {
-std::vector<ScreenWin*> g_stack;
+// Never destroyed: global windows (e.g. the desktop) call sw_forget from their destructors at exit.
+std::vector<ScreenWin*>& g_stack = *new std::vector<ScreenWin*>;
 
 void blit_keyed(Buffer* screen, Buffer* src, int32_t x0, int32_t y0) {
     if (!src->data) return;
@@ -155,6 +156,10 @@ static void redraw(ScreenWin* s) {
 void sw_show(ScreenWin* s) {
     if (std::find(g_stack.begin(), g_stack.end(), s) == g_stack.end()) g_stack.push_back(s);
     redraw(s);
+}
+
+void sw_forget(ScreenWin* s) {
+    g_stack.erase(std::remove(g_stack.begin(), g_stack.end(), s), g_stack.end());
 }
 
 void sw_hide(ScreenWin* s) {
