@@ -95,32 +95,44 @@ allow-list, so no game data or anything derived from `terranx.exe` can ship.
 
 ## Builds
 
+The simplest way to build and play is the `Makefile` in the repository root, a wrapper around CMake:
+
 ```sh
-cmake -S . -B build/native && cmake --build build/native -j2          # engine + smacx_headless
-cmake -S . -B build/hybrid -DSMACX_HYBRID=ON -DCMAKE_TOOLCHAIN_FILE=cmake/i686-mingw.cmake
-cmake --build build/hybrid -j2                                         # oracle.dll, hybrid.dll, oracle_launch.exe
+make            # configure (first time) and build smacx, smacx_headless and the tests
+make run        # build, then start the game: it finds the game files or asks for their folder
+make test       # build, then run the unit and smoke tests (ctest)
+make clean      # remove the build directory
 ```
+
+Options: `BUILD=dir` (default `build/native`), `JOBS=n`, `CMAKE_ARGS="..."` (extra configure options,
+e.g. `CMAKE_ARGS=-DSMACX_SANITIZE=ON`). On macOS it also works around Command Line Tools betas whose
+compiler can't find its own C++ headers. If `make` reports that smacx wasn't built, install SDL2 and
+SDL2\_ttf and run `make clean && make`.
+
+Dependencies:
+
+| Platform | Install |
+| --- | --- |
+| macOS | Xcode command line tools (`xcode-select --install`), then `brew install cmake sdl2 sdl2_ttf python` |
+| Debian/Ubuntu | `sudo apt install build-essential cmake python3 libsdl2-dev libsdl2-ttf-dev` |
+| Windows | MSYS2 CLANG64 (or UCRT64): `pacman -S make mingw-w64-clang-x86_64-{clang,cmake,ninja,python,SDL2,SDL2_ttf}` |
 
 The native build needs CMake 3.20+, Python 3 (it generates the original-function bindings) and a
-C++17 compiler with `<filesystem>`. Game data is only needed at run time: `smacx_headless` reads
-`game/` and `src/data/data_image.bin` (see "Getting started"). `smacx_smoke` (`ctest`) is a
-portability self-test that needs no game data; `smacx_unit` (`ctest`, doctest) holds the engine's
-unit tests. Cleanup work (docs/CLEANUP_PLAN.md) is gated by `src/tools/gate.sh`.
+C++17 compiler with `<filesystem>`. Game data is only needed at run time: `smacx` finds the game
+itself; `smacx_headless` reads `game/` and `src/data/data_image.bin` (see "Getting started").
+`smacx_smoke` (`ctest`) is a portability self-test that needs no game data; `smacx_unit` (`ctest`,
+doctest) holds the engine's unit tests. Cleanup work (docs/CLEANUP_PLAN.md) is gated by
+`src/tools/gate.sh`.
 
-**macOS** (Xcode command line tools, CMake from Homebrew or cmake.org; Apple Silicon or Intel):
-
-```sh
-cmake -S . -B build/native -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build build/native -j8 --target smacx_headless smacx_smoke smacx_unit && ctest --test-dir build/native
-```
-
-**Windows**: MSYS2 with the CLANG64 (or UCRT64) environment is the supported toolchain:
+The same with CMake directly, and the hybrid build used by the comparison harness (Linux):
 
 ```sh
-pacman -S mingw-w64-clang-x86_64-{clang,cmake,ninja,python}
-cmake -S . -B build/native -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_EXE_LINKER_FLAGS=-static
-cmake --build build/native --target smacx_headless smacx_smoke smacx_unit && ctest --test-dir build/native
+cmake -S . -B build/native -DCMAKE_BUILD_TYPE=RelWithDebInfo && cmake --build build/native -j8
+cmake -S . -B build/hybrid -DSMACX_HYBRID=ON -DCMAKE_TOOLCHAIN_FILE=cmake/i686-mingw.cmake
+cmake --build build/hybrid -j8                                         # oracle.dll, hybrid.dll, oracle_launch.exe
 ```
+
+On Windows with MSYS2, add `-G Ninja -DCMAKE_EXE_LINKER_FLAGS=-static` to the configure step.
 
 Cross-compiling from Linux with the local llvm-mingw: `-DCMAKE_TOOLCHAIN_FILE=cmake/x86_64-mingw.cmake`
 (64-bit) or `cmake/i686-mingw.cmake` without `SMACX_HYBRID` (32-bit native, runs under 32-bit Wine).
@@ -170,35 +182,27 @@ Screenshots of `smacx` (native, no original code):
 
 ## Playing on macOS
 
+The release download (above) needs no tools. To build it yourself:
+
 1. Tools: Xcode command line tools (`xcode-select --install`) and Homebrew, then
    `brew install cmake sdl2 sdl2_ttf python`.
-2. Game files: `game/` must hold the installed game (the same files as the Windows install, with
-   `game/terranx.exe` v2.0, md5 `cc659f53cb6fa0eaaddccd0a54176647`). Either copy `game/` from a
-   machine where it is installed, or take the game folder out of the GOG Mac app (a Wineskin
-   wrapper: right-click the app, Show Package Contents, then `Contents/Resources/drive_c/...`, the
-   folder that contains `terranx.exe`).
-3. Data image (only for `smacx_headless` and `--outdir` runs; `smacx` alone builds its own):
-   `python3 src/tools/gen_data_image.py game/terranx.exe src/data/data_image.bin`.
-4. Build and run from the repository root:
+2. Build and run from the repository root:
 
 ```sh
-make run                                 # configure, build, start the game (main menu)
+make run
 ```
 
-The `Makefile` wraps CMake (`make`, `make run`, `make test`, `make clean`; `BUILD=dir`,
-`CMAKE_ARGS=...`). It also works around macOS Command Line Tools betas whose compiler can't find
-its own C++ headers. The equivalent CMake commands:
+3. On first start smacx looks for the game: the GOG Mac app in `/Applications` or `~/Applications`
+   (it is a Wine wrapper; the game folder is inside the app bundle), CrossOver bottles and Steam. If
+   it finds none, it asks for the folder that contains `terranx.exe` (v2.0, md5
+   `cc659f53cb6fa0eaaddccd0a54176647`) and remembers it. It then builds its data image from that
+   `terranx.exe` and keeps settings and saves in `~/Library/Application Support/smacx`.
 
-```sh
-cmake -S . -B build/native -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build build/native -j8 --target smacx
-build/native/smacx                       # main menu; or: --new --human 1, --save FILE.SAV
-```
-
-CMake builds `smacx` only when it finds SDL2 and SDL2\_ttf (the configure step prints a message
-otherwise). Run without `--outdir`, smacx finds the game and keeps its settings and saves in the
-per-user directory as a released build does ("Download and play"); with `--outdir DIR` it uses
-`game/` and `src/data/data_image.bin` from the current directory and writes below `DIR`.
+`make` also works around Command Line Tools betas whose compiler can't find its own C++ headers
+(`'cstdint' file not found`). With CMake directly: `cmake -S . -B build/native && cmake --build
+build/native -j8`, then `build/native/smacx` (`--new --human 1` or `--save FILE.SAV` skip the menu).
+With `--outdir DIR`, smacx instead uses `game/` and `src/data/data_image.bin` from the current
+directory and writes below `DIR` (the test mode; `src/tools/gen_data_image.py` builds the image).
 
 ## Getting started
 
