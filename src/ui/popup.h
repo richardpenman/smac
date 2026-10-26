@@ -84,8 +84,19 @@ int32_t BasePop_check_state(BasePop* self);
 void BasePop_set_check_state(BasePop* self, int32_t bits);
 // Text of edit field i after exec (EditGroup_get_text).
 const char* BasePop_edit_text(BasePop* self, int32_t i);
-// Number of items.
+// Number of items; item i's text and id; the initial selection (+0xA44).
 int32_t BasePop_item_count(BasePop* self);
+const char* BasePop_item_text(BasePop* self, int32_t i);
+int32_t BasePop_item_id(BasePop* self, int32_t i);
+int32_t BasePop_active(BasePop* self);
+// An edit field of an edit group (flag 4) labelled `label`, its text `text` (EditGroup_edit).
+void BasePop_edit(BasePop* self, const char* label, const char* text, int32_t max_len);
+// A popup shown without running it (BasePop_exec_3 of a modeless popup: the PickWin's faction
+// text, thumb_routine) at its #x / #y position, until BasePop_hide (or popup_delete).
+void BasePop_show(BasePop* self);
+void BasePop_hide(BasePop* self);
+// A check box mark of interface.pcx (state 0 clear, 1 under the mouse, 2 checked) at (x, y).
+void popup_draw_check(Buffer* b, int32_t x, int32_t y, int32_t state);
 // Not original functions: the popup's mode (+0x30AC, #extra: 1 message line, 2 base message,
 // 0x3EA base message and dialog) and its text lines joined by spaces (Popup_on_exec, POP2).
 void BasePop_set_mode(BasePop* self, int32_t mode);

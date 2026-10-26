@@ -34,6 +34,8 @@ struct ScreenWin {
     BaseButton* pressed = nullptr;
     // What the last redraw wrote (test aid: SCREENSTATE): one entry per text drawn by sw_text.
     std::vector<std::string> texts;
+    // The palette layer of the window's canvas (win.h ui_layer_mark; 0: the game palette).
+    uint8_t layer = 0;
 
     virtual ~ScreenWin() {}
     virtual void redraw() = 0;
@@ -45,6 +47,8 @@ struct ScreenWin {
                           bool /*right*/, bool /*double_click*/) {}
     // Logged by SCREENSTATE after the texts (state the tests check).
     virtual void log_state() {}
+    // The mouse moved to (x, y) of the window's canvas (screen coordinates minus the position).
+    virtual void on_move(int32_t /*x*/, int32_t /*y*/) {}
 };
 
 // Creates the canvases: the window (w x h at x, y; filled with the transparent colour 9) and, with
@@ -57,6 +61,10 @@ void sw_clear_buttons(ScreenWin* s);
 // Runs the modal loop until the window closes (s->open false) or the input ends; redraws first.
 void sw_run(ScreenWin* s);
 void sw_close(ScreenWin* s);
+// Shows / hides the window without running it (a window that stays up under other modal windows,
+// as the desktop of the opening screens).
+void sw_show(ScreenWin* s);
+void sw_hide(ScreenWin* s);
 // Text helpers recording what they write (s->texts).
 int32_t sw_text(ScreenWin* s, Buffer* c, const std::string& text, int32_t x, int32_t y);
 int32_t sw_text_cent(ScreenWin* s, Buffer* c, const std::string& text, const UiRect& r);

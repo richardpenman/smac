@@ -27,6 +27,11 @@ void video_present(const uint8_t* pixels, int32_t pitch, int32_t width, int32_t 
 // Writes an 8-bit frame as a 24-bit BMP. Returns false on error.
 bool save_bmp(const char* path, const uint8_t* pixels, int32_t pitch, int32_t width, int32_t height,
               const Rgb* palette);
+// Per-pixel palettes (the original's windows each have their own DIB colour table under GDI: the
+// opening screens show their pictures through their own palettes): while set, a pixel whose layer
+// (top-down rows of `pitch` bytes, as the frame's) is n > 0 and n < count takes its colour from
+// palettes[n] instead of the frame's palette. layers null: off.
+void set_layer_palettes(const uint8_t* layers, int32_t pitch, const Rgb* const* palettes, int32_t count);
 
 // ---- input (the window procedure's messages) ----
 enum EventType : int32_t {

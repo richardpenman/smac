@@ -40,22 +40,16 @@ void GAMEAPI clear_council_notify(int32_t faction_id) {
     CouncilVoteState[faction_id] = 0;
 }
 void GAMEAPI diplo(int32_t, int32_t) {}
-void GAMEAPI show_credits() {}
 void GAMEAPI quayle(int32_t) {}
 // The end of the game for the harness (g_harness_game_end: final snapshot, exit), as the oracle
 // does at the original's show_replay.
 void GAMEAPI show_replay() {
     if (g_harness_game_end) g_harness_game_end();
 }
-// The script runner of the headless app takes the place of the main menu (see g_harness_top_menu);
-// without it the game quits.
-int32_t GAMEAPI top_menu(int32_t) { return 1; }
 int32_t THISCALL Net_check_for_lobby(uint8_t*, char*, uint8_t*, int32_t, int32_t) { return 0; }
 void THISCALL FX_init(uint8_t*) {}
 int32_t THISCALL Wave_is_playing(uint8_t*) { return 0; }
 void GAMEAPI desktop_close() {}
-void GAMEAPI close_opening() {}
-int32_t GAMEAPI multiplayer_init(int32_t) { return 1; }
 void THISCALL GraphicWin_fill(uint8_t*, int32_t) {}
 void THISCALL Win_show(uint8_t*, int32_t) {}
 bool ui_directplay_registered() { return false; }

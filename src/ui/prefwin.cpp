@@ -1,0 +1,301 @@
+// The preferences dialog (PrefWin, ui 0x48D840..0x492410; PrefWin_display from Console_set_preferences
+// ctrl+P, Console_set_adv_preferences ctrl+O, Console_set_base_preferences ctrl+W,
+// Console_set_auto_preferences ctrl+A, Console_set_audiovisual ctrl+I, Console_set_map_display
+// ctrl+M) and the Game menu's Resign (Console_retire_game 0x514B30) and the scenario editor's
+// custom rules (Console_editor_rules 0x4DC230).
+//
+// PrefWin: the six pages (BASICPREFS, ADVANCEDPREFS, BASEWARNINGS, AUTOMATIONPREFS,
+// AUDIOVISUALPREFS, MAPPREFS of the script: their items are the check boxes, with the original's
+// check box ids), the page buttons (labels 750..754, 1077), Gamma Correction (label 1078), Restore
+// Defaults (1079), OK and Cancel. PrefWin_display copies GamePreferences / GameMorePreferences /
+// GameWarnings; PrefWin_get_preferences sets the boxes from them and PrefWin_set_preferences
+// (on OK) builds the three words from the boxes alone (bits no box stands for are dropped, as the
+// original), then PrefWin_destroy: AlphaIniPrefs, prefs_use, prefs_save(0) (Alpha Centauri.Ini).
+// Keys: Enter OK, Esc Cancel, Up / Down the page.
+// Approximated: the layout (measured on the original's screen at 1024x768, not PrefWin_init's
+// rectangles), the audio page's volume buttons and sliders (here the music, sound effects and voice
+// switches are check boxes; the volumes are not written), the gamma correction dialog (not
+// reconstructed), the sliding animation.
+#include <cstdio>
+#include <string>
+#include <vector>
+
+#include "engine/globals.h"
+#include "engine/prefs.h"
+#include "engine/save.h"
+#include "engine/strings.h"
+#include "engine/text.h"
+#include "engine/rules.h"
+#include "engine/ui_bridge.h"
+#include "engine/log.h"
+#include "platform/ui_platform.h"
+#include "ui/basewin_internal.h"
+#include "ui/console.h"
+#include "ui/popup.h"
+#include "ui/screenwin.h"
+#include "ui/win.h"
+
+namespace {
+
+int32_t mem_i32(uint32_t addr) { return *reinterpret_cast<int32_t*>(mem::host(addr)); }
+
+// PrefWin_set_preferences / PrefWin_get_preferences: check box id -> word (P GamePreferences,
+// M GameMorePreferences, W GameWarnings), bit, inverted (checked when the bit is clear).
+struct Bit {
+    int32_t id;
+    char word;
+    uint32_t bit;
+    bool inverted;
+};
+const Bit kBits[] = {
+    {0x7, 'P', 0x20, 0}, {0x8, 'P', 0x4000, 0}, {0x9, 'M', 0x100000, 0}, {0xa, 'P', 0x1000, 0}, {0xb, 'P', 0x2, 0},
+    {0xc, 'P', 0x1, 0}, {0xd, 'P', 0x4, 1}, {0xe, 'P', 0x8000, 1}, {0xf, 'P', 0x20000000, 1}, {0x10, 'M', 0x40000, 0},
+    {0x11, 'M', 0x8000, 0}, {0x12, 'M', 0x10, 0}, {0x13, 'P', 0x8, 0}, {0x1c, 'M', 0x40, 0}, {0x14, 'M', 0x80, 0},
+    {0x15, 'P', 0x80000, 0}, {0x17, 'M', 0x4, 0}, {0x18, 'M', 0x200000, 0}, {0x19, 'M', 0x400, 0},
+    {0x1a, 'M', 0x100, 0}, {0x1d, 'P', 0x10000, 0}, {0x1e, 'P', 0x1000000, 0}, {0x1f, 'P', 0x20000, 0},
+    {0x20, 'P', 0x2000000, 0}, {0x2a, 'M', 0x400000, 1}, {0x21, 'M', 0x8, 0}, {0x22, 'M', 0x20, 0},
+    {0x23, 'P', 0x100000, 0}, {0x24, 'P', 0x200000, 0}, {0x25, 'P', 0x400000, 0}, {0x26, 'P', 0x800000, 0},
+    {0x27, 'P', 0x40000000, 0}, {0x28, 'P', 0x80000000, 0}, {0x29, 'M', 0x800, 0}, {0x3d, 'P', 0x800, 0},
+    {0x3e, 'P', 0x400, 0}, {0x3f, 'M', 0x4000, 0}, {0x40, 'M', 0x20000, 0}, {0x41, 'P', 0x10000000, 0},
+    {0x42, 'P', 0x40000, 1}, {0x47, 'M', 0x1000000, 1}, {0x43, 'P', 0x80, 0}, {0x44, 'P', 0x8000000, 0},
+    {0x45, 'M', 0x80000, 0}, {0x16, 'M', 0x200, 0}, {0x2b, 'W', 0x1, 0}, {0x2c, 'W', 0x2, 0}, {0x2d, 'W', 0x400, 0},
+    {0x2e, 'W', 0x4, 0}, {0x2f, 'W', 0x2000, 0}, {0x30, 'W', 0x8, 0}, {0x31, 'W', 0x10, 0}, {0x32, 'W', 0x20, 0},
+    {0x33, 'W', 0x40, 0}, {0x34, 'W', 0x80, 0}, {0x35, 'W', 0x100, 0}, {0x36, 'W', 0x200, 0}, {0x37, 'W', 0x800, 0},
+    {0x38, 'W', 0x1000, 0}, {0x39, 'W', 0x4000, 0}, {0x3a, 'W', 0x8000, 0}, {0x3b, 'W', 0x10000, 0},
+    {0x3c, 'W', 0x20000, 0}, {0x48, 'M', 0x1, 0}, {0x49, 'P', 0x100, 0}, {0x4a, 'P', 0x200, 0},
+    {0x4b, 'M', 0x2000, 0}, {0x4c, 'M', 0x1000, 0}, {0x4d, 'M', 0x10000, 0}, {0x4e, 'M', 0x800000, 0},
+    {0x4f, 'M', 0x2000000, 1}};
+
+// PrefWin_init: the pages' script sections and the ids of their items in order.
+struct Page {
+    const char* section;
+    int32_t label;
+    std::vector<int32_t> ids;
+};
+const Page kPages[6] = {
+    {"BASICPREFS", 750, {0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe}},
+    {"ADVANCEDPREFS", 751, {0xf, 0x10, 0x11, 0x12, 0x13, 0x1c, 0x14, 0x15, 0x17, 0x18, 0x19, 0x1a}},
+    {"BASEWARNINGS", 752,
+     {0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c}},
+    {"AUTOMATIONPREFS", 753, {0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x2a, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29}},
+    {"AUDIOVISUALPREFS", 754, {0x3d, 0x3e, 0x3f, 0x40, 0x41, 0x42, 0x47, 0x43, 0x44, 0x45, 0x16}},
+    {"MAPPREFS", 1077, {0x48, 0x49, 0x4e, 0x4a, 0x4b, 0x4c, 0x4d, 0x4f}},
+};
+
+struct PrefWin : ScreenWin {
+    int32_t page = 0;            // +0xA14
+    uint32_t words[3] = {};      // P, M, W
+    bool state[0x60] = {};       // the check boxes by id
+    bool apply = false;          // +0xA5C
+    std::vector<std::string> items[6];
+    std::vector<std::string> notes[6];  // text lines of a page (MAPPREFS)
+    Font font, small;
+    UiRect panel{};
+    int32_t rows_y = 0;
+
+    uint32_t& word(char w) { return words[w == 'P' ? 0 : (w == 'M' ? 1 : 2)]; }
+    void get_preferences() {
+        for (const Bit& b : kBits) state[b.id] = ((word(b.word) & b.bit) != 0) != b.inverted;
+    }
+    void set_preferences() {
+        words[0] = words[1] = words[2] = 0;
+        for (const Bit& b : kBits)
+            if (state[b.id] != b.inverted) word(b.word) |= b.bit;
+    }
+    void load() {
+        for (int32_t p = 0; p < 6; p++) {
+            if (text_open(ScriptFileName, kPages[p].section)) continue;
+            bool list = false;
+            for (char* l = text_get(); l; l = text_get()) {
+                if (*l == '#') {
+                    if (!list && (l[1] == 'i' || l[1] == 'I')) list = true;  // #itemlist
+                    else if (list) break;
+                    continue;
+                }
+                if (!*l) {
+                    if (list && !items[p].empty()) break;
+                    continue;
+                }
+                if (list) items[p].push_back(std::string(" ") + l);
+                else notes[p].push_back(l);
+            }
+            text_close();
+        }
+    }
+    void layout() {
+        Font_ctor(&font);
+        Font_init(&font, "Arial", 0xE, 1);
+        int32_t w = 0x2B9, h = 0x182;
+        int32_t x = (ScreenWidth - w) / 2 + 26 + 4, y = ScreenHeight == 768 ? 150 : (ScreenHeight - h) / 2;
+        sw_init(this, x, y, w, h, false);
+        panel = UiRect{0xE6, 5, w - 10, h - 5};
+        int32_t bx = 10, bw = 0xD6, bh = 0x13;
+        for (int32_t p = 0; p < 6; p++)
+            sw_button(this, label_get(kPages[p].label), p, bx, 10 + p * 22, bw, bh, 0, &font);
+        sw_button(this, label_get(1078), 6, bx, 10 + 7 * 22, bw, bh, 0, &font);
+        sw_button(this, label_get(1079), 0x5A, bx, h - 0x48, bw, bh, 0, &font);
+        sw_button(this, sw_upper(label_get(101)).c_str(), 0x5C, bx, h - 0x31, bw, bh, 0, &font);
+        sw_button(this, label_get(102), 0x5B, bx, h - 0x1A, bw, bh, 0, &font);
+    }
+    void redraw() override {
+        UiRect all{0, 0, canvas.width, canvas.height};
+        Buffer_set_clip(&canvas, &all);
+        Buffer_fill_3(&canvas, &all, 9);
+        Buffer_box_sprite(&canvas, &all, box_def(9));
+        UiRect in{5, 5, 0xE4, canvas.height - 5};
+        Buffer_box_sprite(&canvas, &in, box_def(0));
+        Buffer_box_sprite(&canvas, &panel, box_def(0));
+        for (BaseButton* b : buttons) b->set_state = b->id == page ? 1 : 0;
+        spot_init(&spots[0], 0x20);
+        int32_t y = panel.top + 10;
+        sw_font(&canvas, &font, mem_i32(0x8C6C74), mem_i32(0x8C6C78));
+        for (const std::string& n : notes[page]) {
+            sw_text(this, &canvas, n, panel.left + 6, y);
+            y += 24;
+        }
+        const std::vector<int32_t>& ids = kPages[page].ids;
+        for (size_t i = 0; i < items[page].size() && i < ids.size(); i++) {
+            int32_t id = ids[i];
+            popup_draw_check(&canvas, panel.left + 4, y - 2, state[id] ? 2 : 0);
+            sw_font(&canvas, &font, mem_i32(0x8C6C74), mem_i32(0x8C6C78));
+            sw_text(this, &canvas, items[page][i], panel.left + 0x18, y);
+            spot_add(&spots[0], id, 0, panel.left + 2, y - 4, panel.right - panel.left - 4, 24);
+            y += 24;
+        }
+    }
+    void show_page(int32_t p) {
+        page = (p + 6) % 6;
+    }
+    void close(bool ok) {
+        // PrefWin_destroy.
+        if (ok) {
+            set_preferences();
+            AlphaIniPrefs.preferences = (int32_t)words[0];
+            AlphaIniPrefs.more_preferences = (int32_t)words[1];
+            AlphaIniPrefs.announce = (int32_t)words[2];
+            prefs_use();
+            prefs_save(0);
+            std::fprintf(stderr, "prefs: preferences %08X more %08X warnings %08X saved\n", words[0], words[1],
+                         words[2]);
+        }
+        draw_map(1);
+        GameDrawState |= 4;
+        sw_close(this);
+    }
+    void on_button(int32_t id) override {  // PrefWin_on_button_clicked (0x491400)
+        if (id >= 0 && id < 6) {
+            show_page(id);
+        } else if (id == 6) {
+            console_not_reconstructed("PrefWin: gamma correction");
+        } else if (id == 0x5A) {  // Restore Defaults
+            words[0] = default_prefs();
+            words[1] = default_prefs2();
+            words[2] = default_warn();
+            get_preferences();
+        } else if (id == 0x5C) {
+            close(true);
+        } else if (id == 0x5B) {
+            close(false);
+        }
+    }
+    void on_key(int32_t key) override {  // PrefWin_on_key_click (0x48FCD0)
+        switch (key & 0xFFFF) {
+        case VKEY_RETURN: close(true); break;
+        case VKEY_ESCAPE: close(false); break;
+        case VKEY_UP: show_page(page < 1 ? 5 : page - 1); break;
+        case VKEY_DOWN: show_page(page < 5 ? page + 1 : 0); break;
+        default: break;
+        }
+    }
+    void on_click(int32_t parent, int32_t index, int32_t, int32_t, int32_t, bool right, bool) override {
+        if (parent != 0 || right || index < 0 || index >= 0x60) return;
+        state[index] = !state[index];  // CheckBox_flip_state_id
+    }
+    void log_state() override {
+        std::fprintf(stderr, "screenstate prefwin page=%d", page);
+        for (int32_t id : kPages[page].ids) std::fprintf(stderr, " %x:%d", id, state[id] ? 1 : 0);
+        std::fprintf(stderr, "\n");
+    }
+};
+
+}  // namespace
+
+// PrefWin_display (0x48FA00): the dialog on page `page`.
+void prefwin_display(int32_t page) {
+    PrefWin w;
+    w.name = "prefwin";
+    w.load();
+    w.layout();
+    w.words[0] = (uint32_t)GamePreferences;
+    w.words[1] = (uint32_t)GameMorePreferences;
+    w.words[2] = (uint32_t)GameWarnings;
+    w.get_preferences();
+    if (page >= 0) w.show_page(page);
+    sw_run(&w);
+    sw_clear_buttons(&w);
+    if (AlphaIniPrefs.preferences & 0x20000000) GameDialogFlags &= ~4;
+    else GameDialogFlags |= 4;
+}
+
+// ---- Console_retire_game (0x514B30): Resign ----
+void THISCALL Console_retire_game(uint8_t*) {
+    if (GameRules & 0x400) auto_save();
+    const char* label = (GameRules & 0x400) ? "REALLYRETIRE2" : "REALLYRETIRE";
+    if ((MultiplayerActive || PbemActive)) {
+        int32_t humans = 0;
+        for (int32_t f = 1; f < 8; f++)
+            if (FactionStatus[0] & (1 << f)) humans++;
+        if (humans > 1) label = "REALLYWIMPOUT";
+    }
+    if (!X_pop(label, 0)) return;
+    if (PbemActive) {
+        FactionStatus[0] &= (uint8_t)~(1 << CurrentPlayerFaction);
+        save_game(0);
+    }
+    bool net = false;
+    if (MultiplayerActive) {
+        // NetDaemon_hang_up and the session's state (no network play here).
+        MultiplayerActive = 0;
+        net = true;
+    }
+    if (GameRules & 0x400) kill_auto_save();
+    report_score(1);
+    if (!(GameState & 0x10)) {
+        quayle(CurrentPlayerFaction);
+        hall_of_fame(1);
+    }
+    if (!net) show_replay();
+    ControlTurnB = !net;
+    ControlTurnA = 1;
+    log_say_2("Retire --------------------------------", 0, 0, 0);
+}
+
+// ---- Console_editor_rules (0x4DC230): the scenario's rules (RULES' check boxes) ----
+void THISCALL Console_editor_rules(uint8_t*) {
+    static const uint32_t kRuleBits[16] = {0x800, 2, 8, 4, 0x1000, 1, 0x10, 0x20,
+                                           0x4000, 0x200, 0x40, 0x100, 0x2000, 0x8000, 0x80, 0x400};
+    auto_undo();
+    for (;;) {
+        GameState = (int32_t)((uint32_t)GameState & 0xFE7FFFFFu);
+        uint32_t g = (uint32_t)GameRules, c = 0;
+        for (int32_t i = 0; i < 16; i++)
+            if (i == 11 ? !(g & kRuleBits[i]) : (g & kRuleBits[i]) != 0) c |= 1u << i;
+        DialogChoices = (int32_t)c;
+        PopupDialogState = 6;
+        int32_t r = X_pop_6("RULES", 0x41, 0);
+        PopupDialogState = 0;
+        if (r < 0) break;
+        GameRules = (int32_t)((uint32_t)GameRules & 0xFFFF0000u);
+        GameState = (int32_t)((uint32_t)GameState & 0xFE7FFFFFu);
+        if (DialogToggle == 0) {
+            uint32_t d = (uint32_t)DialogChoices;
+            for (int32_t i = 0; i < 16; i++)
+                if (i == 11 ? !(d & (1u << i)) : (d & (1u << i)) != 0) GameRules |= (int32_t)kRuleBits[i];
+            if (d & 0x10000) GameState |= 0x800000;
+            if (d & 0x20000) GameState |= 0x1000000;
+            break;
+        }
+        GameRules |= (int32_t)default_rules();  // Standard Rules
+    }
+    prefs_save(0);
+}

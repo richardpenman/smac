@@ -28,14 +28,23 @@ std::string g_game_dir = ".";
 
 uint32_t argb(const Rgb& c) { return 0xFF000000u | (uint32_t)c.r << 16 | (uint32_t)c.g << 8 | c.b; }
 
+const uint8_t* g_layers = nullptr;  // set_layer_palettes
+int32_t g_layer_pitch = 0;
+std::vector<std::vector<uint32_t>> g_layer_luts;
+
 void convert(const uint8_t* pixels, int32_t pitch, int32_t width, int32_t height, const Rgb* palette) {
     uint32_t lut[256];
     for (int32_t i = 0; i < 256; i++) lut[i] = argb(palette[i]);
     g_rgb.resize((size_t)width * height);
+    int32_t n = (int32_t)g_layer_luts.size();
     for (int32_t y = 0; y < height; y++) {
         const uint8_t* src = pixels + (size_t)y * pitch;
         uint32_t* dst = &g_rgb[(size_t)y * width];
-        for (int32_t x = 0; x < width; x++) dst[x] = lut[src[x]];
+        const uint8_t* lay = g_layers ? g_layers + (size_t)y * g_layer_pitch : nullptr;
+        for (int32_t x = 0; x < width; x++) {
+            int32_t l = lay ? lay[x] : 0;
+            dst[x] = (l > 0 && l < n && !g_layer_luts[l].empty()) ? g_layer_luts[l][src[x]] : lut[src[x]];
+        }
     }
 }
 
@@ -281,6 +290,19 @@ void video_present(const uint8_t* pixels, int32_t pitch, int32_t width, int32_t 
     SDL_RenderClear(g_renderer);
     SDL_RenderCopy(g_renderer, g_texture, nullptr, nullptr);
     SDL_RenderPresent(g_renderer);
+}
+
+void set_layer_palettes(const uint8_t* layers, int32_t pitch, const Rgb* const* palettes, int32_t count) {
+    g_layers = layers;
+    g_layer_pitch = pitch;
+    g_layer_luts.clear();
+    if (!layers) return;
+    g_layer_luts.resize((size_t)count);
+    for (int32_t l = 1; l < count; l++) {
+        if (!palettes[l]) continue;
+        g_layer_luts[l].resize(256);
+        for (int32_t i = 0; i < 256; i++) g_layer_luts[l][i] = argb(palettes[l][i]);
+    }
 }
 
 bool save_bmp(const char* path, const uint8_t* pixels, int32_t pitch, int32_t width, int32_t height,

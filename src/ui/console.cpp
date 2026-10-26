@@ -1708,8 +1708,9 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         }
     }
     if (GameState & 0x40) {
-        // Scenario editor keys.
-        console_not_reconstructed("Console_on_key_click: scenario editor keys");
+        // Scenario editor keys (only the custom rules, shift+F10, are reconstructed).
+        if (vk == 0x10079) Console_editor_rules(self);
+        else console_not_reconstructed("Console_on_key_click: scenario editor keys");
         return 1;
     }
     if (!Console_edit_lock(self)) {
@@ -1785,7 +1786,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     case 0x7B: MultiWin_show(nullptr); break;  // F12: MainInterface_on_iface_button_clicked(0x3EC)
     case 0x10008: console_not_reconstructed("Console_next_cursor"); break;  // shift+Backspace
     case 0x1004E: console_not_reconstructed("Console_name_landmark"); break;
-    case 0x10051: console_not_reconstructed("Console_retire_game"); break;  // then the quit question
+    case 0x10051: Console_retire_game(self); break;  // shift+Q: Resign
     case 0x20042: Console_go_to(self, -1, -2, 0); break;  // ctrl+B
     case 0x20051: confirm_quit(); break;                   // ctrl+Q
     case 0x30051:                                          // ctrl+shift+Q: quit to the main menu
@@ -1797,8 +1798,13 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         break;
     case 0x20058: pfncProcZoomKey(self, 0x208, 0); break;  // ctrl+X
     case 0x2005A: pfncProcZoomKey(self, 0x207, 0); break;  // ctrl+Z
-    case 0x20041: case 0x20047: case 0x20049: case 0x2004B: case 0x2004D: case 0x2004E:
-    case 0x2004F: case 0x20050: case 0x20057: case 0x20073: case 0x30041: case 0x30047: case 0x3004C:
+    case 0x20050: prefwin_display(0); break;  // ctrl+P: Console_set_preferences
+    case 0x2004F: prefwin_display(1); break;  // ctrl+O: Console_set_adv_preferences
+    case 0x20057: prefwin_display(2); break;  // ctrl+W: Console_set_base_preferences
+    case 0x20041: prefwin_display(3); break;  // ctrl+A: Console_set_auto_preferences
+    case 0x20049: prefwin_display(4); break;  // ctrl+I: Console_set_audiovisual
+    case 0x2004D: prefwin_display(5); break;  // ctrl+M: Console_set_map_display
+    case 0x20047: case 0x2004B: case 0x2004E: case 0x20073: case 0x30041: case 0x30047: case 0x3004C:
     case 0x3004E: case 0x30057: case 0x30058: case 0x30073:
         // Preferences, landmarks, load, editor, version, credits (menu commands).
         console_not_reconstructed("Console_on_key_click: menu command");

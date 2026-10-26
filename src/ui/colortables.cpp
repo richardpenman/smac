@@ -101,9 +101,12 @@ int32_t THISCALL Palette_create_table_from_color(Palette* pal, int32_t color, ui
 }
 
 void GAMEAPI colortables_init() {
-    // Only the tables the map uses so far; the others (0x6FEB7C, 0x6F0F7C, 0x6F117C, 0x6F1A7C,
-    // 0x6F127C.., 0x6F1B7C..) are not reconstructed yet.
+    // Only the tables the map and the opening screens use so far; the others (0x6FEB7C, 0x6F0F7C,
+    // 0x6F127C.., 0x6F1B7C..) are not reconstructed yet. (The original first tries its cached
+    // copies, shadow.tmp etc., which hold the same tables.)
     Palette_create_table(&GamePalette, ShadowTable, 0, 0x100, -0x2B);
+    Palette_create_table_from_color(&GamePalette, 0x22, RedTintTable, 0, 0x100, 0x14, 0x50);
+    Palette_create_table_from_color(&GamePalette, 0xB3, BlueTintTable, 0, 0x100, 0x14, 0x50);
     vehdraw_color_tables_init();
 }
 

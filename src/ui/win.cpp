@@ -23,6 +23,7 @@
 #include "ui/popup.h"
 #include "ui/screenwin.h"
 #include "ui/techwin.h"
+#include "ui/topmenu.h"
 
 bool g_ui_exit_when_script_done = false;
 std::string g_ui_outdir = ".";
@@ -51,6 +52,12 @@ bool g_font_ok = false;
 int32_t g_script_mods = 0;
 // The tile under a go-to drag (ui_set_drag_target).
 int32_t g_drag_x = -1, g_drag_y = -1;
+
+// Desktop mode (the opening screens, before a game): no map view nor console.
+bool g_desktop = false;
+// Palette layers (ui_layer_mark): per pixel of the screen, the palette it is shown through.
+std::vector<uint8_t> g_layers;
+const Palette* g_layer_pals[4] = {};
 
 // ---- keyboard: the original's Win_on_key (0x5F5D10) with TranslateMessage for a US layout ----
 
@@ -183,6 +190,10 @@ bool run_command(const std::string& cmd) {
         if (id >= 0 && id < BaseCount) BaseWin_zoom(&BaseWin, id, 0);
         return true;
     }
+    if (cmd == "menustate") {  // test aid: the open menu column of the opening screens (topmenu.h)
+        topmenu_log_state();
+        return true;
+    }
     if (cmd == "screenstate") {  // test aid: the open screen's texts and state (screenwin.h)
         screens_log_state();
         return true;
@@ -285,27 +296,77 @@ void ui_set_message(const std::string& text) {
     g_dirty = true;
 }
 
+void ui_set_desktop(bool on) {
+    g_desktop = on;
+    g_dirty = true;
+}
+bool ui_desktop() { return g_desktop; }
+
+void ui_set_layer_palette(int32_t layer, const Palette* palette) {
+    if (layer > 0 && layer < 4) g_layer_pals[layer] = palette;
+}
+
+void ui_layer_mark(int32_t x0, int32_t y0, const Buffer* src, uint8_t layer, int32_t key) {
+    if (!src->data || g_layers.empty()) return;
+    for (int32_t y = 0; y < src->height; y++) {
+        int32_t sy = y0 + y;
+        if (sy < 0 || sy >= g_canvas.height) continue;
+        const uint8_t* s = src->data + (size_t)y * src->stride;
+        uint8_t* d = &g_layers[(size_t)sy * g_canvas.stride];
+        for (int32_t x = 0; x < src->width; x++) {
+            int32_t sx = x0 + x;
+            if (sx < 0 || sx >= g_canvas.width || s[x] == key) continue;
+            d[sx] = layer;
+        }
+    }
+}
+
+// The palettes of the screen's layers for the platform (none when every pixel is of layer 0).
+static void set_layers() {
+    bool any = false;
+    for (uint8_t l : g_layers)
+        if (l) {
+            any = true;
+            break;
+        }
+    if (!any) {
+        platform::set_layer_palettes(nullptr, 0, nullptr, 0);
+        return;
+    }
+    const platform::Rgb* pals[4] = {};
+    for (int32_t i = 1; i < 4; i++)
+        if (g_layer_pals[i]) pals[i] = reinterpret_cast<const platform::Rgb*>(g_layer_pals[i]->rgb);
+    platform::set_layer_palettes(g_layers.data(), g_canvas.stride, pals, 4);
+}
+
 void ui_present() {
     if (!g_ready) return;
-    if (g_map_dirty) {
-        g_map_dirty = false;
-        pfncRedrawMap(MapWins[0], 1);
+    g_layers.assign((size_t)g_canvas.stride * g_canvas.height, 0);
+    if (g_desktop) {
+        // The opening screens: black behind the windows (the desktop window, the menus).
+        std::memset(g_canvas.data, 0, (size_t)g_canvas.stride * g_canvas.height);
+    } else {
+        if (g_map_dirty) {
+            g_map_dirty = false;
+            pfncRedrawMap(MapWins[0], 1);
+        }
+        for (int32_t y = 0; y < g_canvas.height; y++) {
+            uint8_t* dst = g_canvas.data + (size_t)y * g_canvas.stride;
+            if (y < g_view.height) std::memcpy(dst, g_view.data + (size_t)y * g_view.stride, (size_t)g_view.width);
+        }
+        if (mw(&MainConsole, kConCursorShown) || !MapWinInVehMode)
+            draw_tile_marker(MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex], 0xFF);
+        if (MapWinInVehMode && MapWinVehA >= 0 && MapWinVehA < VehCount)
+            draw_tile_marker(Vehs[MapWinVehA].x, Vehs[MapWinVehA].y, 0xFB);
+        if (g_drag_x >= 0) draw_tile_marker(g_drag_x, g_drag_y, 0xFA);
+        console_frame_draw(&g_canvas);
     }
-    for (int32_t y = 0; y < g_canvas.height; y++) {
-        uint8_t* dst = g_canvas.data + (size_t)y * g_canvas.stride;
-        if (y < g_view.height) std::memcpy(dst, g_view.data + (size_t)y * g_view.stride, (size_t)g_view.width);
-    }
-    if (mw(&MainConsole, kConCursorShown) || !MapWinInVehMode)
-        draw_tile_marker(MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex], 0xFF);
-    if (MapWinInVehMode && MapWinVehA >= 0 && MapWinVehA < VehCount)
-        draw_tile_marker(Vehs[MapWinVehA].x, Vehs[MapWinVehA].y, 0xFB);
-    if (g_drag_x >= 0) draw_tile_marker(g_drag_x, g_drag_y, 0xFA);
-    console_frame_draw(&g_canvas);
     screens_compose(&g_canvas);  // full-screen windows (reports, social engineering; screenwin.h)
     basewin_compose(&g_canvas);  // the base window over the console frame
     console_menu_draw(&g_canvas);
     popup_draw_windows(&g_canvas);
     console_draw_cursor(&g_canvas);
+    set_layers();
     platform::video_present(g_canvas.data, g_canvas.stride, g_canvas.width, g_canvas.height,
                             reinterpret_cast<const platform::Rgb*>(GamePalette.rgb));
     g_dirty = false;
@@ -314,6 +375,7 @@ void ui_present() {
 
 bool ui_screenshot(const std::string& path) {
     ui_present();
+    set_layers();
     bool ok = platform::save_bmp(path.c_str(), g_canvas.data, g_canvas.stride, g_canvas.width, g_canvas.height,
                                  reinterpret_cast<const platform::Rgb*>(GamePalette.rgb));
     std::fprintf(stderr, "screenshot %s (turn %d): %s\n", path.c_str(), CurrentTurn, ok ? "ok" : "failed");

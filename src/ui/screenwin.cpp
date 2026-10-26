@@ -151,9 +151,19 @@ static void redraw(ScreenWin* s) {
     ui_invalidate();
 }
 
+void sw_show(ScreenWin* s) {
+    if (std::find(g_stack.begin(), g_stack.end(), s) == g_stack.end()) g_stack.push_back(s);
+    redraw(s);
+}
+
+void sw_hide(ScreenWin* s) {
+    g_stack.erase(std::remove(g_stack.begin(), g_stack.end(), s), g_stack.end());
+    ui_invalidate();
+}
+
 void sw_run(ScreenWin* s) {
     s->open = true;
-    g_stack.push_back(s);
+    if (std::find(g_stack.begin(), g_stack.end(), s) == g_stack.end()) g_stack.push_back(s);
     redraw(s);
     const UiRect& mp = mi_rect(kMiPos);
     while (s->open && !ControlTurnA) {
@@ -171,7 +181,11 @@ void sw_run(ScreenWin* s) {
             continue;
         }
         bool right = in.type == UiInput::RDOWN || in.type == UiInput::RUP;
-        if (in.type == UiInput::MOVE || in.type == UiInput::RDOWN) continue;
+        if (in.type == UiInput::MOVE) {
+            s->on_move(in.x - s->x, in.y - s->y);
+            continue;
+        }
+        if (in.type == UiInput::RDOWN) continue;
         int32_t parent = -1, lx = 0, ly = 0;
         if (s->iface && in_box(in.x, in.y, mp) &&
             (opaque(&s->mi, in.x - mp.left, in.y - mp.top) || button_at(s, 1, in.x - mp.left, in.y - mp.top))) {
@@ -234,10 +248,12 @@ void screens_compose(Buffer* screen) {
     const UiRect& mp = mi_rect(kMiPos);
     for (ScreenWin* s : g_stack) {
         blit_keyed(screen, &s->canvas, s->x, s->y);
+        ui_layer_mark(s->x, s->y, &s->canvas, s->layer);
         for (BaseButton* b : s->buttons) {
             if (!b->shown || b->parent != 0) continue;
             bw_button_draw(b);
             blit_keyed(screen, &b->canvas, s->x + b->r.left, s->y + b->r.top);
+            ui_layer_mark(s->x + b->r.left, s->y + b->r.top, &b->canvas, 0);
         }
         if (!s->iface) continue;
         blit_keyed(screen, &s->mi, mp.left, mp.top);

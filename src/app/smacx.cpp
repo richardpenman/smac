@@ -1,14 +1,17 @@
 // smacx: the native game with the SDL2 UI.
 //
-//   smacx (--new [k=v ...] | --save FILE.sav) [--human N] [--viewer N] [--seed CRT,GAME|clock]
+//   smacx [--new [k=v ...] | --save FILE.sav] [--human N] [--viewer N] [--seed CRT,GAME|clock]
 //         [--keys K1,K2,...] [--exit-after-keys] [--turns N] [--shot FILE.bmp] [--snapshots DIR]
 //         [--rng FILE] [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR]
 //         [--gamedir DIR] [--image FILE] [--ini FILE]
 //
-// The reconstructed engine runs as in the original: control_game boots, the main menu (top_menu)
-// is replaced by starting a new game (--new, the harness's newgame keys: size, width, height,
-// ocean, erosion, orbit, clouds, natives, diff, rules, factions=a,b,..., random) or loading a save,
-// and control_turn plays the turns.
+// The reconstructed engine runs as in the original: control_game boots, the main menu (top_menu,
+// src/ui/topmenu.cpp: the opening screens, the game setup dialogs, LOAD GAME's FileBox) sets up or
+// loads a game, and control_turn plays the turns. --new (the harness's newgame keys: size, width,
+// height, ocean, erosion, orbit, clouds, natives, diff, rules, factions=a,b,..., random) or --save
+// take the place of the main menu. A game set up in the main menu with --seed is seeded at the menu
+// and again when its world is built (as the harness's seed command before newgame), so it equals
+// the --new game of the same parameters and seed (tests/menu/run.sh).
 //
 // With --human N (default 1 for --new; 0: none) faction N is played by a human: its turns run the
 // reconstructed Console_human_turn (src/ui/console.cpp) with the original key bindings, e.g.
@@ -28,7 +31,8 @@
 // base's production, queue, workers and stores on stderr), SCREENSTATE (the open report / social
 // engineering / monuments screen: its texts and state), FACTIONSTATE (the viewer's social choice,
 // energy allocation, credits and upheaval paid), TECHSTATE (the viewer's research goal and
-// points, blind research priorities), PROTOSTATE (the viewer's prototypes), and the commands SHOT[:FILE]
+// points, blind research priorities), PROTOSTATE (the viewer's prototypes), MENUSTATE (the open
+// menu column of the opening screens: caption, items, selection), and the commands SHOT[:FILE]
 // (screenshot), SAVE:FILE (save the game
 // and its generators in FILE.rng, relative to --outdir), UNITS (list the human's units on
 // stderr), QUIT. --exit-after-keys (default with --hidden) quits when they run out.
@@ -83,6 +87,7 @@
 #include "ui/sprites.h"
 #include "ui/vehdraw.h"
 #include "ui/basewin.h"
+#include "ui/topmenu.h"
 #include "ui/win.h"
 
 namespace fs = std::filesystem;
@@ -225,6 +230,11 @@ void observer_pause() {
         g_quit = true;
         return;
     }
+    // An unattended run (--hidden, no scripted keys) of --turns N turns ends there.
+    if (g_opt.turns > 0 && g_opt.hidden && g_opt.keys.empty()) {
+        g_quit = true;
+        return;
+    }
     for (;;) {
         int32_t key = ui_wait_key();
         int32_t vk = key & 0xFFFF;
@@ -350,15 +360,64 @@ void new_game(std::string args) {
                  human > 0 ? MFactions[human].noun_faction : "none");
 }
 
+void apply_seed() {
+    if (!g_opt.seeded) return;
+    game_srand(g_opt.seed_crt);
+    game_reseed(g_opt.seed_game);
+    engine_set_logic_clock_state(0);
+}
+
+// The game's main view once a game exists (desktop_init's part that smacx does: the art of the
+// factions, the main view reset and centred on the cursor, its display options).
+void show_game() {
+    for (int32_t f = 1; f < 8; f++) load_faction_art(f);
+    load_flags();
+    // desktop_init(ControlTurnMove == 0) -> mapwin_system_init: the main view is reset and
+    // centred on the cursor; MapWin_init_2 then sets its display options (main view of a
+    // single-player game: 0x60010EE3, see 0x470A90).
+    if (ControlTurnMove == 0) MapWin_clear(&MainConsole, 0);
+    mw(&MainConsole, kMwOptions) = 0x60010EE3;
+    if (g_opt.zoom != 0x7FFF) mw(&MainConsole, kMwZoom) = g_opt.zoom;
+    if (g_opt.cx >= 0) {
+        mw(&MainConsole, kMwCenterX) = g_opt.cx;
+        mw(&MainConsole, kMwCenterY) = g_opt.cy;
+    }
+    ui_invalidate_map();
+    std::fprintf(stderr, "view: zoom %d centre %d,%d options %08X viewer %d\n", mw(&MainConsole, kMwZoom),
+                 mw(&MainConsole, kMwCenterX), mw(&MainConsole, kMwCenterY), (uint32_t)mw(&MainConsole, kMwOptions),
+                 CurrentPlayerFaction);
+}
+
+// No --new / --save: the original's main menu (top_menu, src/ui/topmenu.cpp). With --seed the
+// generators are seeded at the menu and again when the world of a new game is built (config_game's
+// hook), as the harness's seed command before newgame, so a game set up in the menu equals the
+// --new game of the same parameters and seed.
+int32_t main_menu() {
+    // Back from a game (Start New Game, a retired or finished game: control_game's reload) the
+    // menu comes up again, as in the original.
+    static bool started = false;
+    if (!started) apply_seed();
+    started = true;
+    g_ui_before_world_build = apply_seed;
+    int32_t r = top_menu(0);
+    g_ui_before_world_build = nullptr;
+    if (r) return r;
+    // The game's human player (none: an observer game).
+    int32_t f = CurrentPlayerFaction;
+    g_opt.human = (FactionStatus[0] & (1 << f)) ? f : 0;
+    std::fprintf(stderr, "game from the menu: turn %d, human faction %d (%s)\n", CurrentTurn, g_opt.human,
+                 g_opt.human > 0 ? MFactions[g_opt.human].noun_faction : "none");
+    if (g_opt.human <= 0 && g_opt.viewer >= 0) CurrentPlayerFaction = g_opt.viewer;
+    apply_observer_prefs();
+    show_game();
+    return 0;
+}
+
 int32_t start_game_menu() {
     static bool started = false;
     if (started) return 1;  // back from a game: quit
     started = true;
-    if (g_opt.seeded) {
-        game_srand(g_opt.seed_crt);
-        game_reseed(g_opt.seed_game);
-        engine_set_logic_clock_state(0);
-    }
+    apply_seed();
     if (g_opt.new_game) {
         new_game(g_opt.new_args);
     } else {
@@ -390,22 +449,7 @@ int32_t start_game_menu() {
         else if (g_opt.new_game) CurrentPlayerFaction = 0;
     }
     apply_observer_prefs();
-    for (int32_t f = 1; f < 8; f++) load_faction_art(f);
-    load_flags();
-    // desktop_init(ControlTurnMove == 0) -> mapwin_system_init: the main view is reset and
-    // centred on the cursor; MapWin_init_2 then sets its display options (main view of a
-    // single-player game: 0x60010EE3, see 0x470A90).
-    if (ControlTurnMove == 0) MapWin_clear(&MainConsole, 0);
-    mw(&MainConsole, kMwOptions) = 0x60010EE3;
-    if (g_opt.zoom != 0x7FFF) mw(&MainConsole, kMwZoom) = g_opt.zoom;
-    if (g_opt.cx >= 0) {
-        mw(&MainConsole, kMwCenterX) = g_opt.cx;
-        mw(&MainConsole, kMwCenterY) = g_opt.cy;
-    }
-    ui_invalidate_map();
-    std::fprintf(stderr, "view: zoom %d centre %d,%d options %08X viewer %d\n", mw(&MainConsole, kMwZoom),
-                 mw(&MainConsole, kMwCenterX), mw(&MainConsole, kMwCenterY), (uint32_t)mw(&MainConsole, kMwOptions),
-                 CurrentPlayerFaction);
+    show_game();
     return 0;
 }
 
@@ -440,6 +484,10 @@ bool parse_key(std::string tok, ScriptedKey* out) {
     }
     if (tok == "DIPLOSTATE") {  // the viewer's treaties, energy and techs (diplowin.h, test aid)
         out->command = "diplostate";
+        return true;
+    }
+    if (tok == "MENUSTATE") {  // the open menu column of the opening screens (topmenu.h, test aid)
+        out->command = "menustate";
         return true;
     }
     if (tok == "TECHSTATE") {  // the viewer's research (techwin.h, test aid)
@@ -526,7 +574,7 @@ bool parse_key(std::string tok, ScriptedKey* out) {
 
 int usage() {
     std::fprintf(stderr,
-                 "usage: smacx (--new [k=v ...] | --save FILE.sav) [--human N] [--viewer N] [--seed CRT,GAME|clock]\n"
+                 "usage: smacx [--new [k=v ...] | --save FILE.sav] [--human N] [--viewer N] [--seed CRT,GAME|clock]\n"
                  "             [--keys K1,K2,..] [--exit-after-keys] [--turns N] [--shot FILE.bmp] [--snapshots DIR] [--rng FILE]\n"
                  "             [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR] [--gamedir DIR]\n"
                  "             [--image FILE] [--ini FILE] [--dump FILE.smxmap [--like REF.smxmap] [--scroll-from X,Y]]\n");
@@ -585,7 +633,8 @@ int main(int argc, char** argv) {
         else if (a == "--size") std::sscanf(next().c_str(), "%dx%d", &g_opt.width, &g_opt.height);
         else return usage();
     }
-    if (g_opt.save.empty() == !g_opt.new_game) return usage();
+    if (!g_opt.save.empty() && g_opt.new_game) return usage();
+    bool menu = g_opt.save.empty() && !g_opt.new_game;  // the main menu
     // Scripted or hidden runs (tests) default to fixed seeds; interactive play seeds from the clock.
     if (!g_opt.seed_given) g_opt.seeded = !g_opt.keys.empty() || g_opt.hidden;
     if (g_opt.new_game && g_opt.human < 0) g_opt.human = 1;
@@ -629,12 +678,15 @@ int main(int argc, char** argv) {
     g_ui_exit_when_script_done = g_opt.exit_after_keys || g_opt.hidden;
     diplowin_set_animate(!g_opt.seeded);
     ui_script_keys(g_opt.keys);
-    g_harness_top_menu = start_game_menu;
+    g_harness_top_menu = menu ? main_menu : start_game_menu;
     g_harness_turn_upkeep = harness_turn_upkeep;
     // Observer games: the pause is taken before turn_upkeep (harness_turn_upkeep), not in the
     // round-end Console_human_turn.
     g_harness_observer_pause = [] { return 0; };
-    g_harness_game_end = [] { std::fprintf(stderr, "game over (turn %d)\n", CurrentTurn); std::exit(0); };
+    // The end of a game (show_replay): the harness's runs exit; a game from the main menu goes back to
+    // it (control_game's reload, ControlTurnB).
+    if (menu) g_harness_game_end = [] { std::fprintf(stderr, "game over (turn %d)\n", CurrentTurn); };
+    else g_harness_game_end = [] { std::fprintf(stderr, "game over (turn %d)\n", CurrentTurn); std::exit(0); };
     control_game();
     platform::video_shutdown();
     return 0;

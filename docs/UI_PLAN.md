@@ -108,7 +108,8 @@ src/app/smacx.cpp the native game executable
   | `art` | load_faction_art, load_flags | sprites.cpp, vehdraw.cpp |
   | `pump` | wait_task, do_all_non_input, do_non_input, flush_input | win.cpp |
   | `popup` | popp, X_pop, X_pop_2, X_pops, X_pops_11, popb, POP2, POP3, NetMsg_pop, NetMsg_close, Popup_ctor/dtor, ui_first_base_name, ui_crash_landing_*, ui_pact_ends_dialog, ui_tech_popup_*, ui_production_popup_*, ui_council_menu_*, ui_supply_menu, ui_artifact_menu, ui_disembark_menu | win_popup.cpp, popup_menus.cpp (popup.cpp, font_text.cpp) |
-  | `filebox` | FileDialog_*, FileBox_*, FileList_set_path/add_ext/close, ui_filebox_destroy (the dialogs of save_game / load_game) | console_filebox.cpp |
+  | `filebox` | FileDialog_*, FileBox_*, FileList_set_path/add_ext/close, ui_filebox_destroy (the dialogs of save_game / load_game) | filebox.cpp |
+  | `topmenu` | top_menu, show_credits, multiplayer_init, close_opening (the opening screens) | topmenu.cpp, gamesetup.cpp |
   | `socialwin` | SocialWin_exec, SocialWin_close | socialwin.cpp |
   | `reports` | report_score, report_intel, monument, hall_of_fame | reports.cpp, monuwin.cpp |
   | `techwin` | tech_pick (the research dialog), NewTechWin_exec | techwin.cpp |
@@ -144,7 +145,7 @@ src/app/smacx.cpp the native game executable
 | 6 (done, section 6) | popups: BasePop on the game's script files (Script.txt, xscript.txt etc.: `#LABEL`, `^` lines, `$STR` parsing via the reconstructed text module), `popp/popb/X_pop*`, NetMsg, choice lists | popups by label vs oracle |
 | 7 (done, section 9) | design workshop (DesignWin), tech pick (research window, Console_set_tech / set_ai), NewTechWin, datalinks (help); social engineering was done with the reports (section 8) | tests/design/run.sh, tests/datalinks/run.sh; tests/design/compare.sh vs the original |
 | 8 (done, section 10; reports and monuments in section 8) | diplomacy (communicate and the human's menus, DiploPop), council window (CouncilWin); hotseat/PBEM `diplo` (DiploWin) not reconstructed | tests/diplo/run.sh |
-| 9 | main menu, game setup (top_menu, setup dialogs), file dialogs (FileBox), preferences | new game from the menu |
+| 9 (done, section 11) | main menu, game setup (top_menu, setup dialogs), file dialogs (FileBox), preferences (PrefWin), Resign | tests/menu/run.sh (a new game from the menu equals --new); tests/menu/compare.sh vs the original |
 | 10 | sound (FX, voices, music), movies (FLC/WVE: openings, interludes, secret projects) | |
 
 Each phase replaces the corresponding headless stubs in smacx; `smacx_headless` and the hybrid
@@ -515,3 +516,80 @@ F10 hall of fame, F11 menu detail, F12 the commlink panel (MainInterface_on_ifac
   COMM popup "not now" first (DOWN,ENTER).
 * **Not compared with the original**: QUICK START has no contacts, so the original's commlink and
   council cannot be reached there. The late saves are observer games and have no human player.
+
+
+## 11. The opening screens, file dialogs and preferences (phase 9)
+
+`smacx` without `--new` / `--save` runs the original's main menu: control_game calls top_menu as the
+original does (smacx's main_menu only adds the seeding and the human player for its harness parts).
+
+* **Desktop and menu column** (src/ui/topmenu.cpp): the desktop (TopMenuWin, change_opening /
+  close_opening) shows xopeninga.pcx (xopeningb.pcx at 800 x 600) through the picture's own palette.
+  Under GDI each of the original's windows has its own DIB colour table, so the screen now has
+  palette layers (win.h ui_set_layer_palette / ui_layer_mark, platform set_layer_palettes): the
+  desktop and the menu column are layer 1, the credits layer 2, popups and the game's windows the
+  game palette. The menu column (SetupWin_do_menu_rightside / SetupWin_draw_item and its key and
+  mouse handlers) stacks the frames of openitem.flc (frame 5 at rest, indices of the desktop's
+  colour table, 9 transparent, 0 the redtint table's colour of the desktop pixel under it: Win +0xA0,
+  RedTintTable now built by colortables_init) at the bottom right, the caption first and 20 pixels
+  apart, texts in Arial 18 bold upper case cut at "(", colours 0xCD / 0xCA / 0x42. The custom
+  planet's items put their pictures (S?L?C?.pcx, MOON1..3.PCX) on the desktop when highlighted.
+  FLC decoding moved to src/ui/flic.{h,cpp} (diplowin.cpp uses it), with raw indices on request.
+* **top_menu** (0x58E360): TOPMENU (START GAME, QUICK START, SCENARIO, LOAD GAME, MULTIPLAYER,
+  VIEW CREDITS, EXIT GAME; DefaultPrefs.top_menu saved), SCENARIOMENU (PLAY SCENARIO: a scenario
+  file, config_game(2), the INTRO; CREATE SCENARIO: size, config_game(3), setup_game(1) and the
+  editor state 0x80000E0; LOAD MAP FILE; EDIT SCENARIO), LOAD GAME (load_game with the FileBox),
+  MULTIPLAYER (multiplayer_init: a placeholder message, no network play), VIEW CREDITS
+  (show_credits: credits2.pcx and the CREDITS section scrolling in a 400 x 400 window, closed by a
+  key or a click). There is no SMAC / SMACX choice in terranx.exe: the launcher picks terran.exe or
+  terranx.exe (ExpansionEnabled is set by WinMain).
+* **The game setup**: map_menu (MAPMENU; QUICK START reuses the last choices; the random map's two
+  game_rand draws for ocean and erosion), size_of_planet (WORLDSIZE of alphax.txt, Custom Size with
+  CUSTOMMAP and VERYLARGEMAP; map_init, Path_init), custom_planet (the custom map asks ocean, erosion,
+  native life and clouds in this order; the orbit is left 0, as SMACX does), config_game
+  (src/ui/gamesetup.cpp, reconstructed from the disassembly with the original's jumps: DIFFICULTY,
+  USERULES / RULES with the DialogChoices bit order, the faction picker, NAME / NAME2 / NAME3, the
+  CUSTOMNAMES dialog (CHANGE NAME, or the name popup's button), the random rivals of JENN282 slots
+  with the alien pair rule and its draws, load_flags, the alien player's rules, the human player,
+  world_build, setup_game(0), alien_start, planetfall). clear_all_player_messages is done in
+  top_menu (the combat counts and the players' message lists).
+* **PickWin** (0x4887A0..): the 790 x 300 window of PickWin_init's rectangles: title, the three
+  pickfac.pcx buttons (the original factions, the new factions, all random; one column of
+  pickfac.pcx per button, its rows the states), PLAY SELECTED / PLAY RANDOM FACTION, the seven
+  slots (formal name | (description), RANDOM) with their arrow menus (every faction's noun and
+  RANDOM: read_faction2), the line to the selected slot, INFO / QUOTE, CHANGE NAME, OK, CANCEL;
+  under it thumb_routine's text box (the faction's BLURB or DATALINKS1/2 with the leader's portrait,
+  700 pixels wide while dword_9469FC is set). The picker stays up under the name popup, as the
+  original's.
+* **FileBox** (src/ui/filebox.cpp, replacing the simple box of console_filebox.cpp): FileBox_init's
+  layout at the menu and in a game, the list of FileList (directories, "..", the files of the
+  dialog's extensions, jackal.pcx icons, rows of 24 pixels, box 29 for the selection), the name
+  field, OK / CANCEL, FILEWIN_LOAD / FILEWIN_SAVEEXISTS / FILEWIN_ILLEGALCHAR of jackal.txt.
+  Directories are browsed relative to the game directory (the original changes the process's
+  current directory and answers absolute paths); a typed absolute directory is entered.
+* **Preferences** (src/ui/prefwin.cpp): PrefWin with its six pages (BASICPREFS, ADVANCEDPREFS,
+  BASEWARNINGS, AUTOMATIONPREFS, AUDIOVISUALPREFS, MAPPREFS; PrefWin_init's check box ids,
+  PrefWin_get / set_preferences' bits), Restore Defaults, OK (PrefWin_destroy: AlphaIniPrefs,
+  prefs_use, prefs_save(0) into Alpha Centauri.Ini) and Cancel; ctrl+P / O / W / A / I / M open their
+  pages. Resign (shift+Q, Console_retire_game: REALLYRETIRE, report_score, quayle, hall_of_fame,
+  show_replay, back to the main menu) and the editor's custom rules (shift+F10,
+  Console_editor_rules) are reconstructed; Start New Game (ctrl+shift+Q) returns to the main menu.
+* **Not reconstructed (placeholders)**: the menu column's slide animations and sounds, the opening
+  movie and menu music, multiplayer_init (DirectPlay / hotseat / PBEM setup, time controls,
+  HOTSEATADD), the PBEM tamper seeds, the gamma correction dialog, the audio page's volume buttons
+  and sliders (switches as check boxes here), the Windows common file dialog (WindowsFileBox), the
+  scenario editor itself.
+* **Testing**: tests/menu/run.sh: the main menu and its sub-menus (MENUSTATE, SCREENSTATE); a new
+  game set up through every dialog compared with the --new game (`size=0 ocean=1 erosion=1 orbit=0
+  clouds=1 natives=1 diff=3`, the Crossfire factions, human 3): turn_000 equal by
+  harness/compare.py; custom rules (RULES, diff 1) against `--new rules=0x120E`; a save loaded through
+  the FileBox; a preference flipped and written to the ini. tests/menu/compare.sh drives the plain
+  original through the same screens (orig_menu.steps) and scores them (fraction of pixels within
+  tolerance): the main menu, its highlighted second item, the scenario menu, the map menu, the
+  planet's size, ocean, erosion, native life, clouds, the difficulty and the rules 0.999 to 1.000
+  (pixel exact but for a few text pixels); the load FileBox 0.983; the faction picker 0.909 (list
+  and portrait text glyphs: the original runs Arial Narrow under Wine's substitute, see section 6);
+  the name popup over the picker 0.937; PLANETFALL 0.738 (the same text, one line less with the
+  game's arialn.ttf, so the box is lower); the preferences 0.869 (and its check boxes reflect
+  different preferences); the save FileBox in a game 0.847 (the original's base window behind it).
+  The credits (animated) and the multiplayer setup (a placeholder) are not scored.

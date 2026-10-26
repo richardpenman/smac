@@ -31,6 +31,16 @@ void ui_invalidate();
 // Redraws what is invalid and presents the screen.
 void ui_present();
 bool ui_screenshot(const std::string& path);
+// Desktop mode (the opening screens before a game: top menu, setup dialogs): the screen shows the
+// windows over black, without the map view and the console (topmenu.cpp).
+void ui_set_desktop(bool on);
+bool ui_desktop();
+// Palette layers: under GDI each of the original's windows shows through its own DIB colour table
+// (the opening pictures, the menu items' animation, the faction portraits). Layer n (1..3) is shown
+// through `palette` (null: off); ui_layer_mark marks the pixels of `src` placed at (x0, y0) that
+// are not `key` as layer `layer` (0: the game palette) for the frame being composed.
+void ui_set_layer_palette(int32_t layer, const Palette* palette);
+void ui_layer_mark(int32_t x0, int32_t y0, const Buffer* src, uint8_t layer, int32_t key = 9);
 // Message line of the console panel (the latest message box or placeholder note).
 void ui_set_message(const std::string& text);
 // GetKeyState for a virtual key: bit 15 held, bit 0 toggled (Scroll Lock etc. are never toggled).

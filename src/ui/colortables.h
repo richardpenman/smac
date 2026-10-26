@@ -31,6 +31,10 @@ ADDR_NATIVE(0x5FEFF0) int32_t THISCALL Palette_create_table_from_color(Palette* 
 
 // Shadow table (darker by 43%) of Sprite_draw_dest (unk_6F107C).
 GLOBAL(uint8_t[256], ShadowTable, 0x6F107C);
+// The tint tables of the opening screens' menu column (SetupWin: Win +0xA0, pixels 0 of the window
+// show the table's colour of what is under them): redtint (Crossfire) and bluetint.
+GLOBAL(uint8_t[256], RedTintTable, 0x6F117C);
+GLOBAL(uint8_t[256], BlueTintTable, 0x6F1A7C);
 // Per faction tint of the territory borders (colortables_init_faction).
 GLOBAL(uint8_t[8][256], FactionColorTable, 0x6F077C);
 

@@ -19,6 +19,7 @@
 #include "engine/text.h"
 #include "engine/ui_bridge.h"
 #include "platform/ui_platform.h"
+#include "engine/game.h"
 #include "ui/win.h"
 
 namespace {
@@ -451,7 +452,7 @@ std::vector<BasePop*> g_windows;  // shown popups, bottom to top
 
 bool interface_visible() {
     // pfncWinIsVisible(pMain): the main interface (console) is up once the game screen exists.
-    return ui_screen_canvas() != nullptr && MapWins[0] != nullptr;
+    return ui_screen_canvas() != nullptr && MapWins[0] != nullptr && !ui_desktop();
 }
 
 // Height of the main interface's console (DAT_007AF59C) at 1024x768; popups rise from it.
@@ -705,6 +706,18 @@ const char* BasePop_edit_text(BasePop* self, int32_t i) {
     return (i >= 0 && i < (int32_t)self->edit.size()) ? self->edit[i].c_str() : "";
 }
 int32_t BasePop_item_count(BasePop* self) { return (int32_t)self->items.size(); }
+const char* BasePop_item_text(BasePop* self, int32_t i) {
+    return i >= 0 && i < (int32_t)self->items.size() ? self->items[i].text : nullptr;
+}
+int32_t BasePop_item_id(BasePop* self, int32_t i) {
+    return i >= 0 && i < (int32_t)self->items.size() ? self->items[i].id : -1;
+}
+int32_t BasePop_active(BasePop* self) { return self->active; }
+// EditGroup_edit (0x611F80): an edit field labelled `label` holding `text` (`max` characters).
+void BasePop_edit(BasePop* self, const char* label, const char* text, int32_t) {
+    BasePop_item(self, label, (int32_t)self->items.size());
+    if (!self->edit.empty()) self->edit.back() = text ? text : "";
+}
 void BasePop_set_mode(BasePop* self, int32_t mode) { self->mode = mode; }
 void BasePop_set_active(BasePop* self, int32_t id) { self->active = id; }
 const char* BasePop_caption(BasePop* self) { return self->caption; }
@@ -815,7 +828,8 @@ int32_t calculate(BasePop* p) {
     if (p->has_picture) {
         int32_t w = p->total_w ? p->total_w : p->dlg_width;
         w += p->picture.full_width * p->pic_scale_d / p->pic_scale_s + p->hpad;
-        if (ScreenWidth == 800) w = std::min(w, 0x1EE);
+        if (dword_9469FC) w = 0x2BC;  // the faction picker's text box (thumb_routine)
+        else if (ScreenWidth == 800) w = std::min(w, 0x1EE);
         else if (ScreenWidth - 0x16E <= w) w = ScreenWidth - 0x16E;
         p->dlg_width = w;
     }
@@ -1248,7 +1262,8 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
     // smacx's observer mode (no human player) takes the no-display path, as the oracle forces it
     // for unattended runs (harness/README.md "Determinism measures"), so observer games play as
     // the oracle's.
-    if (!FactionStatus[0]) no_display = 1;
+    // The opening screens' dialogs (desktop mode, before a game) are always shown.
+    if (!FactionStatus[0] && !ui_desktop()) no_display = 1;
     if (no_display || (p->flags & 0x8000)) return 0;
     // The window (GraphicWin_init) and its position (Popup_show / BasePop_exec_3).
     Buffer_init(&p->canvas, std::max(1, p->width), std::max(1, p->height), 8, 0);
@@ -1374,14 +1389,38 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
         }
     }
     // Close (Win_release_modal, Popup_hide).
-    g_windows.erase(std::remove(g_windows.begin(), g_windows.end(), p), g_windows.end());
-    p->shown = false;
-    ui_invalidate();
+    BasePop_hide(p);
     // Edit groups: the texts go to the parse slots.
     if (p->item_type == 4)
         for (int32_t i = 0; i < 8 && i < (int32_t)p->edit.size(); i++) parse_says(i, p->edit[i].c_str(), -1, -1);
     std::fprintf(stderr, "popup %s answer: %d (button %d)\n", p->label.c_str(), p->choice, p->button);
     return p->choice;
+}
+
+void popup_draw_check(Buffer* b, int32_t x, int32_t y, int32_t state) {
+    popup_art_init();
+    sprite_copy(&g_checks[std::max(0, std::min(2, state))], b, x, y);
+}
+
+void BasePop_show(BasePop* p) {
+    if (p->items.empty()) p->item_type = -1;
+    calculate(p);
+    Buffer_init(&p->canvas, std::max(1, p->width), std::max(1, p->height), 8, 0);
+    int32_t x = p->req_x, y = p->req_y;
+    p->win_x = x == 0x1000 ? (ScreenWidth - p->width) >> 1 : (x < 0 ? x - p->width + ScreenWidth : x);
+    p->win_y = y == 0x1000 ? (ScreenHeight - p->height) >> 1 : (y < 0 ? y - p->height + ScreenHeight : y);
+    p->selected = 0;
+    place_buttons(p);
+    redraw(p);
+    if (!p->shown) g_windows.push_back(p);
+    p->shown = true;
+    ui_invalidate();
+}
+
+void BasePop_hide(BasePop* p) {
+    g_windows.erase(std::remove(g_windows.begin(), g_windows.end(), p), g_windows.end());
+    p->shown = false;
+    ui_invalidate();
 }
 
 void popup_draw_windows(Buffer* screen) {
@@ -1398,5 +1437,6 @@ void popup_draw_windows(Buffer* screen) {
                 dst[x] = src[i];
             }
         }
+        ui_layer_mark(p->win_x, p->win_y, &c, 0, kKey);
     }
 }

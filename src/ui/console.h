@@ -176,6 +176,14 @@ ADDR_NATIVE(0x5165B0) void THISCALL Console_zoom_to_upkeep_base(uint8_t* console
 ADDR_NATIVE(0x516C50) void THISCALL Console_show_scen_objectives(uint8_t* console);
 ADDR_NATIVE(0x4DD1B0) void THISCALL Console_custom_my_faction(uint8_t* console);
 ADDR_NATIVE(0x4E2000) void THISCALL Console_corner_the_market(uint8_t* console);
+// Resign (shift+Q): REALLYRETIRE, then the score, the rating, the hall of fame, the replay and back
+// to the main menu (prefwin.cpp).
+ADDR_NATIVE(0x514B30) void THISCALL Console_retire_game(uint8_t* console);
+// The scenario editor's game rules (RULES' check boxes; prefwin.cpp).
+ADDR_NATIVE(0x4DC230) void THISCALL Console_editor_rules(uint8_t* console);
+// PrefWin_display (0x48FA00): the preferences dialog on a page (0 preferences, 1 advanced,
+// 2 warnings, 3 automation, 4 audio/visual, 5 map display; prefwin.cpp).
+void prefwin_display(int32_t page);
 // Tutorial popup (popup `label` of file, e.g. TUTOR).
 ADDR_NATIVE(0x48C320) int32_t GAMEAPI popt(const char* file, const char* label, int32_t a3, int32_t a4, int32_t a5);
 // Text entry popup (label of SCRIPT.txt): the default text in `text`; 0 when confirmed, with the
