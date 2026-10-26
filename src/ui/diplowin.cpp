@@ -19,9 +19,9 @@
 // DiploPop_draw_info: the centre pane's two faction boxes (draw_info below); DiploPop's buttons
 // (DATALINKS: the faction's datalink entry, PROFILE: report_intel, HQINFO: DiploPop_draw_hq's pane
 // in place of the world map until a globe button is clicked), clickable while the dialog's popups
-// are open (DiploPop_set_modal: the interface belongs to the modal set). Not reconstructed:
-// the PlanWin map previews of the base trade menus (proposal_menu, FUN_0054DC90),
-// the multiplayer paths (channels, diplo lock messages, PBEM diplo).
+// are open (DiploPop_set_modal: the interface belongs to the modal set). The base trade menus'
+// PlanWin previews (proposal_menu). Not reconstructed: the multiplayer paths (channels, diplo
+// lock messages, PBEM diplo).
 #include "ui/diplowin.h"
 #include "ui/flic.h"
 
@@ -62,8 +62,11 @@
 #include "ui/font_text.h"
 #include "ui/win.h"
 #include "ui/slide.h"
+#include "ui/reports.h"
 #include "ui/statuswin.h"
 #include "ui/console.h"
+
+void battle_routine(int32_t target);
 
 namespace {
 
@@ -107,6 +110,7 @@ void window_show() {
     UiRect frame{0x17, 0, w - 0x37, h};
     Buffer_box_sprite(&g_win.canvas, &frame, box_def(9));
     BasePop_set_def_external_window(true, g_win.x, g_win.y, w, h);
+    multiwin_hide();  // MainInterface_on_status(0)
     slide_show_window(&g_win.canvas, g_win.x, g_win.y);
     mi_slide(true);
     g_win.shown = true;
@@ -652,7 +656,13 @@ bool has_hq(int32_t base_id) {
     return (Bases[base_id].facilities_built[off] & (uint8_t)mask) != 0;
 }
 // PROPOSEBASE / COUNTERBASE: the bases (without headquarters) to swap; -1 when none was chosen.
+// PlanWin previews them (FUN_0048BC60, its background FUN_0048B3F0): zoomed on the first base,
+// its single-point "route" (FUN_0048AE90(b, b, 0)); the list's selection callback is the
+// original's battle_routine (its routes from attack_from for DiploBattlePlayer / Rival, as left
+// by the last battle plans: proposal_menu sets it, FUN_0054DC90 the base preview is not used).
 int32_t base_menu(const char* label, int32_t owner, int32_t viewer, int32_t fw) {
+    planwin_open();
+    planwin_redraw_back();
     ui_diplo_menu_start(label, 0x100040);
     int32_t n = 0;
     for (int32_t i = 0; i < BaseCount; i++) {
@@ -662,10 +672,21 @@ int32_t base_menu(const char* label, int32_t owner, int32_t viewer, int32_t fw) 
         StrBuffer[0] = 0;
         say_base(StrBuffer, i);
         ui_diplo_menu_item(StrBuffer, i);
+        if (!n) {
+            planwin_clear_lines();
+            planwin_zoom_tile(Bases[i].x, Bases[i].y, 0);
+            planwin_add_base_line(i, i, 0);
+            planwin_draw();
+        }
         n++;
     }
-    int32_t r = n ? ui_diplo_menu_exec(fw) : -1;
+    int32_t r = -1;
+    if (n) {
+        ui_diplo_menu_set_callback(battle_routine);
+        r = ui_diplo_menu_exec(fw);
+    }
     ui_diplo_menu_close();
+    planwin_close();
     return r;
 }
 }  // namespace

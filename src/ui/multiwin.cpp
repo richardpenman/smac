@@ -215,3 +215,12 @@ void THISCALL MultiWin_show(uint8_t*) {
     sw_run(s);
     sw_clear_buttons(s);
 }
+
+// MultiWin_hide (0x479C00) as MainInterface_on_status(0) calls it when another interface mode
+// starts (the diplomacy dialog): the commlink window closes.
+void multiwin_hide() {
+    if (g_mp.open) {
+        sw_close(&g_mp);
+        sw_hide(&g_mp);
+    }
+}

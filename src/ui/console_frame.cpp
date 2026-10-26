@@ -205,8 +205,7 @@ void console_frame_draw(Buffer* s) {
     if (!battlewin_shown()) statuswin_compose(mi);  // the stack row's scroll arrows
     // (In the diplomacy mode DiploPop's panes replace the info pane: InfoWin is hidden.)
     if (!battlewin_shown() && diplowin_faction() < 0) infowin_compose(mi);  // the info pane or the message list
-    if (planwin_shown()) planwin_compose(mi);  // the go-to list's PlanWin in the world map pane
-    else if (!diplowin_hq_shown()) worldpane_draw(mi);  // WorldWin / MapWins[1] (hidden under DiploPop's HQ pane)
+    if (!planwin_shown() && !diplowin_hq_shown()) worldpane_draw(mi);  // WorldWin / MapWins[1] (hidden under DiploPop's HQ pane)
     maininfc_set_date();
     // The globe buttons (0x3EE world map, 0x3EF detail map: the one shown pressed; neither under
     // DiploPop's HQ pane, ButtonGroup_set(-1)): their sprite centred.
@@ -221,6 +220,9 @@ void console_frame_draw(Buffer* s) {
     }
     maininfc_redraw_complete();
     diplowin_draw_iface(mi);
+    // PlanWin (the go-to list's, the diplomacy's base and battle previews): its own window over the
+    // world map pane (above DiploPop's HQ pane).
+    if (planwin_shown()) planwin_compose(mi);
     // The window onto the screen (colour 9: the screen behind).
     const UiRect& pos = mi_rect(kMiPos);
     g_ox = pos.left;

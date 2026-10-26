@@ -70,13 +70,14 @@ check "aicall147 reload Believers" "$(dl aicall147r 1 6 | cut -d' ' -f1-4)" "dip
 
 # 2. The human calls the Spartans (F12, their row of the commlink panel: commlink_attempt) after
 #    the Hive's call (default answers): their topics, then DIPLO "make a proposal", PROPOSAL "a
-#    gift", COUNTER "ALL of my research data" (make_a_proposal -> tech_trade: GAVETECH1): the
+#    gift", COUNTER "ALL of my research data" (make_a_proposal -> tech_trade: GAVETECH1; the
+#    commlink panel closed by the dialog, MultiWin_hide): the
 #    Spartans get the technologies, their friction drops. Saved and loaded again.
 HIVE="ENTER,ENTER,ENTER,ENTER,ENTER,ENTER,ENTER,ENTER"
 SPARTANS="F12,CLICK:950x382,ENTER,ENTER,ENTER,ENTER,ENTER,ENTER"
 run giftech147 --save work/saves_late/turn_147.sav --human 3 --keys \
 "$HIVE,$SPARTANS,DIPLOSTATE,DOWN,ENTER,SHOT:proposal.bmp,DOWN,ENTER,SHOT:counter.bmp,DOWN,DOWN,ENTER,ENTER,DIPLOSTATE,\
-SHOT:menu.bmp,ENTER,ESC,SAVE:after.sav"
+SHOT:menu.bmp,ENTER,SAVE:after.sav"
 nocrash giftech147
 has giftech147 "commlink to the Spartans" "^multiwin action 1 faction 5"
 check "giftech147 menus" "$(popups giftech147 | sed 's/.*DIPLO=0 //')" \
@@ -89,7 +90,7 @@ check "giftech147 reload" "$(dl giftech147r 1 5 | cut -d' ' -f17-18)" "techs 33"
 # 3. The same call, COUNTER "a modest sum of energy credits" (make_gift: OFFERENERGY, the second
 #    amount, 75): the credits change hands.
 run giftenergy147 --save work/saves_late/turn_147.sav --human 3 --keys \
-"$HIVE,$SPARTANS,DIPLOSTATE,DOWN,ENTER,DOWN,ENTER,DOWN,DOWN,DOWN,ENTER,SHOT:offer.bmp,DOWN,ENTER,ENTER,DIPLOSTATE,ENTER,ESC,\
+"$HIVE,$SPARTANS,DIPLOSTATE,DOWN,ENTER,DOWN,ENTER,DOWN,DOWN,DOWN,ENTER,SHOT:offer.bmp,DOWN,ENTER,ENTER,DIPLOSTATE,ENTER,\
 SAVE:after.sav"
 nocrash giftenergy147
 check "giftenergy147 menus" "$(popups giftenergy147 | sed 's/.*PROPOSAL=1 //')" "COUNTER1=5 OFFERENERGY=75 GAVEENERGY=0 DIPLO=0"
@@ -151,5 +152,17 @@ has diplowin147 "the world map again" "^diplopop globe 1006: hq 0"
 has diplowin147 "the window hidden at the end" "^diplopop window hidden"
 has diplowin147 "the main interface's detail map" "^worldwin detail map"
 if [ "$(grep -ac '^worldwin detail map' "$OUT/diplowin147.log")" = 2 ]; then echo "PASS diplowin147: the main interface's globe"; else echo "FAIL diplowin147: the main interface's globe"; FAIL=1; fi
+
+# 7. The base trade menus' PlanWin preview (proposal_menu): the Spartans asked for one of their
+#    bases (PROPOSAL "You must cede control of one of your bases", PROPOSEBASE): PlanWin over the
+#    world map pane (above the HQ pane) zoomed on the first base with its point "route"; the
+#    commlink panel closed when the dialog started (MultiWin_hide); hidden again after the menu.
+run basetrade147 --save work/saves_late/turn_147.sav --human 3 --keys \
+"$HIVE,$SPARTANS,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,PLANSTATE,SHOT:base.bmp,ESC,PLANSTATE"
+nocrash basetrade147
+has basetrade147 "the preview opened" "^planwin open "
+has basetrade147 "the first base's point" "^planwin shown 1 zoom -13 centre 24,24 lines 1 \\(22,20\\)-\\(22,20\\) c0"
+has basetrade147 "the menu in DiploPop's window" "^popup PROPOSEBASE shown: 700x450 at 178,105"
+has basetrade147 "hidden after the menu" "^planwin shown 0 "
 
 exit $FAIL

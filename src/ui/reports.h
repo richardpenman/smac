@@ -17,6 +17,8 @@ ADDR_NATIVE(0x4ACB30) void GAMEAPI report_security();
 // Not original: the view of base operations (0 production, 1 citizens, 2 garrison).
 void reports_set_ops_view(int32_t view);
 
+// MultiWin_hide (multiwin.cpp): the commlink panel closed (another interface mode starts).
+void multiwin_hide();
 // The commlink panel (multiwin.cpp): F12 and the console's COMMLINK button
 // (MainInterface_on_iface_button_clicked 0x3EC).
 ADDR_NATIVE(0x479970) void THISCALL MultiWin_show(uint8_t* self);
