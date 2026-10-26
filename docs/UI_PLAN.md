@@ -147,6 +147,7 @@ src/app/smacx.cpp the native game executable
 | 8 (done, section 10; reports and monuments in section 8) | diplomacy (communicate and the human's menus, DiploPop), council window (CouncilWin); hotseat/PBEM `diplo` (DiploWin) not reconstructed | tests/diplo/run.sh |
 | 9 (done, section 11) | main menu, game setup (top_menu, setup dialogs), file dialogs (FileBox), preferences (PrefWin), Resign | tests/menu/run.sh (a new game from the menu equals --new); tests/menu/compare.sh vs the original |
 | 10 (done, section 12) | sound (FX, voices, music), movies (WVE: opening, faction, secret project, defeat and victory movies), the menu column's slide, monument.flc | tests/sound/run.sh; tests/sound/compare.sh vs the original (oracle `logsound`) |
+| 11 (placeholder sweep, section 13) | right-click menu (PullDown), landmarks, go-to path preview and destination lines, the build picker grid, garrison menu, support map, Console_menu_proc, the status and world panes, the map cursor; the remaining work table | tests/placeholders/run.sh; tests/placeholders/compare.sh vs the original |
 
 Each phase replaces the corresponding headless stubs in smacx; `smacx_headless` and the hybrid
 builds stay unchanged.
@@ -701,3 +702,52 @@ are replaced by smacx (src/ui/sound.cpp, music.cpp, movie.cpp).
   and compares (--update refreshes the reference). Human-input sounds cannot be logged in the
   original under the oracle (it plays observer games only); their triggers come from the
   disassembly.
+
+## 13. Remaining work
+
+The placeholder sweep (phase 11): the placeholders, "not reconstructed" parts and approximations of
+the native UI, with their state after the sweep. Size: S (under ~1 KB of the original's code, an
+hour), M (a few KB, a day), L (more, several days). Checks of the items done:
+tests/placeholders/run.sh (and the suites named), side by side with the original:
+tests/placeholders/compare.sh (orig_rmenu.steps; orig_basewin.steps by eye).
+
+| Item | Original functions | State | Size |
+|---|---|---|---|
+| Map right-click menu | MapWin_right_menu, PullDown (add_item .. show, on_redraw), AlphaMenu fill functions | done (mapwin_menu.cpp, pulldown.cpp) | — |
+| Landmarks | Console_name_landmark, Console_erase_landmark (shift+N, ctrl+shift+N) | done | — |
+| Go-to drag path and distance | MapWin_dest_line, MapWin_direct_dest_line, DesktopWin overlay, MapWin_on_mouse_move's text | done (mapwin_dest.cpp) | — |
+| Destination lines on the map | MapWin_draw_base_dest, Buffer_line (dashed) | done | — |
+| Go-to list's map preview | Console_goto_routine's PlanWin (a second MapWin, FUN_0048AF30.., PlanWin_blink) | not reconstructed | M |
+| Build menu picture grid | FUN_00492FA0, FUN_00494700, FUN_004927C0, FUN_00493EA0, FUN_00494280, FUN_004945D0; BaseWin_production's modes | done (prodwin.cpp; the scroll bar's picture missing) | — |
+| Units present / supported menu | BaseWin_garrison_click | done | — |
+| Support map pane | BaseWin_draw_support | done | — |
+| Governor advanced settings (ops report) | ReportIf_on_iface_button_clicked 0xCF4, BaseWin_governor | done | — |
+| City map cursor texture | pfncDrawCityMap's Texture_draw_trans_3 | done | — |
+| Menu commands | Console_menu_proc, Console_next_cursor, the display toggles and their keys | done (console_menu.cpp) | — |
+| Menu items without a function | Console_survey, Console_zoom_to_upkeep_base, Console_show_scen_objectives, Console_corner_the_market | done | — |
+| Menu bar look and item visibility | Menu_on_redraw, PullDown_pulldown_update, pfncMainMenuUpdateVisible | approximated (menu.cpp) | M |
+| Status panes | StatusWin_draw_status, StatusWin_draw_active, say_morale, StatusWin_set_loc / redraw / reset | done (maininfc.cpp) | — |
+| World map pane | WorldWin_on_redraw, MapWin_gen_bases_only, WorldWin_draw_box, WorldWin_tile_to_pixel | done (nearest-pixel stretch for maps larger than the pane) | — |
+| Date box, TURN COMPLETE, globe buttons | MainInterface_set_date, MainInterface_redraw_complete, MainInterface_init's geometry | done (turn.flc not decoded) | — |
+| Map cursor and blinking | MapWin_draw_radius's cursor texture, Texture_draw_trans_3, blink_timer | done (no edge scrolling) | — |
+| Info pane | InfoWin_setup_text, InfoWin_draw_text, InfoWin timer / set_state, the M / I / X buttons, InfoWin_right_menu | approximated (year and allocation) | L |
+| Clicks on the interface panes | StatusWin_on_left_click / on_right_click, StatusWin_arrow_left / right, WorldWin_click / right_menu, the stack scroll arrows | not reconstructed | M |
+| Labs report and the Datalinks tech tree | ReportWin_draw_labs, ReportIf_draw_labs, the Datalinks tree view | approximated / missing | L |
+| Energy report's two columns | ReportWin_draw_energy, ReportIf_draw_energy | approximated | M |
+| Base locator map, report pictures, satellite FLC, hover help | ReportWin_draw_ops / sat, ReportIf_* | approximated | L |
+| Scroll bars | Scroll (ctor, init, on_redraw, compute_thumb_rect, mouse / keys) and its users (picker, list popups, base window panes, reports) | not reconstructed (keys and positions work) | M |
+| Combat animation | boom, BattleWin_* (battle report in the status pane), XI.PCX / XF.PCX frames | not reconstructed (sounds only) | L |
+| Move / turn animations | vehdraw_turn*, veh_scoot (sliding) | not reconstructed (facing set) | M |
+| Interface arms, slide sounds | slide_show, slide_hide, scroll_show / hide | not reconstructed | M |
+| Tutorial windows and hints | TutWin_tour, TutWin_tut_win, Console_give_hints, TutWin_draw_arrow | not reconstructed (hints marked shown) | L |
+| Time controls | Console_time_controls, Console_use_time_bonus (multiplayer), time_controls_dialog | not reconstructed | M |
+| Assemble | Console_assemble | not reconstructed | S |
+| Gamma dialog | FUN_005C8E60 / FUN_005C9520 / FUN_005C95E0 (PrefWin button 6) | not reconstructed | M |
+| Custom faction | Console_custom_my_faction | not reconstructed | M |
+| Scenario / map editor | MapWin_editor, Console_editor_* (Scenario and Edit Map menus, keys), BaseWin_base_editor, Console_editor_edit_veh / kill_veh | not reconstructed | L |
+| Base window details | help bubbles (right clicks on panes), the panes' scroll arrows, the production pane's 3D model | not reconstructed | M |
+| Diplomacy panes | DiploPop_draw_info, DiploPop_draw_hq, DiploPop's popup look | not reconstructed | M |
+| Monuments / hall of fame | the new entry (FUN_0044A660), decorations, background FLC | partly approximated | M |
+| Map view | partial and scrolled redraws (MapWin_gen_radius), MapWin_draw_wars / legend / overlays, pfncProcZoomKey's mouse position, palette cycling | not reconstructed | M |
+| Music | soundx.dll's ambient engine | approximated (music.cpp) | L |
+| Out of scope | multiplayer: DirectPlay, NetDaemon, PBEM / hotseat setup and DiploWin (`diplo`), NetMsg's timed window, MultiWin's chat, multiplayer_init | documented placeholders | — |

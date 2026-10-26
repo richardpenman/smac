@@ -13,6 +13,7 @@
 #include <algorithm>
 #include "ui/font_text.h"
 #include "ui/sprites.h"
+#include "ui/texture.h"
 #include "ui/colortables.h"
 #include "ui/mapwin.h"
 #include "ui/vehdraw.h"
@@ -1418,7 +1419,7 @@ void THISCALL pfncDrawCityMap(uint8_t* self, int32_t flag) {
                     if (v >= 0) veh_draw(c, v, px, py - q2, 0, 0, 0);
                 } else if (tf & 0x10) {
                     polygon_dest(c, &TileCorners[0][0], 4, mem::host(0x6F0F7C));
-                    // Texture_draw_trans_3 of texture 0x787FB8 over the tile: not reconstructed.
+                    Texture_draw_trans_3(ArtTexture(0x787FB8), c, &TileCorners[0][0], 0);  // the cursor texture
                 }
             } else {
                 int32_t bid = base_at(x, y);
