@@ -8,6 +8,7 @@
 #include "ui/wve.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 
 #include "platform/win32.h"

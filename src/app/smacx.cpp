@@ -5,6 +5,17 @@
 //         [--rng FILE] [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR]
 //         [--gamedir DIR] [--image FILE] [--ini FILE] [--nosound]
 //
+// Files. Played as a game (no --outdir): the settings (Alpha Centauri.Ini, seeded from the default
+// ini next to the executable), saves (the game's "saves" folder), the hall of fame, screenshots and
+// the data image built from terranx.exe go to the per-user directory (SDL_GetPrefPath: Linux
+// ~/.local/share/smacx, macOS ~/Library/Application Support/smacx, Windows %APPDATA%\smacx); the
+// game folder is found at start-up (app/gamedata.h: the remembered folder, the standard install
+// locations, else the player is asked) and remembered in smacx.cfg there. --gamedir, --image and
+// --ini replace each of these. With --outdir (tests, the harness) nothing is looked for: the
+// defaults are the repository's (game, src/data/data_image.bin,
+// harness/oracle/runtime/Alpha Centauri.Ini), everything is written below --outdir and the game's
+// saves folder is the game directory's; the ini is copied from --ini at every start.
+//
 // The reconstructed engine runs as in the original: control_game boots, the main menu (top_menu,
 // src/ui/topmenu.cpp: the opening screens, the game setup dialogs, LOAD GAME's FileBox) sets up or
 // loads a game, and control_turn plays the turns. --new (the harness's newgame keys: size, width,
@@ -78,6 +89,7 @@
 #include <string>
 #include <vector>
 
+#include "app/gamedata.h"
 #include "engine/clock.h"
 #include "engine/game.h"
 #include "engine/globals.h"
@@ -93,6 +105,7 @@
 #include "engine/ui_bridge.h"
 #include "engine/world.h"
 #include "platform/ui_platform.h"
+#include "platform/win32.h"
 #include "ui/console.h"
 #include "ui/diplowin.h"
 #include "ui/gfx.h"
@@ -110,8 +123,7 @@ namespace fs = std::filesystem;
 namespace {
 
 struct Options {
-    std::string save, gamedir = "game", image = "src/data/data_image.bin";
-    std::string ini = "harness/oracle/runtime/Alpha Centauri.Ini", outdir = "smacx_out", shot, snapshots, rng;
+    std::string save, gamedir, image, ini, outdir, shot, snapshots, rng;  // defaults: main
     std::string dump, like;  // --dump FILE [--like REF]: map canvas dump (ui_mapdump_like)
     std::string basedump;    // --basedump BASE:FILE: the base window's canvases (the oracle's basedump)
     int scroll_x = -1, scroll_y = -1;  // --scroll-from X,Y: the dump's redraw scrolls from there
@@ -714,21 +726,59 @@ int main(int argc, char** argv) {
     if (!g_opt.seed_given) g_opt.seeded = !g_opt.keys.empty() || g_opt.hidden;
     if (g_opt.new_game && g_opt.human < 0) g_opt.human = 1;
     if (!g_opt.save.empty()) g_opt.save = fs::absolute(g_opt.save).string();
-    g_opt.outdir = fs::absolute(g_opt.outdir).string();
     if (!g_opt.shot.empty()) g_opt.shot = fs::absolute(g_opt.shot).string();
     if (!g_opt.snapshots.empty()) {
         g_opt.snapshots = fs::absolute(g_opt.snapshots).string();
         fs::create_directories(g_opt.snapshots);
     }
+    std::string ini_copy;  // the ini the game reads and writes
+    if (!g_opt.outdir.empty()) {
+        // Tests and the harness: the repository's files; the ini is a fresh copy of --ini at every
+        // start, so that a run's preferences never carry over into the next run in the same outdir.
+        if (g_opt.gamedir.empty()) g_opt.gamedir = "game";
+        if (g_opt.image.empty()) g_opt.image = "src/data/data_image.bin";
+        if (g_opt.ini.empty()) g_opt.ini = "harness/oracle/runtime/Alpha Centauri.Ini";
+        g_opt.outdir = fs::absolute(g_opt.outdir).string();
+        fs::create_directories(g_opt.outdir);
+        ini_copy = (fs::path(g_opt.outdir) / "Alpha Centauri.Ini").string();
+        std::error_code ec;
+        fs::copy_file(g_opt.ini, ini_copy, fs::copy_options::overwrite_existing, ec);
+    } else {
+        // The game as players run it: the per-user directory and the installed game.
+        std::string udir = gamedata::user_dir();
+        if (udir.empty()) {
+            gamedata::show_error("Cannot create the per-user settings folder.");
+            return 1;
+        }
+        g_opt.outdir = fs::absolute(udir).string();
+        while (g_opt.outdir.size() > 1 && (g_opt.outdir.back() == '/' || g_opt.outdir.back() == '\\'))
+            g_opt.outdir.pop_back();
+        if (g_opt.gamedir.empty()) {
+            g_opt.gamedir = gamedata::find_game_dir(udir);
+            if (g_opt.gamedir.empty()) return 3;
+        } else {
+            std::string why;
+            if (!gamedata::check_game_dir(g_opt.gamedir, &why)) {
+                gamedata::show_error(why);
+                return 3;
+            }
+        }
+        if (g_opt.image.empty()) {
+            g_opt.image = gamedata::data_image(g_opt.gamedir, udir);
+            if (g_opt.image.empty()) return 1;
+        }
+        if (g_opt.ini.empty()) {
+            ini_copy = (fs::path(udir) / "Alpha Centauri.Ini").string();
+            gamedata::seed_ini(ini_copy);
+        } else {
+            ini_copy = fs::absolute(g_opt.ini).string();
+        }
+        platform::set_saves_dir((fs::path(udir) / "saves").string().c_str());
+    }
     if (!mem::init(fs::absolute(g_opt.image).string().c_str())) {
         std::fprintf(stderr, "cannot load data image %s\n", g_opt.image.c_str());
         return 2;
     }
-    // The game writes its preferences: work on a copy.
-    fs::create_directories(g_opt.outdir);
-    std::string ini_copy = (fs::path(g_opt.outdir) / "Alpha Centauri.Ini").string();
-    std::error_code ec;
-    if (!fs::exists(ini_copy)) fs::copy_file(g_opt.ini, ini_copy, ec);
     fs::current_path(g_opt.gamedir);
     platform::set_game_dir(".");
     engine_static_init(ini_copy.c_str());

@@ -30,6 +30,7 @@
 // negative faction, tutwin.cpp); the slide (screenwin.cpp).
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 

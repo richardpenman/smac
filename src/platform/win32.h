@@ -49,5 +49,8 @@ const char* resolve_path(const char* path, char* out, uint32_t out_size);
 bool host_stat(const char* path, bool* is_dir, uint64_t* size);
 // _mkdir: true if the directory was created (false if it exists or cannot be created).
 bool host_mkdir(const char* path);
+// Redirects the game directory's "saves" folder: resolve_path maps a relative path whose first
+// component is "saves" (any case) into dir (smacx's per-user directory; empty: no redirect).
+void set_saves_dir(const char* dir);
 #endif
 }  // namespace platform

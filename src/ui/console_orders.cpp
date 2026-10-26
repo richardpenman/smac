@@ -8,6 +8,7 @@
 // net_* helpers of console.cpp. The go-to list's path preview is PlanWin (planwin.cpp); drawing
 // left out (destination lines of group moves) is noted where it is.
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include "engine/action.h"

@@ -124,8 +124,8 @@ Recip recip(int32_t w) {  // 1 / w, w > 0
     int32_t b = bit_length((uint64_t)w);
     r.s = b + 23;
     // 2^s / w lies in (2^23, 2^24]; for a power of two it is exactly 2^24.
-    unsigned __int128 num = (unsigned __int128)1 << r.s;
-    r.m = (uint64_t)(num / (uint64_t)w);
+    uint64_t num = (uint64_t)1 << r.s;  // s <= 54 (w < 2^31)
+    r.m = num / (uint64_t)w;
     if (r.m >= (1u << 24)) {
         r.m >>= 1;
         r.s -= 1;

@@ -14,6 +14,7 @@
 // multiplayer, Scenario and Edit Map in the scenario editor). A chosen item runs its command id
 // through Console_menu_proc (console_menu.cpp), as Menu_menu_event does.
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>

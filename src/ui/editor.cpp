@@ -12,6 +12,7 @@
 // technology, personality and strategy; the diplomacy editor: editor_diplo.cpp) and the scenario's
 // rules, parameters and victory conditions.
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 

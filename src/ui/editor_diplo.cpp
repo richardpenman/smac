@@ -11,6 +11,7 @@
 // Approximated: the list box's and the check boxes' look (rows of the window's Arial 14 with the
 // popups' check marks, the selection's colour; no scroll bar: the list holds six factions).
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 

@@ -4,6 +4,58 @@ Goal: reconstruct the source of *Sid Meier's Alpha Centauri: Alien Crossfire*
 as portable C++ that builds and runs natively,
 and prove behavioural equivalence against the original binary with a differential harness.
 
+## Download and play
+
+Releases (GitHub Releases of this repository) have ready-to-run packages of `smacx`, the native
+game with the SDL2 UI. They contain no game data: you need your own installed copy of *Alpha
+Centauri* with *Alien Crossfire* v2.0 (GOG's Planetary Pack; `terranx.exe` md5
+`cc659f53cb6fa0eaaddccd0a54176647`).
+
+| Package | Run |
+| --- | --- |
+| `smacx-vX.Y.Z-windows-x86_64.zip` | unzip, run `smacx.exe` (SDL2 DLLs included) |
+| `smacx-vX.Y.Z-macos-arm64.zip` | unzip, open `smacx.app` (Apple Silicon, macOS 11+; ad-hoc signed, not notarized: right-click > Open the first time) |
+| `smacx-vX.Y.Z-linux-x86_64.tar.gz` | unpack, run `./smacx` (glibc 2.35+, X11 or Wayland; the SDL2 libraries are in `lib/`) |
+
+First run (`src/app/gamedata.cpp`):
+
+1. **Finding the game.** smacx uses the folder it remembered (`smacx.cfg` in the per-user
+   directory), else looks in the standard install locations: on Windows GOG's registry entries,
+   `C:\GOG Games`, `Program Files`, GOG Galaxy and Steam folders; on macOS GOG's Mac app (a Wineskin
+   wrapper: `*.app/Contents/Resources/drive_c/...`) in `/Applications` and `~/Applications`,
+   `~/GOG Games`, CrossOver bottles; on Linux `~/GOG Games`, `~/Games` (Lutris, Heroic), Wine prefixes
+   (`$WINEPREFIX`, `~/.wine`), Heroic and Bottles prefixes, Steam/Proton. A folder qualifies when it
+   has `terranx.exe` v2.0 and the game's data files; another version of `terranx.exe` is reported
+   with its md5. If none is found, smacx asks: a message box, then the platform's folder picker
+   (Windows: the shell's folder dialog; macOS: `osascript` choose folder; Linux: `zenity` or
+   `kdialog` when installed), else a path typed on the terminal. The answer is checked and
+   remembered. Without a display or a terminal it exits with status 3 and a message;
+   `SMACX_GAMEDIR=DIR` gives the answer in advance, `--gamedir DIR` skips the search.
+2. **The data image.** smacx builds the engine's initial data image from the player's
+   `terranx.exe` (the C++ port of `src/tools/gen_data_image.py`, byte-identical output) and
+   caches it as `data_image.bin` in the per-user directory (`--image` overrides).
+3. **Per-user files.** The ini (`Alpha Centauri.Ini`, seeded from the default ini shipped next to
+   the executable), saved games (the game's `saves` folder), the Hall of Fame and screenshots go to
+   the per-user directory: `%APPDATA%\smacx` (Windows), `~/Library/Application Support/smacx`
+   (macOS), `~/.local/share/smacx` (Linux). The game folder is only read.
+
+With `--outdir DIR` (the tests and the harness) none of this happens: the defaults are the
+repository's (`game/`, `src/data/data_image.bin`, `harness/oracle/runtime/Alpha Centauri.Ini`),
+everything is written below `DIR`, and the ini is copied from `--ini` at every start, so a
+stale ini from an earlier run cannot change a test run.
+
+### Making a release
+
+Push a tag: `git tag v1.2.3 && git push origin v1.2.3`. `.github/workflows/release.yml` builds
+the three packages (Linux on Ubuntu 22.04, the SDL2 libraries built from source; macOS arm64 on
+`macos-14`, an `.app` with the SDL2 dylibs in `Contents/Frameworks`, ad-hoc signed; Windows
+cross-compiled with llvm-mingw against the official SDL2 mingw packages) and publishes them as a
+GitHub Release (a tag with a `-`, e.g. `v1.2.3-rc1`, makes a pre-release). The repository is
+private, so Actions minutes are billed: one release is roughly 65 billed minutes (macOS counts
+10x). Running the workflow by hand on a branch builds the packages as workflow artifacts without
+a release. `packaging/package.sh` assembles a package and refuses any file outside its
+allow-list, so no game data or anything derived from `terranx.exe` can ship.
+
 ## Layout
 
 | Path | What |
@@ -124,7 +176,8 @@ Screenshots of `smacx` (native, no original code):
    machine where it is installed, or take the game folder out of the GOG Mac app (a Wineskin
    wrapper: right-click the app, Show Package Contents, then `Contents/Resources/drive_c/...`, the
    folder that contains `terranx.exe`).
-3. Data image: `python3 src/tools/gen_data_image.py game/terranx.exe src/data/data_image.bin`.
+3. Data image (only for `smacx_headless` and `--outdir` runs; `smacx` alone builds its own):
+   `python3 src/tools/gen_data_image.py game/terranx.exe src/data/data_image.bin`.
 4. Build and run from the repository root:
 
 ```sh
@@ -134,7 +187,9 @@ build/native/smacx                       # main menu; or: --new --human 1, --sav
 ```
 
 CMake builds `smacx` only when it finds SDL2 and SDL2\_ttf (the configure step prints a message
-otherwise). smacx writes its settings and saves under `smacx_out/` by default (`--outdir`).
+otherwise). Run without `--outdir`, smacx finds the game and keeps its settings and saves in the
+per-user directory as a released build does ("Download and play"); with `--outdir DIR` it uses
+`game/` and `src/data/data_image.bin` from the current directory and writes below `DIR`.
 
 ## Getting started
 

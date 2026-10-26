@@ -1,0 +1,181 @@
+# Builds the smacx release packages (Linux x86_64, macOS arm64, Windows x86_64) and publishes them
+# as a GitHub Release. Runs when a tag v* is pushed (git tag v1.2.3 && git push origin v1.2.3), or
+# by hand (Actions > release > Run workflow): on a tag it publishes the release, on a branch it only
+# keeps the packages as workflow artifacts.
+#
+# The packages contain smacx, the SDL2 libraries, the default ini, packaging/README.txt and the
+# licences: never game data or anything derived from terranx.exe (packaging/package.sh checks the
+# file list). Players supply the game; smacx builds its data image from it on the first run.
+#
+# Cost: the repository is private, so the minutes are billed (macOS counts 10x, Windows 2x; the
+# Windows package is cross-compiled on Linux). One release is about 65 billed minutes, less when
+# the SDL builds come from the cache.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SDL_CACHE_KEY: sdl2-2.30.11-ttf-2.24.0-v1
+  # Build only the game (not smacx_headless or the smoke test).
+  SMACX_CONFIGURE: -DCMAKE_BUILD_TYPE=Release
+
+jobs:
+  linux:
+    name: linux-x86_64
+    # The oldest supported runner: the package runs on distributions with glibc >= 2.35.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        run: echo "VERSION=$([[ $GITHUB_REF == refs/tags/v* ]] && echo "$GITHUB_REF_NAME" || echo "dev-${GITHUB_SHA::7}")" >> "$GITHUB_ENV"
+      - name: SDL build dependencies
+        # SDL loads these libraries at run time when present (X11, Wayland, ALSA, PulseAudio, ...).
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libx11-dev libxext-dev libxrandr-dev \
+            libxcursor-dev libxi-dev libxfixes-dev libxss-dev libxxf86vm-dev libxkbcommon-dev \
+            libwayland-dev wayland-protocols libegl1-mesa-dev libgl1-mesa-dev libdecor-0-dev \
+            libasound2-dev libpulse-dev libpipewire-0.3-dev libdbus-1-dev libudev-dev
+      - name: SDL cache
+        id: sdl-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/sdl
+          key: ${{ env.SDL_CACHE_KEY }}-linux-x86_64
+      - name: SDL2 and SDL2_ttf
+        if: steps.sdl-cache.outputs.cache-hit != 'true'
+        run: packaging/build_sdl.sh ~/sdl
+      - name: Configure
+        # RUNPATH $ORIGIN/lib: the SDL libraries next to the executable; libstdc++ linked in.
+        run: >
+          cmake -S . -B build $SMACX_CONFIGURE -DCMAKE_PREFIX_PATH=$HOME/sdl
+          -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON '-DCMAKE_INSTALL_RPATH=$ORIGIN/lib'
+          '-DCMAKE_EXE_LINKER_FLAGS=-static-libstdc++ -static-libgcc'
+      - name: Build
+        run: cmake --build build --parallel 4 --target smacx
+      - name: Package
+        run: packaging/package.sh linux-x86_64 build ~/sdl/lib "$VERSION" dist ~/sdl/licenses/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smacx-linux-x86_64
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  macos:
+    name: macos-arm64
+    # Apple Silicon only (Intel Macs: add x86_64 to CMAKE_OSX_ARCHITECTURES for a universal build,
+    # which about doubles this job's time).
+    runs-on: macos-14
+    timeout-minutes: 40
+    env:
+      MACOS_FLAGS: -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        run: echo "VERSION=$([[ $GITHUB_REF == refs/tags/v* ]] && echo "$GITHUB_REF_NAME" || echo "dev-${GITHUB_SHA::7}")" >> "$GITHUB_ENV"
+      - name: SDL cache
+        id: sdl-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/sdl
+          key: ${{ env.SDL_CACHE_KEY }}-macos-arm64
+      - name: SDL2 and SDL2_ttf
+        if: steps.sdl-cache.outputs.cache-hit != 'true'
+        run: packaging/build_sdl.sh ~/sdl $MACOS_FLAGS
+      - name: Configure
+        run: cmake -S . -B build $SMACX_CONFIGURE $MACOS_FLAGS -DCMAKE_PREFIX_PATH=$HOME/sdl
+      - name: Build
+        run: cmake --build build --parallel 4 --target smacx
+      - name: Package
+        run: packaging/package.sh macos-arm64 build ~/sdl/lib "$VERSION" dist ~/sdl/licenses/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smacx-macos-arm64
+          path: dist/*.zip
+          if-no-files-found: error
+
+  windows:
+    name: windows-x86_64
+    # Cross-compiled with llvm-mingw (the toolchain of cmake/x86_64-mingw.cmake) and the official
+    # SDL2 / SDL2_ttf mingw development packages: Linux minutes cost half of Windows minutes.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    env:
+      LLVM_MINGW: llvm-mingw-20260922-msvcrt-ubuntu-22.04-x86_64
+      LLVM_MINGW_SHA256: 17bbc667b96f7b1f02ce4a172d8cac4fa480927a1f649e788dee5914919566a1
+      SDL2_MINGW_SHA256: 0590db0a47b564aab92499ed03eaa75db9aee17c371080caa3b05df9d49d9ff9
+      TTF_MINGW_SHA256: 3a09e0a967ad53eca3ff2701de4d0df3369c0368739a1088a78d9d74908ef2c3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        run: echo "VERSION=$([[ $GITHUB_REF == refs/tags/v* ]] && echo "$GITHUB_REF_NAME" || echo "dev-${GITHUB_SHA::7}")" >> "$GITHUB_ENV"
+      - name: Toolchain and SDL
+        run: |
+          mkdir -p tools deps
+          curl -fsSL -o llvm-mingw.tar.xz "https://github.com/mstorsjo/llvm-mingw/releases/download/20260922/$LLVM_MINGW.tar.xz"
+          curl -fsSL -o sdl2.tar.gz https://github.com/libsdl-org/SDL/releases/download/release-2.30.11/SDL2-devel-2.30.11-mingw.tar.gz
+          curl -fsSL -o ttf.tar.gz https://github.com/libsdl-org/SDL_ttf/releases/download/release-2.24.0/SDL2_ttf-devel-2.24.0-mingw.tar.gz
+          printf '%s  %s\n' "$LLVM_MINGW_SHA256" llvm-mingw.tar.xz "$SDL2_MINGW_SHA256" sdl2.tar.gz \
+            "$TTF_MINGW_SHA256" ttf.tar.gz | sha256sum -c -
+          tar xJf llvm-mingw.tar.xz -C tools
+          tar xzf sdl2.tar.gz -C deps
+          tar xzf ttf.tar.gz -C deps
+          rm llvm-mingw.tar.xz sdl2.tar.gz ttf.tar.gz
+      - name: Configure
+        # Static C++ runtime; a GUI program (no console window).
+        run: >
+          cmake -S . -B build $SMACX_CONFIGURE -DCMAKE_TOOLCHAIN_FILE=cmake/x86_64-mingw.cmake
+          -DSDL2_DIR=$PWD/deps/SDL2-2.30.11/x86_64-w64-mingw32/lib/cmake/SDL2
+          -DSDL2_ttf_DIR=$PWD/deps/SDL2_ttf-2.24.0/x86_64-w64-mingw32/lib/cmake/SDL2_ttf
+          -DSMACX_WIN32_GUI=ON
+      - name: Build
+        run: cmake --build build --parallel 4 --target smacx
+      - name: Package
+        run: |
+          packaging/package.sh windows-x86_64 build \
+            deps/SDL2-2.30.11/x86_64-w64-mingw32/bin:deps/SDL2_ttf-2.24.0/x86_64-w64-mingw32/bin "$VERSION" dist \
+            deps/SDL2-2.30.11 deps/SDL2_ttf-2.24.0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smacx-windows-x86_64
+          path: dist/*.zip
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    needs: [linux, macos, windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ls -l dist
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            pre=()
+            [[ "$TAG" == *-* ]] && pre=(--prerelease)  # v1.0.0-rc1
+            gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --title "smacx $TAG" \
+              --generate-notes --verify-tag "${pre[@]}"
+          fi

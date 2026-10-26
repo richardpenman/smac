@@ -144,10 +144,23 @@ bool host_mkdir(const char* path) {
     return fs::create_directory(path, ec) && !ec;
 }
 
+namespace {
+std::string g_saves_dir;  // set_saves_dir
+}  // namespace
+
+void set_saves_dir(const char* dir) {
+    g_saves_dir = dir ? dir : "";
+    for (char& c : g_saves_dir)
+        if (c == '\\') c = '/';
+    while (g_saves_dir.size() > 1 && g_saves_dir.back() == '/') g_saves_dir.pop_back();
+}
+
 const char* resolve_path(const char* path, char* out, uint32_t out_size) {
     std::string p(path);
     for (char& c : p)
         if (c == '\\') c = '/';
+    if (!g_saves_dir.empty() && p.size() >= 5 && ieq(p.substr(0, 5), "saves") && (p.size() == 5 || p[5] == '/'))
+        p = g_saves_dir + p.substr(5);
     std::string result;
     size_t pos = 0;
     if (!p.empty() && p[0] == '/') {

@@ -19,6 +19,7 @@
 // original's GDI stretch mode is BLACKONWHITE).
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 
