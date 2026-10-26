@@ -54,6 +54,8 @@ ADDR_NATIVE(0x5DA6C0) int32_t THISCALL Buffer_tile_mask(Buffer* self, Buffer* ti
 // Loads interface.pcx's popup pieces (button bars, check box marks, box sprites), the text
 // colours of text.pcx and iface.pcx and the popup fonts, once.
 void popup_art_init();
+// iface.pcx's colours of load_interface (0x68A5A0 + 4 i).
+int32_t g_iface_color(int32_t i);
 
 // ---- BasePop / Popup ----
 class BasePop;

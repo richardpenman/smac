@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "engine/action.h"
+#include "engine/game.h"
 #include "engine/base.h"
 #include "engine/crt.h"
 #include "engine/parse.h"
@@ -206,8 +207,31 @@ void GAMEAPI go_timer() {
 }
 
 // Fires the drag timer when it is due (called by the pump).
+// blink_timer (0x50EA40, every 150 ms; start_timers): while the human gives orders, the cursor
+// (view mode) or the selected unit (unit mode) blinks: kConCursorShown toggles and draw_cursor
+// redraws. Not reconstructed: its scrolling of the view when the mouse is at the screen's edge,
+// PlanWin_blink.
+void blink_timer() {
+    uint8_t* self = &MainConsole;
+    if (GameNotStarted || MapMouseModal || Win_is_visible(&BaseWin)) return;
+    if ((!mw(self, kConTurnActive) && (!MultiplayerActive || !(GameState & 2))) || ControlTurnA) {
+        mw(self, kConCursorOn) = 0;
+        return;
+    }
+    if (mw(self, kConWaiting) || (MultiplayerActive && (GameState & 2))) {
+        mw(self, kConCursorShown) = !mw(self, kConCursorShown);
+        draw_cursor();
+    }
+}
+
 void console_ui_tick() {
     if (g_go_timer_due && (int32_t)(platform::ticks_ms() - g_go_timer_due) >= 0) go_timer();
+    static uint32_t last_blink = 0;
+    uint32_t now = platform::ticks_ms();
+    if (now - last_blink >= 150) {
+        last_blink = now;
+        blink_timer();
+    }
 }
 
 // ---- MapWin handlers -------------------------------------------------------------------------------

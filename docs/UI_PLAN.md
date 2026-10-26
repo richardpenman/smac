@@ -213,10 +213,18 @@ computer players move with the engine.
   rally points / patrols / go-to orders, dashed Buffer_line). Not reconstructed: MapWin_editor,
   the go-to list's map preview (Console_goto_routine's PlanWin, a second MapWin at 0x834D70).
   Sounds: section 12.
-* **Main interface** (console_frame.cpp; approximated, see its header): console2_A.pcx frame,
-  pane backgrounds, menu / commlink buttons, "TURN COMPLETE", the unit, tile, stack, info and
-  date panes and a simple world map, drawn with the original's art, fonts and colours at the
-  measured positions, not by StatusWin_draw_* / InfoWin_setup_text / WorldWin_on_redraw.
+* **Main interface** (console_frame.cpp, maininfc.cpp): console2_A.pcx frame, pane backgrounds,
+  menu / commlink buttons and, drawn by the original's code into the main interface's canvas: the
+  status panes (StatusWin_draw_status: the tile with its terrain picture and words or resource
+  numbers, coordinates; StatusWin_draw_active: the unit or base; the stack row), the world map
+  (WorldWin_on_redraw: the whole map by its own MapWin at zoom -14, the bases, the view's box),
+  the date box (MainInterface_set_date), "TURN COMPLETE" (MainInterface_redraw_complete), the globe
+  buttons; the pane rectangles of MainInterface_init. The map cursor is MapWin_draw_radius's cursor
+  texture over the cursor tile (Texture_draw_trans_3), blinking with blink_timer (the selected unit
+  blinks too). Approximated: the info pane's text (InfoWin_setup_text / InfoWin_draw_text with its
+  typewriter timer: the year and the allocation only). Not reconstructed: turn.flc, the info pane's
+  M / I buttons, the stack row's scroll arrows, the panes' clicks (StatusWin_on_left_click /
+  on_right_click), blink_timer's scrolling at the screen's edge.
 * **Menus** (menu.cpp; the look approximated): the bar and pull-downs of menu.txt with the
   original's command ids and init-hidden items (Alt, Alt+letter, arrows, Enter, mouse); a command
   runs Console_menu_proc (console_menu.cpp, reconstructed: every Game / HQ / Map / Action /
@@ -225,8 +233,8 @@ computer players move with the engine.
   Console_corner_the_market). The scenario editor's commands and the multiplayer ones log.
 * **Save / load**: ctrl+S / ctrl+L (and the Game menu) run the engine's save_game / load_game with
   a simple file box (console_filebox.cpp): a name field, a list of saves; original naming.
-* **Placeholders** (src/ui/console_placeholders.cpp): the map cursor and selected unit are
-  diamonds; the scenario editor, time controls, assemble, tutorial hints log
+* **Placeholders** (src/ui/console_placeholders.cpp): the scenario editor, time controls,
+  assemble, tutorial hints log
   "not reconstructed". Multiplayer paths stop at the first network call.
 * **Testing**: `--keys` scripts input (characters, `C-`/`S-`/`A-` modifiers, `ALT`, `CLICK:XxY`,
   `RCLICK:XxY`, `MOVE:XxY`, `DRAG:X1xY1:X2xY2` (a held left button: the go-to drag), KP1..KP9, named keys, and

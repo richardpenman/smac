@@ -1,6 +1,6 @@
 #!/bin/bash
 # The original and smacx side by side for the placeholder sweep's windows (the map's right-click
-# menu, the go-to drag's path preview).
+# menu, the go-to drag's path preview, the main interface's panes at the start).
 #
 #   tests/placeholders/compare.sh OUTDIR [ORIG_DIR]
 #
@@ -21,8 +21,8 @@ if [ ! -f "$ORIG/rmenu.png" ]; then
     "$PY" "$ROOT/tests/popups/orig_drive.py" "$ROOT/tests/placeholders/orig_rmenu.steps" "$ORIG"
 fi
 (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 300 "$SMACX" --hidden --new size=0 --human 1 --seed 1,2 \
-    --outdir "$OUT/smacx" --keys "ENTER,S-RCLICK:512x300,SHOT:rmenu.bmp,ESC,DRAG:512x300:682x430:drag.bmp" > "$OUT/smacx.log" 2>&1)
-for p in "rmenu 513 301 745 700" "drag 400 180 900 510"; do
+    --outdir "$OUT/smacx" --keys "ENTER,SHOT:start.bmp,S-RCLICK:512x300,SHOT:rmenu.bmp,ESC,DRAG:512x300:682x430:drag.bmp" > "$OUT/smacx.log" 2>&1)
+for p in "rmenu 513 301 745 700" "drag 400 180 900 510" "start 0 560 1024 768"; do
     set -- $p
     printf '%-16s ' "$1"
     "$PY" "$ROOT/tests/popups/cmp.py" "$ORIG/$1.png" "$OUT/smacx/$1.bmp" "$OUT/cmp_$1.png" $2 $3 $4 $5 2>/dev/null

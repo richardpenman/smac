@@ -307,6 +307,11 @@ void THISCALL Buffer_box_sprite(Buffer* self, const UiRect* r, const BoxDef* b) 
 
 static int32_t g_main_font = 7, g_button_font = 7;  // config_popups' font sizes (indices of kFontSizes)
 
+int32_t g_iface_color(int32_t i) {
+    popup_art_init();
+    return g_iface_colors[i];
+}
+
 void popup_art_init() {
     if (g_art_ok) return;
     g_art_ok = true;

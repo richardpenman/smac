@@ -91,4 +91,9 @@ run survey $NEW --keys "ENTER,A-m,${D13}ENTER,SHOT:survey1.bmp,A-m,${D13}ENTER,S
 check survey "Map menu: Terrain Survey (0x20F)" "^menu command 20F$"
 nocrash survey
 
+# 6. The main interface's panes (maininfc.cpp: StatusWin_draw_status / draw_active, WorldWin, the
+#    date box) and the map cursor in view mode (v), over a few moves of the cursor.
+run panes $NEW --keys "ENTER,SHOT:unit.bmp,v,KP6,KP6,SHOT:cursor.bmp,S-BACK,BACK,UNITS"
+nocrash panes
+
 exit $FAIL

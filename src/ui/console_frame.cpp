@@ -9,15 +9,16 @@
 // buttons use the bars of console_x2_a.pcx; "TURN COMPLETE" is written centred in spot 5 in
 // colour 0x65. The pane rectangles below are the init's (fields +0xD80.., 1024 layout).
 //
-// Approximated (not the original's drawing code): the contents of the panes (StatusWin_draw_active
-// / StatusWin_draw_status, InfoWin_setup_text, WorldWin_on_redraw, MainInterface_set_date) are
-// written with the original's fonts, colours and positions as measured on the original's screen,
-// not by those functions; the turn.flc animation, the button highlight states and the slide
-// animation of the arms are not drawn.
+// The status panes, the world map, the date box and "TURN COMPLETE" are drawn by the original's
+// code (maininfc.cpp) into the main interface's canvas. Approximated: the info pane's text
+// (InfoWin_setup_text: the year and the allocation, at measured positions). Not drawn: turn.flc,
+// the info pane's buttons (M / I), the globe buttons, the button highlight states and the slide
+// animation of the arms.
 #include "ui/console_frame.h"
 #include "ui/reports.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include "engine/base.h"
@@ -28,6 +29,7 @@
 #include "engine/veh.h"
 #include "engine/zoc.h"
 #include "ui/basewin.h"
+#include "ui/basewin_internal.h"
 #include "ui/colortables.h"
 #include "ui/console.h"
 #include "ui/diplowin.h"
@@ -55,6 +57,7 @@ struct Art {
     bool loaded = false, ok = false;
     Buffer frame;      // console2_A.pcx
     Sprite bar[3];     // button bars (console_x2_a.pcx, 106 x 14 at (1, 0xD9 + 15 i))
+    Sprite globe[2][3];  // the world map buttons 0x3EE / 0x3EF (interface.pcx, MainInfc +0x21C74 / +0x21CF8)
 } g_art;
 
 int32_t g_ox = 0, g_oy = 0;  // frame origin on the screen
@@ -74,6 +77,14 @@ void load_art() {
             pfncSpriteFromCanvasRectTrans(&s, &x, kKey, 1, y, 0x6A, h, 0);
             y += h + 1;
             y2 += h + 1;
+        }
+    }
+    Buffer ifc;
+    Buffer_ctor(&ifc);
+    if (!Buffer_load_pcx(&ifc, "interface.pcx", nullptr, 10, 0xEC)) {
+        for (int32_t k = 0, y = 0x8F; k < 3; k++, y += 0x21) {
+            pfncSpriteFromCanvasRectTrans(&g_art.globe[0][k], &ifc, kKey, 0x214, y, 0x36, 0x20, 0);
+            pfncSpriteFromCanvasRectTrans(&g_art.globe[1][k], &ifc, kKey, 0x24B, y, 0x36, 0x20, 0);
         }
     }
     g_art.ok = true;
@@ -119,63 +130,6 @@ void draw_button(Buffer* s, const UiRect& r, const char* label) {
     write_center(s, up, r, 14, 1, color(228, 104, 24));
 }
 
-// The unit pane (StatusWin_draw_active): picture, name, statistics, morale, faction, moves,
-// orders.
-void draw_unit_pane(Buffer* s, int32_t v) {
-    const VEH& u = Vehs[v];
-    int32_t green = color(116, 156, 56);
-    UiRect clip = {g_ox + 8, g_oy + 0x3C, g_ox + 0x86, g_oy + 0xF8};
-    Buffer_set_clip(s, &clip);
-    veh_draw(s, v, g_ox + 12, g_oy + 0x3E, 0, 0x1000, 0);
-    Buffer_set_clip(s, nullptr);
-    char line[256];
-    std::snprintf(line, sizeof(line), "%s", Units[u.unit_id].name);
-    UiRect r = {8, 0x7C, 0x86, 0x8C};
-    write_center(s, line, r, 12, 0, green);
-    line[0] = 0;
-    say_stats_3(line, u.unit_id);
-    r.top += 14;
-    r.bottom += 14;
-    write_center(s, line, r, 12, 0, green);
-    // Morale, home base (or "Independent"), moves left, orders.
-    int32_t y = 0xA3;
-    int32_t m = u.morale;  // the unit's morale level (the pane's word)
-    if (m < 0) m = 0;
-    if (m > 6) m = 6;
-    std::snprintf(line, sizeof(line), "%s", Morale[m].name);
-    write(s, line, 14, y, 12, 0, green);
-    if (u.home_base_id >= 0) std::snprintf(line, sizeof(line), "%s", Bases[u.home_base_id].name);
-    else std::snprintf(line, sizeof(line), "%s", label_get(194));
-    write(s, line, 14, y + 14, 12, 0, green);
-    int32_t left = speed(v, 0) - u.moves_spent;
-    if (left < 0) left = 0;
-    std::snprintf(line, sizeof(line), "%s: %d", label_get(7), left / Rules.move_rate_roads);
-    write(s, line, 14, y + 28, 12, 0, green);
-    line[0] = 0;
-    say_orders(line, v);
-    if (!line[0]) std::snprintf(line, sizeof(line), "%s", Order[0].order);
-    y += 14;
-    write(s, line, 14, y + 28, 12, 0, green);
-}
-
-// The tile pane (StatusWin_draw_status): elevation, coordinates (unexplored tiles: the word).
-void draw_tile_pane(Buffer* s, int32_t x, int32_t y) {
-    int32_t green = color(116, 156, 56);
-    char line[128];
-    if (x < 0 || y < 0 || x >= MapAreaX || y >= MapAreaY) return;
-    MAP* sq = map_tile(x, y);
-    bool seen = (GameState & 0x80) || (sq->visibility & (1 << (CurrentPlayerFaction & 31)));
-    if (!seen) {
-        UiRect r = {0x8C, 0x60, 0xF1, 0x70};
-        write_center(s, label_get(192), r, 12, 0, green);  // "Unexplored"
-    } else {
-        std::snprintf(line, sizeof(line), "%s: %dm", label_get(11), pfncGetElevation(x, y));
-        write(s, line, 0x95, 0x75, 12, 0, green);
-    }
-    std::snprintf(line, sizeof(line), "(%d , %d)", x, y);
-    write(s, line, 0xBA, 0xA6, 12, 0, green);
-}
-
 // The info pane (InfoWin_setup_text, first state): the year, the faction's allocation.
 void draw_info_pane(Buffer* s) {
     int32_t green = color(116, 156, 56), light = color(184, 192, 96);
@@ -192,40 +146,6 @@ void draw_info_pane(Buffer* s) {
     write(s, line, 0x112, 0x76, 12, 0, green);
     std::snprintf(line, sizeof(line), "%s: %d%%", label_get(170), f.SE_alloc_labs * 10);
     write(s, line, 0x112, 0x84, 12, 0, green);
-}
-
-// The stack row (the units of the cursor's tile, or of the selected unit).
-void draw_stack(Buffer* s, int32_t v) {
-    if (v < 0) return;
-    while (Vehs[v].prev_veh_id_stack >= 0) v = Vehs[v].prev_veh_id_stack;
-    // The row starts right of the unit pane (+0xCEC: the unit pane's right + 3).
-    UiRect clip = {g_ox + 0x8E, g_oy + kStack.top + 4, g_ox + kStack.right - 4, g_oy + kStack.bottom - 4};
-    for (int n = 0; v >= 0 && n < 9; v = Vehs[v].next_veh_id_stack, n++) {
-        Buffer_set_clip(s, &clip);
-        veh_draw(s, v, g_ox + 0xC8 + n * 64, g_oy + kStack.top + 0x6, -6, 0x1000, 0);
-        Buffer_set_clip(s, nullptr);
-    }
-}
-
-// The world map (WorldWin): one dot per tile (land / sea, territory), the view's outline.
-void draw_world(Buffer* s) {
-    UiRect r = {g_ox + kRight.left + 6, g_oy + kRight.top + 30, g_ox + kRight.right - 6, g_oy + kRight.bottom - 46};
-    if (MapAreaX <= 0 || MapAreaY <= 0) return;
-    int32_t w = r.right - r.left, h = r.bottom - r.top;
-    int32_t sea = color(24, 48, 96), land = color(80, 64, 40);
-    for (int32_t py = 0; py < h; py++) {
-        int32_t y = py * MapAreaY / h;
-        for (int32_t px = 0; px < w; px++) {
-            int32_t x = px * MapAreaX / w;
-            if ((x ^ y) & 1) x = (x + 1) % MapAreaX;
-            MAP* sq = map_tile(x, y);
-            if (!(GameState & 0x80) && !(sq->visibility & (1 << (CurrentPlayerFaction & 31)))) continue;
-            int32_t c = (sq->climate & 0xE0) < 0x60 ? sea : land;
-            int32_t owner = sq->owner;
-            if (owner > 0 && owner < 8 && ((x + y) & 2)) c = FactionColorFill[owner];
-            s->data[(size_t)(r.top + py) * s->stride + r.left + px] = (uint8_t)c;
-        }
-    }
 }
 
 }  // namespace
@@ -256,72 +176,56 @@ void console_frame_mouse(int32_t type, int32_t x, int32_t y) {
 void console_frame_draw(Buffer* s) {
     load_art();
     if (!g_art.ok || Win_is_visible(&BaseWin)) return;
-    g_ox = (s->width - 1024) / 2;
-    g_oy = s->height - 0x101;
+    maininfc_geometry();
     // Below the main view the screen has nothing else: black.
     int32_t view_h = console_view_height(s->height);
     for (int32_t y = view_h; y < s->height; y++) std::memset(s->data + (size_t)y * s->stride, 0, (size_t)s->width);
-    for (int32_t y = 0; y < g_art.frame.height; y++) {
-        int32_t sy = g_oy + y;
-        if (sy < 0 || sy >= s->height) continue;
-        const uint8_t* src = g_art.frame.data + (size_t)y * g_art.frame.stride;
-        uint8_t* dst = s->data + (size_t)sy * s->stride + g_ox;
-        for (int32_t x = 0; x < g_art.frame.width && g_ox + x < s->width; x++)
-            if (src[x] != kKey) dst[x] = src[x];
+    // MainInterface_on_redraw (mode 0): the console art, the panes' background and their contents
+    // drawn into the main interface's canvas.
+    Buffer* mi = basewin_mi_canvas();
+    const std::vector<uint8_t>& back = basewin_mi_back();
+    if (mi->data && back.size() == (size_t)mi->stride * mi->height) std::memcpy(mi->data, back.data(), back.size());
+    mi_restore_back(1);
+    g_ox = 0;
+    g_oy = 0;
+    // The info pane's frame and text (InfoWin; approximated, see the file's header).
+    {
+        UiRect c = mi_rect(kMiPaneCenter);
+        UiRect r{c.left + 4, c.top + 4, c.right - 4, c.bottom - 4};
+        Buffer_box_sprite(mi, &r, box_def(3));  // MainInterface_on_redraw's box (button 0x3E9: info)
     }
-    restore_back(s, kLeft);
-    restore_back(s, kRight);
-    restore_back(s, kInfo);
-    restore_back(s, kStack);
-    // The panes' inner frames (StatusWin, InfoWin, the date and turn spots), measured on the
-    // original's screen and drawn with the box sprite of the InfoWin frames (box 18).
-    static const UiRect kBoxes[] = {{8, 61, 136, 250},  {140, 61, 242, 188}, {140, 192, 765, 250},
-                                    {266, 73, 496, 170}, {497, 73, 725, 170}, {783, 212, 901, 248},
-                                    {783, 61, 1018, 84}};
-    for (const UiRect& r : kBoxes) {
-        UiRect a = {g_ox + r.left, g_oy + r.top, g_ox + r.right, g_oy + r.bottom};
-        if (BoxDef* b = box_def(18)) Buffer_box_sprite(s, &a, b);
+    if (!diplowin_draw_console(mi, 0, 0)) {
+        StatusWin_redraw(&InfoWin);
+        draw_info_pane(mi);
+    } else {
+        draw_info_pane(mi);
+    }
+    worldwin_draw();
+    maininfc_set_date();
+    // The globe buttons (0x3EE pressed by ButtonGroup_set(0x3EE, 1), 0x3EF): their sprite centred.
+    for (int32_t i = 0; i < 2; i++) {
+        const UiRect& r = mi_rect(i ? 0xA9C : 0xA8C);
+        Sprite* sp = &g_art.globe[i][i ? 0 : 2];
+        if (!sp->width) continue;
+        BlitDestScale = BlitSourceScale = 1;
+        pfncSpriteStretchCopyToCanvas(sp, mi, kKey, r.left + ((r.right - r.left) - sp->full_width) / 2,
+                                      r.top + ((r.bottom - r.top) - sp->full_height) / 2);
+    }
+    maininfc_redraw_complete();
+    // The window onto the screen (colour 9: the screen behind).
+    const UiRect& pos = mi_rect(kMiPos);
+    g_ox = pos.left;
+    g_oy = pos.top;
+    for (int32_t y = 0; y < mi->height; y++) {
+        int32_t sy = pos.top + y;
+        if (sy < 0 || sy >= s->height) continue;
+        const uint8_t* src = mi->data + (size_t)y * mi->stride;
+        uint8_t* dst = s->data + (size_t)sy * s->stride + pos.left;
+        for (int32_t x = 0; x < mi->width && pos.left + x < s->width; x++)
+            if (src[x] != kKey) dst[x] = src[x];
     }
     draw_button(s, kMenuBtn, label_get(624));
     draw_button(s, kCommBtn, label_get(527));
-    // MainInterface_redraw_complete: "TURN COMPLETE" while the turn waits for its end.
-    {
-        char up[64];
-        std::snprintf(up, sizeof(up), "%s", label_get(26));
-        for (char* p = up; *p; p++) *p = (char)crt_toupper((uint8_t)*p);
-        UiRect spot = {0x30F, 0x3D, 0x3F8, 0x54};
-        write_center(s, up, spot, 14, 1, 0x65);
-    }
-    char line[160];
-    char year[64];
-    year[0] = 0;
-    say_year(year);
-    std::snprintf(line, sizeof(line), "%s %s", label_get(0), year);
-    write(s, line, 0x312, 0xDA, 12, 0, color(60, 148, 124));
-    std::snprintf(line, sizeof(line), "%s: %d", label_get(36), Factions[CurrentPlayerFaction].energy_credits);
-    write(s, line, 0x312, 0xE8, 12, 0, color(60, 148, 124));
-    // The diplomacy mode (DiploPop) replaces the status panes while a commlink is open.
-    if (diplowin_draw_console(s, g_ox, g_oy)) {
-        draw_info_pane(s);
-        draw_world(s);
-        return;
-    }
-    int32_t v = mw(&MainConsole, kConVeh);
-    int32_t cx = MapWinCursorX[MapWinCursorIndex], cy = MapWinCursorY[MapWinCursorIndex];
-    if (MapWinInVehMode && v >= 0 && v < VehCount) {
-        draw_unit_pane(s, v);
-        draw_tile_pane(s, Vehs[v].x, Vehs[v].y);
-        draw_stack(s, v);
-    } else {
-        draw_tile_pane(s, cx, cy);
-        int32_t t = (cx >= 0 && cy >= 0 && cx < MapAreaX && cy < MapAreaY) ? veh_at(cx, cy) : -1;
-        if (t >= 0 && (Vehs[t].faction_id == (uint32_t)CurrentPlayerFaction || (GameState & 0x80))) {
-            draw_unit_pane(s, t);
-            draw_stack(s, t);
-        }
-    }
-    draw_info_pane(s);
-    draw_world(s);
 }
 
 void THISCALL StatusWin_set_title(uint8_t*, const char*) { ui_invalidate(); }

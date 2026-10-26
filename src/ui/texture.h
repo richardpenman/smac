@@ -27,6 +27,9 @@ GLOBAL(int32_t, TextureLightMax, 0x6972D0);
 // Transparent texel index (DAT_009BB548), copied by the transparent blitters at entry.
 GLOBAL(int32_t, TextureKey, 0x9BB548);
 
+// Texture_draw_trans_3 (0x61A240): the texture's own reference points (4 corners, or 8 points
+// with `eight`) mapped onto pts, texels equal to TextureKey skipped, no light (the map cursor).
+ADDR_NATIVE(0x61A240) void THISCALL Texture_draw_trans_3(Texture* self, Buffer* dest, const int32_t* pts, int32_t eight);
 // Gouraud textured (lights clamped).
 ADDR_NATIVE(0x61B1F0) void THISCALL Texture_draw_2(Texture* self, Buffer* dest, const int32_t* pts, int32_t* light,
                                                    int32_t n, const int32_t* uv);

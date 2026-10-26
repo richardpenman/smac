@@ -2,6 +2,8 @@
 #include "ui/diplowin.h"
 #include "ui/win.h"
 #include "ui/pulldown.h"
+#include "ui/texture.h"
+#include "ui/sprites.h"
 #include "ui/sound.h"
 
 #include <algorithm>
@@ -279,21 +281,28 @@ bool pump_platform(int32_t timeout_ms) {
 
 // ---- drawing ----
 
-// Placeholder of the map cursor (draw_cursor / MapWin_draw_cursor): a diamond on the tile.
-void draw_tile_marker(int32_t x, int32_t y, int32_t color) {
+// The map cursor as MapWin_draw_radius (0x46A2A0) draws it over the cursor tile: in view mode,
+// while the human gives orders (kConWaiting), when shown (the blink's kConCursorShown, or 0x23C00),
+// the cursor texture (0x787FB8; 0x75B858 zoomed out below -7) over the tile's corners as the last
+// redraw of the tile computed them (CursorTileCorners).
+void draw_map_cursor() {
     uint8_t* win = MapWins[0];
-    if (!win || !ui_mapwin_native(win) || x < 0 || y < 0 || x >= MapAreaX || y >= MapAreaY) return;
-    int32_t px, py;
-    pfncTileToPoint(win, x, y, &px, &py);
-    int32_t w = mw(win, kMwTileW), h = mw(win, kMwTileH);
-    if (px + w < 0 || py + h < 0 || px > g_view.width || py > g_view.height) return;
+    uint8_t* con = &MainConsole;
+    if (!win || !ui_mapwin_native(win) || MapWinInVehMode) return;
+    if (MultiplayerActive && ControlTurnC) return;
+    if (!mw(con, kConCursorShown) && !mw(con, kConRedraw)) return;
+    if (!mw(con, kConWaiting) && !(MultiplayerActive && (GameState & 2))) return;
+    int32_t x = MapWinCursorX[MapWinCursorIndex], y = MapWinCursorY[MapWinCursorIndex];
+    if (y < mw(win, kMwOriginY) || y >= mw(win, kMwRowsBelow) + mw(win, kMwRowsAbove) + mw(win, kMwOriginY)) return;
+    if (!(MapToggleFlat & 1)) {
+        if (x < mw(win, kMwOriginX)) x += MapAreaX;
+        if (mw(win, kMwColsEven) + mw(win, kMwColsOdd) + mw(win, kMwOriginX) <= x) x -= MapAreaX;
+    }
+    if (x < mw(win, kMwOriginX) || x >= mw(win, kMwColsEven) + mw(win, kMwColsOdd) + mw(win, kMwOriginX)) return;
+    Texture* t = ArtTexture(mw(win, kMwZoom) < -7 ? 0x75B858 : 0x787FB8);
     UiRect clip = {0, 0, g_view.width, g_view.height};
     Buffer_set_clip(&g_canvas, &clip);
-    int32_t cx = px + w / 2, cy = py + h / 2;
-    Buffer_line_2(&g_canvas, px, cy, cx, py, color);
-    Buffer_line_2(&g_canvas, cx, py, px + w, cy, color);
-    Buffer_line_2(&g_canvas, px + w, cy, cx, py + h, color);
-    Buffer_line_2(&g_canvas, cx, py + h, px, cy, color);
+    Texture_draw_trans_3(t, &g_canvas, &CursorTileCorners[0][0], 0);
     Buffer_set_clip(&g_canvas, nullptr);
 }
 
@@ -398,10 +407,7 @@ void ui_present() {
             uint8_t* dst = g_canvas.data + (size_t)y * g_canvas.stride;
             if (y < g_view.height) std::memcpy(dst, g_view.data + (size_t)y * g_view.stride, (size_t)g_view.width);
         }
-        if (mw(&MainConsole, kConCursorShown) || !MapWinInVehMode)
-            draw_tile_marker(MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex], 0xFF);
-        if (MapWinInVehMode && MapWinVehA >= 0 && MapWinVehA < VehCount)
-            draw_tile_marker(Vehs[MapWinVehA].x, Vehs[MapWinVehA].y, 0xFB);
+        draw_map_cursor();
         console_frame_draw(&g_canvas);
         if (g_desktop_shown && g_desktop_buf.data) {  // DesktopWin over the windows (go-to drag)
             for (int32_t y = 0; y < g_canvas.height; y++) {

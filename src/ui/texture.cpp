@@ -471,6 +471,12 @@ void THISCALL Texture_draw_upper_threshold_trans(Texture* self, Buffer* dest, co
     raster(self, dest, poly(pts, uv, nullptr, n, false), d);
 }
 
+void THISCALL Texture_draw_trans_3(Texture* self, Buffer* dest, const int32_t* pts, int32_t eight) {
+    // The same scan converter and span as Texture_draw_upper_threshold_trans (the two functions
+    // differ only in where the vertex count and the texture points come from).
+    Texture_draw_upper_threshold_trans(self, dest, pts, eight ? 8 : 4, &self->points[eight ? 4 : 0][0]);
+}
+
 void THISCALL Texture_draw_upper_threshold_trans_2(Texture* self, Buffer* dest, const int32_t* pts, int32_t n,
                                                    const int32_t* uv, int32_t color) {
     if (color == -1) {

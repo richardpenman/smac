@@ -4,13 +4,19 @@
 #include "ui/console.h"
 #include "ui/console_frame.h"
 #include "ui/win.h"
+#include "engine/ui_bridge.h"
 
-// The cursor and the panes are drawn by the placeholder screen (win.cpp) at presentation.
-void GAMEAPI draw_cursor() { ui_invalidate(); }
-void THISCALL MapWin_draw_cursor(uint8_t*) { ui_invalidate(); }
+// The cursor (MapWin_draw_radius's Texture_draw_trans_3 of the cursor texture over the cursor
+// tile) is composed over the map view at presentation (win.cpp) from the tile's corners of the
+// last redraw; partial redraws are not reconstructed: the selected unit's blink and a moved cursor
+// redraw the view.
+void GAMEAPI draw_cursor() {
+    if (MapWinInVehMode) ui_invalidate_map();
+    else ui_invalidate();
+}
+void THISCALL MapWin_draw_cursor(uint8_t*) { ui_invalidate_map(); }
 void THISCALL InfoWin_change(uint8_t*, int32_t) { ui_invalidate(); }
 void THISCALL InfoWin_reset(uint8_t*) {}
-void THISCALL StatusWin_set_loc(uint8_t*, int32_t, int32_t) { ui_invalidate(); }
 void THISCALL WorldWin_set_world_map(uint8_t*) {}
 void THISCALL pfncMainMenuUpdateVisible(uint8_t*, int32_t) {}
 void THISCALL TutWin_tour(uint8_t*) { console_not_reconstructed("TutWin_tour"); }

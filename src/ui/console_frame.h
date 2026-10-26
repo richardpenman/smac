@@ -43,6 +43,14 @@ void console_toggle_pref(int32_t id);
 // Height of the main view (the map window): the screen minus the console's lower part.
 int32_t console_view_height(int32_t screen_height);
 
+// The main interface's panes drawn by the original's code (maininfc.cpp): the pane rectangles of
+// MainInterface_init, the world map (WorldWin_on_redraw), the date box (MainInterface_set_date)
+// and "TURN COMPLETE" (MainInterface_redraw_complete), into the main interface's canvas.
+void maininfc_geometry();
+void worldwin_draw();
+void maininfc_set_date();
+void maininfc_redraw_complete();
+
 // ---- original functions ----
 // Hides the pull-down menu bar (AlphaMenu at 0x9380DC).
 void AlphaMenu_hide_main();
