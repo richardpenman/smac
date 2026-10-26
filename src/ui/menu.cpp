@@ -36,6 +36,7 @@
 #include "ui/console_frame.h"
 #include "ui/popup.h"
 #include "ui/pulldown.h"
+#include "ui/sound.h"
 #include "ui/win.h"
 
 namespace {
@@ -521,7 +522,59 @@ void choose(const Item& it) {
     Console_menu_proc(&MainConsole, it.id);  // Menu_menu_event -> Console_menu_daemon
 }
 
+// AlphaMenu_show (0x403680): the column shown with fx\amenu2.wav (the interface sounds) and, with
+// the "animate interface" preference outside multiplayer, slid in: its picture drawn six times in
+// its rectangle, from y = bottom - top piece's height up by a fifth of its height per frame
+// (DAT_00691AF8 ms apart). Unattended runs skip the frames.
+void alphamenu_show() {
+    if (GamePreferences & 0x400) Wave_play_2(mem::host(0x6A7090));
+    std::fprintf(stderr, "alphamenu show (sound %d, slide %d)\n", (GamePreferences & 0x400) ? 1 : 0,
+                 (GamePreferences & 0x8000000) && !MultiplayerActive && !g_ui_exit_when_script_done ? 1 : 0);
+    Buffer* scr = ui_screen_canvas();
+    if (!(GamePreferences & 0x8000000) || MultiplayerActive || g_ui_exit_when_script_done || !scr || !scr->data) return;
+    load_art();
+    // The column's picture: drawn alone into a screen-sized canvas of colour 9.
+    Buffer pic;
+    Buffer_ctor(&pic);
+    Buffer_init(&pic, scr->width, scr->height, 8, 0);
+    UiRect all{0, 0, pic.width, pic.height};
+    Buffer_set_clip(&pic, &all);
+    Buffer_fill_3(&pic, &all, 9);
+    int32_t keep = g_cur;
+    g_cur = -1;
+    console_menu_draw(&pic);
+    g_cur = keep;
+    ui_present();
+    std::vector<uint8_t> screen(scr->data, scr->data + (size_t)scr->stride * scr->height);
+    const int32_t x0 = column_x(), top = column_y(), h = column_h(), bottom = top + h;
+    const int32_t w = g_art.top.full_width;
+    const int32_t step = h / 5;
+    int32_t y = bottom - g_art.top.full_height;
+    std::fprintf(stderr, "alphamenu slide %dx%d at %d,%d\n", w, h, x0, top);
+    for (int32_t f = 0; f < 6; f++) {
+        uint32_t t = platform::ticks_ms();
+        std::memcpy(scr->data, screen.data(), screen.size());
+        for (int32_t j = top; j < bottom && j < scr->height; j++) {
+            int32_t sj = j - y + top;  // the picture's row shown at screen row j
+            if (j < 0 || sj < top || sj >= bottom) continue;
+            const uint8_t* src = pic.data + (size_t)sj * pic.stride;
+            uint8_t* dst = scr->data + (size_t)j * scr->stride;
+            for (int32_t i = x0; i < x0 + w && i < scr->width; i++)
+                if (src[i] != 9) dst[i] = src[i];
+        }
+        platform::video_present(scr->data, scr->stride, scr->width, scr->height,
+                                reinterpret_cast<const platform::Rgb*>(GamePalette.rgb));
+        y -= step;
+        while ((int32_t)(platform::ticks_ms() - t) < *reinterpret_cast<int32_t*>(mem::host(0x691AF8))) platform::delay_ms(1);
+    }
+    std::memcpy(scr->data, screen.data(), screen.size());
+}
+
 void open_menu(int32_t i) {
+    if (!g_open) {
+        g_open = true;
+        alphamenu_show();
+    }
     g_open = true;
     g_cur = i;
     g_sel = -1;

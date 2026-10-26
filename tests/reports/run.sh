@@ -153,13 +153,19 @@ check "monuments reload" "$(line monuments147r monustate 1)" "monustate f3 count
 
 # 5b. Retiring (shift+Q, REALLYRETIRE "yes") ends the game: report_score, then hall_of_fame(1) adds
 #     the viewer's entry (FUN_0044A660: its score, rating, the "best of" marks of a first entry)
-#     with the world map pane's picture hof_3_1.pcx (in --outdir), shown in WORLD MAP. The
+#     with the world map pane's picture hof_3_1.pcx (in --outdir), shown in WORLD MAP; the hall's
+#     other panels (FUN_00448D90): the factions' emblems, SCORE ANALYSIS (the marks, the score
+#     lines), the first mark's banner, TOP 5 SCORES. The
 #     monuments' decorations: the viewer's emblem above the centre.
 run retire147 --save work/saves_late/turn_147.sav --human 3 --keys "DOWN,ENTER,S-q,DOWN,ENTER,ESC,SCREENSTATE,ESC"
 nocrash retire147
 has retire147 "the new entry" "^hall of fame: faction 3 slot 0 score 247 rating 15 flags 01 best 0F picture 0"
 has retire147 "its world map" "^screentext world map hof_3_1.pcx"
 has retire147 "the window" "^famestate faction 3 entries 1"
+has retire147 "SCORE ANALYSIS: the entry's marks" "^screentext HIGHEST TECH LEVEL SCORE"
+has retire147 "SCORE ANALYSIS: its score lines" "^screentext ALPHA CENTAURI RATING"
+has retire147 "SCORE ANALYSIS: the difficulty" "^screentext LIBRARIAN"
+has retire147 "TOP 5 SCORES: the entry" "^screentext 15%  M.Y.2248"
 check "hof_3_1.pcx written" "$(head -c 4 "$OUT/retire147/hof_3_1.pcx" 2>/dev/null | od -An -tx1 | tr -d ' ')" "0a050108"
 check "hallfame.jhh with the entry" "$(od -An -tx1 -j $((10 * 0x8C)) -N 2 "$OUT/retire147/hallfame.jhh" 2>/dev/null | tr -d ' ')" "010f"
 
@@ -177,6 +183,25 @@ has locator147 "the base located" "^report locator: base 2 at 180,26"
 run satanim300 --save work/saves_late/turn_300.sav --human 3 --keys "ESC,ESC,ESC,ESC,ESC,ESC,ESC,F6,CLICK:700x41,SCREENSTATE,SHOT:sat.bmp,ESC"
 nocrash satanim300
 has satanim300 "the animation view" "^report sat anim satellites 0"
+
+# 5e. The satellites table (ReportWin_draw_sat: every faction, the five columns; the panes' SAT0 /
+#     SAT1 texts) and the orbital attack: in the editor's omniscient view a right click on a cell
+#     adds a satellite (sat_edit: two ODPs for the University, a Sky Hydroponics Lab for the
+#     Spartans); reopened, ORBITAL ATTACK VIEW, the Spartans (target button), their Lab (kind
+#     button), ATTACK (0xD3E): sat_attack, ReportWin_start_attack's explosion, action_sat_attack
+#     (WEMUFFEDIT: the pod failed), one satellite fewer in the view.
+run satattack300 --save work/saves_late/turn_300.sav --human 3 --keys \
+"ESC,ESC,ESC,ESC,ESC,ESC,ESC,F6,SCREENSTATE,ESC,C-k,DOWN,ENTER,ENTER,F6,RCLICK:677x227,RCLICK:677x227,RCLICK:371x325,ESC,F6,\
+CLICK:700x41,CLICK:63x631,CLICK:838x609,SCREENSTATE,SHOT:attack.bmp,CLICK:563x487,ENTER,SCREENSTATE"
+nocrash satattack300
+has satattack300 "the table's rows" "^report sat Peacekeepers 0 0 0 0/0 0"
+has satattack300 "SAT0 in the left pane" "^screentext Each satellite \\(Lab, Mining Station"
+has satattack300 "sat_edit" "^sat edit: faction 5 kind 0 -> 1"
+has satattack300 "the target and kind buttons" "^report sat iface view 3389 target 5 kind 65 targets 5@13,110 kinds 0@788,88 attack shown"
+has satattack300 "the explosion" "^sat attack start: faction 3 on 5 kind 0 base 0"
+has satattack300 "action_sat_attack" "^sat attack: faction 3 on 5 kind 0 base 0"
+has satattack300 "its result" "^popup WEMUFFEDIT shown"
+has satattack300 "a satellite fewer" "^report sat anim satellites 2"
 
 # 6. Base operations' governor (turn_147, University Base selected: Set to BUILD, then off) and the
 #    commlink panel (F12): the contacts, a right click's menu, Faction Profile (the intelligence

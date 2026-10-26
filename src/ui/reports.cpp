@@ -26,18 +26,21 @@
 // projects, ReportIf_bl_anim's dot0..3.pcx after a single base is selected or a project
 // clicked), the satellites' ORBITAL ATTACK VIEW (satellite.flc and the orbiting satellites,
 // ReportWin_sat_anim every 4000 ms), the production pictures of base operations.
+// The base operations' citizens view, the satellites' table, the main interface's satellite
+// panes and the orbital attack (sat_attack, ReportWin_start_attack, sat_edit) from the asm too.
 // Approximated (not compared with the original's pixels): the layout inside the window of the
 // other reports (rows and columns at the original's rectangles, text instead of some pictures:
-// the citizens of a base, the project pictures of the projects report), the list boxes' look,
-// the faction logo of the main interface's centre pane, the satellites' table and the orbital
-// attack (ReportWin_start_attack). The faction buttons of ReportIf (viewing other factions'
-// reports, only with GameState 0x80) are not drawn.
+// the project pictures of the projects report), the list boxes' look, the faction logo of the
+// main interface's centre pane. The faction buttons of ReportIf (viewing other factions'
+// reports) are not drawn.
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include <vector>
 
+#include "engine/action.h"
+#include "engine/save.h"
 #include "engine/base.h"
 #include "engine/design.h"
 #include "engine/diplo_act.h"
@@ -105,6 +108,9 @@ struct ReportScreen : ScreenWin {
     BaseButton* report_btn[7]{};
     BaseButton* ops_btn[3]{};    // the views of base operations (ids 0x8B3..0x8B5)
     BaseButton* sat_btn[2]{};    // the satellites' views: the table (0xD3C), the animation (0xD3D)
+    BaseButton* sat_target[8]{}; // ORBITAL ATTACK VIEW: the target factions (ReportIf +0x13778, group 0x6A)
+    BaseButton* sat_type[5]{};   // the satellite kinds (+0x18720, ids 0x41.., group 0xCE)
+    BaseButton* sat_attack_btn = nullptr;  // ATTACK (0xD3E, ReportWin)
     std::vector<BaseButton*> ops_iface;  // GOVERNOR / BEST BASES tabs, the governor buttons
     bool ops_best = false;       // the BEST BASES tab (0xD0B) is shown
     std::vector<BaseButton*> labs_iface;  // TECHNOLOGY / BASES tabs (0x92, 0x93)
@@ -165,6 +171,7 @@ struct ReportScreen : ScreenWin {
     void iface_labs();
     void iface_energy();
     void iface_security();
+    void iface_sat();
     void iface_common(const std::string& head);
 };
 
@@ -281,7 +288,16 @@ int32_t report_facility_mandate(int32_t fac) {
     }
 }
 
+// The UI generator of ReportWin_draw_ops (Random_reseed(timeGetTime()), Random_get), as
+// BaseWin_draw_pop's.
+uint32_t g_ui_seed = 0;
+int32_t g_ui_rand(int32_t lo, int32_t hi) {
+    g_ui_seed = g_ui_seed * 0x19660D + 0x3C6EF35F;
+    return (int32_t)(((uint32_t)(hi - lo) * (g_ui_seed & 0xFFFF)) >> 16) + lo;
+}
+
 void ReportScreen::draw_ops() {
+    g_ui_seed = platform::ticks_ms();
     Buffer* c = &canvas;
     std::string t = "[" + up(adj(faction)) + " " + up(sw_label(0xACC));
     if (g_ops_sort) t += " - " + up(sw_label(kSortLabels[g_ops_sort]));
@@ -396,11 +412,34 @@ void ReportScreen::draw_ops() {
             sw_text_right(this, c, amount, rr);
             line += " build " + what + " " + amount;
         } else if (g_ops_view == 1) {
+            // ReportWin_draw_ops' citizens (0x8B4): the small faces from the row's right, right to
+            // left: the specialists (the last first), the drones (superdrones first), the workers,
+            // the talents; a step of (row width - 0xE2) / (pop - 1), 1..0x22; the faces' looks from
+            // the UI generator (Random_reseed(timeGetTime())). Aliens: ALIENCIT.PCX's.
             int32_t workers = b.pop_size - b.talent_total - b.specialist_total - std::max(b.drone_total, 0);
-            std::string s = num(b.talent_total) + " " + sw_label(0x4CC) + "+, " + num(std::max(workers, 0)) + " workers, " +
-                            num(b.drone_total) + " drones, " + num(b.specialist_total) + " specialists";
-            sw_font(c, f_text, 0xE1);
-            sw_text(this, c, s, col, row.top + 12);
+            const int32_t left = in.left + 0x2D, right = row.right;
+            int32_t step = b.pop_size < 2 ? 0x22 : std::max(1, std::min(0x22, ((right - left) - 0xE2) / (b.pop_size - 1)));
+            int32_t x = step - 0x20 + right;
+            const int32_t fy = row.top + 0x28 - 0x2A / 2 - 0x12;
+            const bool al = ExpansionEnabled && (MFactions[faction].rule_flags & 0x80);
+            auto put = [&](uint32_t addr) {
+                x -= step;
+                Sprite* sp = ArtSprite(addr);
+                sprite_copy1(sp, c, sp->key, x, fy, 1, 1);
+            };
+            for (int32_t i = 0; i < b.specialist_total; i++) {
+                int32_t idx = b.specialist_total - i - 1;
+                int32_t type = idx < 0x10 ? (b.specialist_types[idx >> 3] >> ((idx & 7) << 2)) & 0xF : best_specialist();
+                put((al ? 0x75B710u : 0x779B78u) + (uint32_t)type * 0x2C);
+            }
+            for (int32_t i = 0; i < b.drone_total; i++) {
+                int32_t mood = (i < b.superdrone_total) + 2;
+                put(al ? 0x75B180u + (uint32_t)mood * 0x2C : 0x776420u + (uint32_t)(mood + g_ui_rand(0, 2) * 4) * 0x2C);
+            }
+            for (int32_t i = 0; i < workers; i++) put(al ? 0x75B1ACu : 0x77644Cu + (uint32_t)g_ui_rand(0, 2) * 0xB0);
+            for (int32_t i = 0; i < b.talent_total; i++) put(al ? 0x75B180u : 0x776420u + (uint32_t)g_ui_rand(0, 2) * 0xB0);
+            std::string s = num(b.talent_total) + " talents, " + num(std::max(workers, 0)) + " workers, " + num(b.drone_total) +
+                            " drones, " + num(b.specialist_total) + " specialists";
             line += " citizens " + s;
         } else {
             int32_t v = veh_at(b.x, b.y);
@@ -1048,7 +1087,29 @@ struct SatAnim {
     int32_t cx = 0, cy = 0, fx = 0, fy = 0, frame = 0;
     uint32_t last = 0;
     bool active = false;
+    int32_t count = 0;  // +0xF918: the satellites of all factions (dots shown: the first 16)
+    // ReportWin_start_attack's explosion (+0xF91C.., sat_expl_daemon every 50 ms): its place, the
+    // background under it, its frame; the attack's arguments (+0xF924..).
+    bool expl = false, expl_done = false;
+    int32_t ex = 0, ey = 0, eframe = 0;
+    Buffer ebg;
+    int32_t af = 0, at = 0, atype = 0, abase = 0;
+    uint32_t elast = 0;
 } g_sat;
+int32_t g_sat_target = -1;  // DAT_008996A0: the target faction's button (group 0x6A)
+int32_t g_sat_kind = -1;    // DAT_0089E648: the satellite kind's button (0x41..0x45, group 0xCE)
+// The bases of faction f with Facility 41 (bitmask(0x29)).
+int32_t sat_pods(int32_t f) {
+    int32_t n = 0;
+    for (int32_t b = 0; b < BaseCount; b++)
+        if (Bases[b].faction_id == f && has_fac(41, b, 0)) n++;
+    return n;
+}
+int32_t sat_count(int32_t f, int32_t k) {
+    const Faction& fa = Factions[f];
+    const int32_t v[4] = {fa.satellites_nutrient, fa.satellites_mineral, fa.satellites_energy, fa.satellites_ODP};
+    return k == 4 ? sat_pods(f) : v[k];
+}
 int32_t g_sat_view = 0xD3C;  // DAT_0088037C: the satellites report's view button (0xD3C the table)
 
 void sat_frame(Buffer* c) {
@@ -1093,6 +1154,7 @@ void sat_start(Buffer* c, const UiRect& win) {
     for (int32_t fa = 1; fa < 8; fa++)
         total += Factions[fa].satellites_nutrient + Factions[fa].satellites_mineral + Factions[fa].satellites_energy +
                  Factions[fa].satellites_ODP;
+    a.count = total;
     for (int32_t i = 0; i < 16; i++) {
         int32_t r = 0xD2 / 2 - 10;
         float k = (float)std::sqrt((double)(int32_t)(float)(r * r * 2));
@@ -1111,6 +1173,65 @@ void sat_start(Buffer* c, const UiRect& win) {
     a.last = platform::ticks_ms();
     sat_frame(c);
 }
+
+// ReportWin_exp_anim (sat_expl_daemon, every 50 ms): the background restored and the next of
+// XI.PCX's sixteen frames of row 3 drawn through table group 1 (0x6F2B7C); after the last, the
+// background once more and action_sat_attack.
+void sat_expl_step(Buffer* c) {
+    SatAnim& a = g_sat;
+    if (!a.expl) return;
+    Buffer_set_clip(c, &a.box);
+    if (!a.expl_done) {
+        Buffer_copy_4(&a.ebg, c, 0, 0, a.ex, a.ey, 0x2B, 0x2F);
+        Sprite* s = ArtSprite(0x7A9B30u + (uint32_t)(3 * 16 + a.eframe) * 0x2C);
+        Sprite_draw_multi_table_dest_2(s, c, s->key, a.ex, a.ey, mem::host(0x6F2B7C));
+        if (++a.eframe > 0xF) a.expl_done = true;
+    } else {
+        a.expl = false;
+        Buffer_copy_4(&a.ebg, c, 0, 0, a.ex, a.ey, 0x2B, 0x2F);
+        UiRect all{0, 0, c->width, c->height};
+        Buffer_set_clip(c, &all);
+        std::fprintf(stderr, "sat attack: faction %d on %d kind %d base %d\n", a.af, a.at, a.atype, a.abase);
+        action_sat_attack(a.af, a.at, a.atype, a.abase);
+        ui_invalidate();
+        return;
+    }
+    UiRect all{0, 0, c->width, c->height};
+    Buffer_set_clip(c, &all);
+    ui_invalidate();
+}
+
+// ReportWin_start_attack (0x49FFD0): the arguments kept; one satellite fewer (its dot gone when it
+// was one of the sixteen), the orbits stepped once, the explosion at that satellite's place
+// (0x15 left and 0x17 above it), the background under it saved, the 50 ms timer started.
+void sat_start_attack(Buffer* c, int32_t f, int32_t target, int32_t kind, int32_t base) {
+    SatAnim& a = g_sat;
+    a.af = f;
+    a.at = target;
+    a.atype = kind;
+    a.abase = base;
+    a.expl_done = false;
+    a.eframe = 0;
+    if (!a.count) return;
+    a.count--;
+    int32_t i = a.count & 15;
+    if (a.count < 16) a.on[i] = 0;
+    sat_frame(c);
+    a.ey = (int32_t)a.y[i] - 0x17 + a.cy;
+    a.ex = (int32_t)a.x[i] - 0x15 + a.cx;
+    Buffer_ctor(&a.ebg);
+    Buffer_init(&a.ebg, 0x2B, 0x2F, 8, 0);
+    UiRect all{0, 0, 0x2B, 0x2F};
+    Buffer_set_clip(&a.ebg, &all);
+    Buffer_copy_4(c, &a.ebg, a.ex, a.ey, 0, 0, 0x2B, 0x2F);
+    a.expl = true;
+    a.elast = platform::ticks_ms();
+    std::fprintf(stderr, "sat attack start: faction %d on %d kind %d base %d (explosion at %d,%d)\n", f, target, kind, base,
+                 a.ex, a.ey);
+    // Unattended runs: the frames at once (as the slides).
+    if (g_ui_exit_when_script_done)
+        while (a.expl) sat_expl_step(c);
+}
 }  // namespace
 
 void ReportScreen::draw_sat() {
@@ -1118,6 +1239,13 @@ void ReportScreen::draw_sat() {
     title("[" + up(adj(faction)) + " " + up(sw_label(0xAD4)) + "]");
     UiRect in = inner(), tr = title_rect();
     g_sat.active = false;
+    if (g_sat_view != 0xD3C && g_sat.expl) {
+        // (An attack's explosion running: the view kept as it is, not started again.)
+        Buffer_box_sprite(c, &g_sat.box, box_def(4));
+        g_sat.active = true;
+        state.push_back("sat anim attack");
+        return;
+    }
     if (g_sat_view != 0xD3C) {
         sat_start(c, in);
         int32_t n = 0;
@@ -1136,30 +1264,192 @@ void ReportScreen::draw_sat() {
         state.push_back("sat none");
         return;
     }
-    int32_t y = tr.bottom + 10, lh = line_h() + 4;
-    int32_t c0 = in.left + 12, step = 110;
-    sw_font(c, f_bold, 0x99);
-    static const uint32_t heads[4] = {0xA4, 0xA0, 0xE4, 0};
-    sw_text(this, c, "", c0, y);
-    for (int32_t k = 0; k < 3; k++)
-        sw_text_right(this, c, up(sw_label(heads[k])), {c0 + 180 + k * step, y, c0 + 180 + (k + 1) * step - 10, y + lh});
-    sw_text_right(this, c, "ODP", {c0 + 180 + 3 * step, y, c0 + 180 + 4 * step - 10, y + lh});
-    y += lh + 4;
-    for (int32_t f = 1; f < 8; f++) {
-        if (!(FactionStatus[1] & (1 << f)) && !Factions[f].base_count) continue;
-        if (f != faction && !(Factions[faction].diplo_status[f] & 1) && !(GameState & 0x80)) continue;
-        const Faction& fa = Factions[f];
-        int32_t v[4] = {fa.satellites_nutrient, fa.satellites_mineral, fa.satellites_energy, fa.satellites_ODP};
-        sw_font(c, f_text, text_color(0x68FA30 + (uint32_t)f * 4));
-        sw_text(this, c, MFactions[f].noun_faction, c0, y);
-        std::string l = "sat " + std::string(MFactions[f].noun_faction);
-        for (int32_t k = 0; k < 4; k++) {
-            sw_text_right(this, c, num(v[k]), {c0 + 180 + k * step, y, c0 + 180 + (k + 1) * step - 10, y + lh});
-            l += " " + num(v[k]);
+    // ReportWin_draw_sat's table: a header row and the seven factions, rows of (height - 0x32 -
+    // (top + 0x32) - 2) / 8 from 0x32 below the panel's top (the original mixes the panel's height
+    // into the bottom), the name column a third of the width (a fifth with the expansion's fifth
+    // column) and four or five columns: the satellites of the Sky Hydro Lab, Nessus Mining Station,
+    // Orbital Power Transmitter, Orbital Defense Pods (the ODPs left / all) and, with the
+    // expansion, the bases with Facility 41; the headers (Facility names) wrapped in white, the
+    // numbers centred in their column's colour (0xF8 when none).
+    const int32_t W = in.right - in.left, H = in.bottom - in.top;
+    const int32_t top = in.top + 0x32, bottom = H - 0x32;
+    const int32_t rh = ((bottom - top) - 2) / 8;
+    const int32_t ncol = ExpansionEnabled ? 5 : 4;
+    const int32_t namew = ExpansionEnabled ? W / 5 : W / 3;
+    const int32_t colw = ((W - 4) - namew) / ncol;
+    static const int32_t kColor[5] = {0x98, 0xDF, 0x62, 0xF9, 0xFF};
+    int32_t y = top;
+    for (int32_t f = 0; f < 8; f++) {
+        int32_t x = in.left + 2;
+        if (f) {
+            GenderDefault = MFactions[f].noun_gender;
+            PluralDefault = MFactions[f].is_noun_plural;
+            sw_font(c, f_text, FactionColorText[f], FactionColorShadow[f]);
+            sw_text(this, c, MFactions[f].noun_faction, x, y);
         }
-        state.push_back(l);
-        y += lh;
+        x += namew;
+        std::string l = "sat " + (f ? std::string(MFactions[f].noun_faction) : std::string("header"));
+        int32_t pods = 0;
+        if (f)
+            for (int32_t b = 0; b < BaseCount; b++)
+                if (Bases[b].faction_id == f && has_fac(41, b, 0)) pods++;
+        for (int32_t k = 0; k < ncol; k++, x += colw) {
+            UiRect cell{x, y, x + colw, y + rh};
+            if (!f) {
+                sw_font(c, f_text, 0xFF);
+                std::string h = k == 4 ? Facility[41].name : Facility[65 + k].name;
+                texts.push_back(h);
+                Buffer_wrap_cent_4(c, h.c_str(), cell.left, cell.top, cell.right - cell.left);
+                continue;
+            }
+            const Faction& fa = Factions[f];
+            const int32_t sat[4] = {fa.satellites_nutrient, fa.satellites_mineral, fa.satellites_energy, fa.satellites_ODP};
+            bool some = k == 4 ? pods != 0 : sat[k] != 0;
+            sw_font(c, f_text, some ? kColor[k] : 0xF8);
+            std::string v;
+            if (k == 3) v = num(fa.satellites_ODP - fa.ODP_deployed) + "/";
+            v += num(k == 4 ? pods : sat[k]);
+            UiRect vr{cell.left, cell.top, cell.right, cell.top + line_h()};
+            sw_text_cent(this, c, v, vr);
+            spot_add(&spots[0], k, 80 + f, cell.left, cell.top, cell.right - cell.left, cell.bottom - cell.top);
+            l += " " + v;
+        }
+        if (f) state.push_back(l);
+        y += rh;
     }
+}
+
+// ReportIf_draw_sat (0x4AA970): the main interface's panes. The table: SAT0 (left) and SAT1
+// (right) of the script in their boxes; ORBITAL ATTACK VIEW: "[label 0xF18]" over the target
+// factions' buttons (those with satellites or Facility 41 bases; group 0x6A) on the left, "[label
+// 0xF1C]" over the kinds the target has (the Facility names, ids 0x41..0x45; group 0xCE) on the
+// right; ATTACK (0xD3E, in the window) shown once a kind is chosen (ReportIf_on_iface_group_clicked).
+void ReportScreen::iface_sat() {
+    Buffer* m = &mi;
+    Font* f12 = find_font(12, 0);
+    const int32_t lh = f12->field_0 < 0 ? f12->height : f12->ascent_above + f12->field_0;  // ReportIf +0x1C
+    for (BaseButton* b : sat_target)
+        if (b) b->shown = false;
+    for (BaseButton* b : sat_type)
+        if (b) b->shown = false;
+    for (int32_t side = 0; side < 2; side++) {
+        const UiRect p = mi_rect(side ? kMiPaneRight : kMiPaneQueue);
+        int32_t x = p.left + 6, y = p.top + 6, w = (p.right - p.left) - 12, h = (p.bottom - p.top) - 12;
+        UiRect clip = p;
+        Buffer_set_clip(m, &clip);
+        if (g_sat_view == 0xD3C) {
+            UiRect bx{x, y, x + w, y + h};
+            Buffer_box_sprite(m, &bx, box_def(0));
+            // The section's lines joined (parse_string) and wrapped 4 in.
+            std::string text;
+            if (!X_text_open(ScriptFileName, side ? "SAT1" : "SAT0")) {
+                while (const char* line = text_get()) {
+                    if (!*line) break;
+                    char buf[512];
+                    buf[0] = 0;
+                    parse_string(line, buf);
+                    text += std::string(buf) + " ";
+                }
+            }
+            text_close();
+            sw_font(m, f12, 0xE1);
+            texts.push_back(text);
+            UiRect tr{x + 4, y + 4, x + w - 4, y + h - 4};
+            Buffer_wrap_2(m, text.c_str(), &tr);
+        } else {
+            UiRect hb{x, y, x + w, y + lh + 6};
+            Buffer_box_sprite(m, &hb, box_def(0));
+            UiRect lb{x, hb.bottom + 2, x + w, p.bottom - 6};
+            Buffer_box_sprite(m, &lb, box_def(0));
+            std::string head = "[" + sw_label(side ? 0xF1C : 0xF18) + "]";
+            Buffer_set_font(m, f12, find_font(14, 2), find_font(14, 1), nullptr);
+            Buffer_set_text_color(m, 0xE1, -1, 1, 1);
+            Buffer_set_text_color2(m, 0xE1, -1, 1, 1);
+            Buffer_set_text_color3(m, 0xE1, -1, 1, 1);
+            int32_t tw = Buffer_text_width_2(m, head.c_str(), (int32_t)head.size());
+            sw_text(this, m, head, x + (w - tw) / 2, y + 4);
+            // The buttons: 9 in, from 0x20 below the pane's top, 0x16 apart.
+            int32_t bx = p.left + 9, bw = (p.right - p.left) - 0x12, by = p.top + 0x20;
+            if (!side) {
+                for (int32_t f = 1; f < 8; f++) {
+                    BaseButton* b = sat_target[f];
+                    if (!b) continue;
+                    int32_t total = 0;
+                    for (int32_t k = 0; k < 4; k++) total += sat_count(f, k);
+                    b->shown = total + sat_pods(f) != 0;
+                    bw_button_set(b, f == g_sat_target);
+                }
+            } else {
+                int32_t t = g_sat_target >= 1 && g_sat_target <= 7 ? g_sat_target : -1;
+                for (int32_t k = 0; k < 5; k++) {
+                    BaseButton* b = sat_type[k];
+                    if (!b) continue;
+                    b->r = {bx, by, bx + bw, by + 0x14};
+                    if (t > 0 && (k < 4 || ExpansionEnabled) && sat_count(t, k)) {
+                        b->shown = true;
+                        bw_button_set(b, 0x41 + k == g_sat_kind);
+                        by += 0x16;
+                    }
+                }
+                // A kind the target lacks: ATTACK hidden.
+                int32_t k = g_sat_kind - 0x41;
+                if (sat_attack_btn && (t < 0 || k < 0 || k > 4 || !sat_count(t, k))) sat_attack_btn->shown = false;
+            }
+        }
+        UiRect all{0, 0, m->width, m->height};
+        Buffer_set_clip(m, &all);
+    }
+    if (g_sat_view == 0xD3C && sat_attack_btn) sat_attack_btn->shown = false;
+    std::string l = "sat iface view " + num(g_sat_view) + " target " + num(g_sat_target) + " kind " + num(g_sat_kind) +
+                    " targets";
+    for (int32_t f = 1; f < 8; f++)
+        if (sat_target[f] && sat_target[f]->shown) l += " " + num(f) + "@" + num(sat_target[f]->r.left) + "," + num(sat_target[f]->r.top);
+    l += " kinds";
+    for (int32_t k = 0; k < 5; k++)
+        if (sat_type[k] && sat_type[k]->shown) l += " " + num(k) + "@" + num(sat_type[k]->r.left) + "," + num(sat_type[k]->r.top);
+    l += std::string(" attack ") + (sat_attack_btn && sat_attack_btn->shown ? "shown" : "hidden");
+    state.push_back(l);
+}
+
+// sat_attack (0x4A0260): the orbital attack of f on faction target with kind (0..3 a kind of
+// satellite, 4 the Facility 41 bases): without Orbital Defense Pods NOKILLERS, with all of them
+// used this turn KILLERSDEPLOYED; when the target has that kind: break_treaty (a refusal ends it),
+// diplo_lock, then (kind 4) WHICHGSP picks the base (satbat_sm.pcx) and ReportWin_start_attack.
+void sat_attack(int32_t f, int32_t target, int32_t kind) {
+    if (f == target || target < 1) return;
+    const Faction& F = Factions[f];
+    if (F.satellites_ODP == 0) {
+        if (f == CurrentPlayerFaction) popp(ScriptFileName, "NOKILLERS", 0, "space_sm.pcx", 0);
+        return;
+    }
+    if (F.satellites_ODP <= F.ODP_deployed) {
+        if (f == CurrentPlayerFaction) popp(ScriptFileName, "KILLERSDEPLOYED", 0, "space_sm.pcx", 0);
+        return;
+    }
+    if (!sat_count(target, kind)) return;
+    if (break_treaty(f, target, 7)) return;
+    if (diplo_lock(100)) return;
+    int32_t base = 0;
+    bool go = true;
+    if (kind == 4) {
+        BasePop* p = popup_new();
+        Popup_start(p, ScriptFileName, "WHICHGSP", -1, nullptr, 0);
+        BasePop_set_picture(p, "satbat_sm.pcx");
+        // (The original tests the bases' Facility 41 bit at Bases + f * 0x20CC, the attacker's
+        // faction offset, not the base's own facilities.)
+        int32_t off = 0, mask = 0;
+        bitmask(41, &off, &mask);
+        const uint8_t* raw = reinterpret_cast<const uint8_t*>(&Bases[0]);
+        for (int32_t b = 0; b < BaseCount; b++) {
+            if (Bases[b].faction_id != target) continue;
+            if (raw[0x8C + (size_t)f * 0x20CC + (size_t)b * 0x134 + off] & mask) BasePop_item(p, Bases[b].name, b);
+        }
+        base = BasePop_exec_3(p, 0, 0);
+        popup_delete(p);
+        go = base >= 0;
+    }
+    if (go) sat_start_attack(&g_rs.canvas, f, target, kind, base);
+    diplo_unlock();
 }
 
 // ---- security nexus ----
@@ -1384,7 +1674,7 @@ void ReportScreen::redraw() {
     case kEnergy: draw_energy(); iface_energy(); break;
     case kOps: draw_ops(); iface_ops(); break;
     case kProjects: draw_projects(); break;
-    case kSat: draw_sat(); break;
+    case kSat: draw_sat(); iface_sat(); break;
     case kSecurity: draw_security(); iface_security(); break;
     case kScore: draw_score(); break;
     default: draw_intel(); break;
@@ -1467,6 +1757,21 @@ void ReportScreen::on_button(int32_t id) {
     // ReportWin_on_button_clicked: the views of base operations, DATALINKS (1), CLOSE (9).
     if (id >= 0x8B3 && id <= 0x8B5) g_ops_view = id - 0x8B3;
     if (id == 0xD3C || id == 0xD3D) g_sat_view = id;  // ReportWin_on_group_clicked
+    // ReportIf_on_iface_group_clicked: a target (group 0x6A: ATTACK hidden), a kind (0xCE: shown).
+    if (id > 0x6A00 && id < 0x6A08) {
+        g_sat_target = id - 0x6A00;
+        if (sat_attack_btn) sat_attack_btn->shown = false;
+    }
+    if (id >= 0xCE41 && id <= 0xCE45) {
+        g_sat_kind = id - 0xCE00;
+        if (sat_attack_btn) sat_attack_btn->shown = true;
+    }
+    // ReportWin_on_button_clicked: ATTACK.
+    if (id == 0xD3E && kind() == kSat) {
+        int32_t k = g_sat_kind - 0x41;
+        if (g_sat_target > 0 && g_sat_target < 8 && k >= 0 && k < 5) sat_attack(CurrentPlayerFaction, g_sat_target, k);
+        else if (sat_attack_btn) sat_attack_btn->shown = false;
+    }
     if (id == 9) sw_close(this);
     if (id == 1) {  // DATALINKS: the entry of the report's subject
         switch (kind()) {
@@ -1526,7 +1831,25 @@ void ReportScreen::on_key(int32_t key) {
 
 void locator_start(int32_t base_id);
 
-void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool, bool dbl) {
+void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool right, bool dbl) {
+    // ReportWin_on_right_click in the satellites table with the editor's omniscient view: sat_edit
+    // (0x4A0810), a satellite more (shift: fewer; the ODPs used then kept at most all of them).
+    if (parent == 0 && right && type >= 81 && type <= 87 && kind() == kSat && (GameState & 0x40) && (GameState & 0x80)) {
+        int32_t f = type - 80, k = index;
+        if (k < 4 && faction != 0) {
+            Faction& fa = Factions[f];
+            int32_t* v[4] = {&fa.satellites_nutrient, &fa.satellites_mineral, &fa.satellites_energy, &fa.satellites_ODP};
+            if (!(ui_key_state(0x10) & 0x8000)) {
+                ++*v[k];
+            } else {
+                if (*v[k]) --*v[k];
+                if (k == 3 && fa.satellites_ODP - fa.ODP_deployed < 0) fa.ODP_deployed = fa.satellites_ODP;
+            }
+            see_map_check();
+            std::fprintf(stderr, "sat edit: faction %d kind %d -> %d\n", f, k, *v[k]);
+        }
+        return;
+    }
     if (type == 99) {  // the window's scroll bar (Scroll 0x882584): a line or a page
         int32_t d = index;
         if (d < -1 || d > 1) d = scroll_click(page_bar, x, y, -d);
@@ -1704,7 +2027,11 @@ void locator_start(int32_t base_id) {
 }  // namespace
 
 void reports_tick(uint32_t now) {
-    if (g_rs.open && g_sat.active && kind() == kSat && now - g_sat.last >= 4000) {  // sat_anim_daemon
+    if (g_rs.open && g_sat.expl && kind() == kSat && now - g_sat.elast >= 50) {  // sat_expl_daemon
+        g_sat.elast = now;
+        sat_expl_step(&g_rs.canvas);
+    }
+    if (g_rs.open && g_sat.active && !g_sat.expl && kind() == kSat && now - g_sat.last >= 4000) {  // sat_anim_daemon
         g_sat.last = now;
         sat_frame(&g_rs.canvas);
         ui_invalidate();
@@ -1780,6 +2107,42 @@ void open_reports(int32_t k) {
     s->sat_btn[1] = sw_button(s, up(sw_label(0xCB4)).c_str(), 0xD3D, bw / 2 + 1 + bx, by, bx + bw - (bw / 2 + 1 + bx), 0x14,
                               0, s->f_bold);
     g_sat_view = 0xD3C;
+    // ReportIf_on_status: the ORBITAL ATTACK VIEW's buttons: the target factions in the left pane
+    // (9 in, from 0x20 below its top, 0x16 apart; those with the satellites' technologies,
+    // satellites or Facility 41 bases), the kinds in the right pane (placed by iface_sat), ATTACK
+    // (label 0xCB8, boxes 47 / 46 / 45) under the view button 0xD3D at the panel's bottom.
+    {
+        const UiRect& lp = mi_rect(kMiPaneQueue);
+        int32_t tx = lp.left + 9, tw = (lp.right - lp.left) - 0x12, ty = lp.top + 0x20;
+        for (int32_t f = 0; f < 8; f++) s->sat_target[f] = nullptr;
+        for (int32_t f = 1; f < 8; f++) {
+            if (f == CurrentPlayerFaction) continue;
+            int32_t total = sat_pods(f);
+            for (int32_t k = 0; k < 4; k++) total += sat_count(f, k);
+            if (!has_tech(Facility[65].preq_tech, f) && !total && !has_tech(Facility[41].preq_tech, f)) continue;
+            GenderDefault = MFactions[f].noun_gender;
+            PluralDefault = MFactions[f].is_noun_plural;
+            s->sat_target[f] = sw_button(s, MFactions[f].noun_faction, 0x6A00 + f, tx, ty, tw, 0x14, 1, s->f_bold);
+            s->sat_target[f]->shown = false;
+            ty += 0x16;
+        }
+        for (int32_t k = 0; k < 5; k++) {
+            s->sat_type[k] = sw_button(s, k == 4 ? Facility[41].name : Facility[65 + k].name, 0xCE41 + k, tx, ty, tw, 0x14, 1,
+                                       s->f_bold);
+            s->sat_type[k]->shown = false;
+        }
+        const UiRect& vb = s->sat_btn[1]->r;
+        s->sat_attack_btn = sw_button(s, sw_label(0xCB8).c_str(), 0xD3E, vb.left, in.bottom - 0x1A, vb.right - vb.left, 0x14, 0,
+                                      s->f_bold);
+        s->sat_attack_btn->box[0] = box_def(47);
+        s->sat_attack_btn->box[1] = box_def(46);
+        s->sat_attack_btn->box[2] = box_def(45);
+        for (Sprite** sp : {s->sat_attack_btn->left, s->sat_attack_btn->right, s->sat_attack_btn->top, s->sat_attack_btn->bottom,
+                            s->sat_attack_btn->tl, s->sat_attack_btn->tr, s->sat_attack_btn->bl, s->sat_attack_btn->br})
+            sp[0] = sp[1] = sp[2] = nullptr;
+        s->sat_attack_btn->shown = false;
+        g_sat_target = g_sat_kind = -1;
+    }
     // DATALINKS (1) and CLOSE (9) below the report (ReportIf_on_status).
     int32_t cx = (in.left + in.right) / 2, dl = in.left + 0x4B;
     sw_button(s, up(sw_label(0x86C)).c_str(), 1, dl, in.bottom + 7, cx - 1 - dl, 0x14, 0, s->f_bold);

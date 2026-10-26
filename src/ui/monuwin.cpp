@@ -526,13 +526,14 @@ void load_portraits(int32_t viewer) {
 
 struct FameWinState : ScreenWin {
     int32_t faction = 1;
-    int32_t entry = 0;  // +0xA918: the entry shown in WORLD MAP (the new one after fame_add)
+    int32_t entry = -1;  // +0xA918: the entry analysed (FUN_00448400: -1; the new one after fame_add)
     Font *f_text = nullptr, *f_bold = nullptr;
     void redraw() override;
     void on_button(int32_t id) override;
     void on_key(int32_t) override { sw_close(this); }
     void on_click(int32_t, int32_t index, int32_t type, int32_t, int32_t, bool, bool) override {
-        if (type == 1 && index > 0 && index < 8) faction = index;  // ButtonGroup of the factions
+        if (type == 1 && index > 0 && index < 8) faction = index;  // ButtonGroup 0x15 of the factions
+        else if (type == 0 && index >= 0 && index < 5) entry = index;  // an entry of TOP 5 SCORES
     }
     void log_state() override;
 };
@@ -541,10 +542,18 @@ FameWinState g_fw;
 
 uint8_t* fame_entry(int32_t f, int32_t slot) { return &HallOfFame[((f - 1) * 5 + slot) * 0x8C]; }
 
+// FUN_00448400's layout: the 800 x 600 panel at (0x77, 0x50) of the 1024 x 768 window and its
+// rectangles (+0xB42C ..), relative to the panel.
+constexpr int32_t kFx = 0x77, kFy = 0x50;
+UiRect fr(int32_t l, int32_t t, int32_t r, int32_t b) { return {l + kFx, t + kFy, r + kFx, b + kFy}; }
+
 void FameWinState::redraw() {
-    // FUN_00448400 / FUN_00448D90 (approximated layout): frame.pcx over the screen, hof.pcx (the
-    // panel: faction emblems, TOP 5 SCORES, WORLD MAP, SCORE ANALYSIS) centred; a click on an
-    // emblem shows that faction's top five.
+    // FUN_00448D90: frame.pcx over the window, hof.pcx (the panel) at its origin; the six score
+    // categories (hoficons.pcx buttons 0x8AE..: their pressed picture for the analysed entry's
+    // "best of" marks), the factions' emblems (buttons 1..7 of ButtonGroup 0x15: the faction's
+    // PCX at 0x2BD, 0x48 / pressed 0x2BD, 1), the analysed entry's world map picture, its
+    // faction's logo, SCORE ANALYSIS (its marks, how the game was won, its score lines), the
+    // banner of its first mark, the column titles and TOP 5 SCORES.
     Buffer* c = &canvas;
     UiRect all{0, 0, c->width, c->height};
     Buffer_set_clip(c, &all);
@@ -555,53 +564,146 @@ void FameWinState::redraw() {
     if (Buffer_load_pcx(&bg, "frame.pcx", nullptr, 10, 0xEC) == 0)
         Buffer_copy_4(&bg, c, 0, 0, 0, 0, std::min(bg.width, c->width), std::min(bg.height, c->height));
     if (Buffer_load_pcx(&bg, "hof.pcx", nullptr, 10, 0xEC) == 0)
-        Buffer_copy_4(&bg, c, 0, 0, kOx, kOy, std::min(bg.width, c->width), std::min(bg.height, c->height));
-    // The six score categories (hoficons.pcx, 0x4F x 0x4F) and the factions' row (their names
-    // here where the original draws their emblems; the selected one framed).
-    if (Buffer_load_pcx(&bg, "hoficons.pcx", nullptr, 10, 0xEC) == 0) {
+        Buffer_copy_4(&bg, c, 0, 0, kFx, kFy, std::min(bg.width, 800), std::min(bg.height, 600));
+    // ReportIf_init's fonts (ReportWin 0x885F38 + 0x1E180 ..): 0x8A40C8 (14), 0x8A40D4 (16),
+    // 0x8A40EC (22).
+    Font* f12b = find_font(14, 0);
+    Font* f14b = find_font(16, 0);
+    Font* f18i = find_font(22, 0);
+    const int32_t lh = f12b->field_0 < 0 ? f12b->height : f12b->ascent_above + f12b->field_0;  // +0xA44
+    auto cent5 = [&](const std::string& t, int32_t x, int32_t y, int32_t w) {
+        int32_t tw = Buffer_text_width_2(c, t.c_str(), (int32_t)t.size());
+        sw_text(this, c, t, x + (w - tw) / 2, y);
+    };
+    auto right4 = [&](const std::string& t, int32_t x, int32_t y, int32_t w) {
+        int32_t tw = Buffer_text_width_2(c, t.c_str(), (int32_t)t.size());
+        sw_text(this, c, t, x + w - tw, y);
+    };
+    // The analysed entry: +0xA918 within the faction's five (-1: the flat index before them).
+    const int32_t flat = (faction - 1) * 5 + entry;
+    const uint8_t* e = flat >= 0 ? &HallOfFame[flat * 0x8C] : nullptr;
+    const bool valid = e && (e[0] & 1);
+    // The category buttons (6 of 0x4F in +0xB46C: 0x4C, 0x27 .. 0x2D4, 0x77).
+    static Sprite icons[6][2];
+    static bool icons_loaded = false;
+    if (!icons_loaded && Buffer_load_pcx(&bg, "hoficons.pcx", nullptr, 10, 0xEC) == 0) {
+        icons_loaded = true;
+        for (int32_t k = 0; k < 6; k++)
+            for (int32_t r = 0; r < 2; r++)
+                pfncSpriteFromCanvasRectTrans(&icons[k][r], &bg, 9, 1 + k * 0x50, 1 + r * 0x50, 0x4F, 0x4F, 0);
+    }
+    {
+        UiRect r = fr(0x4C, 0x27, 0x2D4, 0x77);
+        int32_t w = (r.right - r.left) / 6;
+        int32_t x0 = (w - 0x4F) / 2 + r.left, y0 = ((r.bottom - r.top) - 0x4F) / 2 + r.top;
         for (int32_t k = 0; k < 6; k++) {
-            Sprite icon;
-            pfncSpriteFromCanvasRectTrans(&icon, &bg, 9, 1 + k * 0x50, 1, 0x4F, 0x4F, 0);
-            sprite_copy1(&icon, c, 9, kOx + 0x5F + k * 0x6C, kOy + 0x23, 1, 1);
+            bool pressed = valid && (e[1] & (1 << k));  // forced state 2, else -1
+            Sprite* sp = &icons[k][pressed ? 0 : 1];
+            if (sp->width) sprite_copy1(sp, c, 9, x0 + k * w, y0, 1, 1);
         }
     }
-    for (int32_t f = 1; f < 8; f++) {
-        UiRect r{kOx + 0x2D + (f - 1) * 0x6B, kOy + 0x8C, kOx + 0x2D + (f - 1) * 0x6B + 0x46, kOy + 0xD2};
-        spot_add(&spots[0], f, 1, r.left, r.top, r.right - r.left, r.bottom - r.top);
-        sw_font(c, f_text, f == faction ? 0xFF : 0x99);
-        sw_text_cent(this, c, MFactions[f].noun_faction, r);
-        if (f == faction) Buffer_box_2(c, &r, 0xFF, 0xFF);
+    // The faction buttons (7 of 0x46 in +0xB45C: 0x15, 0x7B .. 0x303, 0xED).
+    {
+        UiRect r = fr(0x15, 0x7B, 0x303, 0xED);
+        int32_t w = (r.right - r.left) / 7;
+        int32_t x0 = (w - 0x46) / 2 + r.left, y0 = ((r.bottom - r.top) - 0x46) / 2 + r.top;
+        for (int32_t f = 1; f < 8; f++) {
+            int32_t x = (f - 1) * w + x0;
+            Sprite* sp = &BaseSprites[f][f == faction ? 32 : 33];
+            if (sp->width) sprite_copy1(sp, c, sp->key, x, y0, 1, 1);
+            spot_add(&spots[0], f, 1, x, y0, 0x46, 0x46);
+        }
     }
-    sw_font(c, f_bold, 0);
-    sw_text_cent(this, c, sw_upper(sw_label(0x109C)), {kOx + 0x1C, kOy + 0xEE, kOx + 0x112, kOy + 0x100});
-    sw_text_cent(this, c, sw_upper(sw_label(0x4C8)), {kOx + 0x12E, kOy + 0xEE, kOx + 0x1FC, kOy + 0x100});
-    sw_text_cent(this, c, sw_upper(sw_label(0xF10)), {kOx + 0x226, kOy + 0xEE, kOx + 0x2F8, kOy + 0x100});
-    // WORLD MAP (+0xB43C: 0x12F, 0x10D .. 0x21D, 0x183): the entry's picture hof_<f>_<entry + 1>.pcx
-    // (its pixels as written: loaded without an offset).
-    if (fame_entry(faction, entry)[0] & 1) {
+    if (valid) {
+        // WORLD MAP (+0xB43C: 0x12F, 0x10D .. 0x21D, 0x183): hof_<f>_<entry + 1>.pcx.
         Buffer pic;
         Buffer_ctor(&pic);
         std::string file = g_ui_outdir + "/hof_" + std::to_string(faction) + "_" + std::to_string(entry + 1) + ".pcx";
         if (Buffer_load_pcx(&pic, file.c_str(), nullptr, 0, 0xEC) == 0) {
-            Buffer_copy_4(&pic, c, 0, 0, kOx + 0x12F, kOy + 0x10D, std::min(pic.width, 0x21D - 0x12F),
-                          std::min(pic.height, 0x183 - 0x10D));
+            UiRect m = fr(0x12F, 0x10D, 0x21D, 0x183);
+            Buffer_copy_4(&pic, c, 0, 0, m.left, m.top, m.right - m.left, m.bottom - m.top);
             texts.push_back("world map " + file.substr(file.rfind('/') + 1));
         }
+        // The faction's logo (sprite 30) in +0xB47C (0x128, 0x187 ..), 9 and 10 in.
+        Sprite* logo = &BaseSprites[faction][30];
+        UiRect lr = fr(0x128, 0x187, 0x224, 0x248);
+        if (logo->width) sprite_copy1(logo, c, logo->key, lr.left + 9, lr.top + 10, 1, 1);
+        // SCORE ANALYSIS (+0xB44C: 0x228, 0x10D .. 0x2FA, 0x21F), 3 in.
+        UiRect a = fr(0x228, 0x10D, 0x2FA, 0x21F);
+        Buffer_set_clip(c, &a);
+        const int32_t x = a.left + 3, w = (a.right - a.left) - 6;
+        int32_t y = a.top + 3;
+        sw_font(c, f12b, 0xE6);
+        auto wrapped = [&](std::string t, bool upper) {
+            if (upper) t = sw_upper(t);
+            texts.push_back(t);
+            Buffer_wrap_cent_4(c, t.c_str(), x, y, w);
+            y += Buffer_wrap_height(c, t.c_str(), w);
+        };
+        for (int32_t k = 0; k < 6; k++)
+            if (e[1] & (1 << k)) wrapped(sw_label(0xF38 + 4 * (uint32_t)k), false);
+        const uint8_t v = e[0];
+        if (v & 4) wrapped(Facility[102].name, true);
+        else if (v & 8) wrapped(sw_label(0x830) + " " + sw_label(0xE10), true);
+        else if (v & 0x10) wrapped(sw_label(0xE88), true);
+        else if (v & 0x20) wrapped(sw_label(0xE70), true);
+        else if (v & 0x40) wrapped(sw_label(0x1014) + " " + sw_label(0xE10), true);
+        auto i32 = [&](int32_t o) { return *reinterpret_cast<const int32_t*>(e + o); };
+        auto row = [&](const std::string& l, const std::string& val) {
+            sw_text(this, c, l, x, y);
+            right4(val, x, y, w);
+            y += lh;
+        };
+        row(sw_upper(sw_label(0x51C)), std::to_string(i32(0x14)));
+        row(sw_upper(sw_label(0x130)), std::to_string(i32(0x1C)));
+        row(sw_label(0xE4), std::to_string(i32(0xC)));
+        row(sw_label(0xAB4), std::to_string(i32(0x18)));
+        row(sw_label(0x10A0), sw_upper(Difficulty[e[0x20] < 6 ? e[0x20] : 0]));
+        if (e[0x21]) {
+            if (e[0x21] == 2) row(sw_upper(sw_label(0x908)), "+25%");
+            else row(sw_upper(sw_label(0x904)), "-25%");
+        }
+        if (v & 2) row(sw_upper(sw_label(0x1044)), "+100%");
+        row(sw_upper(sw_label(0x6C0)), std::to_string(i32(8)));
+        row(sw_upper(sw_label(0x1090)), std::to_string(i32(0x10)) + "%");
+        Buffer_set_clip(c, &all);
+        // The banner of the first mark: the label on a box of colour 0x41 at the window's top.
+        sw_font(c, f18i, 0xF4);
+        for (int32_t k = 0; k < 6; k++) {
+            if (!(e[1] & (1 << k))) continue;
+            std::string t = sw_label(0xF38 + 4 * (uint32_t)k);
+            int32_t tw = Buffer_text_width_2(c, t.c_str(), (int32_t)t.size());
+            UiRect box{kFx - tw / 2 + 0x186, kFy + 0xF, kFx - tw / 2 + 0x186 + tw + 0x14, kFy + 0xF + 0x15};
+            Buffer_fill_3(c, &box, 0x41);
+            cent5(t, kFx, kFy + 0x10, 800);
+            break;
+        }
     }
-    // The five entries in the TOP 5 SCORES column.
-    int32_t lh = f_text->height;
+    // The column titles.
+    sw_font(c, f14b, 0xF4);
+    cent5(sw_label(0x109C), kFx + 0x1C, kFy + 0xF7, 0x109);
+    cent5(sw_upper(sw_label(0x4C8)), kFx + 0x12E, kFy + 0xF7, 0xF0);
+    cent5(sw_label(0xF10), kFx + 0x227, kFy + 0xF7, 0xD4);
+    // TOP 5 SCORES (+0xB42C: 0x1E, 0x10E .. 0x123, 0x147, one per 0x3F): "title name", the
+    // faction, "rating%  <label> year" centred; the analysed one in colour 0x9B; each a spot.
+    UiRect er = fr(0x1E, 0x10E, 0x123, 0x147);
     for (int32_t slot = 0; slot < 5; slot++) {
-        uint8_t* e = fame_entry(faction, slot);
-        int32_t y = kOy + 0x11B + slot * 0x3F;
-        if (!(e[0] & 1)) continue;
-        auto i32 = [&](int32_t o) { return *reinterpret_cast<int32_t*>(e + o); };
-        std::string who = std::string(reinterpret_cast<char*>(e + 0x22)) + " " + reinterpret_cast<char*>(e + 0x3A);
-        sw_font(c, f_text, 0xFF);
-        sw_text(this, c, std::to_string(slot + 1) + ". " + who, kOx + 0x26, y);
-        sw_font(c, f_text, 0x99);
-        sw_text(this, c, sw_label(0xB68) + " " + std::to_string(i32(4)) + "  " + sw_label(0x6C0) + ": " +
-                             std::to_string(i32(8)), kOx + 0x26, y + lh);
-        sw_text(this, c, sw_label(0x1090) + ": " + std::to_string(i32(0x10)), kOx + 0x26, y + 2 * lh);
+        const uint8_t* q = fame_entry(faction, slot);
+        if (q[0] & 1) {
+            int32_t x = er.left, y = er.top + 3, w = er.right - er.left;
+            sw_font(c, f12b, slot == entry ? 0x9B : 0xE6);
+            cent5(std::string(reinterpret_cast<const char*>(q + 0x22)) + " " + reinterpret_cast<const char*>(q + 0x3A), x, y, w);
+            y += lh;
+            cent5(reinterpret_cast<const char*>(q + 0x52), x, y, w);
+            y += lh;
+            cent5(std::to_string(*reinterpret_cast<const int32_t*>(q + 0x10)) + "%" + "  " + sw_label(0xB68) +
+                      std::to_string(*reinterpret_cast<const int32_t*>(q + 4)),
+                  x, y, w);
+            spot_add(&spots[0], slot, 0, er.left, er.top, er.right - er.left, er.bottom - er.top);
+        }
+        int32_t step = (er.bottom - er.top) + 6;
+        er.top += step;
+        er.bottom += step;
     }
 }
 
@@ -781,7 +883,7 @@ void GAMEAPI hall_of_fame(int32_t add) {
             std::memset(HallOfFame, 0, sizeof(HallOfFame));
         std::fclose(f);
     }
-    g_fw.entry = 0;
+    g_fw.entry = -1;
     if (add) fame_add();
     FameWinState* s = &g_fw;
     s->name = "halloffame";
@@ -790,10 +892,14 @@ void GAMEAPI hall_of_fame(int32_t add) {
     s->f_text = find_font(12, 0);
     s->f_bold = find_font(14, 1);
     sw_clear_buttons(s);
-    BaseButton* close = sw_button(s, sw_upper(sw_label(0xA64)).c_str(), 0x7B8, kOx + 0x22C, kOy + 0x23A, 0xB8, 0x18, 0,
-                                  s->f_bold);
-    close->text_color[0] = 0;
-    close->text_color[2] = 0xFF;
+    // CLOSE (0x7B8: 0x22A, 0x22C .. 0x2F8, 0x242 of the panel; boxes 47 / 46 / 45).
+    BaseButton* close = sw_button(s, sw_label(0xA64).c_str(), 0x7B8, kFx + 0x22A, kFy + 0x22C, 0x2F8 - 0x22A,
+                                  0x242 - 0x22C, 0, s->f_bold);
+    close->box[0] = box_def(47);
+    close->box[1] = box_def(46);
+    close->box[2] = box_def(45);
+    for (Sprite** sp : {close->left, close->right, close->top, close->bottom, close->tl, close->tr, close->bl, close->br})
+        sp[0] = sp[1] = sp[2] = nullptr;
     sw_run(s);
     sw_clear_buttons(s);
     if (FILE* f = std::fopen(fame_path().c_str(), "wb")) {
