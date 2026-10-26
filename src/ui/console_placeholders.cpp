@@ -18,7 +18,6 @@ void THISCALL TutWin_tour(uint8_t*) { console_not_reconstructed("TutWin_tour"); 
 int32_t THISCALL TutWin_reset(uint8_t*) { return 0; }
 // Tutorial hints for the selected unit (game state: tut_check bits; only with tutorial hints on).
 void THISCALL Console_give_hints(uint8_t*) { console_not_reconstructed("Console_give_hints"); }
-void THISCALL MapWin_draw_base_dest(uint8_t*, int32_t) { ui_invalidate_map(); }
 void THISCALL Console_assemble(uint8_t*) { console_not_reconstructed("Console_assemble"); }
 void THISCALL Console_survey(uint8_t*) { console_not_reconstructed("Console_survey"); }
 void THISCALL Console_time_controls(uint8_t*) { console_not_reconstructed("Console_time_controls"); }

@@ -5,6 +5,7 @@
 // the window layer (win.cpp) into the console's mouse code (console_mouse.cpp) and the menus
 // (menu.cpp).
 #pragma once
+#include <string>
 #include <cstdint>
 
 #include "engine/memmap.h"
@@ -20,7 +21,7 @@ void console_frame_mouse(int32_t type, int32_t x, int32_t y);
 // Main screen mouse input: menus, frame, map (console_mouse.cpp).
 void console_ui_mouse(int32_t type, int32_t x, int32_t y);
 // Scripted drag from (x1, y1) to (x2, y2) (the go-to drag of a held button).
-void console_ui_drag(int32_t x1, int32_t y1, int32_t x2, int32_t y2);
+void console_ui_drag(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const std::string& shot = std::string());
 // Timers of the console (go-to drag): called by the pump.
 void console_ui_tick();
 // The mouse cursor sprite (CURSOR.PCX) at the mouse position.

@@ -165,3 +165,22 @@ Font* ui_label_font(int32_t zoom, int32_t num, int32_t den, int32_t style);
 void THISCALL pfncRedrawMap(uint8_t* win, int32_t flag);  // 0x46A550
 // Centres the view on (x, y) and redraws it.
 void THISCALL pfncMoveMap(uint8_t* win, int32_t x, int32_t y, int32_t redraw);  // 0x46B1F0
+
+// ---- destination lines (mapwin_dest.cpp) ----
+GLOBAL(int32_t, DestLineCost, 0x7D3B70);  // path cost summed by MapWin_dest_line (move units)
+// MapWin_dest_line: the path a unit (unit_id; mode: triad, 2 straight) of faction_id would take
+// from (x1, y1) to (x2, y2): drawn tile by tile (another region / unknown tiles: straight), its
+// cost in DestLineCost. solid: on the screen overlay (the go-to drag), else dashed (on, off) on
+// the view.
+ADDR_NATIVE(0x467430) void THISCALL MapWin_dest_line(uint8_t* win, int32_t x1, int32_t y1, int32_t x2, int32_t y2,
+                                                     int32_t unit_id, int32_t faction_id, int32_t mode,
+                                                     int32_t patrol, int32_t on, int32_t off, int32_t solid);
+ADDR_NATIVE(0x4672C0) void THISCALL MapWin_direct_dest_line(uint8_t* win, int32_t x1, int32_t y1, int32_t x2,
+                                                            int32_t y2, int32_t triad, int32_t on, int32_t off,
+                                                            int32_t solid);
+// MapWin_draw_base_dest: the destination lines of the map display options (0x40000 rally points,
+// 0x400000 patrols, 0x800000 go-to orders); redraw: update the view when one was drawn.
+ADDR_NATIVE(0x467970) void THISCALL MapWin_draw_base_dest(uint8_t* win, int32_t redraw);
+// Buffer_line (0x5E09D0): a dashed line (runs of `on` pixels of c1, `off` of c2; -1 transparent).
+void buffer_dashed_line(Buffer* b, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t c1, int32_t c2,
+                        int32_t on, int32_t off, int32_t phase);

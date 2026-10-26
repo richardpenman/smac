@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Drive the plain original (no oracle) under Xvfb: run terranx.exe, then follow a step file:
 #   wait SECONDS | key KEYSYM [n] | text STRING | shot NAME | click X Y | rclick X Y [S|C] | move X Y
-#   | quit
+#   | press X Y | release (the left button held / let go: drags) | quit
 # Screenshots go to OUTDIR/NAME.png. Usage: orig_drive.py STEPFILE OUTDIR [extra ini lines file]
 # Keys are X keysyms with C+/S+/A+ modifiers (sent with XTEST to the game's Xvfb display). The game
 # runs in work/popup_orig_run with harness/oracle/runtime's ini (no sound, no DirectDraw, no movie).
@@ -66,6 +66,11 @@ try:
             d.sync(); time.sleep(0.2)
         elif c=='move':
             x,y=map(int,arg.split()); xtest.fake_input(d,XX.MotionNotify,x=x,y=y); d.sync()
+        elif c=='press':
+            x,y=map(int,arg.split()); xtest.fake_input(d,XX.MotionNotify,x=x,y=y); d.sync(); time.sleep(0.1)
+            xtest.fake_input(d,XX.ButtonPress,1); d.sync()
+        elif c=='release':
+            xtest.fake_input(d,XX.ButtonRelease,1); d.sync(); time.sleep(0.2)
         elif c=='quit': break
 finally:
     # Only the processes started here are stopped (never wineserver -k: the prefix is shared).

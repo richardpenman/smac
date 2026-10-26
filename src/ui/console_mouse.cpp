@@ -11,6 +11,7 @@
 // centre the view.
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <vector>
 
 #include "engine/action.h"
@@ -25,6 +26,10 @@
 #include "engine/world.h"
 #include "platform/ui_platform.h"
 #include "ui/console.h"
+#include "ui/mapwin.h"
+#include "ui/font_text.h"
+#include "ui/basewin.h"
+#include "engine/strings.h"
 #include "ui/console_frame.h"
 #include "ui/popup.h"
 #include "ui/sprites.h"
@@ -123,6 +128,7 @@ void console_draw_cursor(Buffer* screen) {
 
 void GAMEAPI go_reset() {
     // Win_hide(DesktopWin) and the drag timer stop.
+    ui_desktop_show(false);
     g_go_timer_due = 0;
     for (int32_t i = 0; i < 8; i++) {
         uint8_t* w = MapWins[i];
@@ -192,6 +198,8 @@ void GAMEAPI go_timer() {
         mw(w, kMwCursor) = (int32_t)sprite;
     }
     mw(self, kConMode) = cursor;
+    Buffer_fill_2(ui_desktop_canvas(), 9);  // DesktopWin: GraphicWin_fill(9), Win_show
+    ui_desktop_show(true);
     mw(w, kMwTracking) = 1;
     mw(w, kMwGroupDrag) = (!MapWinInVehMode && mw(self, kCon23D1C)) ? 1 : 0;
     MapWin_on_mouse_move(w, mx, my);
@@ -298,13 +306,35 @@ void THISCALL MapWin_on_mouse_move(uint8_t* win, int32_t px, int32_t py) {
     do_all_non_input();
     MouseMoveBusy = 0;
     if (mw(win, kMwDragX) == x && mw(win, kMwDragY) == y) return;
+    // The path from the unit (each leg of a patrol / waypoint route) or the base to the tile on
+    // DesktopWin (GraphicWin_fill(9), MapWin_dest_line solid), with "Go to <tile>: Turns = n".
+    Buffer* d = ui_desktop_canvas();
+    Buffer_fill_2(d, 9);
     mw(win, kMwDragX) = x;
     mw(win, kMwDragY) = y;
+    // Path segment table of the drag (+0x1DDE4: x[i], +0x1DDF8: y[i]; leg i from i to i + 1).
+    auto seg_x = [&](int32_t i) -> int32_t& { return mw(win, 0x1DDE4 + 4 * (uint32_t)i); };
+    auto seg_y = [&](int32_t i) -> int32_t& { return mw(win, 0x1DDF8 + 4 * (uint32_t)i); };
     int32_t v = mw(self, kConVeh);
-    if (v >= 0) {
+    if (v < 0) {
+        // A base's rally point. BUG(original): the leg's end is (y, stale) — the tile's y is stored
+        // as the end's x and the end's y is not written.
+        mw(win, 0x1DE14) = 10;
+        int32_t b = mw(win, kMwDragBase);
+        seg_x(0) = Bases[b].x;
+        seg_y(0) = Bases[b].y;
+        seg_x(1) = y;
+        mw(win, 0x1DE18) = 2;
+        mw(win, 0x1DE1C) = 0;
+        mw(win, 0x1DE20) = 1;
+        MapWin_dest_line(win, seg_x(0), seg_y(0), seg_x(1), seg_y(1), mw(win, 0x1DE14), CurrentPlayerFaction,
+                         mw(win, 0x1DE18), mw(win, 0x1DE1C), 3, 5, 1);
+    } else {
         // The waypoint under the mouse (patrol: the next one; go to: the destination).
         VEH& u = Vehs[v];
+        mw(win, 0x1DE14) = u.unit_id;
         bool patrol = mw(self, kConMode) == 8;
+        mw(win, 0x1DE1C) = patrol;
         if (patrol || (mw(self, kConMode) == 1 && (u.state & 0x2000000))) {
             u.waypoint_x[u.waypoint_count] = (int16_t)x;
             u.waypoint_y[u.waypoint_count] = (int16_t)y;
@@ -313,9 +343,47 @@ void THISCALL MapWin_on_mouse_move(uint8_t* win, int32_t px, int32_t py) {
             u.waypoint_y[0] = (int16_t)y;
             u.waypoint_count = 0;
         }
+        mw(win, 0x1DE18) = Chassis[Units[u.unit_id].chassis_id].triad;
+        for (int32_t i = 0; i < u.waypoint_count + 1 + (patrol && u.waypoint_count ? 1 : 0); i++) {
+            int32_t n = u.waypoint_count + 2, j = (i + 1) % n;
+            int32_t fx = i ? u.waypoint_x[i - 1] : u.x, fy = i ? u.waypoint_y[i - 1] : u.y;
+            int32_t tx = j ? u.waypoint_x[j - 1] : u.x, ty = j ? u.waypoint_y[j - 1] : u.y;
+            seg_x(i) = fx;
+            seg_y(i) = fy;
+            seg_x(i + 1) = tx;
+            seg_y(i + 1) = ty;
+            mw(win, 0x1DE20) = i + 1;
+            MapWin_dest_line(win, fx, fy, tx, ty, mw(win, 0x1DE14), CurrentPlayerFaction, mw(win, 0x1DE18),
+                             mw(win, 0x1DE1C), 3, 5, 1);
+        }
     }
-    // The original draws the path (MapWin_dest_line, with its length in turns) and the text
-    // "Go to <tile>: Turns = n" on DesktopWin; here the destination is marked by the frame.
+    // The text beside the mouse: "<Go to|Patrol|Group> <tile>: Turns = n[ r/m]".
+    char text[512], num[16];
+    int32_t label = mw(self, kConMode) == 8 ? 0x668 : (mw(win, kMwGroupDrag) ? 0x6C4 : 0x66C);
+    crt_strcpy(text, label_get(label / 4));
+    crt_strcat(text, " ");
+    say_loc(text, x, y, 0, 2, 0);
+    crt_strcat(text, reinterpret_cast<const char*>(mem::host(0x682E94)));
+    crt_strcat(text, label_get(0x670 / 4));
+    crt_strcat(text, reinterpret_cast<const char*>(mem::host(0x6863A0)));
+    int32_t mr = Rules.move_rate_roads;
+    std::snprintf(num, sizeof(num), "%d", DestLineCost / mr);
+    crt_strcat(text, num);
+    if (DestLineCost % mr) {
+        std::snprintf(num, sizeof(num), " %d", DestLineCost % mr);
+        crt_strcat(text, num);
+        crt_strcat(text, reinterpret_cast<const char*>(mem::host(0x6863A4)));
+        std::snprintf(num, sizeof(num), "%d", mr);
+        crt_strcat(text, num);
+    }
+    Buffer_set_text_color(d, 0x9F, 0x41, 1, 1);
+    Buffer_set_font(d, find_font(12, 1), nullptr, nullptr, nullptr);
+    uint8_t* mv = main_view();
+    int32_t width = mw(mv, ui_mapwin_native(mv)->vbase + kGwWidth);
+    int32_t tw = Buffer_text_width(d, text);
+    Buffer_write_l_3(d, text, px - tw * px / (width ? width : 1), py + mw(&MainConsole, kMwTileH), (int32_t)std::strlen(text));
+    ui_desktop_show(true);
+    std::fprintf(stderr, "goto drag: %s\n", text);
     ui_set_drag_target(x, y);
 }
 
@@ -584,9 +652,10 @@ void console_ui_mouse(int32_t type, int32_t x, int32_t y) {
 }
 
 // Scripted drag (test aid "DRAG:X1xY1:X2xY2"): press, the go-to timer as if held, move, release.
-void console_ui_drag(int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
+void console_ui_drag(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const std::string& shot) {
     console_ui_mouse(UiInput::LDOWN, x1, y1);
     if (g_go_timer_due) go_timer();
     console_ui_mouse(UiInput::MOVE, x2, y2);
+    if (!shot.empty()) ui_screenshot(shot);
     console_ui_mouse(UiInput::LUP, x2, y2);
 }

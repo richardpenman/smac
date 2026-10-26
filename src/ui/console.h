@@ -174,7 +174,6 @@ ADDR_NATIVE(0x4BC6E0) void THISCALL TutWin_tour(uint8_t* win);
 ADDR_NATIVE(0x4BDDE0) int32_t THISCALL TutWin_reset(uint8_t* win);
 ADDR_NATIVE(0x511BB0) void THISCALL Console_give_hints(uint8_t* console);
 ADDR_NATIVE(0x446D10) void GAMEAPI ambience_veh(int32_t veh_id);
-ADDR_NATIVE(0x467970) void THISCALL MapWin_draw_base_dest(uint8_t* win, int32_t a1);
 ADDR_NATIVE(0x4D95F0) void THISCALL Console_assemble(uint8_t* console);
 ADDR_NATIVE(0x515450) void THISCALL Console_survey(uint8_t* console);
 ADDR_NATIVE(0x515900) void THISCALL Console_time_controls(uint8_t* console);

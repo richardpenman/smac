@@ -211,7 +211,7 @@ void THISCALL MapWin_draw_base_names(uint8_t* win) {
     Buffer* canvas = n->canvas;
     UiRect saved = canvas->clip;
     Buffer_set_clip(canvas, reinterpret_cast<UiRect*>(win + n->vbase + kGwClientRect));
-    // MapWin_draw_base_dest(0): destination lines (option 0x40000), not reconstructed.
+    MapWin_draw_base_dest(win, 0);
     if (!(mw(win, kMwOptions) & 0x800) || !(GameMorePreferences & 0x2000)) {
         Buffer_set_clip(canvas, &saved);
         return;

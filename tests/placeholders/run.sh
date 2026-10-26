@@ -56,4 +56,11 @@ check landmark "erase question" "popup LANDMARKKILL shown"
 nocheck landmark "no placeholder" "not reconstructed: Console_name_landmark"
 nocrash landmark
 
+# 3. The go-to drag's path preview (MapWin_on_mouse_move -> MapWin_dest_line on DesktopWin): the
+#    text with the path's length; the screenshot is taken with the button still held.
+run drag $NEW --keys "ENTER,DRAG:530x200:700x330:drag.bmp,UNITS"
+check drag "drag text with the distance" "goto drag: Move to \(38, 12\): Dist = 4"
+check drag "go-to order 24" "unit 4 f1 Scout Patrol \([0-9]+,[0-9]+\) order 24"
+nocrash drag
+
 exit $FAIL

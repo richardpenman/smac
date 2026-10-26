@@ -33,6 +33,7 @@
 #include "engine/game.h"
 #include "ui/basewin.h"
 #include "ui/console.h"
+#include "ui/mapwin.h"
 #include "ui/vehdraw.h"
 #include "ui/popup.h"
 #include "ui/statuswin.h"

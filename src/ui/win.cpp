@@ -313,6 +313,21 @@ void ui_screen_init(int32_t width, int32_t height) {
 }
 
 Buffer* ui_screen_canvas() { return &g_canvas; }
+
+static Buffer g_desktop_buf;
+static bool g_desktop_shown = false;
+Buffer* ui_desktop_canvas() {
+    if (!g_desktop_buf.data || g_desktop_buf.width != g_canvas.width || g_desktop_buf.height != g_canvas.height) {
+        Buffer_ctor(&g_desktop_buf);
+        Buffer_init(&g_desktop_buf, g_canvas.width, g_canvas.height, 8, 0);
+        Buffer_fill_2(&g_desktop_buf, 9);
+    }
+    return &g_desktop_buf;
+}
+void ui_desktop_show(bool on) {
+    g_desktop_shown = on;
+    g_dirty = true;
+}
 void ui_set_drag_target(int32_t x, int32_t y) {
     g_drag_x = x;
     g_drag_y = y;
@@ -387,8 +402,15 @@ void ui_present() {
             draw_tile_marker(MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex], 0xFF);
         if (MapWinInVehMode && MapWinVehA >= 0 && MapWinVehA < VehCount)
             draw_tile_marker(Vehs[MapWinVehA].x, Vehs[MapWinVehA].y, 0xFB);
-        if (g_drag_x >= 0) draw_tile_marker(g_drag_x, g_drag_y, 0xFA);
         console_frame_draw(&g_canvas);
+        if (g_desktop_shown && g_desktop_buf.data) {  // DesktopWin over the windows (go-to drag)
+            for (int32_t y = 0; y < g_canvas.height; y++) {
+                const uint8_t* s = g_desktop_buf.data + (size_t)y * g_desktop_buf.stride;
+                uint8_t* d = g_canvas.data + (size_t)y * g_canvas.stride;
+                for (int32_t x = 0; x < g_canvas.width; x++)
+                    if (s[x] != 9) d[x] = s[x];
+            }
+        }
     }
     screens_compose(&g_canvas);  // full-screen windows (reports, social engineering; screenwin.h)
     basewin_compose(&g_canvas);  // the base window over the console frame
@@ -461,7 +483,9 @@ void GAMEAPI wait_task() {
             ui_mouse(UiInput::RUP, x1, y1);
         } else if (std::sscanf(k.command.c_str(), "drag %d %d %d %d", &x1, &y1, &x2, &y2) == 4) {
             ui_mouse(UiInput::MOVE, x1, y1);
-            console_ui_drag(x1, y1, x2, y2);
+            char shot[256] = "";
+            std::sscanf(k.command.c_str(), "drag %*d %*d %*d %*d %255s", shot);
+            console_ui_drag(x1, y1, x2, y2, shot[0] ? g_ui_outdir + "/" + shot : std::string());
         } else if (std::sscanf(k.command.c_str(), "move %d %d", &x1, &y1) == 2) {
             ui_mouse(UiInput::MOVE, x1, y1);
         } else if (!k.command.empty()) {

@@ -207,8 +207,12 @@ computer players move with the engine.
   the reconstructed PullDown (pulldown.cpp: items, separators, disabled rows, AlphaMenu's row
   fill, keys and mouse), with its Action... / Terraform... sub-menus (the menu bar's pull-downs)
   and the landmark commands (Console_name_landmark, Console_erase_landmark; shift+N,
-  ctrl+shift+N). Not reconstructed: MapWin_editor, the path preview (MapWin_dest_line,
-  Console_goto_routine's PlanWin). Sounds: section 12.
+  ctrl+shift+N). The go-to drag's path preview (mapwin_dest.cpp: MapWin_dest_line,
+  MapWin_direct_dest_line on DesktopWin's overlay, the "Move to <tile>: Dist = n" text of
+  MapWin_on_mouse_move) and the map's destination lines (MapWin_draw_base_dest: display options
+  rally points / patrols / go-to orders, dashed Buffer_line). Not reconstructed: MapWin_editor,
+  the go-to list's map preview (Console_goto_routine's PlanWin, a second MapWin at 0x834D70).
+  Sounds: section 12.
 * **Main interface** (console_frame.cpp; approximated, see its header): console2_A.pcx frame,
   pane backgrounds, menu / commlink buttons, "TURN COMPLETE", the unit, tile, stack, info and
   date panes and a simple world map, drawn with the original's art, fonts and colours at the

@@ -5,6 +5,7 @@
 // sounds, most orders) go to placeholders (console_placeholders.cpp) or the bridge's headless
 // versions; their game-state effects, where they have any, are noted at the call.
 #include "ui/console.h"
+#include "ui/mapwin.h"
 #include "ui/help.h"
 #include "ui/techwin.h"
 #include "ui/reports.h"

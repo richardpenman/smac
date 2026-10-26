@@ -41,6 +41,10 @@ bool ui_desktop();
 // are not `key` as layer `layer` (0: the game palette) for the frame being composed.
 void ui_set_layer_palette(int32_t layer, const Palette* palette);
 void ui_layer_mark(int32_t x0, int32_t y0, const Buffer* src, uint8_t layer, int32_t key = 9);
+// DesktopWin's canvas (0x93755C): the screen-size overlay of the go-to drag (path and turns),
+// transparent (9) where nothing is drawn; shown over the map while the drag runs.
+Buffer* ui_desktop_canvas();
+void ui_desktop_show(bool on);
 // Message line of the console panel (the latest message box or placeholder note).
 void ui_set_message(const std::string& text);
 // GetKeyState for a virtual key: bit 15 held, bit 0 toggled (Scroll Lock etc. are never toggled).

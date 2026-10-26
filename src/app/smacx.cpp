@@ -546,6 +546,9 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         if (std::sscanf(tok.c_str() + 5, "%dx%d:%dx%d", &x1, &y1, &x2, &y2) != 4) return false;
         out->command = "drag " + std::to_string(x1) + " " + std::to_string(y1) + " " + std::to_string(x2) + " " +
                        std::to_string(y2);
+        // DRAG:X1xY1:X2xY2:FILE: a screenshot before the button is released (the path preview).
+        size_t c3 = tok.find(':', tok.find(':', 5) + 1);
+        if (c3 != std::string::npos) out->command += " " + tok.substr(c3 + 1);
         return true;
     }
         if (tok == "QUIT" || tok == "UNITS") {
