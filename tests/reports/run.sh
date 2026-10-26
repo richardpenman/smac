@@ -24,7 +24,7 @@ FAIL=0
 run() {  # run CASE ARGS... : runs smacx, log in OUT/CASE.log
     local name="$1"; shift
     mkdir -p "$OUT/$name"
-    rm -f "$OUT/$name"/*.bmp "$OUT/$name"/hallfame.jhh
+    rm -f "$OUT/$name"/*.bmp "$OUT/$name"/hallfame.jhh "$OUT/$name"/hof_*.pcx
     (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
@@ -150,6 +150,18 @@ has monuments147 "hall of fame" "^famestate faction 3 entries 0"
 check "hallfame.jhh written" "$(stat -c %s "$OUT/monuments147/hallfame.jhh" 2>/dev/null)" "4900"
 run monuments147r --save "$OUT/monuments147/after.sav" --human 3 --keys "F9,SCREENSTATE,ESC"
 check "monuments reload" "$(line monuments147r monustate 1)" "monustate f3 count 9 latest 7 zoom 0"
+
+# 5b. Retiring (shift+Q, REALLYRETIRE "yes") ends the game: report_score, then hall_of_fame(1) adds
+#     the viewer's entry (FUN_0044A660: its score, rating, the "best of" marks of a first entry)
+#     with the world map pane's picture hof_3_1.pcx (in --outdir), shown in WORLD MAP. The
+#     monuments' decorations: the viewer's emblem above the centre.
+run retire147 --save work/saves_late/turn_147.sav --human 3 --keys "DOWN,ENTER,S-q,DOWN,ENTER,ESC,SCREENSTATE,ESC"
+nocrash retire147
+has retire147 "the new entry" "^hall of fame: faction 3 slot 0 score 247 rating 15 flags 01 best 0F picture 0"
+has retire147 "its world map" "^screentext world map hof_3_1.pcx"
+has retire147 "the window" "^famestate faction 3 entries 1"
+check "hof_3_1.pcx written" "$(head -c 4 "$OUT/retire147/hof_3_1.pcx" 2>/dev/null | od -An -tx1 | tr -d ' ')" "0a050108"
+check "hallfame.jhh with the entry" "$(od -An -tx1 -j $((10 * 0x8C)) -N 2 "$OUT/retire147/hallfame.jhh" 2>/dev/null | tr -d ' ')" "010f"
 
 # 6. Base operations' governor (turn_147, University Base selected: Set to BUILD, then off) and the
 #    commlink panel (F12): the contacts, a right click's menu, Faction Profile (the intelligence

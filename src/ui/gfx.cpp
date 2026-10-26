@@ -959,3 +959,48 @@ int32_t THISCALL pfncImageFromCanvas(Texture* self, Buffer* canvas, int32_t x, i
     std::memcpy(self->points, pts, sizeof(pts));
     return 0;
 }
+
+// Buffer_write_pcx (0x5DF590): ".pcx" appended without an extension; version 5, RLE, 8 bits, one
+// plane of the stride's bytes per row (runs of up to 63, a count byte for runs of 2+ or values of
+// 0x40 and more), then 0x0C and the 256 colours of the game palette. 0, 3 (no bits), 4 (no file).
+int32_t THISCALL Buffer_write_pcx(Buffer* self, const char* name) {
+    std::string path = name ? name : "";
+    size_t slash = path.find_last_of("/\\");
+    if (path.find('.', slash == std::string::npos ? 0 : slash) == std::string::npos) path += ".pcx";
+    if (!self->data) return 3;
+    FILE* f = std::fopen(path.c_str(), "wb");
+    if (!f) return 4;
+    uint8_t hdr[0x80] = {};
+    hdr[0] = 10;
+    hdr[1] = 5;
+    hdr[2] = 1;
+    hdr[3] = 8;
+    auto put16 = [&](int32_t o, int32_t v) {
+        hdr[o] = (uint8_t)v;
+        hdr[o + 1] = (uint8_t)(v >> 8);
+    };
+    put16(8, self->width - 1);
+    put16(10, self->height - 1);
+    hdr[0x41] = 1;
+    put16(0x42, self->stride);
+    std::fwrite(hdr, 1, sizeof(hdr), f);
+    std::vector<uint8_t> out;
+    for (int32_t y = 0; y < self->height; y++) {
+        const uint8_t* row = self->data + (size_t)y * self->stride;
+        uint32_t x = 0, n = (uint32_t)self->stride;
+        while (x < n) {
+            uint8_t v = row[x];
+            uint32_t run = 1;
+            while (x + run < n && run < 0x3F && row[x + run] == v) run++;
+            if (run >= 2 || v > 0x3F) out.push_back((uint8_t)(0xC0 | run));
+            out.push_back(v);
+            x += run;
+        }
+    }
+    out.push_back(0xC);
+    for (int32_t i = 0; i < 256; i++)
+        for (int32_t c = 0; c < 3; c++) out.push_back(GamePalette.rgb[i][c]);
+    std::fwrite(out.data(), 1, out.size(), f);
+    std::fclose(f);
+    return 0;
+}

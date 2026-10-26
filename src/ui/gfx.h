@@ -95,6 +95,8 @@ ADDR_NATIVE(0x5D7670) int32_t THISCALL Buffer_init(Buffer* self, int32_t width, 
 // Loads a PCX file (".pcx" appended when there is no extension). Pixels get `offset` added
 // (mod 256); file palette entries 0..count-1 go to colours offset..offset+count-1, and when
 // `pal` is given they are copied into it. Returns 0, 3 (bad file) or 6 (not found).
+// Writes the canvas as a PCX file (".pcx" appended without an extension): 0, 3, 4 (no file).
+ADDR_NATIVE(0x5DF590) int32_t THISCALL Buffer_write_pcx(Buffer* self, const char* name);
 ADDR_NATIVE(0x5D7DE0) int32_t THISCALL Buffer_load_pcx(Buffer* self, const char* file, Palette* pal, int32_t offset,
                                                        int32_t count);
 ADDR_NATIVE(0x5E2690) int32_t THISCALL Buffer_load_pcx_2(Buffer* self, const uint8_t* data, int32_t size,

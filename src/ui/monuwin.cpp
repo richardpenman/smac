@@ -12,13 +12,15 @@
 // the faction's latest monument (Monuments[f].latest_event_id, game state, as the original). A key
 // or the button closes the text, then the window.
 // The overview's background is monument.flc's frame of the number of monuments (as MonuWin_init
-// leaves it). Approximated: the decorations and the eliminated leaders' portraits (written as
-// text).
+// leaves it); MonuWin_init's decorations: the eliminated leaders' portraits (<faction>3.pcx) in
+// their slots with the pillars for their number (monicons.pcx), the viewer's emblem above the
+// centre, the victory picture or an eliminated leader in the centre.
 //
 // hall_of_fame(add): reads hallfame.jhh (7 factions x 5 entries of 0x8C bytes, 0x9A3840),
 // shows the viewer's faction's top five, and writes the table back. smacx reads and writes the
 // file in --outdir (the original: the game directory), so tests never change the game data.
-// Adding the finished game's entry (add != 0, end of game: FUN_0044A660) is not reconstructed.
+// The finished game's entry (add != 0, end of game: FUN_0044A660) is added (fame_add) with its world
+// map picture hof_<faction>_<slot>.pcx (also in --outdir).
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -33,6 +35,7 @@
 #include "engine/tech.h"
 #include "engine/text.h"
 #include "engine/ui_bridge.h"
+#include "engine/zoc.h"
 #include "ui/flic.h"
 #include "ui/basewin.h"
 #include "ui/console.h"
@@ -65,6 +68,11 @@ struct MonuWinState : ScreenWin {
     int32_t zoom = 0;        // +0xA4C (0x293 * 4): the text of a monument is shown
     int32_t selected = 0;    // +0xA54
     Sprite small[15], big[15];
+    Sprite deco[6];          // +0x3244 .. +0x3320: the eliminations' pillars (left / right by count)
+    Sprite portrait[8];      // +0x3380 + f * 0x2C: the leaders' small portraits (<faction>3.pcx)
+    Sprite portrait_big[8];  // +0x34B4 + f * 0x2C: their large portraits (the centre)
+    Sprite unify;            // +0x3614: the viewer's victory picture (the centre, monument 13)
+    Sprite crest;            // +0x3640: the viewer's emblem above the centre (+0x36CC)
     Font *f_text = nullptr, *f_bold = nullptr;
     BaseButton *close = nullptr, *back = nullptr;
     std::string text;        // the monument's text (test aid)
@@ -365,17 +373,42 @@ void MonuWinState::redraw() {
         selected = cur;
         UiRect cr = off(kCentre);
         spot_add(&spots[0], 0x45, 0, cr.left, cr.top, cr.right - cr.left, cr.bottom - cr.top);
-        if (cur >= 0 && cur < 15) sprite_copy1(&big[cur], c, 9, cr.left, cr.top, 1, 1);
-        // The leaders the faction eliminated (events 15..20).
-        for (int32_t k = 0; k < 6; k++) {
-            if (!ev(faction, 15 + k, 4)) continue;
-            int32_t victim = ev(faction, 15 + k, 2);
-            UiRect r = off(kKills[k]);
-            Buffer_box_sprite(c, &r, box_def(1));
-            spot_add(&spots[0], 15 + k, 0, r.left, r.top, r.right - r.left, r.bottom - r.top);
-            sw_font(c, f_text, 0xFF);
-            if (victim >= 0 && victim < 8) sw_text_cent(this, c, MFactions[victim].noun_faction, r);
+        // The centre: the latest monument's large icon; the victory's picture (13); an eliminated
+        // faction's leader (15..20).
+        Sprite* centre = nullptr;
+        if (cur == 0xD) centre = &unify;
+        else if (cur > 0xE && cur < 21) centre = &portrait_big[ev(faction, cur, 2) & 7];
+        else if (cur >= 0 && cur < 15) centre = &big[cur];
+        if (centre) sprite_copy1(centre, c, centre->key, cr.left, cr.top, 1, 1);
+        // The leaders the faction eliminated (events 15..20): the pillars by their count (the left
+        // piece of (n - 1) / 2, the right one of (n - 2) / 2), their portraits in the slots.
+        static const UiRect kDecoRect[6] = {{0xFD, 500, 0x14B, 0x233}, {0x1DC, 500, 0x225, 0x233},
+                                            {0xBE, 500, 0x14B, 0x233}, {0x1DC, 500, 0x262, 0x233},
+                                            {0x7F, 500, 0x14B, 0x233}, {0x1DC, 500, 0x2B1, 0x233}};
+        int32_t kills = 0;
+        for (int32_t k = 0; k < 6; k++) kills += ev(faction, 15 + k, 4) ? 1 : 0;
+        if (kills) {
+            int32_t l = (kills - 1) / 2;
+            UiRect r = off(kDecoRect[l * 2]);
+            sprite_copy1(&deco[l * 2], c, deco[l * 2].key, r.left, r.top, 1, 1);
+            if (kills > 1) {
+                int32_t rr = (kills - 2) / 2;
+                UiRect r2 = off(kDecoRect[rr * 2 + 1]);
+                sprite_copy1(&deco[rr * 2 + 1], c, deco[rr * 2 + 1].key, r2.left, r2.top, 1, 1);
+            }
+            for (int32_t k = 0, slot = 0; k < 6 && slot < kills; k++) {
+                if (!ev(faction, 15 + k, 4)) continue;
+                int32_t victim = ev(faction, 15 + k, 2) & 7;
+                UiRect r = off(kKills[slot++]);
+                sprite_copy1(&portrait[victim], c, portrait[victim].key, r.left, r.top, 1, 1);
+                spot_add(&spots[0], 15 + k, 0, r.left, r.top, r.right - r.left, r.bottom - r.top);
+                texts.push_back("eliminated " + std::to_string(victim) + " slot " + std::to_string(slot - 1));
+            }
         }
+        // The viewer's emblem (+0x36CC: higher with all fourteen monuments).
+        UiRect er = MonumentCount == 14 ? UiRect{0x148, 6, 0x1D6, 0x6B} : UiRect{0x16C, 0x6F, 0x1B3, 0xAF};
+        er = off(er);
+        sprite_copy1(&crest, c, crest.key, er.left, er.top, 1, 1);
         return;
     }
     // A monument's text and picture.
@@ -462,12 +495,38 @@ void load_icons() {
             x += 0xA1;
         }
     }
+    // The eliminations' pillars: left and right pieces for 1..2, 3..4, 5..6 eliminated factions.
+    static const int16_t kDeco[6][4] = {{0x116, 0x41, 0x4E, 0x3F}, {0x165, 0x41, 0x49, 0x3F}, {1, 0x41, 0x8D, 0x3F},
+                                        {0x8F, 0x41, 0x86, 0x3F},  {1, 1, 0xCC, 0x3F},         {0xCE, 1, 0xD5, 0x3F}};
+    for (int32_t i = 0; i < 6; i++)
+        pfncSpriteFromCanvasRectTrans(&g_mw.deco[i], &art, 9, kDeco[i][0], kDeco[i][1], kDeco[i][2], kDeco[i][3], 0);
+}
+
+// MonuWin_init's pictures of each faction's <file>3.pcx: the small (0xB2, 0xA, 0x3A x 0x32) and the
+// large (0xA4, 0x6D, 0xA0 x 0x61) portraits; for the viewer also the victory picture (0xA4, 0xB,
+// 0xA0 x 0x61) and the emblem (0xA, 0xB, 0x8E x 0x65 with all 14 monuments, else 0xA, 0x71,
+// 0x47 x 0x40).
+void load_portraits(int32_t viewer) {
+    for (int32_t f = 1; f < 8; f++) {
+        Buffer art;
+        Buffer_ctor(&art);
+        std::string file = std::string(MFactions[f].filename) + "3.pcx";
+        if (Buffer_load_pcx(&art, file.c_str(), nullptr, 10, 0xEC) != 0) continue;
+        if (f == viewer) {
+            pfncSpriteFromCanvasRectTrans(&g_mw.unify, &art, 9, 0xA4, 0xB, 0xA0, 0x61, 0);
+            if (MonumentCount == 14) pfncSpriteFromCanvasRectTrans(&g_mw.crest, &art, 9, 0xA, 0xB, 0x8E, 0x65, 0);
+            else pfncSpriteFromCanvasRectTrans(&g_mw.crest, &art, 9, 0xA, 0x71, 0x47, 0x40, 0);
+        }
+        pfncSpriteFromCanvasRectTrans(&g_mw.portrait_big[f], &art, 9, 0xA4, 0x6D, 0xA0, 0x61, 0);
+        pfncSpriteFromCanvasRectTrans(&g_mw.portrait[f], &art, 9, 0xB2, 0xA, 0x3A, 0x32, 0);
+    }
 }
 
 // ---- hall of fame ----
 
 struct FameWinState : ScreenWin {
     int32_t faction = 1;
+    int32_t entry = 0;  // +0xA918: the entry shown in WORLD MAP (the new one after fame_add)
     Font *f_text = nullptr, *f_bold = nullptr;
     void redraw() override;
     void on_button(int32_t id) override;
@@ -517,6 +576,18 @@ void FameWinState::redraw() {
     sw_text_cent(this, c, sw_upper(sw_label(0x109C)), {kOx + 0x1C, kOy + 0xEE, kOx + 0x112, kOy + 0x100});
     sw_text_cent(this, c, sw_upper(sw_label(0x4C8)), {kOx + 0x12E, kOy + 0xEE, kOx + 0x1FC, kOy + 0x100});
     sw_text_cent(this, c, sw_upper(sw_label(0xF10)), {kOx + 0x226, kOy + 0xEE, kOx + 0x2F8, kOy + 0x100});
+    // WORLD MAP (+0xB43C: 0x12F, 0x10D .. 0x21D, 0x183): the entry's picture hof_<f>_<entry + 1>.pcx
+    // (its pixels as written: loaded without an offset).
+    if (fame_entry(faction, entry)[0] & 1) {
+        Buffer pic;
+        Buffer_ctor(&pic);
+        std::string file = g_ui_outdir + "/hof_" + std::to_string(faction) + "_" + std::to_string(entry + 1) + ".pcx";
+        if (Buffer_load_pcx(&pic, file.c_str(), nullptr, 0, 0xEC) == 0) {
+            Buffer_copy_4(&pic, c, 0, 0, kOx + 0x12F, kOy + 0x10D, std::min(pic.width, 0x21D - 0x12F),
+                          std::min(pic.height, 0x183 - 0x10D));
+            texts.push_back("world map " + file.substr(file.rfind('/') + 1));
+        }
+    }
     // The five entries in the TOP 5 SCORES column.
     int32_t lh = f_text->height;
     for (int32_t slot = 0; slot < 5; slot++) {
@@ -546,6 +617,127 @@ void FameWinState::log_state() {
 }
 
 std::string fame_path() { return g_ui_outdir + "/hallfame.jhh"; }
+// The world map picture of an entry: hof_<faction>_<slot + 1>.pcx (the original's game directory;
+// here --outdir, as hallfame.jhh).
+std::string hof_pcx(int32_t f, int32_t n) {
+    return g_ui_outdir + "/hof_" + std::to_string(f) + "_" + std::to_string(n) + ".pcx";
+}
+int32_t& fi(int32_t f, uint32_t off) { return *reinterpret_cast<int32_t*>(reinterpret_cast<uint8_t*>(&Factions[f]) + off); }
+int32_t& ei(uint8_t* e, uint32_t off) { return *reinterpret_cast<int32_t*>(e + off); }
+void strncpy_pad(char* d, const char* s, size_t n) {  // _strncpy: zeros after the terminator
+    size_t i = 0;
+    for (; i < n && s[i]; i++) d[i] = s[i];
+    for (; i < n; i++) d[i] = 0;
+}
+
+// FUN_0044AC10: entry `slot` (< 4) of faction f moves down one place, its world map picture too.
+void fame_move_down(int32_t f, int32_t slot) {
+    if (slot >= 4) return;
+    Buffer pic;
+    Buffer_ctor(&pic);
+    if (Buffer_load_pcx(&pic, hof_pcx(f, slot + 1).c_str(), nullptr, 0, 0xEC) == 0)
+        Buffer_write_pcx(&pic, hof_pcx(f, slot + 2).c_str());
+    uint8_t *src = fame_entry(f, slot), *dst = fame_entry(f, slot + 1);
+    dst[0] = src[0];
+    dst[1] = src[1];
+    std::memcpy(dst + 4, src + 4, 0x1C);  // year, score .. (+0x04 .. +0x1F)
+    dst[0x20] = src[0x20];
+    dst[0x21] = src[0x21];
+    for (uint32_t o : {0x22u, 0x3Au, 0x52u}) strncpy_pad(reinterpret_cast<char*>(dst + o), reinterpret_cast<char*>(src + o), 0x18);
+    std::memcpy(dst + 0x6C, src + 0x6C, 0x20);
+}
+
+// FUN_0044A660 (hall_of_fame(1), the end of the game): the viewer's entry where its rating ranks
+// among the faction's five (not in a scenario: GameState 0x20), the lower ones moved down; its
+// fields (year, the score and rating of compute_score / get_rating, the faction's totals, its
+// leader's title, name and faction noun, the difficulty, how the game was won), the "best of"
+// marks it takes from the other entries (bits 1 rating, 2 +0x1C, 4 +0xC, 8 +0x18, 0x10 the
+// earliest transcendence, 0x20 the earliest conquest; all of 1..8 without other entries), and the
+// world map pane's picture written as hof_<f>_<slot + 1>.pcx.
+void fame_add() {
+    if (GameState & 0x20) return;
+    const int32_t f = CurrentPlayerFaction;
+    if (f < 1 || f > 7) return;
+    compute_score(f, nullptr, nullptr, 0);
+    const int32_t score = fi(f, 0x209C);
+    const int32_t rating = get_rating(f, score);
+    int32_t slot = 0x11A;
+    for (int32_t i = 4; i >= 0; i--) {
+        uint8_t* e = fame_entry(f, i);
+        if (ei(e, 0x10) <= rating || !(e[0] & 1)) slot = i;
+    }
+    if (slot > 4) return;
+    for (int32_t k = 3; k >= slot; k--) fame_move_down(f, k);
+    uint8_t* n = fame_entry(f, slot);
+    ei(n, 0x10) = rating;
+    ei(n, 8) = score;
+    n[1] = 0;
+    ei(n, 0xC) = fi(f, 0x220);
+    n[0] = 1;
+    ei(n, 4) = game_year(CurrentTurn);
+    ei(n, 0x1C) = fi(f, 0x20B4) + fi(f, 0x20B0);
+    ei(n, 0x14) = fi(f, 0x20B8);
+    ei(n, 0x18) = fi(f, 0x20A8);
+    n[0x21] = fi(f, 0x20BC) == 0 ? 0 : (MapNativeLifeForms == 0 ? 1 : 2);
+    const uint8_t* mf = reinterpret_cast<const uint8_t*>(&MFactions[f]);
+    PluralDefault = 0;
+    GenderDefault = MFactions[f].is_leader_female;
+    strncpy_pad(reinterpret_cast<char*>(n + 0x22), reinterpret_cast<const char*>(mf + 0x4C), 0x18);
+    strncpy_pad(reinterpret_cast<char*>(n + 0x3A), reinterpret_cast<const char*>(mf + 0x34), 0x18);
+    GenderDefault = MFactions[f].noun_gender;
+    PluralDefault = MFactions[f].is_noun_plural;
+    strncpy_pad(reinterpret_cast<char*>(n + 0x52), MFactions[f].noun_faction, 0x18);
+    n[0x20] = (uint8_t)fi(f, 8);
+    if (GameRules & 0x400) n[0] |= 2;
+    if (GameState & 0x2000) n[0] |= 8;
+    else if (GameState & 0x400000) n[0] |= 0x10;
+    else if (GameState & 0x200000) n[0] |= 0x20;
+    else if (fi(f, 0x20C0)) n[0] |= 4;
+    else if (GameState & 0x10) n[0] |= 0x40;
+    auto others = [&](auto&& fn) {
+        for (int32_t g = 1; g < 8; g++)
+            for (int32_t i = 0; i < 5; i++)
+                if (g != f || i != slot) fn(fame_entry(g, i));
+    };
+    int32_t used = 0;
+    others([&](uint8_t* o) {
+        if (!(o[0] & 1)) return;
+        used++;
+        static const struct { uint8_t bit; uint32_t off; } kBest[4] = {{1, 0x10}, {2, 0x1C}, {4, 0xC}, {8, 0x18}};
+        for (const auto& b : kBest)
+            if ((o[1] & b.bit) && ei(o, b.off) <= ei(n, b.off)) {
+                n[1] |= b.bit;
+                o[1] &= (uint8_t)~b.bit;
+            }
+    });
+    if (!used) n[1] = 0xF;
+    for (const auto& w : {std::pair<uint8_t, uint8_t>{8, 0x10}, std::pair<uint8_t, uint8_t>{4, 0x20}}) {
+        int32_t count = 0;
+        others([&](uint8_t* o) {
+            if (!(o[0] & 1) || !(o[0] & w.first)) return;
+            count++;
+            if ((o[1] & w.second) && (n[0] & w.first) && ei(n, 4) <= ei(o, 4)) {
+                n[1] |= w.second;
+                o[1] &= (uint8_t)~w.second;
+            }
+        });
+        if (!count && (n[0] & w.first)) n[1] |= w.second;
+    }
+    // The world map pane (WorldWin's canvas) as the entry's picture.
+    Buffer* mi = basewin_mi_canvas();
+    UiRect pane = mi_rect(0xCFC);
+    Buffer pic;
+    Buffer_ctor(&pic);
+    int32_t w = pane.right - pane.left, h = pane.bottom - pane.top;
+    if (mi && mi->data && w > 0 && h > 0) {
+        Buffer_init(&pic, w, h, 8, 0);
+        Buffer_copy_4(mi, &pic, pane.left, pane.top, 0, 0, w, h);
+    }
+    int32_t r = Buffer_write_pcx(&pic, hof_pcx(f, slot + 1).c_str());
+    g_fw.entry = slot;
+    std::fprintf(stderr, "hall of fame: faction %d slot %d score %d rating %d flags %02X best %02X picture %d\n", f, slot,
+                 score, rating, n[0], n[1], r);
+}
 
 }  // namespace
 
@@ -566,6 +758,7 @@ void GAMEAPI monument(int32_t is_new) {
     MonumentIsNew = is_new != 0;
     sw_init(s, (ScreenWidth - 0x400) / 2, ScreenHeight - 0x300, 0x400, 0x300, false);
     load_icons();
+    load_portraits(CurrentPlayerFaction);
     s->f_text = find_font(14, 0);
     s->f_bold = find_font(14, 1);
     sw_clear_buttons(s);
@@ -588,7 +781,8 @@ void GAMEAPI hall_of_fame(int32_t add) {
             std::memset(HallOfFame, 0, sizeof(HallOfFame));
         std::fclose(f);
     }
-    if (add) console_not_reconstructed_quiet("hall_of_fame: the new entry (FUN_0044A660)");
+    g_fw.entry = 0;
+    if (add) fame_add();
     FameWinState* s = &g_fw;
     s->name = "halloffame";
     s->faction = CurrentPlayerFaction >= 1 && CurrentPlayerFaction < 8 ? CurrentPlayerFaction : 1;
