@@ -51,8 +51,8 @@ ADDR(0x4CD6A0) int32_t GAMEAPI valid_patrol(int32_t veh_id, int32_t x, int32_t y
 ADDR(0x4CDA30) void GAMEAPI action_patrol(int32_t veh_id, int32_t x, int32_t y);
 // Orbital defence (and flechette defence of bases near (x, y)) of faction_id_def against a
 // payload missile of faction_id_atk. Returns 1 if the missile was shot down.
-ADDR(0x4CDAF0) int32_t GAMEAPI shoot_it(int32_t faction_id_atk, int32_t faction_id_def, int32_t x, int32_t y,
-                                        int32_t is_fungal);
+ADDR(0x4CDAF0)
+int32_t GAMEAPI shoot_it(int32_t faction_id_atk, int32_t faction_id_def, int32_t x, int32_t y, int32_t is_fungal);
 // Tectonic payload of veh_id detonating at (x, y).
 ADDR(0x4CE210) void GAMEAPI action_tectonic(int32_t veh_id, int32_t x, int32_t y);
 // 0x4CE6B0 (no callers): plants fungus at (x, y) as action_fungal does for each tile.
@@ -65,8 +65,8 @@ ADDR(0x4CEDE0) void GAMEAPI action_give(int32_t veh_id, int32_t faction_id);
 ADDR(0x4CF380) void GAMEAPI action_gate(int32_t veh_id, int32_t base_id);
 // Satellite attack of faction_id's orbital defence on faction_id_def's satellite type (0..2
 // satellites, 4: Orbital Defense Pod of base_id).
-ADDR(0x4CF480) void GAMEAPI action_sat_attack(int32_t faction_id, int32_t faction_id_def, int32_t type,
-                                              int32_t base_id);
+ADDR(0x4CF480)
+void GAMEAPI action_sat_attack(int32_t faction_id, int32_t faction_id_def, int32_t type, int32_t base_id);
 // Carries out veh_id's current order (terraforming, go to, road to). Returns 0 if it has none.
 ADDR(0x4CF740) int32_t GAMEAPI action(int32_t veh_id);
 
@@ -81,13 +81,14 @@ ADDR(0x476B70) void GAMEAPI mon_colony_founded(int32_t faction_id, const char* b
 ADDR(0x593220) void GAMEAPI synch_veh(int32_t veh_id);
 ADDR(0x592E10) void GAMEAPI message_veh(int32_t type, int32_t veh_id, int32_t a3, int32_t a4);
 // net: multiplayer locks and remote execution (NetDaemon object NetState).
-ADDR(0x531020) int32_t THISCALL NetDaemon_lock_veh(uint8_t* net, int32_t* veh_id, int32_t a2, int32_t a3, int32_t a4,
-                                                  int32_t a5);
+ADDR(0x531020)
+int32_t THISCALL NetDaemon_lock_veh(uint8_t* net, int32_t* veh_id, int32_t a2, int32_t a3, int32_t a4, int32_t a5);
 ADDR(0x5310F0) void THISCALL NetDaemon_unlock_veh(uint8_t* net);
 ADDR(0x531300) void THISCALL NetDaemon_await_exec(uint8_t* net, int32_t a1);
 ADDR(0x531480) void THISCALL NetDaemon_await_synch(uint8_t* net);
-ADDR(0x531700) int32_t THISCALL NetDaemon_maybe_lock(uint8_t* net, int32_t* veh_id, int32_t a2, int32_t a3, int32_t a4,
-                                                    int32_t a5, int32_t a6);
+ADDR(0x531700)
+int32_t THISCALL
+    NetDaemon_maybe_lock(uint8_t* net, int32_t* veh_id, int32_t a2, int32_t a3, int32_t a4, int32_t a5, int32_t a6);
 ADDR(0x531780) int32_t THISCALL NetDaemon_order_veh(uint8_t* net, int32_t veh_id, int32_t dir, int32_t a3);
 // diplo_act
 ADDR(0x50BCC0) void GAMEAPI double_cross(int32_t faction_id, int32_t faction_id_with, int32_t a3);

@@ -11,9 +11,12 @@
 #include "fcompare.h"
 
 #define A(k) FcArg{FA_##k, 0, 0}
-#define R(lo, hi) FcArg{FA_RANGE, lo, hi}
-#define C(v) FcArg{FA_CONST, v, v}
-#define BITS(lo, hi) FcArg{FA_BIT, lo, hi}
+#define R(lo, hi) \
+    FcArg { FA_RANGE, lo, hi }
+#define C(v) \
+    FcArg { FA_CONST, v, v }
+#define BITS(lo, hi) \
+    FcArg { FA_BIT, lo, hi }
 #define XY A(X), A(Y)
 
 static const FcFunc kFcFuncs[] = {
@@ -208,7 +211,8 @@ static const FcFunc kFcFuncs[] = {
     {"has_project", 0, {R(0, 63), A(FACTION)}},
     {"base_claimed", 0, {R(-133, 600), R(-5, 2000), A(BOOL), A(BOOL), A(BOOL), A(BOOL)}},
     /* set_base/base_compute: mutating; the outputs are optional (null or a buffer) */
-    {"base_build", FC_MUTATES,
+    {"base_build",
+     FC_MUTATES,
      {A(BASE_SIGNED), FcArg{FA_BUF_OPT, 0x7777, 0x7777}, FcArg{FA_BUF_OPT, 0x7777, 0x7777},
       FcArg{FA_BUF_OPT, 0x7777, 0x7777}}},
     /* ---- social, setup, net_misc (social_select opens the social engineering dialog and
@@ -218,7 +222,8 @@ static const FcFunc kFcFuncs[] = {
     {"social_upheaval", 0, {A(FACTION), FcArg{FA_BUF, 0, 3}}},
     {"social_set", FC_MUTATES | FC_VOID, {A(FACTION1)}},
     {"society_avail", 0, {R(0, 3), R(0, 3), A(FACTION)}},
-    {"social_ai", FC_MUTATES | FC_VOID,
+    {"social_ai",
+     FC_MUTATES | FC_VOID,
      {A(FACTION1), R(-1, 110), A(BOOL), A(BOOL), A(BOOL), FcArg{FA_BUF_OPT, 0x7777, 0x7777}}},
     {"sort", FC_VOID, {R(0, 16), FcArg{FA_BUF, 0, 127}, FcArg{FA_BUF, -20, 20}}},
     {"compute_faction_modifiers", FC_MUTATES | FC_VOID, {A(FACTION)}},
@@ -388,7 +393,7 @@ static const FcFunc kFcFuncs[] = {
     {"promote", FC_MUTATES | FC_VOID, {A(VEH)}},
     {"invasions", FC_MUTATES | FC_VOID, {A(BASE)}},
     {"interceptor", FC_MUTATES, {A(FACTION1), A(FACTION1), XY}}, /* viewer 0: scramble animation */
-    {"shoot", FC_MUTATES, {A(FACTION1), A(FACTION1), XY}},      /* viewer 0: popups */
+    {"shoot", FC_MUTATES, {A(FACTION1), A(FACTION1), XY}}, /* viewer 0: popups */
     /* planet_busting: not compared (only valid for planet busters: boom divides by the strength;
        reached through battle_fight with a buster) */
     {"mon_enemy_destroyed", FC_MUTATES | FC_VOID, {A(FACTION1), A(FACTION)}}, /* viewer 0: window */
@@ -588,7 +593,7 @@ static const FcFunc kFcFuncs[] = {
  * e.g. by the depth of the calling stack). Restored like the rest of the image. */
 static const struct {
     uint32_t addr, size;
-    const char *what;
+    const char* what;
 } kFcIgnore[] = {
     {0x9B22F0, 0x9B7AE4 - 0x9B22F0, "MultiDebugWin (debug message window)"},
     {0x9B90F8, 0x9BB570 - 0x9B90F8, "TextLabels and text buffers"},
@@ -599,8 +604,9 @@ static const struct {
     {0x90EA68, 0x90F554 - 0x90EA68, "boom() explosion animation object (flic player state; timing)"},
     {0x912428, 8 * 0x588, "boom() map-window graphics buffers (Buffer objects)"},
     {0x7AD2A0, 0x7AE778 - 0x7AD2A0, "InfoWindow status pane (InfoWin_on_redraw state)"},
-    {0x7AF190, 4, "status window buffer font word (Buffer_set_font from StatusWin_draw during battle odds; "
-                  "value depends on the caller's stack, UI only)"},
+    {0x7AF190, 4,
+     "status window buffer font word (Buffer_set_font from StatusWin_draw during battle odds; "
+     "value depends on the caller's stack, UI only)"},
     {0x7CFF10, 4, "dword written by the OS (Wine) during the message pump (do_all_non_input; timing)"},
     {0x6A5DF8, 20 * 0x20, "CRT stream table _iob (a file opened by both calls gets a different heap buffer)"},
     {0x9C1084, 0x9C11CC - 0x9C1084, "CRT low-level I/O handle tables (__pioinfo, handle counts; see _iob)"},

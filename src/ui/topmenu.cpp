@@ -88,15 +88,15 @@ struct SetupPics {  // the pictures of the highlighted item (custom_planet)
 
 struct SetupWin : ScreenWin {
     std::vector<std::string> items;  // upper-cased, as SetupWin_draw_item leaves them
-    std::string caption;             // local_1b4
-    int32_t count = 0;               // +0xFCC: items (with the caption while drawn)
-    int32_t sel = 0;                 // +0xFD0
+    std::string caption;  // local_1b4
+    int32_t count = 0;  // +0xFCC: items (with the caption while drawn)
+    int32_t sel = 0;  // +0xFD0
     bool done = false;
     const Flc* flc = nullptr;
-    Font font;                       // Arial 18 bold
+    Font font;  // Arial 18 bold
     SetupPics* pics = nullptr;
     Spots spots;
-    int32_t anim = 5;                // the frame of openitem.flc drawn (5: at rest)
+    int32_t anim = 5;  // the frame of openitem.flc drawn (5: at rest)
 
     // Top of item i's frame (the caption is frame 0 when present).
     int32_t frame_top(int32_t i) const {
@@ -175,8 +175,15 @@ struct SetupWin : ScreenWin {
     void on_key(int32_t key) override {  // SetupWin_on_key_click (0x4AE3E0)
         int32_t n = (int32_t)items.size();
         switch (key & 0xFFFF) {
-        case VKEY_RETURN: done = true; sw_close(this); break;
-        case VKEY_ESCAPE: sel = -1; done = true; sw_close(this); break;
+        case VKEY_RETURN:
+            done = true;
+            sw_close(this);
+            break;
+        case VKEY_ESCAPE:
+            sel = -1;
+            done = true;
+            sw_close(this);
+            break;
         case VKEY_UP: sel = sel == 0 ? n - 1 : sel - 1; break;
         case VKEY_DOWN: sel = sel == n - 1 ? 0 : sel + 1; break;
         default: break;
@@ -526,15 +533,9 @@ int32_t GAMEAPI top_menu(int32_t hotseat) {
             }
             break;
         }
-        case 4:
-            leave = multiplayer_init(0) == 0;
-            break;
-        case 5:
-            show_credits();
-            break;
-        default:
-            leave = true;
-            break;
+        case 4: leave = multiplayer_init(0) == 0; break;
+        case 5: show_credits(); break;
+        default: leave = true; break;
         }
         if (leave) break;
     } while (!ControlTurnA);
@@ -725,7 +726,10 @@ int32_t GAMEAPI custom_planet(int32_t setup_win, int32_t no_dialogs) {
         };
         if (setup_win) {
             switch (idx) {
-            case 1: planets(1); label += "LAND"; break;
+            case 1:
+                planets(1);
+                label += "LAND";
+                break;
             case 3:
                 for (int32_t i = 0; i < 3; i++) {
                     char name[20];
@@ -737,8 +741,14 @@ int32_t GAMEAPI custom_planet(int32_t setup_win, int32_t no_dialogs) {
                 label += "TIDES";
                 break;
             case 4: label += "ORBIT"; break;
-            case 5: planets(5); label += "CLOUDS"; break;
-            case 6: planets(3); label += "LIFE"; break;
+            case 5:
+                planets(5);
+                label += "CLOUDS";
+                break;
+            case 6:
+                planets(3);
+                label += "LIFE";
+                break;
             default: break;
             }
         } else {

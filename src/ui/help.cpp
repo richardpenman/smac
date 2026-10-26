@@ -16,7 +16,7 @@
 namespace {
 
 int32_t g_heck_section = -1;  // DAT_00684634: the section tech_heck writes for (-1: all)
-int32_t g_heck_header = 0;    // DAT_007591BC: the "^" before the first line was written
+int32_t g_heck_header = 0;  // DAT_007591BC: the "^" before the first line was written
 
 // tech_heck (0x44B380): the lines of helpx.txt #TECHHECK that apply to tech_id.
 void tech_heck(const std::function<void(const char*)>& out, int32_t t) {
@@ -32,8 +32,8 @@ void tech_heck(const std::function<void(const char*)>& out, int32_t t) {
         out(text);
     };
     const CRules& r = Rules;
-    const int32_t rules[7] = {r.tech_preq_improv_fungus,       r.tech_preq_ease_fungus_mov,
-                              r.tech_preq_build_road_fungus,   r.tech_preq_allow_2_spec_abil,
+    const int32_t rules[7] = {r.tech_preq_improv_fungus,        r.tech_preq_ease_fungus_mov,
+                              r.tech_preq_build_road_fungus,    r.tech_preq_allow_2_spec_abil,
                               r.tech_preq_allow_3_nutrients_sq, r.tech_preq_allow_3_minerals_sq,
                               r.tech_preq_allow_3_energy_sq};
     for (int32_t v : rules) line(t == v, text_get());

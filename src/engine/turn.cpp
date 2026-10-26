@@ -105,8 +105,9 @@ void GAMEAPI reset_territory() {
             uint32_t region = sq->region;
             for (int32_t f = 1; f < 8; f++) {
                 uint32_t flags = game().factions[f].player_flags;
-                bool seen = (flags & PFLAG_STRAT_SEARCH_OBJECTIVES) ? (sq->items & BIT_SUPPLY_REMOVE) != 0
-                                                                     : (flags & PFLAG_MAP_REVEALED) || (sq->visibility & (1 << f));
+                bool seen = (flags & PFLAG_STRAT_SEARCH_OBJECTIVES)
+                                ? (sq->items & BIT_SUPPLY_REMOVE) != 0
+                                : (flags & PFLAG_MAP_REVEALED) || (sq->visibility & (1 << f));
                 if (seen) game().factions[f].region_visible_tiles[region]++;
             }
             // Owner: the nearest base within the territory distance (half at sea), and at sea any
@@ -279,10 +280,8 @@ void sea_wipe(int32_t base_id, uint32_t item, const char* label) {
 
 void GAMEAPI random_events(int32_t is_extra) {
     if (!is_extra) {
-        if (SolarFlaresEvent & 2)
-            SolarFlaresEvent = 0;
-        else if (SolarFlaresEvent & 1)
-            SolarFlaresEvent = 2;
+        if (SolarFlaresEvent & 2) SolarFlaresEvent = 0;
+        else if (SolarFlaresEvent & 1) SolarFlaresEvent = 2;
         int32_t sunspots = SunspotDuration < -1000 ? -1000 : SunspotDuration;
         if (DustCloudDuration < 0) DustCloudDuration = 0;
         SunspotDuration = sunspots - 1;
@@ -382,7 +381,8 @@ void GAMEAPI random_events(int32_t is_extra) {
         // only the event base's visibility counts).
         COMPAT_ORIGINAL(event_shown_base_0);
         int32_t shown = 0;
-        if (base.faction_id == CurrentPlayerFaction || (base.visibility & (uint8_t)(1 << (CurrentPlayerFaction & 31)))) {
+        if (base.faction_id == CurrentPlayerFaction ||
+            (base.visibility & (uint8_t)(1 << (CurrentPlayerFaction & 31)))) {
             shown = 1;
             Console_focus(&MainConsole, base.x, base.y, CurrentPlayerFaction);
         }
@@ -483,10 +483,8 @@ void GAMEAPI random_events(int32_t is_extra) {
         }
         parse_say(1, ResName[resource].name_plural, -1, -1);
         bool ocean = (map_tile(x, y)->climate & 0xE0) < 0x60;
-        if (resource == 0)
-            POP2("NEWRESOURCE", ocean ? "rdneuw_sm.pcx" : "rdneul_sm.pcx", -1);
-        else
-            POP2("NEWRESOURCE", ocean ? "rdminw_sm.pcx" : "rdminl_sm.pcx", -1);
+        if (resource == 0) POP2("NEWRESOURCE", ocean ? "rdneuw_sm.pcx" : "rdneul_sm.pcx", -1);
+        else POP2("NEWRESOURCE", ocean ? "rdminw_sm.pcx" : "rdminl_sm.pcx", -1);
         return;
     }
     case 9: {
@@ -500,10 +498,8 @@ void GAMEAPI random_events(int32_t is_extra) {
             }
         }
         SolarFlaresEvent = 1;
-        if (hit)
-            POP2("SOLARSTORM", "sun_sm.pcx", -1);
-        else
-            POP2("SOLARFLARE", "heat_sm.pcx", -1);
+        if (hit) POP2("SOLARSTORM", "sun_sm.pcx", -1);
+        else POP2("SOLARFLARE", "heat_sm.pcx", -1);
         return;
     }
     case 10: {
@@ -608,7 +604,11 @@ void GAMEAPI random_events(int32_t is_extra) {
                     VEH& veh = game().vehs[v];
                     if (veh.x != x || veh.y != y) continue;
                     const UNIT& u = Units[veh.unit_id];
-                    int32_t hp = u.plan == 12 ? 1 : (u.reactor_id < 1 ? 1 : u.reactor_id > 100 ? 100 : u.reactor_id) * 10;
+                    int32_t hp = u.plan == 12 ? 1
+                                              : (u.reactor_id < 1     ? 1
+                                                 : u.reactor_id > 100 ? 100
+                                                                      : u.reactor_id) *
+                                                    10;
                     int32_t left = hp - veh.damage_taken;
                     left = left < 0 ? 0 : (left > 9999 ? 9999 : left);
                     veh.damage_taken = (uint8_t)(veh.damage_taken + left / 2);
@@ -827,11 +827,9 @@ void GAMEAPI random_events(int32_t is_extra) {
         if (PbemActive || CurrentTurn < 75 || !event_rank_ok(faction_id)) return;
         sea_wipe(base_id, BIT_MINE, "PLATFORMWIPE");
         return;
-    default:
-        return;
+    default: return;
     }
 }
-
 
 // ---- turn upkeep ----------------------------------------------------------------------------------
 
@@ -901,10 +899,8 @@ void GAMEAPI alien_fauna() {
             }
             if (!MapWin_focus(MapWins[0], x, y)) draw_tiles(x, y, 2);
             parse_says(0, game().bases[base_id].name, -1, -1);
-            if (ocean)
-                POP2("KELPGROWS", "kelp_sm.pcx", -1);
-            else
-                POP2("FORESTGROWS", "forgr_sm.pcx", -1);
+            if (ocean) POP2("KELPGROWS", "kelp_sm.pcx", -1);
+            else POP2("FORESTGROWS", "forgr_sm.pcx", -1);
         }
     }
     if (GameRules & RULES_SCN_NO_NATIVE_LIFE) return;
@@ -941,10 +937,8 @@ void GAMEAPI alien_fauna() {
             bool spawned = true;
             if (ExpansionEnabled && (engine_logic_time() & 1)) {
                 int32_t veh_id = veh_init(BSC_SEALURK, 0, x, y);  // Sealurk
-                if (veh_id < 0)
-                    spawned = false;
-                else
-                    veh_promote(veh_id);
+                if (veh_id < 0) spawned = false;
+                else veh_promote(veh_id);
             } else {
                 int32_t veh_id = veh_init(BSC_ISLE_OF_THE_DEEP, 0, x, y);  // Isle of the Deep
                 if (veh_id < 0) {
@@ -1078,10 +1072,8 @@ void GAMEAPI turn_upkeep() {
             MapSeaLevel += step;
             world_climate();
             draw_map(1);
-            if (step > 0)
-                popp(ScriptFileName, "SEARISING", 0, "searis_sm.pcx", 0);
-            else
-                popp(ScriptFileName, "SEAFALLING", 0, "seafal_sm.pcx", 0);
+            if (step > 0) popp(ScriptFileName, "SEARISING", 0, "searis_sm.pcx", 0);
+            else popp(ScriptFileName, "SEAFALLING", 0, "seafal_sm.pcx", 0);
         }
     }
     alien_fauna();
@@ -1155,7 +1147,6 @@ void GAMEAPI turn_upkeep() {
     do_all_non_input();
 }
 
-
 // ---- faction upkeep -------------------------------------------------------------------------------
 
 void GAMEAPI repair_phase(int32_t faction_id) {
@@ -1181,8 +1172,8 @@ void GAMEAPI repair_phase(int32_t faction_id) {
         if (veh.state & 8) {
             MAP* sq = map_tile(x, y);
             int32_t triad = veh_triad(veh_id);
-            if (((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8) || (triad == TRIAD_LAND && (sq->items & BIT_BUNKER)) ||
-                (triad == TRIAD_AIR && (sq->items & BIT_AIRBASE)))
+            if (((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8) ||
+                (triad == TRIAD_LAND && (sq->items & BIT_BUNKER)) || (triad == TRIAD_AIR && (sq->items & BIT_AIRBASE)))
                 veh.state &= ~8;
         }
         if (veh.unit_id == 19) veh.faction_id = 0;  // Fungal Tower
@@ -1354,8 +1345,7 @@ void GAMEAPI production_phase(int32_t faction_id) {
     if (full_game_turn() && f.sanction_turns && --f.sanction_turns == 0 && faction_id == CurrentPlayerFaction) {
         if (game().mfactions[faction_id].rule_flags & RFLAG_ALIEN)
             popp(ScriptFileName, "SANCTIONSENDALIEN", 0, "Alopdir.pcx", 0);
-        else
-            popp(ScriptFileName, "SANCTIONSEND", 0, "council_sm.pcx", 0);
+        else popp(ScriptFileName, "SANCTIONSEND", 0, "council_sm.pcx", 0);
     }
 }
 
@@ -1414,8 +1404,8 @@ void GAMEAPI allocate_energy(int32_t faction_id) {
         if (f.SE_alloc_psych > psych_goal / 2) f.SE_alloc_psych--;
     }
     int32_t psych_min = f.SE_police_pending > -2 ? 0 : 2;
-    f.SE_alloc_psych = (psych_min <= f.SE_alloc_psych && psych_min < 5) ? (f.SE_alloc_psych < 5 ? f.SE_alloc_psych : 4)
-                                                                        : psych_min;
+    f.SE_alloc_psych =
+        (psych_min <= f.SE_alloc_psych && psych_min < 5) ? (f.SE_alloc_psych < 5 ? f.SE_alloc_psych : 4) : psych_min;
     if (has_sp(FAC_TELEPATHIC_MATRIX - 70, faction_id)) f.SE_alloc_psych = 0;
     // Labs allocation from the AI priorities.
     f.SE_alloc_labs = (f.AI_tech - f.AI_power - f.SE_alloc_psych + 11) / 2 - f.AI_wealth;
@@ -1509,7 +1499,8 @@ void GAMEAPI faction_upkeep(int32_t faction_id) {
     Paths.xDst = -1;
     Paths.yDst = -1;
     if (full_game_turn()) {
-        if (faction_id == CurrentPlayerFaction && !(GameState & (STATE_COUNCIL_HAS_CONVENED | STATE_DISPLAYED_COUNCIL_AVAIL_MSG)) &&
+        if (faction_id == CurrentPlayerFaction &&
+            !(GameState & (STATE_COUNCIL_HAS_CONVENED | STATE_DISPLAYED_COUNCIL_AVAIL_MSG)) &&
             can_call_council(faction_id, 0) && !(GameState & STATE_GAME_DONE)) {
             GameState |= STATE_DISPLAYED_COUNCIL_AVAIL_MSG;
             popp(ScriptFileName, "COUNCILOPEN", 0, "council_sm.pcx", 0);
@@ -1521,7 +1512,6 @@ void GAMEAPI faction_upkeep(int32_t faction_id) {
     if (!MultiplayerActive && (GamePreferences & PREF_BSC_AUTOSAVE_EACH_TURN) && faction_id == CurrentPlayerFaction)
         auto_save();
 }
-
 
 // ---- small Planet functions -----------------------------------------------------------------------
 
@@ -1545,10 +1535,8 @@ void GAMEAPI climactic_changes() {
     MapSeaLevel += step;
     world_climate();
     draw_map(1);
-    if (step > 0)
-        popp(ScriptFileName, "SEARISING", 0, "searis_sm.pcx", 0);
-    else
-        popp(ScriptFileName, "SEAFALLING", 0, "seafal_sm.pcx", 0);
+    if (step > 0) popp(ScriptFileName, "SEARISING", 0, "searis_sm.pcx", 0);
+    else popp(ScriptFileName, "SEAFALLING", 0, "seafal_sm.pcx", 0);
 }
 
 int32_t GAMEAPI generators(int32_t faction_id, int32_t* out) {
@@ -1611,8 +1599,7 @@ int32_t GAMEAPI end_of_game(int32_t check) {
                         (GameRules & RULES_VICTORY_COOPERATIVE);
             if (gens >= Rules.subspace_gen_req) {
                 fac.player_flags |= PFLAG_UNK_100000;
-                if (f == CurrentPlayerFaction)
-                    GameVictoryType = 16;
+                if (f == CurrentPlayerFaction) GameVictoryType = 16;
                 else if (coop) {
                     if (GameVictoryType != 16) GameVictoryType = 17;
                 } else if (GameVictoryType != 16 && GameVictoryType != 17) {
@@ -1627,8 +1614,7 @@ int32_t GAMEAPI end_of_game(int32_t check) {
                 fac.player_flags |= PFLAG_UNK_40000;
                 bool coop2 = (game().factions[f].diplo_status[CurrentPlayerFaction] & DIPLO_PACT) &&
                              (GameRules & RULES_VICTORY_COOPERATIVE);
-                if (f == CurrentPlayerFaction)
-                    GameVictoryType = 12;
+                if (f == CurrentPlayerFaction) GameVictoryType = 12;
                 else if (coop2) {
                     if (GameVictoryType != 12) GameVictoryType = 13;
                 } else if (GameVictoryType != 12 && GameVictoryType != 13) {
@@ -1681,18 +1667,12 @@ int32_t GAMEAPI end_of_game(int32_t check) {
     switch (GameVictoryType) {
     case 1:
     case 2:
-    case 3:
-        credits = true;
-        break;
-    case 6:
-        popp(ScriptFileName, "DIPLOMATICVICTORY", 0, "dipvic_sm.pcx", 0);
-        break;
+    case 3: credits = true; break;
+    case 6: popp(ScriptFileName, "DIPLOMATICVICTORY", 0, "dipvic_sm.pcx", 0); break;
     case 7:
         if (GamePreferences & PREF_AV_SECRET_PROJECT_MOVIES) {
-            if (game().mfactions[CurrentPlayerFaction].rule_flags & RFLAG_ALIEN)
-                amovie_project_name("losealien");
-            else
-                amovie_project_name(game().mfactions[CurrentPlayerFaction].is_leader_female ? "losewoman" : "loseman");
+            if (game().mfactions[CurrentPlayerFaction].rule_flags & RFLAG_ALIEN) amovie_project_name("losealien");
+            else amovie_project_name(game().mfactions[CurrentPlayerFaction].is_leader_female ? "losewoman" : "loseman");
         }
         break;
     case 8:
@@ -1709,30 +1689,24 @@ int32_t GAMEAPI end_of_game(int32_t check) {
                 if (!(FactionStatus[1] & (uint8_t)(1 << f))) continue;
                 int32_t value;
                 int32_t table[9];
-                if (GameState & STATE_SCN_VICT_HIGHEST_AC_SCORE_WINS)
-                    compute_score(f, &value, table, 1);
-                else
-                    value = num_objectives(f, GameRules & RULES_VICTORY_COOPERATIVE);
+                if (GameState & STATE_SCN_VICT_HIGHEST_AC_SCORE_WINS) compute_score(f, &value, table, 1);
+                else value = num_objectives(f, GameRules & RULES_VICTORY_COOPERATIVE);
                 if (best < value || (value == best && f == CurrentPlayerFaction)) {
                     best_id = f;
                     best = value;
                 }
             }
             say_faction(best_id);
-            if (best_id == CurrentPlayerFaction)
-                X_pop_2("SCENARIO", "SCENTIMEWIN", 0);
-            else
-                X_pop_2("SCENARIO", "SCENTIMELOSS", 0);
+            if (best_id == CurrentPlayerFaction) X_pop_2("SCENARIO", "SCENTIMEWIN", 0);
+            else X_pop_2("SCENARIO", "SCENTIMELOSS", 0);
         } else {
             X_pop_2("SCENARIO", "SCENTIMELIMIT", 0);
         }
         break;
     case 9: {
         say_faction(winner);
-        if (winner == CurrentPlayerFaction)
-            X_pop_2("SCENARIO", "SUDDENDEATH0", 0);
-        else
-            X_pop_2("SCENARIO", "SUDDENDEATH", 0);
+        if (winner == CurrentPlayerFaction) X_pop_2("SCENARIO", "SUDDENDEATH0", 0);
+        else X_pop_2("SCENARIO", "SUDDENDEATH", 0);
         break;
     }
     case 10:
@@ -1747,9 +1721,7 @@ int32_t GAMEAPI end_of_game(int32_t check) {
                  : "DIPLOMATICLOSE",
              0, "dipvic_sm.pcx", 0);
         break;
-    case 12:
-        popp(ScriptFileName, "ECONOMICVICTORY", 0, "econwin_sm.pcx", 0);
-        break;
+    case 12: popp(ScriptFileName, "ECONOMICVICTORY", 0, "econwin_sm.pcx", 0); break;
     case 13:
         say_faction(victor);
         popp(ScriptFileName, "ECONOMICCOOP", 0, "econwin_sm.pcx", 0);
@@ -1784,33 +1756,29 @@ int32_t GAMEAPI end_of_game(int32_t check) {
         if (!(game().mfactions[CurrentPlayerFaction].rule_flags & RFLAG_ALIEN)) {
             GenderDefault = game().mfactions[victor].noun_gender;
             PluralDefault = game().mfactions[victor].is_noun_plural;
-            interlude(0x1D, (int32_t)(kMFactionsAddr + victor * (uint32_t)sizeof(MFaction) + offsetof(MFaction, noun_faction)),
-                      1, 0);
+            interlude(
+                0x1D,
+                (int32_t)(kMFactionsAddr + victor * (uint32_t)sizeof(MFaction) + offsetof(MFaction, noun_faction)), 1,
+                0);
         }
         say_faction(victor);
         popp(ScriptFileName, "ENDBEACONLOSE", 0, "beaconlose_sm.pcx", 0);
         break;
-    default:
-        break;
+    default: break;
     }
     switch (GameVictoryType) {
     case 4:
     case 5:
     case 6:
-    case 12:
-        mon_winning_unify(CurrentPlayerFaction, -1);
-        break;
+    case 12: mon_winning_unify(CurrentPlayerFaction, -1); break;
     case 10:
     case 13:
         mon_winning_unify(victor, -1);
         mon_winning_unify(CurrentPlayerFaction, victor);
         break;
     case 11:
-    case 14:
-        mon_winning_unify(victor, -1);
-        break;
-    default:
-        break;
+    case 14: mon_winning_unify(victor, -1); break;
+    default: break;
     }
     if (!(GamePreferences & PREF_AV_INTERLUDES_DISABLED)) {
         switch (GameVictoryType) {
@@ -1826,8 +1794,7 @@ int32_t GAMEAPI end_of_game(int32_t check) {
             interlude(0x14, 0, 4, 0);
             credits = true;
             break;
-        default:
-            break;
+        default: break;
         }
     }
     if (GameVictoryType == 1 || GameVictoryType == 2 || GameVictoryType == 3 || credits) show_credits();
@@ -1838,13 +1805,13 @@ int32_t GAMEAPI end_of_game(int32_t check) {
     }
     show_replay();
     GameState |= STATE_FINAL_SCORE_DONE;
-    if (!MultiplayerActive && GameVictoryType != 7 &&
-        popp(ScriptFileName, "GAMEOVERMAN", 0, "stars_sm.pcx", 0))
+    if (!MultiplayerActive && GameVictoryType != 7 && popp(ScriptFileName, "GAMEOVERMAN", 0, "stars_sm.pcx", 0))
         return 0;
     ControlTurnB = !MultiplayerActive;
     if (MultiplayerActive) {
         NetDaemon_hang_up(&NetState);
-        for (int32_t i : {0, 1, 2, 3, 12, 11, 15, 14, 19, 30, 28, 29, 39, 38, 8, 9, 10, 37, 36, 32, 31, 33, 4, 5, 42, 41, 6, 7})
+        for (int32_t i :
+             {0, 1, 2, 3, 12, 11, 15, 14, 19, 30, 28, 29, 39, 38, 8, 9, 10, 37, 36, 32, 31, 33, 4, 5, 42, 41, 6, 7})
             NetSessionState[i] = 0;
         ChatRecipientMask = 0xFF;
         NetSessionState[18] = 0;
@@ -1856,7 +1823,6 @@ int32_t GAMEAPI end_of_game(int32_t check) {
     ControlTurnA = 1;
     return 1;
 }
-
 
 // ---- Planetary Council ----------------------------------------------------------------------------
 
@@ -1905,10 +1871,8 @@ int32_t GAMEAPI wants_prop(int32_t faction_id, int32_t proposal, int32_t candida
             value = rivals > 1 ? 5 : 6;
             if (rivals == 0) value++;
             if (GovernorFaction < 0) value = value * 2 - 1;
-            if (GovernorFaction == faction_id)
-                value += 2;
-            else if (GovernorFaction >= 0 && (f.diplo_status[GovernorFaction] & 0x70))
-                value++;
+            if (GovernorFaction == faction_id) value += 2;
+            else if (GovernorFaction >= 0 && (f.diplo_status[GovernorFaction] & 0x70)) value++;
         } else {
             uint32_t status = f.diplo_status[candidate];
             bool pact = (status & DIPLO_PACT) != 0;
@@ -1929,7 +1893,8 @@ int32_t GAMEAPI wants_prop(int32_t faction_id, int32_t proposal, int32_t candida
                 if (value == 0) {
                     if (pact) {
                         value = 1;
-                        if (!wants_to_attack_fresh(faction_id, candidate, 0) && !wants_to_attack(candidate, faction_id, 0))
+                        if (!wants_to_attack_fresh(faction_id, candidate, 0) &&
+                            !wants_to_attack(candidate, faction_id, 0))
                             value = 2;
                     } else {
                         const MFaction& m = game().mfactions[faction_id];
@@ -2076,10 +2041,8 @@ int32_t GAMEAPI wants_prop(int32_t faction_id, int32_t proposal, int32_t candida
         int32_t trend = MapSeaLevelCouncil > 0 ? 1 : (MapSeaLevelCouncil >= 0) - 1;
         const MFaction& m = game().mfactions[faction_id];
         if (f.AI_growth || m.rule_psi) {
-            if (MapSeaLevelCouncil && dir != trend)
-                value = m.rule_psi ? 4 : 2;
-            else
-                value = m.rule_psi ? -4 : -2;
+            if (MapSeaLevelCouncil && dir != trend) value = m.rule_psi ? 4 : 2;
+            else value = m.rule_psi ? -4 : -2;
         }
         if (trend == dir) {
             value -= 2;
@@ -2100,25 +2063,19 @@ int32_t GAMEAPI wants_prop(int32_t faction_id, int32_t proposal, int32_t candida
             int32_t alt = sq->climate & 0xE0;
             int32_t weight = 0;
             if (alt < 0x60) {
-                if (dir >= 0)
-                    weight = -1;
+                if (dir >= 0) weight = -1;
                 else
                     weight = (int32_t)sq->contour - MapSeaLevel >= AltNatural[3] - WorldBuilder.sea_level_rises ? 2 : 1;
             } else if (dir <= 0) {
                 if (alt > 0x60) weight = -1;
             } else if (!(base_has_facility(i, FAC_PRESSURE_DOME) && alt == 0x60)) {
-                if ((int32_t)sq->contour - MapSeaLevel <= WorldBuilder.sea_level_rises + AltNatural[3])
-                    weight = -3;
-                else if (alt == 0x60)
-                    weight = -1;
-                else
-                    weight = 1;
+                if ((int32_t)sq->contour - MapSeaLevel <= WorldBuilder.sea_level_rises + AltNatural[3]) weight = -3;
+                else if (alt == 0x60) weight = -1;
+                else weight = 1;
             }
             int32_t w = b.pop_size * weight * 2;
-            if ((uint8_t)b.faction_id == (uint32_t)faction_id)
-                sum += w * 2;
-            else
-                sum -= bit_count(f.diplo_status[(uint8_t)b.faction_id] & 0xC0030) * w;
+            if ((uint8_t)b.faction_id == (uint32_t)faction_id) sum += w * 2;
+            else sum -= bit_count(f.diplo_status[(uint8_t)b.faction_id] & 0xC0030) * w;
         }
         int32_t pop = f.pop_total;
         if (pop < 1) return value + sum / 1;
@@ -2160,10 +2117,8 @@ int32_t GAMEAPI wants_prop(int32_t faction_id, int32_t proposal, int32_t candida
         }
         return value;
     }
-    case 10:
-        return -9;
-    default:
-        return 0;
+    case 10: return -9;
+    default: return 0;
     }
 }
 
@@ -2276,20 +2231,18 @@ void GAMEAPI council_action(int32_t proposal, int32_t winner) {
         parse_num(0, 20);
         parse_num(1, WorldBuilder.sea_level_rises * 1000 / 15);
         bool alien = (game().mfactions[CurrentPlayerFaction].rule_flags & RFLAG_ALIEN) != 0;
-        if (rise)
-            popp(ScriptFileName, alien ? "WILLRISEALIEN" : "WILLRISE", 0, "searis_sm.pcx", 0);
-        else
-            popp(ScriptFileName, alien ? "WILLFALLALIEN" : "WILLFALL", 0, "seafal_sm.pcx", 0);
+        if (rise) popp(ScriptFileName, alien ? "WILLRISEALIEN" : "WILLRISE", 0, "searis_sm.pcx", 0);
+        else popp(ScriptFileName, alien ? "WILLFALLALIEN" : "WILLFALL", 0, "seafal_sm.pcx", 0);
         return;
     }
-    default:
-        return;
+    default: return;
     }
 }
 
 int32_t GAMEAPI can_call_council(int32_t faction_id, int32_t show_reason) {
     if (game().mfactions[faction_id].rule_flags & RFLAG_ALIEN) return 0;
-    if ((GameMoreRules & MRULES_NO_PLANETARY_COUNCIL) && (!(GameState & STATE_SCENARIO_EDITOR) || !(GameState & STATE_OMNISCIENT_VIEW)))
+    if ((GameMoreRules & MRULES_NO_PLANETARY_COUNCIL) &&
+        (!(GameState & STATE_SCENARIO_EDITOR) || !(GameState & STATE_OMNISCIENT_VIEW)))
         return 0;
     bool tell = show_reason && faction_id == CurrentPlayerFaction && is_human(faction_id);
     if (SunspotDuration > 0) {
@@ -2386,26 +2339,13 @@ void call_council_body(int32_t faction_id, int32_t aliens_residue) {
                 if ((game().mfactions[i].rule_flags & RFLAG_ALIEN) && is_alive(i)) aliens = 1;
             break;
         case PROP_SALVAGE_UNITY_CORE:
-        case PROP_LAUNCH_SOLAR_SHADE:
-            offer = ProposalPassCount[p] == 0;
-            break;
-        case PROP_GLOBAL_TRADE_PACT:
-            offer = ProposalPassCount[3] <= ProposalPassCount[4];
-            break;
-        case PROP_REPEAL_GLOBAL_TRADE_PACT:
-            offer = ProposalPassCount[4] != ProposalPassCount[3];
-            break;
-        case PROP_INCREASE_SOLAR_SHADE:
-            offer = ProposalPassCount[5] != 0;
-            break;
-        case PROP_REPEAL_UN_CHARTER:
-            offer = ProposalPassCount[8] <= ProposalPassCount[9];
-            break;
-        case PROP_REINSTATE_UN_CHARTER:
-            offer = ProposalPassCount[9] < ProposalPassCount[8];
-            break;
-        default:
-            break;
+        case PROP_LAUNCH_SOLAR_SHADE: offer = ProposalPassCount[p] == 0; break;
+        case PROP_GLOBAL_TRADE_PACT: offer = ProposalPassCount[3] <= ProposalPassCount[4]; break;
+        case PROP_REPEAL_GLOBAL_TRADE_PACT: offer = ProposalPassCount[4] != ProposalPassCount[3]; break;
+        case PROP_INCREASE_SOLAR_SHADE: offer = ProposalPassCount[5] != 0; break;
+        case PROP_REPEAL_UN_CHARTER: offer = ProposalPassCount[8] <= ProposalPassCount[9]; break;
+        case PROP_REINSTATE_UN_CHARTER: offer = ProposalPassCount[9] < ProposalPassCount[8]; break;
+        default: break;
         }
         if (!offer) continue;
         StrBuffer[0] = 0;
@@ -2518,7 +2458,6 @@ __attribute__((naked)) void GAMEAPI call_council(int32_t) {
 void GAMEAPI call_council(int32_t faction_id) { call_council_body(faction_id, 1); }
 #endif
 
-
 // ---- game loops -------------------------------------------------------------------------------------
 
 namespace {
@@ -2528,22 +2467,16 @@ int32_t call_turn_upkeep() {
     return 0;
 }
 void call_faction_upkeep(int32_t faction_id) {
-    if (g_harness_faction_upkeep)
-        g_harness_faction_upkeep(faction_id);
-    else
-        faction_upkeep(faction_id);
+    if (g_harness_faction_upkeep) g_harness_faction_upkeep(faction_id);
+    else faction_upkeep(faction_id);
 }
 void call_enemy_turn(int32_t faction_id) {
-    if (g_harness_enemy_turn)
-        g_harness_enemy_turn(faction_id);
-    else
-        enemy_turn(faction_id);
+    if (g_harness_enemy_turn) g_harness_enemy_turn(faction_id);
+    else enemy_turn(faction_id);
 }
 void call_human_turn() {
-    if (g_harness_human_turn)
-        g_harness_human_turn();
-    else
-        Console_human_turn(&MainConsole);
+    if (g_harness_human_turn) g_harness_human_turn();
+    else Console_human_turn(&MainConsole);
 }
 // Hotseat/PBEM: what the next human player is told when taking over (engine part).
 void hotseat_take_turn(int32_t viewer) {
@@ -2605,10 +2538,8 @@ void hotseat_take_turn(int32_t viewer) {
             GenderDefault = game().mfactions[g].noun_gender;
             parse_says(3, game().mfactions[g].noun_faction, -1, -1);
         }
-        if (CouncilVoteState[CurrentPlayerFaction] == 1)
-            label = "COUNCILHOTGOVWIN";
-        else
-            label = GovernorFaction < 1 ? "COUNCILHOTGOVNONE" : "COUNCILHOTGOVLOSE";
+        if (CouncilVoteState[CurrentPlayerFaction] == 1) label = "COUNCILHOTGOVWIN";
+        else label = GovernorFaction < 1 ? "COUNCILHOTGOVNONE" : "COUNCILHOTGOVLOSE";
     } else if (CouncilVoteState[CurrentPlayerFaction] == 1) {
         label = "COUNCILHOTPASS";
     } else if (CouncilVoteState[CurrentPlayerFaction] == -2) {
@@ -2688,10 +2619,8 @@ void GAMEAPI control_turn() {
         }
         // The observer's "turn complete" pause after a round without a human turn.
         if (!human_moved) {
-            if (g_harness_observer_pause)
-                g_harness_observer_pause();
-            else
-                Console_human_turn(&MainConsole);
+            if (g_harness_observer_pause) g_harness_observer_pause();
+            else Console_human_turn(&MainConsole);
         }
     } while (!ControlTurnA);
 }
@@ -2761,10 +2690,8 @@ void GAMEAPI control_game() {
         GameNotStarted = 0;
         ui_main_mapwin_set_options(0x8C0);
         MapWinVehB = -1;
-        if (MultiplayerActive)
-            net_control_turn();
-        else
-            control_turn();
+        if (MultiplayerActive) net_control_turn();
+        else control_turn();
         desktop_close();
         if (!ControlTurnB) break;
     }

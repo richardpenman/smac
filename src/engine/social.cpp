@@ -26,9 +26,9 @@ bool owns_project(int32_t project, int32_t faction_id) {
     return base_id >= 0 && (uint8_t)game().bases[base_id].faction_id == (uint32_t)faction_id;
 }
 constexpr int32_t kNetworkBackbone = 21;  // FAC_NETWORK_BACKBONE - 70
-constexpr int32_t kCloningVats = 24;      // FAC_CLONING_VATS - 70
-constexpr int32_t kAsceticVirtues = 13;   // FAC_ASCETIC_VIRTUES - 70
-constexpr int32_t kLivingRefinery = 23;   // FAC_LIVING_REFINERY - 70
+constexpr int32_t kCloningVats = 24;  // FAC_CLONING_VATS - 70
+constexpr int32_t kAsceticVirtues = 13;  // FAC_ASCETIC_VIRTUES - 70
+constexpr int32_t kLivingRefinery = 23;  // FAC_LIVING_REFINERY - 70
 
 // Upheaval cost for a change of `changes` models (inline in social_upheaval and social_ai).
 int32_t upheaval_cost(int32_t faction_id, int32_t changes) {
@@ -70,7 +70,7 @@ void GAMEAPI social_calc(const int32_t* choices, int32_t* effects, int32_t facti
         }
     }
     if (choices_only) return;
-    if (owns_project(kAsceticVirtues, faction_id)) effects[5]++;   // police
+    if (owns_project(kAsceticVirtues, faction_id)) effects[5]++;  // police
     if (owns_project(kLivingRefinery, faction_id)) effects[2] += 2;  // support
     if (has_temple(faction_id)) {
         effects[7]++;  // planet
@@ -244,8 +244,7 @@ void GAMEAPI social_ai(int32_t faction_id, int32_t growth, int32_t tech, int32_t
             economy = f.unk_45 + (eff[0] > 4 ? 4 : eff[0]) * 2 - 4;
         } else if (eff[0] > 0) {
             economy = 0;
-            for (int32_t r = 0; r < 128; r++)
-                economy += ((f.region_base_plan[r] != 2) + 1) * f.region_total_bases[r];
+            for (int32_t r = 0; r < 128; r++) economy += ((f.region_base_plan[r] != 2) + 1) * f.region_total_bases[r];
         } else if (eff[0] < -1) {
             economy = 0;
             for (int32_t r = 0; r < 128; r++)
@@ -318,10 +317,8 @@ void GAMEAPI social_ai(int32_t faction_id, int32_t growth, int32_t tech, int32_t
 
         // efficiency
         int32_t effic = inefficiency;
-        if (eff[1] == -3)
-            effic *= 2;
-        else if (eff[1] <= -4)
-            effic <<= 2;
+        if (eff[1] == -3) effic *= 2;
+        else if (eff[1] <= -4) effic <<= 2;
         if (!threat) effic *= 2;
         if (out) {
             if (tech) effic *= 3;
@@ -338,8 +335,8 @@ void GAMEAPI social_ai(int32_t faction_id, int32_t growth, int32_t tech, int32_t
         score -= effic;
 
         // growth
-        int32_t growth_value = (f.nutrient_surplus_total + pop_deficit) * (growth * 2 + 2 - wealth) *
-                               (plan8_regions + 1) * eff[6] / 5;
+        int32_t growth_value =
+            (f.nutrient_surplus_total + pop_deficit) * (growth * 2 + 2 - wealth) * (plan8_regions + 1) * eff[6] / 5;
         if (aah_ooga(faction_id, faction_id)) growth_value *= 2;
         if (m.rule_population > 0) growth_value /= 2;
         if (out) {

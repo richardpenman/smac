@@ -191,10 +191,8 @@ void GAMEAPI wipe_goals(int32_t faction_id) {
     Faction& f = game().factions[faction_id];
     // Goals age: positive priorities turn negative (kept for one more turn), negative ones expire.
     for (Goal& g : f.goals) {
-        if (g.priority < 0)
-            g.type = -1;
-        else
-            g.priority = (int16_t)-g.priority;
+        if (g.priority < 0) g.type = -1;
+        else g.priority = (int16_t)-g.priority;
     }
     for (const Goal& s : f.sites) {
         if (s.type >= 0) add_goal(faction_id, s.type, s.priority, s.x, s.y, -1);

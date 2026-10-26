@@ -11,10 +11,10 @@ ADDR_NATIVE(0x644EF2) void GAMEAPI mem_free(void* ptr);
 // Growable block allocator (gfx module, 0x5D4560-0x5D4850). Blocks are carved from one buffer
 // that grows with realloc in 1 KB steps (previously returned pointers are not updated).
 struct Heap {
-    uint8_t flags;       // bit 0: fixed size, Heap_get fails instead of growing
+    uint8_t flags;  // bit 0: fixed size, Heap_get fails instead of growing
     uint8_t pad[3];
     uint8_t* base;
-    uint8_t* next;       // next free byte
+    uint8_t* next;  // next free byte
     int32_t base_size;
     int32_t free_size;
 };

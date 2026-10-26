@@ -9,8 +9,8 @@
 
 bool ui_directplay_registered() {
     HKEY key;
-    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\DirectPlay\\Applications\\Sid Meier's Alpha Centauri", 0, 0,
-                      &key) != 0)
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\DirectPlay\\Applications\\Sid Meier's Alpha Centauri",
+                      0, 0, &key) != 0)
         return false;
     bool done = false;
     BYTE value[12];

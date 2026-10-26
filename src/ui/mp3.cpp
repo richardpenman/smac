@@ -58,12 +58,12 @@ struct Tables {
             const uint16_t* c;
             const uint8_t* l;
             int32_t xl;
-        } src[] = {{1, mp3_h1_code, mp3_h1_len, 2},   {2, mp3_h2_code, mp3_h2_len, 3},
-                   {3, mp3_h3_code, mp3_h3_len, 3},   {5, mp3_h5_code, mp3_h5_len, 4},
-                   {6, mp3_h6_code, mp3_h6_len, 4},   {7, mp3_h7_code, mp3_h7_len, 6},
-                   {8, mp3_h8_code, mp3_h8_len, 6},   {9, mp3_h9_code, mp3_h9_len, 6},
-                   {10, mp3_h10_code, mp3_h10_len, 8}, {11, mp3_h11_code, mp3_h11_len, 8},
-                   {12, mp3_h12_code, mp3_h12_len, 8}, {13, mp3_h13_code, mp3_h13_len, 16},
+        } src[] = {{1, mp3_h1_code, mp3_h1_len, 2},     {2, mp3_h2_code, mp3_h2_len, 3},
+                   {3, mp3_h3_code, mp3_h3_len, 3},     {5, mp3_h5_code, mp3_h5_len, 4},
+                   {6, mp3_h6_code, mp3_h6_len, 4},     {7, mp3_h7_code, mp3_h7_len, 6},
+                   {8, mp3_h8_code, mp3_h8_len, 6},     {9, mp3_h9_code, mp3_h9_len, 6},
+                   {10, mp3_h10_code, mp3_h10_len, 8},  {11, mp3_h11_code, mp3_h11_len, 8},
+                   {12, mp3_h12_code, mp3_h12_len, 8},  {13, mp3_h13_code, mp3_h13_len, 16},
                    {15, mp3_h15_code, mp3_h15_len, 16}, {16, mp3_h16_code, mp3_h16_len, 16},
                    {24, mp3_h24_code, mp3_h24_len, 16}};
         for (auto& s : src) {
@@ -401,7 +401,8 @@ private:
             int32_t width = ss[sfb + 1] - ss[sfb];
             for (int32_t w = 0; w < 3; w++) {
                 double expo = -2.0 * q.subblock_gain[w] - mult * sf_s_[ch][sfb][w];
-                for (int32_t j = 0; j < width && k < 576; j++, k++) xr[short_index(q.mixed, w, ss[sfb] + j)] = value(k, expo);
+                for (int32_t j = 0; j < width && k < 576; j++, k++)
+                    xr[short_index(q.mixed, w, ss[sfb] + j)] = value(k, expo);
             }
         }
     }
@@ -478,7 +479,6 @@ private:
             }
         }
     }
-
 };
 
 }  // namespace

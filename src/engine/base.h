@@ -16,7 +16,7 @@ GLOBAL(uint32_t, CurrentBasePtr, 0x90EA30);
 GLOBAL(int32_t[6], CostRatioByDiff, 0x689378);  // cost_factor: base cost ratio per difficulty
 GLOBAL(int32_t, BaseBitErrorShown, 0x90EA38);  // base_at: base-bits error dialog in progress
 GLOBAL(int32_t, BaseYieldFoodShort, 0x90E900);  // base_yield: nutrients sufficed while choosing tiles
-GLOBAL(int32_t, BaseWorkersLeft, 0x90E938);     // base_yield: citizens left to place (pop + 1 at start)
+GLOBAL(int32_t, BaseWorkersLeft, 0x90E938);  // base_yield: citizens left to place (pop + 1 at start)
 GLOBAL(int32_t, UpgradeAllProtos, 0x90EA3C);  // upgrade dialog: "upgrade all" chosen this round
 // base_reset: production choices for the four AI priorities and their scores (base_build).
 GLOBAL(int32_t[4], BasePriorityChoice, 0x90EA44);
@@ -57,12 +57,13 @@ ADDR(0x4E3C60) int32_t GAMEAPI base_find_faction(int32_t x, int32_t y, int32_t f
 // Nearest base to (x, y) with filters: region (-1 any), owner faction_id (-1: any owner equal to
 // faction_id_2, or with faction_id_2 == -2 any faction with a pact), faction_id_3 (-1 any: owner or
 // a faction that sees the base). BaseFindDist is 9999 when none is found.
-ADDR(0x4E3D50) int32_t GAMEAPI base_find_filtered(int32_t x, int32_t y, int32_t faction_id, int32_t region,
-                                           int32_t faction_id_2, int32_t faction_id_3);
+ADDR(0x4E3D50)
+int32_t GAMEAPI base_find_filtered(int32_t x, int32_t y, int32_t faction_id, int32_t region, int32_t faction_id_2,
+                                   int32_t faction_id_3);
 // Owner of the territory at (x, y) as seen by faction_id (-1 none or not visible without a
 // commlink unless ignore_comm). For foreign territory, *base_id receives the claiming base.
-ADDR(0x4E3EF0) int32_t GAMEAPI whose_territory(int32_t faction_id, int32_t x, int32_t y, int32_t* base_id,
-                                               int32_t ignore_comm);
+ADDR(0x4E3EF0)
+int32_t GAMEAPI whose_territory(int32_t faction_id, int32_t x, int32_t y, int32_t* base_id, int32_t ignore_comm);
 // Base claiming the foreign territory at (x, y) when one of the two factions is human and they
 // have no treaty; -1 otherwise.
 ADDR(0x4E3FA0) int32_t GAMEAPI base_territory(int32_t faction_id, int32_t x, int32_t y);
@@ -143,8 +144,8 @@ ADDR(0x4EF090) int32_t GAMEAPI pop_goal(int32_t base_id);
 ADDR(0x4EF1C0) int32_t GAMEAPI base_growth();
 ADDR(0x4EFB50) void GAMEAPI do_upgrade(int32_t veh_id, int32_t unit_id, int32_t a3);
 ADDR(0x4EFD50) int32_t GAMEAPI upgrade_cost(int32_t faction_id, int32_t new_unit_id, int32_t old_unit_id);
-ADDR(0x4EFE80) int32_t GAMEAPI upgrade_prototype(int32_t faction_id, int32_t new_unit_id, int32_t old_unit_id,
-                                                 int32_t flag);
+ADDR(0x4EFE80)
+int32_t GAMEAPI upgrade_prototype(int32_t faction_id, int32_t new_unit_id, int32_t old_unit_id, int32_t flag);
 ADDR(0x4F0460) void GAMEAPI upgrade_prototypes(int32_t faction_id, int32_t unit_id);
 ADDR(0x4F0650) void GAMEAPI upgrade_any_prototypes(int32_t faction_id);
 ADDR(0x4F06E0) int32_t GAMEAPI base_queue(int32_t base_id);

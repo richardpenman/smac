@@ -200,13 +200,13 @@ and the screenshot comparisons (`tests/*/compare.sh`, which need Wine).
 
 * `.editorconfig` (added): 4 spaces, LF, 120 columns. It matches the sources, so nothing changes
   on save.
-* `src/tools/clang-format.yml` (added) is the target style. Applied to the whole tree, it would
-  change about 5.7k of 100k lines (mostly lines over 120 columns and mixed one-line `if`s). It is
-  kept out of the root so format-on-save doesn't touch whole files.
-  `git clang-format --style=file:src/tools/clang-format.yml` formats only changed lines.
-* **Decision for the user:** a one-time reformat commit (rename the config to `/.clang-format`,
-  then format all files), proven by identical `-g0` object `.text`. Recommended right before
-  phase 3, so that the splits are reviewed in the final style.
+* `/.clang-format` is the style. The whole tree (src, tests, harness; not third_party/, which has
+  its own `.clang-format` with `DisableFormat`, nor the generated harness/oracle/ui_rng_sites.h)
+  was formatted with it once (increment 6, approved by the user), so format-on-save and
+  `git clang-format` now keep files in this style.
+* The reformat was proven by identical objects: every native object (engine, UI, headless, unit
+  tests) and every hybrid object, built `Release -g0` before and after, has the same
+  `llvm-objdump -drs` output (code with relocations and the contents of every section).
 
 ## 10. Increments
 
@@ -219,7 +219,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 3 | Name table + check + rename tool; first weak names (`base_unused_helper_1/2`) | S | done |
 | 4 | `.editorconfig`, target clang-format style (not applied) | XS | done |
 | 5 | Rename remaining weak names: `_2`/`_3` suffixes where a better name is clear, 36 `dword_`/`DAT_` globals | M | done (see note 5) |
-| 6 | One-time reformat (if approved) | S (mechanical) | |
+| 6 | One-time reformat (approved) | S (mechanical) | done (see note 6) |
 | 7 | `GameState` view + `game()`; migrate module by module (map, factions, bases, vehs) | M ×4 | done (see note 7) |
 | 8 | Magic numbers → named constants/enums, module by module | M | first pass done (see note 8) |
 | 9 | `compat.h`: name and isolate all 173 `BUG(original)` sites | M | done (see note 9) |
@@ -258,6 +258,15 @@ Notes on the increments:
    `say_orders_2`, `get_pacts_2`, `stack_sort_2`, and the methods of the UI classes (`Buffer_*`,
    `Sprite_*`, `Texture_*`, `Font_*`, `Palette_*`, `Wave_*`, `Sound_*`, `Console_*`, `MapWin_*`,
    `GraphicWin_*`), which get their names with the class (section 7.3).
+
+6. Done after increment 9 (the user approved it then), as its own commit with nothing else in
+   it: `src/tools/clang-format.yml` became `/.clang-format` and every C/C++ file under src/,
+   tests/ and harness/ was formatted with clang-format 23.1.2 (tools/llvm-mingw). One change to
+   the target style: `SortIncludes: Never`. Sorting broke engine/types/all.h (its headers depend
+   on their order) and, elsewhere, reordered the definitions of inline globals, which changes
+   their dynamic initialisation order and so the objects. `gen_bindings.py` now also recognises a
+   definition that starts with `__attribute__((naked))` on the same line (clang-format joined
+   them), otherwise native stubs were generated for base_minerals/base_energy.
 
 7. The view is `GameStateView` (engine/game_state.h), not `GameState`: that name is taken by the
    original's game state flags word (`GameState`, 0x9A64C0, a Thinker name used all over the

@@ -30,14 +30,19 @@ inline uint8_t* host(uint32_t addr) { return g_image + (addr - kImageBase); }
 bool init(const char* image_path);
 }  // namespace mem
 
-template <class T> T& smac_bind(uint32_t addr) { return *reinterpret_cast<T*>(mem::host(addr)); }
-template <class T> using smac_type_t = T;  // lets array types appear in declarator position
+template <class T>
+T& smac_bind(uint32_t addr) {
+    return *reinterpret_cast<T*>(mem::host(addr));
+}
+template <class T>
+using smac_type_t = T;  // lets array types appear in declarator position
 
 #define GLOBAL(type, name, addr) inline std::add_lvalue_reference_t<type> name = smac_bind<type>(addr)
 #ifdef SMACX_HYBRID
 #define GLOBAL_NATIVE(type, name, addr) GLOBAL(type, name, addr)
 #else
-#define GLOBAL_NATIVE(type, name, addr) inline smac_type_t<type> name{}
+#define GLOBAL_NATIVE(type, name, addr) \
+    inline smac_type_t<type> name {}
 #endif
 
 // Marks a function declaration with the address of the original function it reconstructs.
@@ -51,7 +56,7 @@ template <class T> using smac_type_t = T;  // lets array types appear in declara
 // Methods of the original C++ classes are reconstructed as free functions taking the object
 // pointer first, declared THISCALL so hybrid builds match the original convention.
 #if defined(SMACX_HYBRID)
-#define GAMEAPI __cdecl
+#define GAMEAPI  __cdecl
 #define THISCALL __thiscall
 #else
 #define GAMEAPI

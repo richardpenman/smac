@@ -169,8 +169,8 @@ void add_root(std::vector<fs::path>* roots, const fs::path& p) {
 void add_prefix(std::vector<fs::path>* roots, const fs::path& prefix) {
     fs::path c = prefix / "drive_c";
     if (!is_dir(c)) return;
-    for (const char* sub : {"GOG Games", "Program Files (x86)/GOG Galaxy/Games", "Program Files (x86)",
-                            "Program Files", "Games"})
+    for (const char* sub :
+         {"GOG Games", "Program Files (x86)/GOG Galaxy/Games", "Program Files (x86)", "Program Files", "Games"})
         add_root(roots, c / sub);
 }
 
@@ -250,8 +250,8 @@ void standard_locations(std::vector<fs::path>* direct, std::vector<fs::path>* ro
             if (n.find("alpha") == std::string::npos && n.find("centauri") == std::string::npos &&
                 n.find("smac") == std::string::npos)
                 continue;
-            for (const char* res : {"Contents/Resources", "Contents/SharedSupport/prefix",
-                                    "Contents/SharedSupport/wineprefix"})
+            for (const char* res :
+                 {"Contents/Resources", "Contents/SharedSupport/prefix", "Contents/SharedSupport/wineprefix"})
                 add_prefix(roots, app / res);
             add_root(roots, app);
         }
@@ -264,10 +264,10 @@ void standard_locations(std::vector<fs::path>* direct, std::vector<fs::path>* ro
     add_root(roots, home / "Games" / "Heroic");  // Heroic's default install folder
     add_prefix(roots, env("WINEPREFIX"));
     add_prefix(roots, home / ".wine");
-    add_prefixes_in(roots, home / "Games");                                // Lutris (~/Games/<game>)
-    add_prefixes_in(roots, home / "Games" / "Heroic" / "Prefixes");        // Heroic
+    add_prefixes_in(roots, home / "Games");  // Lutris (~/Games/<game>)
+    add_prefixes_in(roots, home / "Games" / "Heroic" / "Prefixes");  // Heroic
     add_prefixes_in(roots, home / "Games" / "Heroic" / "Prefixes" / "default");
-    add_prefixes_in(roots, home / ".local/share/bottles/bottles");        // Bottles
+    add_prefixes_in(roots, home / ".local/share/bottles/bottles");  // Bottles
     add_prefixes_in(roots, home / ".var/app/com.usebottles.bottles/data/bottles/bottles");
     add_steam(roots, home / ".steam" / "steam");
     add_steam(roots, home / ".local/share/Steam");
@@ -355,7 +355,8 @@ Pick native_pick(std::string* out) {
     *out = path;
     return Pick::picked;
 #elif defined(__APPLE__)
-    Pick r = run_picker(std::string("osascript -e 'POSIX path of (choose folder with prompt \"") + prompt + "\")'", out);
+    Pick r =
+        run_picker(std::string("osascript -e 'POSIX path of (choose folder with prompt \"") + prompt + "\")'", out);
     return r;
 #else
     if (env("DISPLAY").empty() && env("WAYLAND_DISPLAY").empty()) return Pick::unavailable;
@@ -388,9 +389,10 @@ std::string ask_game_dir(const std::string& reason) {
     }
     std::string text = reason;
     for (;;) {
-        int box = ask_box(text + "\n\nsmacx plays the game with the files of an installed copy of Sid Meier's "
-                                 "Alpha Centauri (v2.0 with Alien Crossfire, e.g. GOG's Planetary Pack). "
-                                 "Choose the folder that contains terranx.exe.",
+        int box = ask_box(text +
+                              "\n\nsmacx plays the game with the files of an installed copy of Sid Meier's "
+                              "Alpha Centauri (v2.0 with Alien Crossfire, e.g. GOG's Planetary Pack). "
+                              "Choose the folder that contains terranx.exe.",
                           "Choose folder...", "Quit");
         if (box == 0) return "";
         std::string dir;
@@ -404,7 +406,8 @@ std::string ask_game_dir(const std::string& reason) {
                                   "\n\nStart smacx with --gamedir FOLDER (or set SMACX_GAMEDIR) to give the folder "
                                   "that contains terranx.exe.";
                 if (box == 1) ask_box(msg, "OK", "Quit");
-                std::fprintf(stderr, "smacx: no game folder: start smacx with --gamedir FOLDER (or set SMACX_GAMEDIR)\n");
+                std::fprintf(stderr,
+                             "smacx: no game folder: start smacx with --gamedir FOLDER (or set SMACX_GAMEDIR)\n");
                 return "";
             }
         }
@@ -482,7 +485,8 @@ bool check_game_dir(const std::string& dir, std::string* why) {
         return false;
     }
     std::string missing;
-    for (const char* f : {"alpha.txt", "alphax.txt", "labels.txt", "script.txt", "texture.pcx", "palette.pcx", "xi.pcx"})
+    for (const char* f :
+         {"alpha.txt", "alphax.txt", "labels.txt", "script.txt", "texture.pcx", "palette.pcx", "xi.pcx"})
         if (find_ci(dir, f).empty()) missing += std::string(missing.empty() ? "" : ", ") + f;
     if (!missing.empty()) {
         *why = "\"" + dir + "\" has terranx.exe but not the game's data files (" + missing +
@@ -534,8 +538,8 @@ std::string find_game_dir(const std::string& udir) {
         std::fprintf(stderr, "smacx: skipping %s: %s\n", d.string().c_str(), why.c_str());
         if (first_problem.empty()) first_problem = why;
     }
-    std::string dir = ask_game_dir(first_problem.empty() ? "Alpha Centauri was not found in the usual install locations."
-                                                         : first_problem);
+    std::string dir = ask_game_dir(
+        first_problem.empty() ? "Alpha Centauri was not found in the usual install locations." : first_problem);
     if (dir.empty()) return "";
     dir = fs::absolute(dir).lexically_normal().string();
     config_set(udir, "gamedir", dir);

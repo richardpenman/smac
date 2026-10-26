@@ -35,10 +35,10 @@ constexpr uint32_t kPaintBox = 0xD4C, kBrushBox = 0xD5C, kTextBox = 0xD6C;
 
 bool g_loaded = false;
 Sprite g_paint[25][3];  // MainInfc +0x21E00 (interface.pcx, 0x2B x 0x12)
-Sprite g_brush[6][3];   // MainInfc +0x22AE4 (0x18 x 0x18)
-BaseButton g_btn[31];   // 0x3F3.. (paints), 0x40C.. (brushes)
+Sprite g_brush[6][3];  // MainInfc +0x22AE4 (0x18 x 0x18)
+BaseButton g_btn[31];  // 0x3F3.. (paints), 0x40C.. (brushes)
 int32_t g_group[2] = {0x3F3, 0x40C};  // ButtonGroup_set of groups 2 and 3
-bool g_shown = false;   // EditorPanelWin (the 0x3EA mode button) shown
+bool g_shown = false;  // EditorPanelWin (the 0x3EA mode button) shown
 
 int32_t mem_i(uint32_t a) { return *reinterpret_cast<int32_t*>(mem::host(a)); }
 
@@ -59,11 +59,13 @@ void load() {
                 x += 0x2C;
             }
         }
-        for (int32_t k = 0; k < 3; k++) pfncSpriteFromCanvasRectTrans(&g_paint[i][k], &ifc, kKey, x, y + 0x13 * k, 0x2B, 0x12, 0);
+        for (int32_t k = 0; k < 3; k++)
+            pfncSpriteFromCanvasRectTrans(&g_paint[i][k], &ifc, kKey, x, y + 0x13 * k, 0x2B, 0x12, 0);
     }
     for (int32_t i = 0; i < 6; i++)
         for (int32_t k = 0; k < 3; k++)
-            pfncSpriteFromCanvasRectTrans(&g_brush[i][k], &ifc, kKey, 0x1D1 + 0x19 * i, 0x1B6 + 0x19 * k, 0x18, 0x18, 0);
+            pfncSpriteFromCanvasRectTrans(&g_brush[i][k], &ifc, kKey, 0x1D1 + 0x19 * i, 0x1B6 + 0x19 * k, 0x18, 0x18,
+                                          0);
 }
 
 UiRect& rect(uint32_t off) { return mi_rect(off); }
@@ -208,7 +210,12 @@ void draw_text(Buffer* c) {
     const char* paint;
     const int32_t p = EditorPaint2;
     switch (p) {
-    case 0: case 1: case 2: case 3: case 4: case 5: paint = label_get(0xEBC / 4 + p); break;
+    case 0:
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+    case 5: paint = label_get(0xEBC / 4 + p); break;
     case 0x1A: paint = Natural[2].name_short; break;
     case 0x1B: paint = Natural[6].name_short; break;
     case 0x1C: paint = Natural[3].name_short; break;
@@ -302,10 +309,11 @@ bool editpane_mouse(int32_t type, int32_t x, int32_t y) {
 }
 
 void editpane_log_state() {
-    std::fprintf(stderr, "editpane shown %d mode %d paint %d (button %d) brush %d (button %d)\n", g_shown ? 1 : 0, mi_mode(),
-                 EditorPaint2, g_group[0], EditorBrush2, g_group[1]);
+    std::fprintf(stderr, "editpane shown %d mode %d paint %d (button %d) brush %d (button %d)\n", g_shown ? 1 : 0,
+                 mi_mode(), EditorPaint2, g_group[0], EditorBrush2, g_group[1]);
     if (g_laid)
         for (int32_t i = 0; i < button_count(); i++)
-            std::fprintf(stderr, "editpane button %X at %d,%d %dx%d: %s\n", g_btn[i].id, g_btn[i].r.left, g_btn[i].r.top,
-                         g_btn[i].r.right - g_btn[i].r.left, g_btn[i].r.bottom - g_btn[i].r.top, g_btn[i].bubble.c_str());
+            std::fprintf(stderr, "editpane button %X at %d,%d %dx%d: %s\n", g_btn[i].id, g_btn[i].r.left,
+                         g_btn[i].r.top, g_btn[i].r.right - g_btn[i].r.left, g_btn[i].r.bottom - g_btn[i].r.top,
+                         g_btn[i].bubble.c_str());
 }

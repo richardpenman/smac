@@ -212,9 +212,7 @@ int32_t GAMEAPI action_terraform(int32_t veh_id, int32_t terraform_id, int32_t i
     if (is_action) v.order = (uint8_t)(t + 4);
     int32_t rate = Terraform[t].rate;
     switch (t) {
-    case 3:
-        rate += (int32_t)((sq->val3 >> 6) * rate) / 2;
-        break;
+    case 3: rate += (int32_t)((sq->val3 >> 6) * rate) / 2; break;
     case 5:
     case 6: {
         uint32_t items = sq->items;
@@ -281,9 +279,7 @@ int32_t GAMEAPI action_terraform(int32_t veh_id, int32_t terraform_id, int32_t i
     synch_bit(x, y, faction_id);
     switch (t) {
     case 10:
-    case 11:
-        site_radius(x, y);
-        break;
+    case 11: site_radius(x, y); break;
     case 12:
     case 14:
         site_radius(x, y);
@@ -384,10 +380,26 @@ int32_t GAMEAPI action_terraform(int32_t veh_id, int32_t terraform_id, int32_t i
             int32_t veh = veh_id;
             if (!is_sea) {
                 switch (t) {
-                case 0: image = &ImgMapFarm; veh = -1; label = "MADEFARM"; break;
-                case 1: image = &ImgMapSoilEnr; veh = -1; label = "MADESOIL"; break;
-                case 2: image = &ImgMapMine; veh = -1; label = "MADEMINE"; break;
-                case 3: image = &ImgMapSolar; veh = -1; label = "MADESOLAR"; break;
+                case 0:
+                    image = &ImgMapFarm;
+                    veh = -1;
+                    label = "MADEFARM";
+                    break;
+                case 1:
+                    image = &ImgMapSoilEnr;
+                    veh = -1;
+                    label = "MADESOIL";
+                    break;
+                case 2:
+                    image = &ImgMapMine;
+                    veh = -1;
+                    label = "MADEMINE";
+                    break;
+                case 3:
+                    image = &ImgMapSolar;
+                    veh = -1;
+                    label = "MADESOLAR";
+                    break;
                 case 4: label = "MADEFOREST"; break;
                 case 5: label = "MADEROAD"; break;
                 case 6: label = "MADETUBE"; break;
@@ -398,11 +410,17 @@ int32_t GAMEAPI action_terraform(int32_t veh_id, int32_t terraform_id, int32_t i
                 default: TutWinMapStates[0] = (int32_t)(~bit & state); break;
                 }
             } else if (t == 0) {
-                image = &ImgMapFarm; label = "MADESEAFARM"; veh = -1;
+                image = &ImgMapFarm;
+                label = "MADESEAFARM";
+                veh = -1;
             } else if (t == 2) {
-                image = &ImgMapMine; label = "MADESEAMINE"; veh = -1;
+                image = &ImgMapMine;
+                label = "MADESEAMINE";
+                veh = -1;
             } else if (t == 3) {
-                image = &ImgMapSolar; label = "MADESEASOLAR"; veh = -1;
+                image = &ImgMapSolar;
+                label = "MADESEASOLAR";
+                veh = -1;
             } else {
                 TutWinMapStates[is_sea] = (int32_t)(~bit & state);
             }
@@ -433,8 +451,7 @@ void GAMEAPI action_staple(int32_t base_id) {
             parse_says(0, b.name, -1, -1);
             if (!(game().mfactions[faction_id].rule_flags & 0x80))
                 popp(ScriptFileName, "NERVESTAPLEDONE", 0, "drone_sm.pcx", 0);
-            else
-                popp(ScriptFileName, "NERVESTAPLEDONE", 0, "ALdrone_sm.pcx", 0);
+            else popp(ScriptFileName, "NERVESTAPLEDONE", 0, "ALdrone_sm.pcx", 0);
         } else {
             parse_says(0, b.name, -1, -1);
             set_leader_title(1, (uint8_t)b.faction_id);
@@ -447,8 +464,7 @@ void GAMEAPI action_staple(int32_t base_id) {
         parse_says(0, b.name, -1, -1);
         if (!(game().mfactions[faction_id].rule_flags & 0x80))
             popp(ScriptFileName, "NERVESTAPLEFAIL", 0, "drone_sm.pcx", 0);
-        else
-            popp(ScriptFileName, "NERVESTAPLEFAIL", 0, "ALdrone_sm.pcx", 0);
+        else popp(ScriptFileName, "NERVESTAPLEFAIL", 0, "ALdrone_sm.pcx", 0);
     }
     atrocity((uint8_t)b.faction_id, (uint8_t)b.faction_id_former, b.faction_id_former != b.faction_id, 1);
 }
@@ -524,7 +540,8 @@ void GAMEAPI action_destroy(int32_t veh_id, int32_t items, int32_t x, int32_t y)
             if (!(Terraform[k].bit & found)) continue;
             removed |= Terraform[k].bit;
             bit_set(x, y, Terraform[k].bit, 0);
-            parse_says(2, Strings_get(&StringTable, map_is_ocean(x, y) ? Terraform[k].name_sea : Terraform[k].name), -1, -1);
+            parse_says(2, Strings_get(&StringTable, map_is_ocean(x, y) ? Terraform[k].name_sea : Terraform[k].name), -1,
+                       -1);
             if (veh_triad(veh_id) == 2 && faction_id == CurrentPlayerFaction)
                 NetMsg_pop(&NetMsg, "BOMBSUCCEEDED", 5000, 0, nullptr);
             synch_bit(x, y, faction_id);
@@ -947,8 +964,8 @@ int32_t GAMEAPI action_airdrop(int32_t veh_id, int32_t x, int32_t y, int32_t fla
     }
     if (!(VehAttackFlags & 2)) return 1;
     int32_t pod = goody_at(x, y);
-    int32_t seen = faction_id == CurrentPlayerFaction ||
-                   tile_veh_owner(map_tile(x, y)) == CurrentPlayerFaction || (GameState & STATE_OMNISCIENT_VIEW);
+    int32_t seen = faction_id == CurrentPlayerFaction || tile_veh_owner(map_tile(x, y)) == CurrentPlayerFaction ||
+                   (GameState & STATE_OMNISCIENT_VIEW);
     int32_t show = 0;
     if (!seen) {
         for (int32_t i = 0; i < 8; i++) {
@@ -1149,8 +1166,8 @@ void GAMEAPI action_oblit(int32_t veh_id, int32_t base_id) {
     parse_says(2, game().mfactions[former].adj_name_faction, -1, -1);
     set_leader_title(3, faction_id);
     set_leader_name(4, faction_id);
-    bool seen = (uint8_t)b.faction_id == CurrentPlayerFaction ||
-                (b.visibility & (uint8_t)(1 << (CurrentPlayerFaction & 31)));
+    bool seen =
+        (uint8_t)b.faction_id == CurrentPlayerFaction || (b.visibility & (uint8_t)(1 << (CurrentPlayerFaction & 31)));
     base_kill(base_id);
     draw_map(1);
     if (faction_id == CurrentPlayerFaction) popp(ScriptFileName, "OBLITTED", 0, "baseobl_sm.pcx", 0);
@@ -1187,9 +1204,8 @@ int32_t GAMEAPI valid_patrol(int32_t veh_id, int32_t x, int32_t y) {
     bool from_base = base_at(v.x, v.y) != 0 || (map_tile(v.x, v.y)->items & BIT_AIRBASE);
     bool to_base = base_at(x, y) != 0 || (map_tile(x, y)->items & BIT_AIRBASE);
     int32_t left = moves_left(veh_id);
-    int32_t reach =
-        (speed(veh_id, 0) * ((Chassis[Units[v.unit_id].chassis_id].range - v.movement_turns) - 1) + left) /
-        Rules.move_rate_roads;
+    int32_t reach = (speed(veh_id, 0) * ((Chassis[Units[v.unit_id].chassis_id].range - v.movement_turns) - 1) + left) /
+                    Rules.move_rate_roads;
     int32_t d = map_dist(x, y, v.x, v.y);
     if (from_base && to_base) return d <= reach;
     return d <= reach / 2;
@@ -1516,7 +1532,8 @@ void GAMEAPI action_give(int32_t veh_id, int32_t faction_id) {
                 for (int32_t k = 0; k < 64; k++) {
                     const UNIT& p = Units[base + k];
                     if ((p.unit_flags & UNIT_ACTIVE) && p.chassis_id == u.chassis_id && p.weapon_id == u.weapon_id &&
-                        p.armor_id == u.armor_id && p.ability_flags == u.ability_flags && p.reactor_id == u.reactor_id) {
+                        p.armor_id == u.armor_id && p.ability_flags == u.ability_flags &&
+                        p.reactor_id == u.reactor_id) {
                         unit_id = base + k;
                         break;
                     }

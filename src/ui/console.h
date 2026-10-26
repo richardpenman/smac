@@ -18,42 +18,42 @@
 #include "ui/mapwin.h"
 
 // ---- Console fields (byte offsets from MainConsole) ----
-constexpr uint32_t kConFaction = 0x23BD4;      // faction whose console this is (the viewer)
-constexpr uint32_t kConVehMode = 0x23BD8;      // MapWinInVehMode: unit mode (1) or view mode (0)
-constexpr uint32_t kConVeh = 0x23BDC;          // MapWinVehA: selected vehicle (-1: none)
-constexpr uint32_t kConNextVeh = 0x23BE0;      // MapWinVehB: vehicle to select next (multiplayer)
-constexpr uint32_t kConWaiting = 0x23BE4;      // waiting for orders for the selected unit
-constexpr uint32_t kConTurnActive = 0x23BE8;   // the human turn goes on (0: end the turn)
-constexpr uint32_t kConAnySelect = 0x23BEC;    // keep the selection if selectable (not only ready)
-constexpr uint32_t kConNoFocus = 0x23BF0;      // a go-to order is under way (no recentring)
-constexpr uint32_t kConMoveSet = 0x23BF4;      // the unit was just selected by Console_set_move
+constexpr uint32_t kConFaction = 0x23BD4;  // faction whose console this is (the viewer)
+constexpr uint32_t kConVehMode = 0x23BD8;  // MapWinInVehMode: unit mode (1) or view mode (0)
+constexpr uint32_t kConVeh = 0x23BDC;  // MapWinVehA: selected vehicle (-1: none)
+constexpr uint32_t kConNextVeh = 0x23BE0;  // MapWinVehB: vehicle to select next (multiplayer)
+constexpr uint32_t kConWaiting = 0x23BE4;  // waiting for orders for the selected unit
+constexpr uint32_t kConTurnActive = 0x23BE8;  // the human turn goes on (0: end the turn)
+constexpr uint32_t kConAnySelect = 0x23BEC;  // keep the selection if selectable (not only ready)
+constexpr uint32_t kConNoFocus = 0x23BF0;  // a go-to order is under way (no recentring)
+constexpr uint32_t kConMoveSet = 0x23BF4;  // the unit was just selected by Console_set_move
 constexpr uint32_t kConCursorShown = 0x23BF8;  // the cursor is drawn
 constexpr uint32_t kConCursorOn = 0x23BFC;
-constexpr uint32_t kConRedraw = 0x23C00;       // the view needs a full redraw before the cursor
-constexpr uint32_t kConCursorIdx = 0x23C08;    // MapWinCursorIndex: current cursor history slot
-constexpr uint32_t kConCursorHead = 0x23C0C;   // newest cursor history slot
-constexpr uint32_t kConCursorX = 0x23C10;      // MapWinCursorX[32]
-constexpr uint32_t kConCursorY = 0x23C90;      // MapWinCursorY[32]
-constexpr uint32_t kConMode = 0x23D10;         // mouse interaction mode (go to, ...; 0: none)
-constexpr uint32_t kConModeRange = 0x23D14;    // range of the mode's target (-1: any tile)
+constexpr uint32_t kConRedraw = 0x23C00;  // the view needs a full redraw before the cursor
+constexpr uint32_t kConCursorIdx = 0x23C08;  // MapWinCursorIndex: current cursor history slot
+constexpr uint32_t kConCursorHead = 0x23C0C;  // newest cursor history slot
+constexpr uint32_t kConCursorX = 0x23C10;  // MapWinCursorX[32]
+constexpr uint32_t kConCursorY = 0x23C90;  // MapWinCursorY[32]
+constexpr uint32_t kConMode = 0x23D10;  // mouse interaction mode (go to, ...; 0: none)
+constexpr uint32_t kConModeRange = 0x23D14;  // range of the mode's target (-1: any tile)
 constexpr uint32_t kConSearchReset = 0x23D18;  // Console_ready searches from the start
 constexpr uint32_t kCon23D1C = 0x23D1C;
-constexpr uint32_t kConMpSearch = 0x23D24;     // multiplayer: units of others' turns searched too
+constexpr uint32_t kConMpSearch = 0x23D24;  // multiplayer: units of others' turns searched too
 
 // ---- globals used by the console ----
-GLOBAL(int32_t, ConsoleTurnFlag, 0x90D930);        // cleared at the start of a human turn
-GLOBAL(int32_t, TutorialTourPending, 0x8CC248);    // TutWin_tour requested
-GLOBAL(int32_t, TutorialWinActive, 0x8CC210);      // dword_8CC210: a tutorial window is up
+GLOBAL(int32_t, ConsoleTurnFlag, 0x90D930);  // cleared at the start of a human turn
+GLOBAL(int32_t, TutorialTourPending, 0x8CC248);  // TutWin_tour requested
+GLOBAL(int32_t, TutorialWinActive, 0x8CC210);  // dword_8CC210: a tutorial window is up
 GLOBAL(int32_t, TutorialArrowShown, 0x8CC228);
-GLOBAL(int32_t, NetSimultaneous, 0x93E8E0);        // multiplayer: units move simultaneously
-GLOBAL(int32_t, NetLocked, 0x93E944);              // multiplayer: input locked
-GLOBAL(int32_t, NetBusyCount, 0x93F664);           // nested network waits
-GLOBAL(int32_t, MapWinMouseIndex, 0x68A5CC);       // map window under the mouse (-1: none)
-GLOBAL(int32_t, ConsoleNotReady, 0x93A944);        // a key arrived before the game was shown
-GLOBAL(int32_t, NewBaseX, 0x685478);               // site shown while naming a new base
+GLOBAL(int32_t, NetSimultaneous, 0x93E8E0);  // multiplayer: units move simultaneously
+GLOBAL(int32_t, NetLocked, 0x93E944);  // multiplayer: input locked
+GLOBAL(int32_t, NetBusyCount, 0x93F664);  // nested network waits
+GLOBAL(int32_t, MapWinMouseIndex, 0x68A5CC);  // map window under the mouse (-1: none)
+GLOBAL(int32_t, ConsoleNotReady, 0x93A944);  // a key arrived before the game was shown
+GLOBAL(int32_t, NewBaseX, 0x685478);  // site shown while naming a new base
 GLOBAL(int32_t, NewBaseY, 0x68547C);
-GLOBAL(uint8_t, ReportWindow, 0x876478);           // a report window (Thinker: ReportWin)
-GLOBAL(int32_t, NetLockHeld, 0x93E940);            // multiplayer: this client holds the unit lock
+GLOBAL(uint8_t, ReportWindow, 0x876478);  // a report window (Thinker: ReportWin)
+GLOBAL(int32_t, NetLockHeld, 0x93E940);  // multiplayer: this client holds the unit lock
 
 // ---- reconstructed functions (also: Console_human_turn, Console_focus, Console_ready_search,
 // Console_set_move, Console_cursor_next, Console_update_data in engine/ui_bridge.h) ----
@@ -128,8 +128,8 @@ ADDR_NATIVE(0x4D2AC0) void THISCALL Console_disband(uint8_t* console, int32_t ve
 ADDR_NATIVE(0x4D2DE0) void THISCALL Console_disband_2(uint8_t* console, int32_t x, int32_t y);
 // The units of the leader's tile (or the marked group) take the leader's go-to orders.
 ADDR_NATIVE(0x4D92D0) void THISCALL Console_group(uint8_t* console, int32_t veh_id);
-ADDR_NATIVE(0x4D8DC0) void THISCALL Console_set_road_to(uint8_t* console, int32_t veh_id, int32_t x, int32_t y,
-                                                       int32_t order);
+ADDR_NATIVE(0x4D8DC0)
+void THISCALL Console_set_road_to(uint8_t* console, int32_t veh_id, int32_t x, int32_t y, int32_t order);
 ADDR_NATIVE(0x4D8CD0) void THISCALL Console_set_bombing_run(uint8_t* console, int32_t veh_id, int32_t x, int32_t y);
 // Unit pick list of a stack (PICKUNIT...): the chosen unit, -1 cancelled.
 ADDR_NATIVE(0x48D0D0) int32_t GAMEAPI veh_pick(int32_t veh_id, const char* label, int32_t cancel);
@@ -254,8 +254,8 @@ void prefwin_display(int32_t page);
 ADDR_NATIVE(0x48C320) int32_t GAMEAPI popt(const char* file, const char* label, int32_t a3, int32_t a4, int32_t a5);
 // Text entry popup (label of SCRIPT.txt): the default text in `text`; 0 when confirmed, with the
 // entry in ParseStrBuffer[0].
-ADDR_NATIVE(0x5BFAB0) int32_t GAMEAPI X_pop_ask(const char* label, int32_t max_len, const char* text, int32_t a4,
-                                                int32_t a5);
+ADDR_NATIVE(0x5BFAB0)
+int32_t GAMEAPI X_pop_ask(const char* label, int32_t max_len, const char* text, int32_t a4, int32_t a5);
 
 // ---- not original functions ----
 // Placeholder of an original function that is not reconstructed: logs the name once (stderr) and
@@ -274,14 +274,15 @@ int32_t net_action(int32_t veh_id, int32_t a2);
 // synch_veh / synch_base (NetDaemon_synch: nothing without multiplayer).
 void ui_synch_veh(int32_t veh_id);
 void ui_synch_base(int32_t base_id);
-void net_await_synch();     // NetDaemon_await_synch: nothing without multiplayer
-int32_t net_add_global();   // NetDaemon_add_global: 0 without multiplayer
+void net_await_synch();  // NetDaemon_await_synch: nothing without multiplayer
+int32_t net_add_global();  // NetDaemon_add_global: 0 without multiplayer
 // The mouse cursor over the map windows (Win_set_cursor of CURSOR.PCX sprite `index`; -1: the
 // arrow) and the mouse position in screen coordinates (Win_get_mouse_pos).
 void ui_set_map_cursor(int32_t index);
 void ui_mouse_pos(int32_t* x, int32_t* y);
 // Every open map window: index 0 is the main view; others count when active (kMwActive).
-template <typename F> inline void for_each_mapwin(F&& fn) {
+template <typename F>
+inline void for_each_mapwin(F&& fn) {
     for (int32_t i = 0; i < 8; i++) {
         uint8_t* w = MapWins[i];
         if (w && (i == 0 || mw(w, kMwActive))) fn(i, w);

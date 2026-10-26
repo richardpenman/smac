@@ -46,12 +46,12 @@
 #include "ui/topmenu.h"
 #include "ui/win.h"
 
-GLOBAL(int32_t, EditorPaint, 0x945AE0);      // DAT_00945AE0: the paint (0 altitude .. 0x1D)
-GLOBAL(int32_t, EditorBrush, 0x945AE4);      // DAT_00945AE4: the brush (0 one tile .. 6)
-GLOBAL(int32_t, EditorVehFaction, 0x688350); // DAT_00688350: the faction of the units created
+GLOBAL(int32_t, EditorPaint, 0x945AE0);  // DAT_00945AE0: the paint (0 altitude .. 0x1D)
+GLOBAL(int32_t, EditorBrush, 0x945AE4);  // DAT_00945AE4: the brush (0 one tile .. 6)
+GLOBAL(int32_t, EditorVehFaction, 0x688350);  // DAT_00688350: the faction of the units created
 GLOBAL(int32_t, EditorVehMorale, 0x688354);  // DAT_00688354: their morale
-GLOBAL(int32_t, EditorAllUnits, 0x90DB8C);   // DAT_0090DB8C: every unit type listed
-GLOBAL(int32_t, EditorLastUnit, 0x90DB90);   // DAT_0090DB90
+GLOBAL(int32_t, EditorAllUnits, 0x90DB8C);  // DAT_0090DB8C: every unit type listed
+GLOBAL(int32_t, EditorLastUnit, 0x90DB90);  // DAT_0090DB90
 // The paints 6..0x19 (0x691888, 0x20 bytes each): the tile bit set, the bits cleared with it.
 GLOBAL(int32_t[20][8], EditorPaintBits, 0x691888);
 // The terrain features' list (Terraform 0x691878.., 0x20 bytes each, 20 entries).
@@ -284,7 +284,10 @@ void THISCALL MapWin_editor(uint8_t* win, int32_t x, int32_t y, int32_t right) {
                         if (b >= 0) Bases[b].visibility &= (uint8_t)~(1 << CurrentPlayerFaction);
                     }
                     break;
-                case 0x1A: case 0x1B: case 0x1C: case 0x1D: {  // the minor features (bit2)
+                case 0x1A:
+                case 0x1B:
+                case 0x1C:
+                case 0x1D: {  // the minor features (bit2)
                     static const uint32_t kBit[4] = {4, 0x40, 8, 0x400};
                     uint32_t bit = kBit[EditorPaint - 0x1A];
                     uint32_t b2 = tile_bits2(tx, ty);
@@ -346,7 +349,8 @@ void THISCALL MapWin_editor(uint8_t* win, int32_t x, int32_t y, int32_t right) {
     } else if (change) {
         for_each_mapwin([&](int32_t, uint8_t* w) { MapWin_draw_radius(w, x, y, 0, 2); });
     }
-    std::fprintf(stderr, "editor paint %d at %d,%d%s: change %d\n", EditorPaint, x, y, right ? " (remove)" : "", change);
+    std::fprintf(stderr, "editor paint %d at %d,%d%s: change %d\n", EditorPaint, x, y, right ? " (remove)" : "",
+                 change);
 }
 
 // ---- the map commands ----------------------------------------------------------------------------
@@ -484,7 +488,8 @@ void GAMEAPI Console_editor_clear_random() {
 void GAMEAPI Console_editor_fast() {
     auto_undo();
     wipe_units();
-    for (int32_t i = 0; i < MapAreaTiles; i++) *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(&MapTiles[i]) + 8) &= 0xFFFFFFFC;
+    for (int32_t i = 0; i < MapAreaTiles; i++)
+        *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(&MapTiles[i]) + 8) &= 0xFFFFFFFC;
     uint32_t omni = GameState & STATE_OMNISCIENT_VIEW;
     GameState &= ~STATE_OMNISCIENT_VIEW;
     world_build();
@@ -498,7 +503,8 @@ void GAMEAPI Console_editor_generate() {
     BaseCount = 0;
     MapWinInVehMode = 0;
     *reinterpret_cast<int32_t*>(mem::host(0x93928C)) = -1;
-    for (int32_t i = 0; i < MapAreaTiles; i++) *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(&MapTiles[i]) + 8) &= 0xFFFFFFFC;
+    for (int32_t i = 0; i < MapAreaTiles; i++)
+        *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(&MapTiles[i]) + 8) &= 0xFFFFFFFC;
     *reinterpret_cast<int32_t*>(mem::host(0x9392A8)) = 0;
     GameState |= 4;
     mw(MapWins[0], kMwZoom) = -0xE;
@@ -525,8 +531,14 @@ void GAMEAPI Console_editor_lock2() {
     MainInterface_draw_edit_pane(&MainInterfaceWin);
 }
 
-void GAMEAPI Console_editor_undo() { load_undo(1); draw_map(1); }
-void GAMEAPI Console_editor_redo() { load_undo(0); draw_map(1); }
+void GAMEAPI Console_editor_undo() {
+    load_undo(1);
+    draw_map(1);
+}
+void GAMEAPI Console_editor_redo() {
+    load_undo(0);
+    draw_map(1);
+}
 
 void GAMEAPI Console_editor_save() { save_map(); }
 
@@ -674,7 +686,8 @@ void GAMEAPI Console_editor_veh() {
                 if (MapWinInVehMode) Console_set_move(&MainConsole, 1);
             }
             FactionStatus[1] |= (uint8_t)(1 << EditorVehFaction);
-            std::fprintf(stderr, "editor: unit %d (%s) of faction %d at %d,%d\n", v, Units[r].name, EditorVehFaction, x, y);
+            std::fprintf(stderr, "editor: unit %d (%s) of faction %d at %d,%d\n", v, Units[r].name, EditorVehFaction, x,
+                         y);
         }
         return;
     }
@@ -742,7 +755,11 @@ bool editor_key(uint8_t* self, int32_t key, int32_t ch) {
     if (key & 0x30000) return false;
     switch (vk) {
     case '0': Console_editor_fast(); return true;
-    case '1': case '2': case '3': case '4': case '5': Console_editor_paints(vk - '1'); return true;
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5': Console_editor_paints(vk - '1'); return true;
     case '6': Console_editor_terrain(); return true;
     case '7': Console_editor_set_brush(); return true;
     case '8': Console_editor_climate(); return true;
@@ -1115,11 +1132,15 @@ void GAMEAPI Console_editor_scen_victory() {
     Pop pop;
     auto_undo();
     // (word, bit): 0 GameRules, 1 GameState
-    static const struct { int32_t w; uint32_t bit; } kBit[13] = {
-        {0, 0x8000000}, {0, 0x10000000}, {1, 0x40000},    {0, 0x40000000}, {0, 0x20000000}, {1, 0x2000000}, {1, 0x4000000},
-        {1, 0x8000},    {1, 0x80000000}, {1, 0x20000000}, {1, 0x40000000}, {0, 0x80000},    {1, 0x80000}};
+    static const struct {
+        int32_t w;
+        uint32_t bit;
+    } kBit[13] = {{0, 0x8000000},  {0, 0x10000000}, {1, 0x40000}, {0, 0x40000000}, {0, 0x20000000},
+                  {1, 0x2000000},  {1, 0x4000000},  {1, 0x8000},  {1, 0x80000000}, {1, 0x20000000},
+                  {1, 0x40000000}, {0, 0x80000},    {1, 0x80000}};
     auto word = [](int32_t w) -> uint32_t& {
-        return *reinterpret_cast<uint32_t*>(w ? reinterpret_cast<void*>(&GameState) : reinterpret_cast<void*>(&GameRules));
+        return *reinterpret_cast<uint32_t*>(w ? reinterpret_cast<void*>(&GameState)
+                                              : reinterpret_cast<void*>(&GameRules));
     };
     uint32_t c = (uint32_t)DialogChoices;
     for (int32_t i = 0; i < 13; i++) set_bit(c, 1u << i, word(kBit[i].w) & kBit[i].bit);
@@ -1145,8 +1166,9 @@ void GAMEAPI Console_editor_scen_victory() {
 void GAMEAPI Console_editor_scen_param() {
     Pop pop;
     auto_undo();
-    int32_t* const kVal[7] = {&ObjectiveReqVictory, &ObjectivesSuddenDeathVictory, &ObjectiveAchievePts,
-                              &VictoryAchieveBonusPts, &StartingMissionYear, &EndingMissionYear, &SunspotDuration};
+    int32_t* const kVal[7] = {&ObjectiveReqVictory,    &ObjectivesSuddenDeathVictory, &ObjectiveAchievePts,
+                              &VictoryAchieveBonusPts, &StartingMissionYear,          &EndingMissionYear,
+                              &SunspotDuration};
     for (int32_t i = 0; i < 7; i++) {
         char num[16];
         std::snprintf(num, sizeof(num), "%d", *kVal[i]);
@@ -1299,7 +1321,8 @@ void GAMEAPI Console_editor_view() {
         PopupDialogState = 0;
     }
     CurrentPlayerFaction = r;
-    if (base_find_faction(cur_x(), cur_y(), r) >= 0) Console_focus(&MainConsole, cur_x(), cur_y(), CurrentPlayerFaction);
+    if (base_find_faction(cur_x(), cur_y(), r) >= 0)
+        Console_focus(&MainConsole, cur_x(), cur_y(), CurrentPlayerFaction);
     Console_set_view(&MainConsole, 1);
     draw_map(1);
     std::fprintf(stderr, "editor: view faction %d (humans %02X)\n", r, FactionStatus[0]);
@@ -1355,10 +1378,20 @@ void GAMEAPI Console_editor_natural(int32_t place) {
         int32_t cls;
         switch (r) {
         case 0: cls = 3; break;
-        case 1: case 0xC: case 0xD: case 0xF: cls = 1; break;
+        case 1:
+        case 0xC:
+        case 0xD:
+        case 0xF: cls = 1; break;
         case 2: cls = 5; break;
         case 4: cls = 4; break;
-        case 3: case 5: case 6: case 8: case 9: case 10: case 0xB: case 0xE: cls = 2; break;
+        case 3:
+        case 5:
+        case 6:
+        case 8:
+        case 9:
+        case 10:
+        case 0xB:
+        case 0xE: cls = 2; break;
         default: cls = 0; break;
         }
         const int32_t n = TableRange[cls];

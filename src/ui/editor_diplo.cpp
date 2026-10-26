@@ -34,27 +34,33 @@
 
 namespace {
 
-uint32_t& fac_u(int32_t f, uint32_t off) { return *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(&Factions[f]) + off); }
-int32_t& fac_i(int32_t f, uint32_t off) { return *reinterpret_cast<int32_t*>(reinterpret_cast<uint8_t*>(&Factions[f]) + off); }
+uint32_t& fac_u(int32_t f, uint32_t off) {
+    return *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(&Factions[f]) + off);
+}
+int32_t& fac_i(int32_t f, uint32_t off) {
+    return *reinterpret_cast<int32_t*>(reinterpret_cast<uint8_t*>(&Factions[f]) + off);
+}
 // Faction +0x18 + 4 f: the diplomatic status with f; +0x38: the agenda; +0x58: the friction.
 uint32_t& status(int32_t a, int32_t b) { return fac_u(a, 0x18 + 4 * b); }
 uint32_t& agenda(int32_t a, int32_t b) { return fac_u(a, 0x38 + 4 * b); }
 
 // The check boxes (FUN_004DB080's CheckBox_item order): label offset, id (0x80000000: an agenda bit).
-const struct { uint32_t label; uint32_t id; } kChecks[13] = {
-    {0xDAC, 8},      {0xA18, 0x10},       {0xA0C, 4},     {0xA10, 2},          {0xA14, 1},
-    {0xD90, 0x1000}, {0xD94, 0x2000},     {0xD98, 0x20},  {0xD9C, 0x2000000},  {0xDA0, 0x400},
-    {0xDA4, 0x40000}, {0xDA8, 0x80000008}, {0xDF8, 0x80002000}};
+const struct {
+    uint32_t label;
+    uint32_t id;
+} kChecks[13] = {{0xDAC, 8},       {0xA18, 0x10},       {0xA0C, 4},         {0xA10, 2},         {0xA14, 1},
+                 {0xD90, 0x1000},  {0xD94, 0x2000},     {0xD98, 0x20},      {0xD9C, 0x2000000}, {0xDA0, 0x400},
+                 {0xDA4, 0x40000}, {0xDA8, 0x80000008}, {0xDF8, 0x80002000}};
 
 int32_t mem_i(uint32_t a) { return *reinterpret_cast<int32_t*>(mem::host(a)); }
 
 struct DiploEdWin : ScreenWin {
     int32_t faction = 1;  // +0xA1C
-    int32_t other = 1;    // +0xA20
+    int32_t other = 1;  // +0xA20
     bool state[13] = {};
     std::vector<int32_t> list;  // the ListBox's factions
-    Font font{};          // +0xA24: Arial 14
-    Font check_font{};    // the check boxes' (the dialogs' default: bold Arial 14)
+    Font font{};  // +0xA24: Arial 14
+    Font check_font{};  // the check boxes' (the dialogs' default: bold Arial 14)
     UiRect list_r{}, check_r{};
     int32_t row_h = 16;
 
@@ -199,7 +205,8 @@ struct DiploEdWin : ScreenWin {
             PluralDefault = MFactions[faction].is_noun_plural;
             GenderDefault = MFactions[faction].noun_gender;
             parse_says(0, MFactions[faction].noun_faction, -1, -1);
-            if (X_pop_ask_number("EDITINTEGRITY", fac_i(faction, 0x124), 0) == 0) fac_i(faction, 0x124) = ParseNumTable[0];
+            if (X_pop_ask_number("EDITINTEGRITY", fac_i(faction, 0x124), 0) == 0)
+                fac_i(faction, 0x124) = ParseNumTable[0];
             PopupDialogState = 0;
             std::fprintf(stderr, "diploedit %d: integrity %d\n", faction, fac_i(faction, 0x124));
         } else if (id == 3) {  // EDITATROCITY: the atrocities (+0x1D4) and major ones (+0x1D8)
@@ -279,7 +286,10 @@ void GAMEAPI Console_editor_diplomacy() {
     // The buttons along the bottom: 3, 2, 1, -1 (FlatButtons).
     int32_t l = 4, top = wh - 0x18, bottom = wh - 4;
     int32_t r = (((ww - l) - 2) / 4) - 2 + l;
-    static const struct { int32_t id; uint32_t label; } kButtons[4] = {{3, 0xDB0}, {2, 0x378}, {1, 0xD8C}, {-1, 0x194}};
+    static const struct {
+        int32_t id;
+        uint32_t label;
+    } kButtons[4] = {{3, 0xDB0}, {2, 0x378}, {1, 0xD8C}, {-1, 0x194}};
     for (const auto& b : kButtons) {
         sw_button(&w, label_get(b.label / 4), b.id, l, top, r - l, bottom - top, 0, &w.font);
         int32_t d = (r - l) + 2;

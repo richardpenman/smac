@@ -56,9 +56,9 @@
 #include "ui/statuswin.h"
 #include "ui/win.h"
 
-GLOBAL(int32_t, EditorPaintType, 0x945AE0);   // the scenario editor's brush (InfoWin state 7)
-GLOBAL(int32_t, EditorBrushSize, 0x945AE4);   // its size (1: "the whole continent")
-GLOBAL(int32_t, MessageCount, 0x9393D0);      // DAT_009393D0: messages in the list
+GLOBAL(int32_t, EditorPaintType, 0x945AE0);  // the scenario editor's brush (InfoWin state 7)
+GLOBAL(int32_t, EditorBrushSize, 0x945AE4);  // its size (1: "the whole continent")
+GLOBAL(int32_t, MessageCount, 0x9393D0);  // DAT_009393D0: messages in the list
 
 namespace {
 
@@ -101,7 +101,8 @@ void save_pixels() {
     if (!c->data || r.right <= r.left) return;
     int32_t w = r.right - r.left, h = r.bottom - r.top;
     g_saved.resize((size_t)w * h);
-    for (int32_t y = 0; y < h; y++) std::memcpy(&g_saved[(size_t)y * w], c->data + (size_t)(r.top + y) * c->stride + r.left, (size_t)w);
+    for (int32_t y = 0; y < h; y++)
+        std::memcpy(&g_saved[(size_t)y * w], c->data + (size_t)(r.top + y) * c->stride + r.left, (size_t)w);
     ui_invalidate();
 }
 
@@ -109,7 +110,8 @@ void restore_pixels(Buffer* c) {
     const UiRect& r = prect(0);
     int32_t w = r.right - r.left, h = r.bottom - r.top;
     if (g_saved.size() != (size_t)w * h || !c->data) return;
-    for (int32_t y = 0; y < h; y++) std::memcpy(c->data + (size_t)(r.top + y) * c->stride + r.left, &g_saved[(size_t)y * w], (size_t)w);
+    for (int32_t y = 0; y < h; y++)
+        std::memcpy(c->data + (size_t)(r.top + y) * c->stride + r.left, &g_saved[(size_t)y * w], (size_t)w);
 }
 
 void cat(char* s, const char* t) { crt_strcat(s, t); }
@@ -149,7 +151,8 @@ void cat_leader(char* s, int32_t f) {
 }
 
 // The living faction with the largest value (ties: the later one); the viewer when none is above 0.
-template <class F> int32_t best_faction(F value) {
+template <class F>
+int32_t best_faction(F value) {
     int32_t best = 0, who = CurrentPlayerFaction;
     for (int32_t f = 1; f < 8; f++) {
         if (!(FactionStatus[1] & (1 << f))) continue;
@@ -452,7 +455,8 @@ void THISCALL InfoWin_setup_text(uint8_t*) {
                 for (int32_t t = 1; t <= CurrentTurn; t += step) {
                     int32_t y = (r.bottom - FactionTurnMight[t][f] / scale) - 1;
                     if (t > 1) {
-                        int32_t col = crt_strcmp(MFactions[f].search_key, "SPARTANS") ? FactionColorFill[f] : FactionColorFrame[f];
+                        int32_t col = crt_strcmp(MFactions[f].search_key, "SPARTANS") ? FactionColorFill[f]
+                                                                                      : FactionColorFrame[f];
                         Buffer_line_2(c, px, py, x, y, col);
                     }
                     px = x;
@@ -852,7 +856,8 @@ void THISCALL MessageWin_on_selected(uint8_t*, uint32_t id) {
                 uint32_t v = id & 0x7FFFFFFF;
                 int32_t y = (int32_t)(v / (uint32_t)MapAreaX), x = (int32_t)(v % (uint32_t)MapAreaX);
                 if (y >= 0 && y < MapAreaY && x >= 0 && x < MapAreaX &&
-                    ((Factions[CurrentPlayerFaction].player_flags & 0x200) || (MapTiles[MapHalfX * y + (x >> 1)].visibility & (1 << CurrentPlayerFaction)))) {
+                    ((Factions[CurrentPlayerFaction].player_flags & 0x200) ||
+                     (MapTiles[MapHalfX * y + (x >> 1)].visibility & (1 << CurrentPlayerFaction)))) {
                     pfncMoveMap(&MainConsole, x, y, 1);
                     if (!MapWinInVehMode) Console_set_cursor(&MainConsole, x, y);
                 }
@@ -912,7 +917,7 @@ void infowin_setup() {
     g_inited = true;
     *reinterpret_cast<int32_t*>(&MainInterfaceWin + kMiMode) = 0x3E9;
     Font_ctor(font());  // InfoWin_ctor
-    fld(0x80) = 0;      // (the native Font_ctor clears the whole Font; the original leaves +0x28 = +0x80)
+    fld(0x80) = 0;  // (the native Font_ctor clears the whole Font; the original leaves +0x28 = +0x80)
     InfoWin_init(self_());
     // MessageWin_init: its font.
     Font_ctor(&g_msg_font);

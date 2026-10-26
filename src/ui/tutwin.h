@@ -6,9 +6,9 @@
 #include "engine/memmap.h"
 #include "ui/gfx.h"
 
-ADDR_NATIVE(0x4BDFE0) int32_t THISCALL TutWin_tut_win(uint8_t* self, uint8_t* parent, const char* label, int32_t px,
-                                                    int32_t py, const Sprite* sprite, uint32_t flags, int32_t px2,
-                                                    int32_t py2);
+ADDR_NATIVE(0x4BDFE0)
+int32_t THISCALL TutWin_tut_win(uint8_t* self, uint8_t* parent, const char* label, int32_t px, int32_t py,
+                                const Sprite* sprite, uint32_t flags, int32_t px2, int32_t py2);
 ADDR_NATIVE(0x4BDEA0) void THISCALL TutWin_draw_arrow(uint8_t* self);
 ADDR_NATIVE(0x4BA870) void THISCALL TutWin_do_base(uint8_t* self, const UiRect* r, const char* label, uint32_t flags);
 ADDR_NATIVE(0x4BC5F0) void THISCALL TutWin_base_rect(const UiRect* r, int32_t* x, int32_t* y);

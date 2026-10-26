@@ -14,19 +14,20 @@
 #include "platform/win32.h"
 
 static int g_failures = 0;
-#define CHECK(cond)                                                              \
-    do {                                                                         \
-        if (!(cond)) {                                                           \
+#define CHECK(cond)                                                                       \
+    do {                                                                                  \
+        if (!(cond)) {                                                                    \
             std::fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #cond); \
-            g_failures++;                                                        \
-        }                                                                        \
+            g_failures++;                                                                 \
+        }                                                                                 \
     } while (0)
 
 static_assert(std::numeric_limits<char>::is_signed, "char must be signed (MSVC)");
 static_assert(sizeof(int32_t) == 4 && sizeof(int16_t) == 2, "fixed-width integers");
 
 // Opaque to the optimizer, so the checks below run on the target instead of being folded.
-template <class T> T opaque(T v) {
+template <class T>
+T opaque(T v) {
     volatile T x = v;
     return x;
 }
@@ -103,7 +104,8 @@ static void check_files() {
     char buf[32];
     CHECK(win32::GetPrivateProfileStringA("ALPHA CENTAURI", "key", "x", buf, sizeof(buf), "smoke_tmp/test.INI") == 5 &&
           std::strcmp(buf, "Value") == 0);
-    CHECK(win32::GetPrivateProfileStringA("Alpha Centauri", "Missing", "Def  ", buf, sizeof(buf), "smoke_tmp/test.ini") == 3 &&
+    CHECK(win32::GetPrivateProfileStringA("Alpha Centauri", "Missing", "Def  ", buf, sizeof(buf),
+                                          "smoke_tmp/test.ini") == 3 &&
           std::strcmp(buf, "Def") == 0);
     char cwd[4096];
     CHECK(win32::GetCurrentDirectoryA(sizeof(cwd), cwd) > 0);

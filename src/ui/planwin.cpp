@@ -31,8 +31,7 @@ GLOBAL(int32_t, DashPhaseP, 0x939FD4);  // the dash pattern counter (line_timer)
 namespace {
 
 constexpr uint32_t kPwVBase = 0x22050;
-constexpr uint32_t kPwShown = 0x21A68, kPwBlink = 0x21A6C, kPwLines = 0x21FF8, kPwColors = 0x21FFC,
-                   kPwEnds = 0x2200C;
+constexpr uint32_t kPwShown = 0x21A68, kPwBlink = 0x21A6C, kPwLines = 0x21FF8, kPwColors = 0x21FFC, kPwEnds = 0x2200C;
 std::vector<uint8_t> g_obj(0x22600);
 Buffer g_canvas, g_back;
 uint32_t g_last_blink = 0, g_last_line = 0;

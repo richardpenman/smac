@@ -141,7 +141,7 @@ uint32_t GAMEAPI has_treaty(int32_t faction_id, int32_t faction_id_with, uint32_
 
 int32_t GAMEAPI drop_range(int32_t faction_id) {
     if (!has_tech(Rules.tech_preq_orb_insert_wo_space, faction_id)) {
-        int32_t base_id = SecretProjects[FAC_SPACE_ELEVATOR - SP_ID_First]  /* The Space Elevator */;
+        int32_t base_id = SecretProjects[FAC_SPACE_ELEVATOR - SP_ID_First] /* The Space Elevator */;
         if (base_id < 0 || (uint8_t)game().bases[base_id].faction_id != (uint32_t)faction_id)
             return Rules.max_airdrop_rng_wo_orbital_insert;
     }
@@ -154,8 +154,7 @@ void GAMEAPI drop_cover_check(int32_t faction_id, int32_t x, int32_t y) {
         (SecretProjects[FAC_SPACE_ELEVATOR - SP_ID_First] < 0 ||
          (uint8_t)game().bases[SecretProjects[FAC_SPACE_ELEVATOR - SP_ID_First]].faction_id != (uint32_t)faction_id))
         range = Rules.max_airdrop_rng_wo_orbital_insert;
-    else
-        range = game().map.x > game().map.y ? game().map.x : game().map.y;
+    else range = game().map.x > game().map.y ? game().map.x : game().map.y;
     for (int32_t veh_id = 0; veh_id < game().veh_count; veh_id++) {
         VEH& veh = game().vehs[veh_id];
         if (veh.faction_id != (uint32_t)faction_id || !has_abil(veh.unit_id, ABL_DROP_POD) ||
@@ -484,8 +483,7 @@ int32_t GAMEAPI get_basic_offense(int32_t veh_id, int32_t veh_id_def, int32_t ps
     int32_t base_morale;
     if (faction_id == 0)
         base_morale = morale_alien(veh_id, veh_id_def < 0 ? -1 : (int32_t)game().vehs[veh_id_def].faction_id);
-    else
-        base_morale = morale_veh(veh_id, 1, 0);
+    else base_morale = morale_veh(veh_id, 1, 0);
     int32_t morale = base_morale;
     int32_t base_id = base_at(game().vehs[veh_id].x, game().vehs[veh_id].y);
     if (base_id >= 0) {
@@ -527,8 +525,7 @@ int32_t GAMEAPI get_basic_defense(int32_t veh_id, int32_t veh_id_atk, int32_t ps
     int32_t morale;
     if (faction_id == 0)
         morale = morale_alien(veh_id, veh_id_atk < 0 ? -1 : (int32_t)game().vehs[veh_id_atk].faction_id);
-    else
-        morale = morale_veh(veh_id, 1, 0);
+    else morale = morale_veh(veh_id, 1, 0);
     int32_t base_id = base_at(game().vehs[veh_id].x, game().vehs[veh_id].y);
     bool skip_gas = false;
     if (base_id >= 0) {
@@ -735,10 +732,8 @@ int32_t GAMEAPI battle_compute(int32_t veh_id_atk, int32_t veh_id_def, int32_t* 
         int32_t def_unit = game().vehs[veh_id_def].unit_id;
         if (psi == 0) {
             int32_t terrain;
-            if (chassis_triad(def_unit) == TRIAD_AIR)
-                terrain = 2;
-            else
-                terrain = defense_value(game().vehs[veh_id_def].faction_id, x, y, veh_id_def, veh_id_atk);
+            if (chassis_triad(def_unit) == TRIAD_AIR) terrain = 2;
+            else terrain = defense_value(game().vehs[veh_id_def].faction_id, x, y, veh_id_def, veh_id_atk);
             if (veh_id_atk >= 0 && chassis_triad(game().vehs[veh_id_atk].unit_id) == TRIAD_LAND) {
                 int32_t atk_unit = game().vehs[veh_id_atk].unit_id;
                 MAP* sq_atk = map_tile(game().vehs[veh_id_atk].x, game().vehs[veh_id_atk].y);
@@ -856,10 +851,10 @@ int32_t GAMEAPI battle_compute(int32_t veh_id_atk, int32_t veh_id_def, int32_t* 
                 text_ptr = TextLabels[0x6B0 / 4];
                 Strings_get(&StringTable, text_ptr);
             }
-            if (Rules.combat_infantry_vs_base && combat_type == 0 && base_id >= 0 &&
-                veh_faction_raw(veh_id_atk) != 0) {
+            if (Rules.combat_infantry_vs_base && combat_type == 0 && base_id >= 0 && veh_faction_raw(veh_id_atk) != 0) {
                 int32_t unit = veh_unit_raw(veh_id_atk);
-                if (!unit_is_native(unit) && chassis_triad(unit) == TRIAD_LAND && Chassis[Units[unit].chassis_id].speed == 1) {
+                if (!unit_is_native(unit) && chassis_triad(unit) == TRIAD_LAND &&
+                    Chassis[Units[unit].chassis_id].speed == 1) {
                     offense = (Rules.combat_infantry_vs_base + 100) * offense / 100;
                     char* text = label(0x88C);
                     bat_line(0, Rules.combat_infantry_vs_base, text);
@@ -1250,8 +1245,10 @@ int32_t GAMEAPI interceptor(int32_t faction_id_def, int32_t faction_id_atk, int3
         int32_t cx = game().vehs[best_id].x;
         // BUG(original): base_find may return -1 (no bases): the name before Bases[0] is used.
         COMPAT_ORIGINAL(out_of_range_reads);
-        parse_says(1, reinterpret_cast<const char*>(&game().bases[0]) + base_find(cx, cy) * (int32_t)sizeof(BASE) +
-                          offsetof(BASE, name), -1, -1);
+        parse_says(1,
+                   reinterpret_cast<const char*>(&game().bases[0]) + base_find(cx, cy) * (int32_t)sizeof(BASE) +
+                       offsetof(BASE, name),
+                   -1, -1);
         Console_focus(&MainConsole, cx, cy, faction_id_def);
         NetMsg_pop(&NetMsg, "AIRSCRAMBLE", 5000, 0, nullptr);
         // Show the flight to the target, one tile at a time.
@@ -1365,11 +1362,11 @@ void GAMEAPI mon_enemy_destroyed(int32_t faction_id, int32_t faction_id_killed) 
 
 int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y, int32_t is_arty, int32_t is_real,
                                int32_t* def_out) {
-    int32_t report_type = 0;      // pact/vendetta battle report for the viewer
-    int32_t disengaged = 0;       // the defender withdrew
+    int32_t report_type = 0;  // pact/vendetta battle report for the viewer
+    int32_t disengaged = 0;  // the defender withdrew
     int32_t show_interlude = 0;
     int32_t intercepted = 0;
-    int32_t captured = 0;         // marine detachment captured the defender's stack
+    int32_t captured = 0;  // marine detachment captured the defender's stack
     int32_t arty = is_arty;
     {
         int32_t unit_id = game().vehs[veh_id].unit_id;
@@ -1399,10 +1396,8 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
     int32_t def_unit = veh_unit_raw(veh_id_def);
     int32_t base_id = base_at(x, y);
     if (can_arty(game().vehs[veh_id].unit_id, 1) && can_arty(def_unit, 1)) {
-        if (veh_triad(veh_id) == TRIAD_LAND)
-            arty |= 2;
-        else if (arty || (sq->climate & 0xE0) > 0x5F)
-            arty |= 2;
+        if (veh_triad(veh_id) == TRIAD_LAND) arty |= 2;
+        else if (arty || (sq->climate & 0xE0) > 0x5F) arty |= 2;
     }
     if (has_abil(def_unit, ABL_AIR_SUPERIORITY) && veh_triad(veh_id) == TRIAD_AIR &&
         !unit_missile(game().vehs[veh_id].unit_id) && !unit_missile(def_unit) && chassis_triad(def_unit) == TRIAD_AIR)
@@ -1472,8 +1467,7 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
                                  game().factions[def_f].diplo_combat_count[atk_f] <=
                                      game().factions[atk_f].diplo_combat_count[def_f]))
                                 extra = 0;
-                            else
-                                extra = (game().factions[atk_f].AI_fight + 1) * 3;
+                            else extra = (game().factions[atk_f].AI_fight + 1) * 3;
                             if (game().factions[def_f].integrity_blemishes + extra > 5) use = true;
                         }
                     } else {
@@ -1865,8 +1859,7 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
     if (has_abil(game().vehs[veh_id].unit_id, ABL_MARINE_DETACHMENT) && veh_triad(veh_id) == TRIAD_SEA &&
         (map_tile(x, y)->climate & 0xE0) < 0x60) {
         int32_t du = game().vehs[veh_id_def].unit_id;
-        if (chassis_triad(du) == TRIAD_SEA && !unit_is_native(du) && base_id < 0)
-            marine = veh_hp(veh_id_def) * 2 / 3;
+        if (chassis_triad(du) == TRIAD_SEA && !unit_is_native(du) && base_id < 0) marine = veh_hp(veh_id_def) * 2 / 3;
     }
     if (Units[game().vehs[veh_id].unit_id].plan == PLAN_PLANET_BUSTER &&
         Units[game().vehs[veh_id].unit_id].reactor_id) {
@@ -1932,17 +1925,14 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
                     if (braw[offsetof(BASE, faction_id)] == game().vehs[veh_id].faction_id &&
                         (int8_t)braw[offsetof(BASE, pop_size)] > 2)
                         game().vehs[v].home_base_id = (int16_t)b;
-                    else
-                        game().vehs[v].home_base_id = -1;
+                    else game().vehs[v].home_base_id = -1;
                     veh_skip(v);
                 }
             }
             bit_set(x, y, 0x100000, 1);
             owner_set(x, y, game().vehs[veh_id].faction_id);
-            if (game().vehs[veh_id].faction_id == (uint32_t)CurrentPlayerFaction)
-                draw_tile_fixup(x, y, 1, 2);
-            else
-                draw_tile(x, y, 2);
+            if (game().vehs[veh_id].faction_id == (uint32_t)CurrentPlayerFaction) draw_tile_fixup(x, y, 1, 2);
+            else draw_tile(x, y, 2);
             if ((uint32_t)captured == (uint32_t)CurrentPlayerFaction) {
                 parse_says(1, game().mfactions[old_f].adj_name_faction, -1, -1);
                 popp(ScriptFileName, "WEMARINEDETACH", 0, "navun_sm.pcx", 0);
@@ -1967,7 +1957,8 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
                 if (!map_in_bounds(x2, y2) || zoc_move(x2, y2, def_f)) continue;
                 int32_t du = game().vehs[veh_id_def].unit_id;
                 MAP* sq2 = map_tile(x2, y2);
-                if (!(chassis_triad(du) == TRIAD_AIR || ((sq2->climate & 0xE0) < 0x60) == (chassis_triad(du) == TRIAD_SEA)))
+                if (!(chassis_triad(du) == TRIAD_AIR ||
+                      ((sq2->climate & 0xE0) < 0x60) == (chassis_triad(du) == TRIAD_SEA)))
                     continue;
                 if (goody_at(x2, y2)) continue;
                 if (!(!(sq2->items & BIT_FUNGUS) || (sq2->climate & 0xE0) < 0x40 || owns_project(16, def_f) ||
@@ -2007,8 +1998,7 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
                 if (atk_left == 0) {
                     if (!single) {
                         if (last_hit == 1 || MultiplayerActive) {
-                            if (!(veh_hp(veh_id) > 0 && !MultiplayerActive))
-                                boom(ax, ay, veh_hp(veh_id) != 0 ? 0 : 2);
+                            if (!(veh_hp(veh_id) > 0 && !MultiplayerActive)) boom(ax, ay, veh_hp(veh_id) != 0 ? 0 : 2);
                         } else {
                             boom(ax, ay, veh_hp(veh_id) != 0 ? 1 : 2);
                         }
@@ -2019,8 +2009,7 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
                 } else if (!single) {
                     if (last_hit == 2 ? (MultiplayerActive || veh_hp(veh_id_def) == 0) : MultiplayerActive)
                         boom(x, y, (veh_hp(veh_id_def) != 0 ? 0 : 2) | 8);
-                    else if (last_hit != 2)
-                        boom(x, y, (2 - (veh_hp(veh_id_def) != 0)) | 8);
+                    else if (last_hit != 2) boom(x, y, (2 - (veh_hp(veh_id_def) != 0)) | 8);
                 } else {
                     if (last_hit != 1 && !MultiplayerActive) boom(ax, ay, (2 - (veh_hp(veh_id) != 0)) | 8);
                     boom(x, y, (2 - (veh_hp(veh_id_def) != 0)) | 8);
@@ -2173,11 +2162,10 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
             MAP* sq2 = map_tile(x, y);
             int32_t du = game().vehs[veh_id_def].unit_id;
             int32_t au = game().vehs[veh_id].unit_id;
-            bool whole_stack =
-                (base_id < 0 && !(sq2->items & 0x800) && chassis_triad(du) != TRIAD_AIR &&
-                 chassis_triad(au) != TRIAD_AIR && Units[au].plan != PLAN_PROBE && Units[du].plan != 6 &&
-                 (!stack_check(veh_id_def, 2, 8, -1, -1) || (sq2->climate & 0xE0) < 0x60)) ||
-                Units[du].plan == PLAN_ARTIFACT;
+            bool whole_stack = (base_id < 0 && !(sq2->items & 0x800) && chassis_triad(du) != TRIAD_AIR &&
+                                chassis_triad(au) != TRIAD_AIR && Units[au].plan != PLAN_PROBE && Units[du].plan != 6 &&
+                                (!stack_check(veh_id_def, 2, 8, -1, -1) || (sq2->climate & 0xE0) < 0x60)) ||
+                               Units[du].plan == PLAN_ARTIFACT;
             if (!whole_stack && atk_f != 0) {
                 if (veh_cargo(veh_id_def) && base_id < 0 && Units[game().vehs[veh_id].unit_id].plan != PLAN_PROBE) {
                     whole_stack = true;
@@ -2387,10 +2375,8 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
         if (disengaged) {
             parse_says(0, Units[game().vehs[def_id].unit_id].name, -1, -1);
             parse_says(1, game().mfactions[def_f].adj_name_faction, -1, -1);
-            if (def_f == (uint32_t)CurrentPlayerFaction)
-                bat_msg("WEDISENGAGED", nullptr);
-            else if (atk_f == (uint32_t)CurrentPlayerFaction)
-                bat_msg("THEYDISENGAGED", nullptr);
+            if (def_f == (uint32_t)CurrentPlayerFaction) bat_msg("WEDISENGAGED", nullptr);
+            else if (atk_f == (uint32_t)CurrentPlayerFaction) bat_msg("THEYDISENGAGED", nullptr);
         }
         StatusWin_redraw(&InfoWin);
         if (husk_refresh) {

@@ -9,22 +9,22 @@
 // make the call itself. The differential harness uses them to snapshot state before each
 // turn_upkeep, poison the stack before engine entry points, stop after N turns, skip the
 // observer's end-of-round pause and run its script in place of the main menu.
-extern int32_t (*g_harness_turn_upkeep)();                // control_turn -> turn_upkeep
-extern int32_t (*g_harness_faction_upkeep)(int32_t);      // control_turn -> faction_upkeep
-extern int32_t (*g_harness_enemy_turn)(int32_t);          // control_turn -> enemy_turn
-extern int32_t (*g_harness_human_turn)();                 // control_turn -> Console_human_turn (human)
-extern int32_t (*g_harness_observer_pause)();             // control_turn -> Console_human_turn (round end)
-extern int32_t (*g_harness_top_menu)();                   // control_game -> top_menu
+extern int32_t (*g_harness_turn_upkeep)();  // control_turn -> turn_upkeep
+extern int32_t (*g_harness_faction_upkeep)(int32_t);  // control_turn -> faction_upkeep
+extern int32_t (*g_harness_enemy_turn)(int32_t);  // control_turn -> enemy_turn
+extern int32_t (*g_harness_human_turn)();  // control_turn -> Console_human_turn (human)
+extern int32_t (*g_harness_observer_pause)();  // control_turn -> Console_human_turn (round end)
+extern int32_t (*g_harness_top_menu)();  // control_game -> top_menu
 // Headless builds: end_of_game -> show_replay calls this (final snapshot; the oracle does the same
 // with the original show_replay, see harness/README.md "End of game").
 extern void (*g_harness_game_end)();
 
 // ---- globals -----------------------------------------------------------------------------------------
-GLOBAL(int32_t[8], CouncilVoteFor, 0x6FF6D4);        // council: the candidate each faction voted for
+GLOBAL(int32_t[8], CouncilVoteFor, 0x6FF6D4);  // council: the candidate each faction voted for
 GLOBAL(int32_t[8], HotseatTamperFaction, 0x93A9B8);  // hotseat: faction caught tampering (told next turn)
 GLOBAL(int32_t[8], HotseatTamperCount, 0x93A9D8);
-GLOBAL(char[4], ControlTurnPlayerText, 0x93AA04);   // hotseat: player name text ($STR0 of SWITCHING)
-GLOBAL(uint8_t, LobbyParam, 0x689218);              // Net_check_for_lobby's second argument
+GLOBAL(char[4], ControlTurnPlayerText, 0x93AA04);  // hotseat: player name text ($STR0 of SWITCHING)
+GLOBAL(uint8_t, LobbyParam, 0x689218);  // Net_check_for_lobby's second argument
 // Image address of MFactions (texts passed to interlude by address).
 constexpr uint32_t kMFactionsAddr = 0x946A50;
 

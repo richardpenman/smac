@@ -44,7 +44,7 @@ namespace {
 constexpr int32_t kPanelHeight = 168;
 
 Buffer g_canvas;  // the window
-Buffer g_view;    // the main view's GraphicWin canvas
+Buffer g_view;  // the main view's GraphicWin canvas
 bool g_ready = false;
 bool g_map_dirty = true;
 bool g_dirty = true;
@@ -74,10 +74,22 @@ const Palette* g_layer_pals[4] = {};
 bool vk_has_char(int32_t vk) {
     if ((vk >= 'A' && vk <= 'Z') || (vk >= '0' && vk <= '9')) return true;
     switch (vk) {
-    case 0x08: case 0x09: case 0x0D: case 0x1B: case 0x20:
-    case 0xBA: case 0xBB: case 0xBC: case 0xBD: case 0xBE: case 0xBF: case 0xC0:
-    case 0xDB: case 0xDC: case 0xDD: case 0xDE:
-        return true;
+    case 0x08:
+    case 0x09:
+    case 0x0D:
+    case 0x1B:
+    case 0x20:
+    case 0xBA:
+    case 0xBB:
+    case 0xBC:
+    case 0xBD:
+    case 0xBE:
+    case 0xBF:
+    case 0xC0:
+    case 0xDB:
+    case 0xDC:
+    case 0xDD:
+    case 0xDE: return true;
     default: return false;
     }
 }
@@ -89,9 +101,12 @@ int32_t vk_char(int32_t vk, bool shift, bool ctrl) {
         if (ctrl) return 0;
         return shift ? ")!@#$%^&*("[vk - '0'] : vk;
     }
-    struct Oem { int32_t vk; char plain, shifted; };
-    static const Oem kOem[] = {{0xBA, ';', ':'}, {0xBB, '=', '+'}, {0xBC, ',', '<'}, {0xBD, '-', '_'},
-                               {0xBE, '.', '>'}, {0xBF, '/', '?'}, {0xC0, '`', '~'}, {0xDB, '[', '{'},
+    struct Oem {
+        int32_t vk;
+        char plain, shifted;
+    };
+    static const Oem kOem[] = {{0xBA, ';', ':'},  {0xBB, '=', '+'}, {0xBC, ',', '<'}, {0xBD, '-', '_'},
+                               {0xBE, '.', '>'},  {0xBF, '/', '?'}, {0xC0, '`', '~'}, {0xDB, '[', '{'},
                                {0xDC, '\\', '|'}, {0xDD, ']', '}'}, {0xDE, '\'', '"'}};
     for (const Oem& o : kOem)
         if (o.vk == vk) return ctrl ? 0 : (shift ? o.shifted : o.plain);
@@ -114,7 +129,7 @@ void dispatch_key(int32_t key) {
                      MapWinInVehMode);
     }
     if (console_menu_key(key)) return;  // the menu bar (Alt, Alt+letter) and an open pull-down
-    if (key & 0x40000) return;          // other Alt keys: WM_SYSKEYDOWN
+    if (key & 0x40000) return;  // other Alt keys: WM_SYSKEYDOWN
     // Keys without a character reach the focused window from Win_key_down_event as (0, key).
     if (!vk_has_char(vk)) {
         Console_on_key_click(&MainConsole, 0, key);
@@ -180,8 +195,8 @@ bool run_command(const std::string& cmd) {
         for (int32_t i = 0; i < VehCount; i++) {
             const VEH& v = Vehs[i];
             if (v.faction_id != CurrentPlayerFaction && !std::getenv("SMACX_ALLUNITS")) continue;
-            std::fprintf(stderr, "unit %d f%d %s (%d,%d) order %d moves %d state %08X %s\n", i, v.faction_id, Units[v.unit_id].name,
-                         v.x, v.y, v.order, v.moves_spent, v.state, veh_ready(i) ? "ready" : "");
+            std::fprintf(stderr, "unit %d f%d %s (%d,%d) order %d moves %d state %08X %s\n", i, v.faction_id,
+                         Units[v.unit_id].name, v.x, v.y, v.order, v.moves_spent, v.state, veh_ready(i) ? "ready" : "");
         }
         return true;
     }
@@ -298,8 +313,7 @@ bool pump_platform(int32_t timeout_ms) {
             // Win_OnRButtonDown): the music hears every key and click.
             if (ev.type != platform::EV_LBUTTON_UP && ev.type != platform::EV_RBUTTON_UP) input_callback();
             g_input.push_back(ev);
-        }
-        else if (ev.type == platform::EV_MOUSE_MOVE) {  // the latest position only
+        } else if (ev.type == platform::EV_MOUSE_MOVE) {  // the latest position only
             if (!g_input.empty() && g_input.back().type == platform::EV_MOUSE_MOVE) g_input.back() = ev;
             else g_input.push_back(ev);
         }
@@ -643,8 +657,7 @@ int32_t GAMEAPI do_non_input() {
 }
 
 void GAMEAPI do_all_non_input() {
-    while (do_non_input()) {
-    }
+    while (do_non_input()) {}
 }
 
 void GAMEAPI flush_input() {
@@ -780,4 +793,3 @@ void console_not_reconstructed(const char* name) {
     console_not_reconstructed_quiet(name);
     ui_set_message(std::string("(not reconstructed yet: ") + name + ")");
 }
-

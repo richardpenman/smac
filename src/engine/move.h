@@ -6,12 +6,14 @@
 // Movement points (road moves) a unit of faction_id spends moving from (x1, y1) to the adjacent
 // (x2, y2). faction_id 0 (natives) ignores roads/tubes/rivers. ignore_terrain: no rough-terrain
 // extras (unit speed equal to a road move, see Path_find).
-ADDR(0x593510) int32_t GAMEAPI hex_cost(int32_t unit_id, int32_t faction_id, int32_t x1, int32_t y1, int32_t x2,
-                                        int32_t y2, int32_t ignore_terrain);
+ADDR(0x593510)
+int32_t GAMEAPI hex_cost(int32_t unit_id, int32_t faction_id, int32_t x1, int32_t y1, int32_t x2, int32_t y2,
+                         int32_t ignore_terrain);
 // Neighbour of (x, y) holding units of a faction without a pact with faction_id (same land/sea
 // type) that is farthest from (x2, y2): written to *x_out, *y_out (unchanged if none).
-ADDR(0x593830) void GAMEAPI quick_zoc(int32_t x, int32_t y, int32_t faction_id, int32_t x2, int32_t y2,
-                                      int32_t* x_out, int32_t* y_out);
+ADDR(0x593830)
+void GAMEAPI
+    quick_zoc(int32_t x, int32_t y, int32_t faction_id, int32_t x2, int32_t y2, int32_t* x_out, int32_t* y_out);
 // A supply crawler of a human player enters a (friendly) base: asks whether to help build the
 // current production (the crawler is consumed: returns 1) or to convoy resources (order 3: returns
 // 0). AI factions: 0. With VehAttackFlags bit 0 (an interactive move) and not bit 1, returns 1

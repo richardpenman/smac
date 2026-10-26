@@ -46,17 +46,17 @@ constexpr int32_t kKey = 9;
 
 // Pane rectangles of the 1024 layout (MainInterface +0xD80, +0xD90, +0xDA0, +0xDB0), relative
 // to the frame.
-const UiRect kLeft = {4, 0x38, 0xF5, 0xFC};      // status: unit and tile
+const UiRect kLeft = {4, 0x38, 0xF5, 0xFC};  // status: unit and tile
 const UiRect kRight = {0x30B, 0x38, 0x3FC, 0xFC};  // world map, date
-const UiRect kInfo = {0x106, 0x42, 0x2FB, 0xAC};   // info (two columns)
-const UiRect kStack = {0xF4, 0xBC, 0x300, 0xFC};   // the units of the tile
-const UiRect kMenuBtn = {0xB, 0x14, 0x75, 0x22};   // +0xA5C
+const UiRect kInfo = {0x106, 0x42, 0x2FB, 0xAC};  // info (two columns)
+const UiRect kStack = {0xF4, 0xBC, 0x300, 0xFC};  // the units of the tile
+const UiRect kMenuBtn = {0xB, 0x14, 0x75, 0x22};  // +0xA5C
 const UiRect kCommBtn = {0x38C, 0x16, 0x3F6, 0x24};  // +0xA6C
 
 struct Art {
     bool loaded = false, ok = false;
-    Buffer frame;      // console2_A.pcx
-    Sprite bar[3];     // button bars (console_x2_a.pcx, 106 x 14 at (1, 0xD9 + 15 i))
+    Buffer frame;  // console2_A.pcx
+    Sprite bar[3];  // button bars (console_x2_a.pcx, 106 x 14 at (1, 0xD9 + 15 i))
     Sprite globe[2][3];  // the world map buttons 0x3EE / 0x3EF (interface.pcx, MainInfc +0x21C74 / +0x21CF8)
 } g_art;
 
@@ -196,7 +196,8 @@ void console_frame_draw(Buffer* s) {
     if (battlewin_shown()) {
         battlewin_compose(mi);  // the battle report (interface mode 10)
     } else if (!diplowin_draw_console(mi, 0, 0)) {
-        int32_t hv = *reinterpret_cast<int32_t*>(&InfoWin + 0x15C4), hb = *reinterpret_cast<int32_t*>(&InfoWin + 0x15C8);
+        int32_t hv = *reinterpret_cast<int32_t*>(&InfoWin + 0x15C4),
+                hb = *reinterpret_cast<int32_t*>(&InfoWin + 0x15C8);
         StatusWin_redraw(&InfoWin);
         *reinterpret_cast<int32_t*>(&InfoWin + 0x15C4) = hv;
         *reinterpret_cast<int32_t*>(&InfoWin + 0x15C8) = hb;
@@ -205,7 +206,8 @@ void console_frame_draw(Buffer* s) {
     if (!battlewin_shown()) statuswin_compose(mi);  // the stack row's scroll arrows
     // (In the diplomacy mode DiploPop's panes replace the info pane: InfoWin is hidden.)
     if (!battlewin_shown() && diplowin_faction() < 0) infowin_compose(mi);  // the info pane or the message list
-    if (!planwin_shown() && !diplowin_hq_shown()) worldpane_draw(mi);  // WorldWin / MapWins[1] (hidden under DiploPop's HQ pane)
+    if (!planwin_shown() && !diplowin_hq_shown())
+        worldpane_draw(mi);  // WorldWin / MapWins[1] (hidden under DiploPop's HQ pane)
     maininfc_set_date();
     // The globe buttons (0x3EE world map, 0x3EF detail map: the one shown pressed; neither under
     // DiploPop's HQ pane, ButtonGroup_set(-1)): their sprite centred.

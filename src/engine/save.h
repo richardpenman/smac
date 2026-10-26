@@ -18,18 +18,18 @@
 constexpr int32_t kSaveFileVersion = 12;
 
 // ---- globals (save module and blocks only the save module names) ----
-GLOBAL(int32_t, NetPlayerListSeq, 0x93D4F8);               // multiplayer copy of NetDiploSeq
-GLOBAL(int32_t[8][103], NetPlayerList, 0x93D4FC);          // multiplayer copy of DiploPlrList
-GLOBAL(int32_t, NetDiploSeq, 0x93F798);                    // dword_93F798
-GLOBAL(char[256], ScenarioFileName, 0x9B2178);             // unk_9B2178 (scenarios only)
-GLOBAL(char[256], GameAltPath, 0x9B2078);                  // unk_9B2078: alternate data directory
+GLOBAL(int32_t, NetPlayerListSeq, 0x93D4F8);  // multiplayer copy of NetDiploSeq
+GLOBAL(int32_t[8][103], NetPlayerList, 0x93D4FC);  // multiplayer copy of DiploPlrList
+GLOBAL(int32_t, NetDiploSeq, 0x93F798);  // dword_93F798
+GLOBAL(char[256], ScenarioFileName, 0x9B2178);  // unk_9B2178 (scenarios only)
+GLOBAL(char[256], GameAltPath, 0x9B2078);  // unk_9B2078: alternate data directory
 // Zero-initialised 4-byte strings (empty) used as defaults: unk_945D80 (GameAltPath of version 0
 // savegames), 0x945D84 (scenario name), 0x945D88 (last save name).
 GLOBAL(char[4], EmptyPathA, 0x945D80);
 GLOBAL(char[4], EmptyPathB, 0x945D84);
 GLOBAL(char[4], EmptyPathC, 0x945D88);
-GLOBAL(int32_t, GameAltPathChanged, 0x9B2074);             // dword_9B2074 (load_game)
-GLOBAL(int32_t, UndoIndex, 0x690D7C);                      // scenario editor undo slot (1-9)
+GLOBAL(int32_t, GameAltPathChanged, 0x9B2074);  // dword_9B2074 (load_game)
+GLOBAL(int32_t, UndoIndex, 0x690D7C);  // scenario editor undo slot (1-9)
 GLOBAL(uint8_t[0x3E80], FactionTurnMightBlock, 0x9A68AC);  // FactionTurnMight and following data
 GLOBAL(int32_t[4], CouncilWinState, 0x6FF69C);
 GLOBAL(int32_t[8], CouncilWinVotesA, 0x6FF6D4);

@@ -20,7 +20,7 @@
 // variant), set by load_vehicles from marker pixels in UNITS.PCX. The chassis table has 9
 // entries; the original writes entries 9..18 past its end.
 GLOBAL(int32_t, VehMovingID, 0x689F30);  // unit being animated (-1: none)
-GLOBAL(int32_t, VehScootX, 0x68E564);    // veh_scoot: where the unit being moved is drawn (-1: none)
+GLOBAL(int32_t, VehScootX, 0x68E564);  // veh_scoot: where the unit being moved is drawn (-1: none)
 GLOBAL(int32_t, VehScootY, 0x68E568);
 GLOBAL(int32_t, VehScootID, 0x68E56C);
 
@@ -38,13 +38,13 @@ ADDR_NATIVE(0x5593E0) int32_t GAMEAPI pick_top_veh(int32_t veh_id);
 // unit of its stack, 2 a stack silhouette behind the flag, 8/0x100 the small-zoom box, 0x10/0x20
 // animations, 0x40/0x400 no flag, 0x80 no model, 0x200 box frame, 0x800 flag only, 0x1000 no
 // flag offset. Returns whether a 3D model was drawn.
-ADDR_NATIVE(0x5594F0) int32_t GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t zoom,
-                                              int32_t mode, int32_t a7);
+ADDR_NATIVE(0x5594F0)
+int32_t GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t zoom, int32_t mode, int32_t a7);
 // The 3D model of a unit (chassis 0..8) with its centre at (px + zoom unit, py + zoom unit): the
 // unit's models (vehdraw_construct_vehicle) in VehScene (ui/voxel.h), seen by the map camera
 // (tilted with the terrain when a7), turned to the unit's direction, scaled by the zoom.
-ADDR_NATIVE(0x4C12A0) void GAMEAPI vehdraw_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t mode,
-                                               int32_t zoom, int32_t a7);
+ADDR_NATIVE(0x4C12A0)
+void GAMEAPI vehdraw_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t mode, int32_t zoom, int32_t a7);
 // The turning and sliding animations of veh_scoot (veh_draw modes 0x10 / 0x20 with the frame in
 // a7): vehdraw_turn_start sets the unit's facing to dir and returns the frames of the turn
 // (per_turn for a whole turn); vehdraw_scoot_start prepares `frames` frames of the slide.
@@ -65,18 +65,21 @@ ADDR_NATIVE(0x4C1B10) void GAMEAPI vehdraw_compute_facet_normals();
 ADDR_NATIVE(0x4BF740) void GAMEAPI compute_camera(const float* up, float* out);
 // Fills the scene with the unit's models: chassis, weapon, abilities, armour, reactor.
 ADDR_NATIVE(0x4C1D20) void GAMEAPI vehdraw_construct_vehicle(int32_t veh_id, VoxelScene* scene);
-ADDR_NATIVE(0x4C2470) void GAMEAPI vehdraw_construct_chassis(int32_t faction_id, int32_t chassis_id, int32_t weapon_id,
-                                                            int32_t armor_id, int32_t reactor_id, VoxelScene* scene);
-ADDR_NATIVE(0x4C2CF0) void GAMEAPI vehdraw_construct_weapon(int32_t faction_id, int32_t chassis_id, int32_t weapon_id,
-                                                           VoxelScene* scene);
+ADDR_NATIVE(0x4C2470)
+void GAMEAPI vehdraw_construct_chassis(int32_t faction_id, int32_t chassis_id, int32_t weapon_id, int32_t armor_id,
+                                       int32_t reactor_id, VoxelScene* scene);
+ADDR_NATIVE(0x4C2CF0)
+void GAMEAPI vehdraw_construct_weapon(int32_t faction_id, int32_t chassis_id, int32_t weapon_id, VoxelScene* scene);
 ADDR_NATIVE(0x4C2030) void GAMEAPI vehdraw_construct_abil(uint32_t abilities, VoxelScene* scene, int32_t faction_id);
 // overlay: the second pass of armour 5 (its transparent shield).
-ADDR_NATIVE(0x4C3090) void GAMEAPI vehdraw_construct_armor(int32_t faction_id, int32_t chassis_id, int32_t weapon_id,
-                                                          int32_t armor_id, int32_t overlay, VoxelScene* scene);
+ADDR_NATIVE(0x4C3090)
+void GAMEAPI vehdraw_construct_armor(int32_t faction_id, int32_t chassis_id, int32_t weapon_id, int32_t armor_id,
+                                     int32_t overlay, VoxelScene* scene);
 // The reactor's model (none for reactor 0; infantry with a weapon / probe, the chassis 8, others;
 // the heavy-transport ability's part).
-ADDR_NATIVE(0x4C3800) void GAMEAPI vehdraw_construct_reactor(int32_t faction_id, int32_t chassis_id, int32_t weapon_id,
-                                                            int32_t reactor_id, uint32_t abilities, VoxelScene* scene);
+ADDR_NATIVE(0x4C3800)
+void GAMEAPI vehdraw_construct_reactor(int32_t faction_id, int32_t chassis_id, int32_t weapon_id, int32_t reactor_id,
+                                       uint32_t abilities, VoxelScene* scene);
 // The unit colour tables of colortables_init (0x423570; system.txt VEHICLECOLORING,
 // ARMORCOLORING, ARMORCOLORING_TRANS): per faction (0x79A7EC) and per armour (0x792664) the
 // shading table of VBP.CVR recoloured with a base colour, the light level table (0x788250) and

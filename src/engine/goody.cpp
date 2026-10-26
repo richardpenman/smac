@@ -405,7 +405,8 @@ dispatch:
                 }
             } while ((int32_t)(dist2(x, y, tx, ty) & ~1u) < 9);
         } while (max_dist < dist2(x, y, tx, ty) >> 1);
-        if (viewer) NetMsg_pop(&NetMsg, is_sea ? "GOODYWAVE" : "GOODYGATE", -5000, 0, is_sea ? nullptr : "stars_sm.pcx");
+        if (viewer)
+            NetMsg_pop(&NetMsg, is_sea ? "GOODYWAVE" : "GOODYGATE", -5000, 0, is_sea ? nullptr : "stars_sm.pcx");
         VEH& v = game().vehs[veh_id];
         v.moves_spent = 0;
         v.order = ORDER_NONE;
@@ -413,8 +414,7 @@ dispatch:
         stack_put(stack_veh(veh_id, 1), tx, ty);
         if (game().vehs[veh_id].faction_id == CurrentPlayerFaction)
             draw_tile_fixup(x, y, has_abil(game().vehs[veh_id].unit_id, 2), 2);
-        else
-            draw_tile(x, y, 2);
+        else draw_tile(x, y, 2);
         if (viewer) {
             Console_focus(&MainConsole, tx, ty, faction_id);
             GraphicWin_redraw(&WorldWin);
@@ -598,8 +598,7 @@ dispatch:
         parse_says(0, Units[unit_id].name, -1, -1);
         if (unit_id != 16 && unit_id != 17 && unit_id != 18)
             NetMsg_pop(&NetMsg, "GOODYPOD", is_sea ? 5000 : -5000, 0, "supply_sm.pcx");
-        else
-            NetMsg_pop(&NetMsg, "OGREPOD", is_sea ? 5000 : -5000, 0, "ogre_sm.pcx");
+        else NetMsg_pop(&NetMsg, "OGREPOD", is_sea ? 5000 : -5000, 0, "ogre_sm.pcx");
         return 0;
     }
     case 10: {
@@ -701,10 +700,22 @@ dispatch:
             if (!is_sea) {
                 uint32_t clear;
                 switch (type) {
-                case 0: bit_set(tx, ty, 0x200000, 1); clear = 0x8050; break;
-                case 1: bit_set(tx, ty, 0x8000, 1); clear = 0x200000; break;
-                case 2: bit_set(tx, ty, 0x14, 1); clear = 0x200040; break;
-                default: bit_set(tx, ty, 0x40, 1); clear = 0x200010; break;
+                case 0:
+                    bit_set(tx, ty, 0x200000, 1);
+                    clear = 0x8050;
+                    break;
+                case 1:
+                    bit_set(tx, ty, 0x8000, 1);
+                    clear = 0x200000;
+                    break;
+                case 2:
+                    bit_set(tx, ty, 0x14, 1);
+                    clear = 0x200040;
+                    break;
+                default:
+                    bit_set(tx, ty, 0x40, 1);
+                    clear = 0x200010;
+                    break;
                 }
                 bit_set(tx, ty, clear, 0);
             } else {

@@ -23,10 +23,8 @@ inline void str(FILE* f, const char* s) {
     }
     std::fputc('"', f);
     for (const uint8_t* p = (const uint8_t*)s; *p; p++) {
-        if (*p < 0x20 || *p >= 0x7F || *p == '"' || *p == '\\')
-            std::fprintf(f, "\\x%02X", *p);
-        else
-            std::fputc(*p, f);
+        if (*p < 0x20 || *p >= 0x7F || *p == '"' || *p == '\\') std::fprintf(f, "\\x%02X", *p);
+        else std::fputc(*p, f);
     }
     std::fputc('"', f);
 }
@@ -71,8 +69,8 @@ inline void rules_dump(FILE* f) {
         std::fprintf(f, "Facility[%d]", i);
         S(x.name);
         S(x.effect);
-        std::fprintf(f, " %d %d %d %d %d %d %d %d %d %d\n", x.pad, x.cost, x.maint, x.preq_tech, x.free_tech, x.AI_fight,
-                     x.AI_growth, x.AI_tech, x.AI_wealth, x.AI_power);
+        std::fprintf(f, " %d %d %d %d %d %d %d %d %d %d\n", x.pad, x.cost, x.maint, x.preq_tech, x.free_tech,
+                     x.AI_fight, x.AI_growth, x.AI_tech, x.AI_wealth, x.AI_power);
     }
     for (int i = 0; i < 9; i++) {
         const CChassis& c = Chassis[i];

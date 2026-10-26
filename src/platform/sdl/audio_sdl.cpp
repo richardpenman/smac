@@ -18,8 +18,8 @@ struct Voice {
     int32_t id = 0;
     std::shared_ptr<const Pcm> pcm;
     VoiceParams p;
-    double pos = 0;          // source frame
-    float fade = 1.0f;       // fade-out gain
+    double pos = 0;  // source frame
+    float fade = 1.0f;  // fade-out gain
     float fade_step = 0.0f;  // per output frame (0: none)
 };
 struct Stream {

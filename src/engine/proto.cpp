@@ -27,31 +27,18 @@ int32_t GAMEAPI proto_cost(int32_t chassis_id, int32_t weapon_id, int32_t armor_
                 continue;
             }
             switch (cost) {
-            case -7:
-                ability_cost += chassis_cost + armor_cost - 2;
-                break;
-            case -6:
-                ability_cost += chassis_cost + weapon_cost - 2;
-                break;
-            case -5:
-                ability_cost += armor_cost + weapon_cost - 2;
-                break;
-            case -4:
-                ability_cost += chassis_cost - 1;
-                break;
-            case -3:
-                ability_cost += armor_cost - 1;
-                break;
-            case -2:
-                ability_cost += weapon_cost - 1;
-                break;
+            case -7: ability_cost += chassis_cost + armor_cost - 2; break;
+            case -6: ability_cost += chassis_cost + weapon_cost - 2; break;
+            case -5: ability_cost += armor_cost + weapon_cost - 2; break;
+            case -4: ability_cost += chassis_cost - 1; break;
+            case -3: ability_cost += armor_cost - 1; break;
+            case -2: ability_cost += weapon_cost - 1; break;
             case -1: {
                 int32_t ratio = weapon_cost / armor_cost;
                 ability_cost += ratio < 0 ? 0 : ratio > 2 ? 2 : ratio;
                 break;
             }
-            default:
-                break;
+            default: break;
             }
         }
     }
@@ -250,9 +237,9 @@ void GAMEAPI proto_sort_design(int32_t faction_id) {
         int32_t unit_id = proto_list_id(i, faction_id);
         ProtoSortList[i] = unit_id;
         UNIT& u = Units[unit_id];
-        bool available = (u.unit_flags & UNIT_ACTIVE) &&
-                         (unit_id >= 64 || (Weapon[u.weapon_id].offense_value >= 0 && unit_id != 15 &&
-                                            has_tech(u.preq_tech, faction_id)));
+        bool available =
+            (u.unit_flags & UNIT_ACTIVE) && (unit_id >= 64 || (Weapon[u.weapon_id].offense_value >= 0 &&
+                                                               unit_id != 15 && has_tech(u.preq_tech, faction_id)));
         int32_t value;
         if (!available) {
             if (unit_id < 64) {

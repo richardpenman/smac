@@ -46,15 +46,16 @@ namespace {
 
 constexpr int32_t kProjectNanoFactory = 22;  // has_project ids (SP index)
 
-
 // ---- small helpers (inline code of the original) ------------------------------------------------
 
 inline bool is_human(int32_t faction_id) { return (FactionStatus[0] & (uint8_t)(1u << (faction_id & 31))) != 0; }
 // diplo_status[other] for any index, as the original reads it (other -1: the field before).
 inline uint32_t dstat_raw(int32_t faction_id, int32_t other) {
     uint32_t r;
-    std::memcpy(&r, reinterpret_cast<const uint8_t*>(&game().factions[0].diplo_status[0]) +
-                faction_id * (int32_t)sizeof(Faction) + 4 * other, 4);
+    std::memcpy(&r,
+                reinterpret_cast<const uint8_t*>(&game().factions[0].diplo_status[0]) +
+                    faction_id * (int32_t)sizeof(Faction) + 4 * other,
+                4);
     return r;
 }
 // The original has no range check here: other may be the faction of Bases[-1] (255) or a zoc
@@ -131,98 +132,98 @@ void wp_shift(VEH& v) {
 
 // Join points of the original reached from more than one helper (L_<address>).
 enum Flow {
-    RET0,        // return 0
-    RET1,        // return 1
-    RETV,        // return EM::retval (alien_move)
-    F_56b970,    // orders of the unit (normal mode)
-    F_574a7e,    // no moves left / end of land unit planning
-    F_574a88,    // sea units: transports and naval planning
-    F_577071,    // return 0 if out of moves, else F_57707f
-    F_57707f,    // land units: F_57708a, others F_57717f
-    F_57708a,    // coast goal of pioneering units, then F_57717f
-    F_57717f,    // order checks, then the tactical move (F_577361)
-    F_577361,    // tactical move: score the nine directions
-    F_578b29,    // step towards EM::best_dir (< 0: F_578b34)
-    F_578b34,    // clear the order
-    F_578f46,    // common end: idle units, waypoints reached, former/colony pod paths
-    F_578d67,    // multiplayer: wait for the remote execution, return 1
-    F_56c2d1,    // drop automation (order 0), return 0
-    F_56c9c2,    // same (other register state)
-    F_56c9e1,    // planning of AI units
-    F_56cdc1,    // giving units away to friendly factions, then damage handling
-    F_56e011,    // probe teams
-    F_56e507,    // land units: drop pods; others F_56ed87
-    F_56ed87,    // sea and air units
-    F_56ef2f,    // naval hunting, artillery
-    F_56f8ad,    // colony pods and exploration sites
-    F_570002,    // colony pods / scouts without a site
-    F_57000c,    // sea colony pods: ocean sites
-    F_5702f7,    // exploration sites
-    F_570c89,    // improvements to destroy, supply pods
-    F_57137d,    // best_dir = -1, then F_57138d
-    F_57138d,    // garrisons, defence, gates (also the hint mode entry)
+    RET0,  // return 0
+    RET1,  // return 1
+    RETV,  // return EM::retval (alien_move)
+    F_56b970,  // orders of the unit (normal mode)
+    F_574a7e,  // no moves left / end of land unit planning
+    F_574a88,  // sea units: transports and naval planning
+    F_577071,  // return 0 if out of moves, else F_57707f
+    F_57707f,  // land units: F_57708a, others F_57717f
+    F_57708a,  // coast goal of pioneering units, then F_57717f
+    F_57717f,  // order checks, then the tactical move (F_577361)
+    F_577361,  // tactical move: score the nine directions
+    F_578b29,  // step towards EM::best_dir (< 0: F_578b34)
+    F_578b34,  // clear the order
+    F_578f46,  // common end: idle units, waypoints reached, former/colony pod paths
+    F_578d67,  // multiplayer: wait for the remote execution, return 1
+    F_56c2d1,  // drop automation (order 0), return 0
+    F_56c9c2,  // same (other register state)
+    F_56c9e1,  // planning of AI units
+    F_56cdc1,  // giving units away to friendly factions, then damage handling
+    F_56e011,  // probe teams
+    F_56e507,  // land units: drop pods; others F_56ed87
+    F_56ed87,  // sea and air units
+    F_56ef2f,  // naval hunting, artillery
+    F_56f8ad,  // colony pods and exploration sites
+    F_570002,  // colony pods / scouts without a site
+    F_57000c,  // sea colony pods: ocean sites
+    F_5702f7,  // exploration sites
+    F_570c89,  // improvements to destroy, supply pods
+    F_57137d,  // best_dir = -1, then F_57138d
+    F_57138d,  // garrisons, defence, gates (also the hint mode entry)
     F_571977,
     F_571982,
     F_571d57,
-    F_572922,    // formers
-    F_5741cf,    // coast patrol, exploration
-    F_57460a,    // exploring land units
+    F_572922,  // formers
+    F_5741cf,  // coast patrol, exploration
+    F_57460a,  // exploring land units
     F_56e62d,
-    F_575b27,    // transports: end of the passenger logic
-    F_57666a,    // other sea units
+    F_575b27,  // transports: end of the passenger logic
+    F_57666a,  // other sea units
     F_56e693,
 };
 
 struct EM {
     int32_t retval;
-    int32_t veh;            // [ebp+8]
-    int32_t tx, ty;         // [-4], [-8] (local_8, local_c): candidate tile
-    int32_t fac;            // [-0xc]
-    int32_t x, y;           // [-0x18], [-0x14]
-    int32_t other;          // [-0x1c] local_20: unit on a tile / loop vehicle
-    int32_t val;            // [-0x20] local_24: candidate score
-    int32_t base_id;        // [-0x24] local_28
-    int32_t best;           // [-0x28] local_2c: best score
-    int32_t s2c;            // [-0x2c] local_30: loop index, counter, direction
-    int32_t s30;            // [-0x30] local_34
-    int32_t region;         // [-0x34] local_38
-    int32_t s38;            // [-0x38] local_3c: distance temp (uninitialised read #3)
-    int32_t triad;          // [-0x40] local_44
-    int32_t s44;            // [-0x44] local_48: recon empath flag, later loop index
-    int32_t s48;            // [-0x48] local_4c (uninitialised read #2)
-    int32_t s4c;            // [-0x4c] local_50: in own territory, later temp
-    int32_t plan;           // [-0x50] local_54
-    int32_t s54;            // [-0x54] local_58
-    int32_t s58;            // [-0x58] local_5c
-    int32_t base_own;       // [-0x5c] local_60: nearest own base
-    int32_t s60;            // [-0x60] local_64: territory owner of the tile, later temp
-    int32_t dist_own;       // [-0x64] local_68
-    int32_t s68;            // [-0x68] local_6c: faction bit, later a region
-    int32_t s6c;            // [-0x6c] local_70: hint mode (negative argument), later loop index
-    int32_t s70;            // [-0x70] local_74: faction temp
-    int32_t at_sea;         // [-0x74] local_78: the unit's tile is ocean
-    int32_t best_idx;       // [-0x78] local_7c
-    int32_t dist_any;       // [-0x7c] local_80
-    int32_t best_dir;       // [-0x80] local_84
-    int32_t s84;            // [-0x84] local_88: next to a hostile base, later tile is ocean
-    int32_t region_plan;    // [-0x88] local_8c
-    int32_t stay;           // [-0x8c] local_90
-    int32_t dmg;            // [-0x90] local_94: damage level 0-4
-    int32_t zocv;           // [-0x94] local_98: zoc_veh (faction + 1)
-    int32_t st4;            // [-0x98] local_9c: state & 0x60000 == 0x40000
-    int32_t base_any;       // [-0x9c] local_a0: nearest base
-    int32_t mp_own;         // [-0xa0] local_a4: multiplayer, own unit
-    int32_t sa4;            // [-0xa4] local_a8: altitude, later temp
-    int32_t st6;            // [-0xa8] local_ac: state & 0x60000 == 0x60000
-    int32_t unit;           // [-0xac] local_b0
-    int32_t st4000;         // [-0xb0] local_b4: state & 0x4000
-    int32_t defend;         // [-0xb4] local_b8
-    int32_t sb8;            // [-0xb8] local_bc: out of moves, later a plan
-    int32_t zocm;           // [-0xbc] local_c0: zoc_move
-    int32_t coast_goal;     // [-0xc0] local_c4
-    int32_t keep_wp;        // [-0xc4] local_c8
-    int32_t ys[64];         // [-0x1c4] local_1c8
-    int32_t xs[64];         // [-0x2c4] local_2c8
+    int32_t veh;  // [ebp+8]
+    int32_t tx, ty;  // [-4], [-8] (local_8, local_c): candidate tile
+    int32_t fac;  // [-0xc]
+    int32_t x, y;  // [-0x18], [-0x14]
+    int32_t other;  // [-0x1c] local_20: unit on a tile / loop vehicle
+    int32_t val;  // [-0x20] local_24: candidate score
+    int32_t base_id;  // [-0x24] local_28
+    int32_t best;  // [-0x28] local_2c: best score
+    int32_t s2c;  // [-0x2c] local_30: loop index, counter, direction
+    int32_t s30;  // [-0x30] local_34
+    int32_t region;  // [-0x34] local_38
+    int32_t s38;  // [-0x38] local_3c: distance temp (uninitialised read #3)
+    int32_t triad;  // [-0x40] local_44
+    int32_t s44;  // [-0x44] local_48: recon empath flag, later loop index
+    int32_t s48;  // [-0x48] local_4c (uninitialised read #2)
+    int32_t s4c;  // [-0x4c] local_50: in own territory, later temp
+    int32_t plan;  // [-0x50] local_54
+    int32_t s54;  // [-0x54] local_58
+    int32_t s58;  // [-0x58] local_5c
+    int32_t base_own;  // [-0x5c] local_60: nearest own base
+    int32_t s60;  // [-0x60] local_64: territory owner of the tile, later temp
+    int32_t dist_own;  // [-0x64] local_68
+    int32_t s68;  // [-0x68] local_6c: faction bit, later a region
+    int32_t s6c;  // [-0x6c] local_70: hint mode (negative argument), later loop index
+    int32_t s70;  // [-0x70] local_74: faction temp
+    int32_t at_sea;  // [-0x74] local_78: the unit's tile is ocean
+    int32_t best_idx;  // [-0x78] local_7c
+    int32_t dist_any;  // [-0x7c] local_80
+    int32_t best_dir;  // [-0x80] local_84
+    int32_t s84;  // [-0x84] local_88: next to a hostile base, later tile is ocean
+    int32_t region_plan;  // [-0x88] local_8c
+    int32_t stay;  // [-0x8c] local_90
+    int32_t dmg;  // [-0x90] local_94: damage level 0-4
+    int32_t zocv;  // [-0x94] local_98: zoc_veh (faction + 1)
+    int32_t st4;  // [-0x98] local_9c: state & 0x60000 == 0x40000
+    int32_t base_any;  // [-0x9c] local_a0: nearest base
+    int32_t mp_own;  // [-0xa0] local_a4: multiplayer, own unit
+    int32_t sa4;  // [-0xa4] local_a8: altitude, later temp
+    int32_t st6;  // [-0xa8] local_ac: state & 0x60000 == 0x60000
+    int32_t unit;  // [-0xac] local_b0
+    int32_t st4000;  // [-0xb0] local_b4: state & 0x4000
+    int32_t defend;  // [-0xb4] local_b8
+    int32_t sb8;  // [-0xb8] local_bc: out of moves, later a plan
+    int32_t zocm;  // [-0xbc] local_c0: zoc_move
+    int32_t coast_goal;  // [-0xc0] local_c4
+    int32_t keep_wp;  // [-0xc4] local_c8
+    int32_t ys[64];  // [-0x1c4] local_1c8
+    int32_t xs[64];  // [-0x2c4] local_2c8
     VEH& v() const { return game().vehs[veh]; }
     Faction& f() const { return game().factions[fac]; }
     bool human() const { return is_human(fac); }
@@ -525,8 +526,9 @@ Flow em_auto_roads(EM& m) {
         m.s38 = 0;
         bool evaluate = false;
         for (;;) {
-            int32_t flags = (has_tech(Rules.tech_preq_build_road_fungus, m.fac) ||
-                             has_tech(Terraform[10].preq_tech, m.fac)) ? 0 : 4;
+            int32_t flags =
+                (has_tech(Rules.tech_preq_build_road_fungus, m.fac) || has_tech(Terraform[10].preq_tech, m.fac)) ? 0
+                                                                                                                 : 4;
             int32_t dir = Path_find(&Paths, px, py, bx, m.s58, 0, -1, flags, -1);
             m.best_dir = dir;
             if (dir < 0) break;
@@ -683,8 +685,7 @@ Flow em_auto_former(EM& m, uint32_t state) {
         for (m.base_id = 0; m.base_id < game().base_count; m.base_id++) {
             const BASE& base = game().bases[m.base_id];
             if (base_faction(m.base_id) != m.fac) continue;
-            if (m.triad == TRIAD_SEA ? !base_on_sea(m.base_id, m.region)
-                                     : tile_region(base.x, base.y) != m.region)
+            if (m.triad == TRIAD_SEA ? !base_on_sea(m.base_id, m.region) : tile_region(base.x, base.y) != m.region)
                 continue;
             int32_t i = m.s48 == 2 ? 1 : TableRange[m.s48 - 1];
             for (; i < TableRange[m.s48]; i++) {
@@ -899,8 +900,7 @@ Flow em_plan(EM& m) {
             if (sq->items & BIT_SOLAR) return F_578f46;
             if (m.sa4 - 2 <= 0) return F_578f46;
             break;
-        default:
-            return F_578f46;
+        default: return F_578f46;
         }
         add_goal(m.fac, 9, 1, m.x, m.y, -1);
         return F_578f46;
@@ -1070,17 +1070,16 @@ Flow em_damaged(EM& m) {
     }
     // L_56db67: fast units out of danger simply wait a turn.
     if (m.dmg >= 4 && m.s84 == 0 && m.dist_any != 0 && v.moves_spent == 0 &&
-        Chassis[unit_of(m.veh).chassis_id].range == 0 && veh_moves(m.veh) == Rules.move_rate_roads &&
-        m.zocm == 0 && !(v.state & 8) && speed_proto(v.unit_id) > Rules.move_rate_roads &&
-        v.unit_id != BSC_BATTLE_OGRE_MK1 && v.unit_id != BSC_BATTLE_OGRE_MK2 && v.unit_id != BSC_BATTLE_OGRE_MK3) {
+        Chassis[unit_of(m.veh).chassis_id].range == 0 && veh_moves(m.veh) == Rules.move_rate_roads && m.zocm == 0 &&
+        !(v.state & 8) && speed_proto(v.unit_id) > Rules.move_rate_roads && v.unit_id != BSC_BATTLE_OGRE_MK1 &&
+        v.unit_id != BSC_BATTLE_OGRE_MK2 && v.unit_id != BSC_BATTLE_OGRE_MK3) {
         v.status_icon = 0x64;
         if (m.triad != TRIAD_SEA) return F_578b34;
         m.stay = 1;
         return F_574a88;
     }
     // L_56dc96: board an adjacent transport.
-    if (m.dmg >= 3 && m.s84 == 0 && m.triad == TRIAD_LAND && m.dist_any != 0 && !veh_cargo(m.veh) &&
-        !(v.state & 8)) {
+    if (m.dmg >= 3 && m.s84 == 0 && m.triad == TRIAD_LAND && m.dist_any != 0 && !veh_cargo(m.veh) && !(v.state & 8)) {
         for (int32_t dir = 0; dir < 8; dir++) {
             m.tx = map_wrap_x(m.x + NearOffsetX[dir]);
             m.ty = NearOffsetY[dir] + m.y;
@@ -1206,7 +1205,8 @@ Flow em_probe(EM& m) {
                     if (!(d & 0x20)) continue;
                     if (m.f().region_total_bases[m.region] != 0 &&
                         (int32_t)game().factions[bf].region_force_rating[m.region] >
-                            (int32_t)((m.f().region_force_rating[m.region] >> 1) + m.f().region_total_combat_units[m.region]))
+                            (int32_t)((m.f().region_force_rating[m.region] >> 1) +
+                                      m.f().region_total_combat_units[m.region]))
                         continue;
                 }
                 score *= 2;
@@ -1747,7 +1747,8 @@ Flow em_sea_sites(EM& m) {
                 int32_t site = site_at(m.tx, m.ty, 0);
                 m.val = (site * 10000) / (vdist(m.x, m.y, m.tx, m.ty) + 1);
                 m.base_id = base_find(m.tx, m.ty);
-                if (m.base_id >= 0 && base_faction(m.base_id) != m.fac && (dstat(m.fac, base_faction(m.base_id)) & 0x10))
+                if (m.base_id >= 0 && base_faction(m.base_id) != m.fac &&
+                    (dstat(m.fac, base_faction(m.base_id)) & 0x10))
                     m.val /= 2;
                 if (m.val < m.best) continue;
                 bool bad = false;
@@ -1968,8 +1969,8 @@ Flow em_destroy(EM& m) {
     }
     // L_570df9
     if (speed(m.veh, 0) <= Rules.move_rate_roads && (sq_at(m.x, m.y)->items & BIT_CONDENSER) &&
-        veh_triad_of(m.veh) != TRIAD_AIR && ba >= 0 && m.dist_any <= 2 && base_faction(ba) != m.fac &&
-        m.dist_own > 3 && (dstat(m.fac, base_faction(ba)) & 0x10)) {
+        veh_triad_of(m.veh) != TRIAD_AIR && ba >= 0 && m.dist_any <= 2 && base_faction(ba) != m.fac && m.dist_own > 3 &&
+        (dstat(m.fac, base_faction(ba)) & 0x10)) {
         if (m.mp_own) {
             log_say_values("Auto sending DESTROY message", m.veh, 0x400000, 0);
             message_data(0x2406, m.veh, 0x400000, 0, 0, 0);
@@ -2325,8 +2326,8 @@ Flow em_siege(EM& m) {
             COMPAT_ORIGINAL(status_icon_wrong_unit);
             if (o.status_icon >= 0x33 && v.status_icon <= 0x35) {
                 m.s44++;
-            } else if ((base_who(m.tx, m.ty) < 0 || (o.state & 0x10000)) &&
-                       o.waypoint_x[0] == v.waypoint_x[0] && o.waypoint_y[0] == v.waypoint_y[0]) {
+            } else if ((base_who(m.tx, m.ty) < 0 || (o.state & 0x10000)) && o.waypoint_x[0] == v.waypoint_x[0] &&
+                       o.waypoint_y[0] == v.waypoint_y[0]) {
                 m.s44++;
             }
         }
@@ -2635,11 +2636,9 @@ L_572d66:
             m.s54 = 0;
         }
         if (at_goal(m.fac, m.at_sea ? 0x19 : 9, m.x, m.y) || (m.x == v.waypoint_x[0] && m.y == v.waypoint_y[0]) ||
-            stack_check(m.veh, 9, 3, -1, -1) ||
-            (m.s54 != 0 && (game().bases[bo].worked_tiles & (1u << (m.s54 & 31)))))
+            stack_check(m.veh, 9, 3, -1, -1) || (m.s54 != 0 && (game().bases[bo].worked_tiles & (1u << (m.s54 & 31)))))
             m.s2c = 1;
-        else
-            m.s2c = 0;
+        else m.s2c = 0;
         MAP* sq = sq_at(m.x, m.y);
         if ((sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40 && m.s44 &&
             (has_abil(v.unit_id, ABL_FUNGICIDAL) || has_tech(tf_preq(10, sq_ocean_i(sq_at(m.x, m.y))), m.fac)) &&
@@ -2873,8 +2872,7 @@ inline int32_t rem8(int32_t a) { return a % 8; }
 // of own territory farthest from the frontier.
 Flow em_patrol(EM& m) {
     VEH& v = m.v();
-    if (m.region_plan > 2 &&
-        m.f().region_visible_tiles[m.region] >= Continents[m.region].tile_count &&
+    if (m.region_plan > 2 && m.f().region_visible_tiles[m.region] >= Continents[m.region].tile_count &&
         m.plan <= PLAN_RECON && m.triad == TRIAD_LAND && v.order != ORDER_MOVE_TO && !m.at_sea) {
         if (coast_or_border(m.x, m.y, m.x, m.y, m.fac)) {
             int32_t d = rem8(v.rotate_angle + 4);
@@ -2894,8 +2892,8 @@ Flow em_patrol(EM& m) {
                 m.tx = map_wrap_x(m.x + NearOffsetX[d]);
                 m.ty = NearOffsetY[d] + m.y;
                 if (!m.s30) {
-                    if (on_map(m.tx, m.ty) &&
-                        (tile_region(m.tx, m.ty) != m.region || whose_territory(m.fac, m.tx, m.ty, nullptr, 0) != m.fac))
+                    if (on_map(m.tx, m.ty) && (tile_region(m.tx, m.ty) != m.region ||
+                                               whose_territory(m.fac, m.tx, m.ty, nullptr, 0) != m.fac))
                         m.s30 = 1;
                 } else if (on_map(m.tx, m.ty) && tile_region(m.tx, m.ty) == m.region &&
                            whose_territory(m.fac, m.tx, m.ty, nullptr, 0) == m.fac) {
@@ -2929,7 +2927,8 @@ Flow em_patrol(EM& m) {
                     m.other = game().veh_count;
                     for (int32_t o = 0; o < game().veh_count; o++) {
                         const VEH& w = game().vehs[o];
-                        if (w.faction_id == (uint32_t)m.fac && w.waypoint_x[0] == m.tx && w.waypoint_y[0] == m.ty) score /= 2;
+                        if (w.faction_id == (uint32_t)m.fac && w.waypoint_x[0] == m.tx && w.waypoint_y[0] == m.ty)
+                            score /= 2;
                     }
                     m.s4c = 0;
                 }
@@ -3026,11 +3025,11 @@ Flow em_transport_unload(EM& m, int32_t found);
 Flow em_transport(EM& m) {
     VEH& v = m.v();
     if (m.plan == PLAN_NAVAL_SUPERIORITY) del_site(m.fac, 6, m.x, m.y, 0);
-    int32_t count = 0;     // ebx: passengers aboard that want to land
+    int32_t count = 0;  // ebx: passengers aboard that want to land
     m.s6c = 0;
-    m.s44 = 0;             // passengers kept sentried
-    m.s2c = 0;             // plan bits of those passengers
-    m.s54 = 0;             // damaged passengers
+    m.s44 = 0;  // passengers kept sentried
+    m.s2c = 0;  // plan bits of those passengers
+    m.s54 = 0;  // damaged passengers
     m.s30 = 0;
     if (m.plan != PLAN_NAVAL_TRANSPORT) {
         if (m.stay) return F_577071;
@@ -3195,7 +3194,8 @@ Flow em_transport(EM& m) {
                     m.s4c = 0;
                 }
                 // L_575257
-                if (m.dist_own == 0 ? !port_to_port(m.base_own, m.base_id) : !base_on_sea(m.base_id, m.region)) continue;
+                if (m.dist_own == 0 ? !port_to_port(m.base_own, m.base_id) : !base_on_sea(m.base_id, m.region))
+                    continue;
                 const Faction& f = m.f();
                 if (!((int32_t)f.region_total_combat_units[rr] > f.region_total_bases[rr] * 2 + 1 ||
                       (f.region_flags[rr] & 3) || (f.region_flags[rr] & 0x1800)))
@@ -3630,12 +3630,14 @@ Flow em_sea(EM& m) {
                 if (bf == m.fac || !(dstat(m.fac, bf) & 0x10)) continue;
                 // BUG(original): checks the own base's sea access instead of the target's.
                 COMPAT_ORIGINAL(sea_access_own_base);
-                if (m.dist_own == 0 ? !port_to_port(m.base_own, m.base_id) : !base_on_sea(m.base_own, m.region)) continue;
+                if (m.dist_own == 0 ? !port_to_port(m.base_own, m.base_id) : !base_on_sea(m.base_own, m.region))
+                    continue;
                 m.s4c = base.x;
                 m.val = base.pop_size * base.pop_size * 32 / (hdist(m.x, m.y, base.x, base.y) + 1);
                 for (m.other = 0; m.other < game().veh_count; m.other++) {
                     const VEH& o = game().vehs[m.other];
-                    if (m.other == m.veh || o.faction_id != (uint32_t)m.fac || unit_plan(m.other) != PLAN_NAVAL_SUPERIORITY)
+                    if (m.other == m.veh || o.faction_id != (uint32_t)m.fac ||
+                        unit_plan(m.other) != PLAN_NAVAL_SUPERIORITY)
                         continue;
                     m.s4c = std::abs(o.y - base.y);
                     if (((m.s4c + x_dist(o.x, base.x)) & ~1) <= 4 ||
@@ -3784,8 +3786,8 @@ Flow em_coast_goal(EM& m, bool land_only) {
 Flow em_follow(EM& m) {
     VEH& v = m.v();
     if (v.order != ORDER_MOVE_TO) return F_577361;
-    if (veh_offense(m.veh) != 0 &&
-        (v.moves_spent == 0 || speed(m.veh, 0) <= Rules.move_rate_roads || m.plan != PLAN_OFFENSE || m.triad != TRIAD_LAND))
+    if (veh_offense(m.veh) != 0 && (v.moves_spent == 0 || speed(m.veh, 0) <= Rules.move_rate_roads ||
+                                    m.plan != PLAN_OFFENSE || m.triad != TRIAD_LAND))
         return F_577361;
     if (v.state & 8) return F_577361;
     m.s4c = std::abs(m.y - v.waypoint_y[0]);
@@ -3805,8 +3807,7 @@ Flow em_follow(EM& m) {
     if (m.s70 != 1) {
         if (m.s70 < 1) return F_577361;
         if (!(dstat(m.fac, m.s70) & 0x10)) return F_577361;  // (this test indexes by zoc_sea's value itself)
-        if (m.plan == PLAN_PROBE &&
-            veh_moves(m.veh) - hex_cost(m.unit, m.fac, m.x, m.y, m.tx, m.ty, 0) >= 1)
+        if (m.plan == PLAN_PROBE && veh_moves(m.veh) - hex_cost(m.unit, m.fac, m.x, m.y, m.tx, m.ty, 0) >= 1)
             return F_577361;
     }
     if (m.zocv == 0 || (m.plan != PLAN_PROBE && veh_offense(m.veh) == 0)) v.order = ORDER_NONE;
@@ -3896,8 +3897,8 @@ Flow em_move(EM& m) {
                 }
             }
             // L_577865
-            if (m.at_sea && !m.s84 && m.triad == TRIAD_LAND && m.dist_own == 0 && !has_abil(v.unit_id, ABL_AMPHIBIOUS) &&
-                !stack_check(m.veh, 2, PLAN_NAVAL_TRANSPORT, -1, -1))
+            if (m.at_sea && !m.s84 && m.triad == TRIAD_LAND && m.dist_own == 0 &&
+                !has_abil(v.unit_id, ABL_AMPHIBIOUS) && !stack_check(m.veh, 2, PLAN_NAVAL_TRANSPORT, -1, -1))
                 continue;
             if (m.at_sea == m.s84 && (v.state & 0x10000) &&
                 (m.zocv == 0 || (m.zocv > 1 && (dstat(m.fac, m.zocv - 1) & 7)))) {
@@ -4017,9 +4018,7 @@ Flow em_move(EM& m) {
                         m.val += a * 4 - b * 2;
                     }
                     break;
-                case 3:
-                    m.val -= hex_cost(m.unit, m.fac, m.x, m.y, m.tx, m.ty, 0) / Rules.move_rate_roads;
-                    break;
+                case 3: m.val -= hex_cost(m.unit, m.fac, m.x, m.y, m.tx, m.ty, 0) / Rules.move_rate_roads; break;
                 case 6: {
                     m.val += stack_check(m.other, 2, 7, -1, -1) * 4;
                     int32_t k = stack_check(m.other, 2, 6, -1, -1);
@@ -4044,8 +4043,7 @@ Flow em_move(EM& m) {
                 case 0xB:
                     if (friendly) m.val += stack_check(m.other, 0xE, -1, -1, -1) * 2;
                     break;
-                default:
-                    break;
+                default: break;
                 }
                 // Higher ground.
                 if ((sq_at(m.tx, m.ty)->climate & 0xE0) > (sq_at(m.x, m.y)->climate & 0xE0) &&
@@ -4178,8 +4176,7 @@ Flow em_move(EM& m) {
             // L_578801
             if ((sq_at(m.tx, m.ty)->items & BIT_MONOLITH) && want_monolith(m.veh)) m.val += 0x63;
         L_57883f:
-            if ((m.st4 || m.st4000) && m.s2c != 0 &&
-                (m.triad == TRIAD_AIR || m.s84 == (m.triad == TRIAD_SEA))) {
+            if ((m.st4 || m.st4000) && m.s2c != 0 && (m.triad == TRIAD_AIR || m.s84 == (m.triad == TRIAD_SEA))) {
                 // Exploring: count unknown tiles along the direction.
                 if (m.st4000) {
                     base_find_faction(m.tx, m.ty, m.fac);
@@ -4243,7 +4240,8 @@ Flow em_move(EM& m) {
                 int32_t t = whose_territory(m.fac, m.tx, m.ty, nullptr, 0);
                 if (t < 0 || t == m.fac || !(dstat(m.fac, t) & 0x10)) continue;
                 int32_t rr = tile_region(m.tx, m.ty);
-                if (m.f().region_total_bases[rr] != 0 && m.f().region_base_plan[rr] != 2 && m.triad == TRIAD_LAND) continue;
+                if (m.f().region_total_bases[rr] != 0 && m.f().region_base_plan[rr] != 2 && m.triad == TRIAD_LAND)
+                    continue;
                 // BUG(original): the improvements are looked up on the unit's own tile.
                 COMPAT_ORIGINAL(destroy_own_tile_items);
                 uint32_t items = sq_at(m.x, m.y)->items;
@@ -4322,9 +4320,7 @@ int32_t GAMEAPI enemy_move(int32_t veh_id) {
         case F_578b29: f = em_step(m); break;
         case F_578b34: f = em_clear_order(m); break;
         case F_578f46: return em_finish(m);
-        case F_578d67:
-            NetDaemon_await_exec(&NetState, 1);
-            return 1;
+        case F_578d67: NetDaemon_await_exec(&NetState, 1); return 1;
         }
     }
 }

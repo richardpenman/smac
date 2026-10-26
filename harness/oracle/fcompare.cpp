@@ -21,8 +21,8 @@ constexpr uint32_t kImgLo = 0x682000, kImgHi = 0x9CA000;
 constexpr int kLogPerFunc = 20;
 
 struct FcState {
-    const FcFunc *f;
-    const HybridPatch *p;
+    const FcFunc* f;
+    const HybridPatch* p;
     uint64_t calls = 0, bad = 0;
     int logged = 0;
 };
@@ -32,14 +32,14 @@ int g_from = 0, g_to = -1;
 bool g_hook_turn = true, g_hook_faction = false, g_hook_enemy = false;
 int g_limit_pure = 2000, g_limit_mut = 100;
 std::vector<FcState> g_funcs;
-FILE *g_log;
+FILE* g_log;
 uint64_t g_total_calls, g_total_bad;
 
 /* deterministic private generator (does not touch the game's generators) */
 uint32_t g_rng;
 uint32_t rnd() { return g_rng = g_rng * 1664525u + 1013904223u; }
 
-void flog(const char *fmt, ...) {
+void flog(const char* fmt, ...) {
     if (!g_log) {
         char p[MAX_PATH];
         snprintf(p, sizeof(p), "%s\\fcompare.log", oracle_outdir());
@@ -59,27 +59,30 @@ struct Snap {
     uint32_t crt = 0, game = 0;
 };
 size_t map_bytes() { return (size_t)(MapAreaX / 2) * MapAreaY * sizeof(MAP); }
-void take(Snap &s) {
-    s.img.assign((uint8_t *)kImgLo, (uint8_t *)kImgHi);
-    s.map.assign((uint8_t *)MapTiles, (uint8_t *)MapTiles + map_bytes());
+void take(Snap& s) {
+    s.img.assign((uint8_t*)kImgLo, (uint8_t*)kImgHi);
+    s.map.assign((uint8_t*)MapTiles, (uint8_t*)MapTiles + map_bytes());
     s.crt = oracle_crt_state();
-    s.game = *(uint32_t *)0x9BB568;
+    s.game = *(uint32_t*)0x9BB568;
 }
-void put(const Snap &s) {
-    memcpy((void *)kImgLo, s.img.data(), s.img.size());
+void put(const Snap& s) {
+    memcpy((void*)kImgLo, s.img.data(), s.img.size());
     if (s.map.size() == map_bytes()) memcpy(MapTiles, s.map.data(), s.map.size());
     oracle_crt_set_state(s.crt);
-    *(uint32_t *)0x9BB568 = s.game;
+    *(uint32_t*)0x9BB568 = s.game;
 }
 /* Name of an image address (main game tables), for mismatch reports. */
 std::string addr_name(uint32_t a) {
     struct T {
-        const char *n;
+        const char* n;
         uint32_t base, size, count;
-    } tabs[] = {{"Vehs", 0x952828, 0x34, 2049},  {"Bases", 0x97D040, 0x134, 512}, {"Factions", 0x96C9E0, 0x20CC, 8},
-                {"MFactions", 0x946A50, 0x59C, 8}, {"Units", 0x9AB868, 0x34, 512}};
+    } tabs[] = {{"Vehs", 0x952828, 0x34, 2049},
+                {"Bases", 0x97D040, 0x134, 512},
+                {"Factions", 0x96C9E0, 0x20CC, 8},
+                {"MFactions", 0x946A50, 0x59C, 8},
+                {"Units", 0x9AB868, 0x34, 512}};
     char b[96];
-    for (auto &t : tabs)
+    for (auto& t : tabs)
         if (a >= t.base && a < t.base + t.size * t.count) {
             snprintf(b, sizeof(b), "%s[%u]+0x%X", t.n, (a - t.base) / t.size, (a - t.base) % t.size);
             return b;
@@ -88,12 +91,12 @@ std::string addr_name(uint32_t a) {
     return b;
 }
 /* First difference between two snapshots ("" if equal). */
-std::string snap_diff(const Snap &a, const Snap &b) {
+std::string snap_diff(const Snap& a, const Snap& b) {
     char buf[256];
     size_t n = a.img.size() < b.img.size() ? a.img.size() : b.img.size();
     auto ignored = [](size_t i) {
         uint32_t addr = kImgLo + (uint32_t)i;
-        for (auto &r : kFcIgnore)
+        for (auto& r : kFcIgnore)
             if (addr >= r.addr && addr < r.addr + r.size) return true;
         return false;
     };
@@ -128,44 +131,45 @@ __attribute__((noinline)) void poison() {
 
 /* THISCALL call with ECX = self; restores ESP itself (works for any callee argument count).
  * slot30: written to [callee entry esp - 0x30] just before the call (FC_PATHS). */
-extern "C" uint32_t __cdecl fc_call_this(uint32_t fn, uint32_t self, const uint32_t *args, uint32_t slot30);
-__asm__(".text\n.globl _fc_call_this\n_fc_call_this:\n"
-        "push %ebp\n mov %esp, %ebp\n push %esi\n push %edi\n push %ebx\n mov %esp, %esi\n"
-        "mov 16(%ebp), %edi\n"
-        "push 28(%edi)\n push 24(%edi)\n push 20(%edi)\n push 16(%edi)\n"
-        "push 12(%edi)\n push 8(%edi)\n push 4(%edi)\n push (%edi)\n"
-        "mov 20(%ebp), %eax\n mov %eax, -0x34(%esp)\n"
-        "mov 12(%ebp), %ecx\n mov 8(%ebp), %eax\n call *%eax\n"
-        "mov %esi, %esp\n pop %ebx\n pop %edi\n pop %esi\n pop %ebp\n ret\n");
+extern "C" uint32_t __cdecl fc_call_this(uint32_t fn, uint32_t self, const uint32_t* args, uint32_t slot30);
+__asm__(
+    ".text\n.globl _fc_call_this\n_fc_call_this:\n"
+    "push %ebp\n mov %esp, %ebp\n push %esi\n push %edi\n push %ebx\n mov %esp, %esi\n"
+    "mov 16(%ebp), %edi\n"
+    "push 28(%edi)\n push 24(%edi)\n push 20(%edi)\n push 16(%edi)\n"
+    "push 12(%edi)\n push 8(%edi)\n push 4(%edi)\n push (%edi)\n"
+    "mov 20(%ebp), %eax\n mov %eax, -0x34(%esp)\n"
+    "mov 12(%ebp), %ecx\n mov 8(%ebp), %eax\n call *%eax\n"
+    "mov %esi, %esp\n pop %ebx\n pop %edi\n pop %esi\n pop %ebp\n ret\n");
 
 /* FC_PATHS: the Paths object's heap tables (map costs, queue). */
 struct PathTabs {
     std::vector<uint8_t> map, xs, ys;
 };
-void paths_take(PathTabs &t) {
-    uint32_t *p = (uint32_t *)0x945B00;
+void paths_take(PathTabs& t) {
+    uint32_t* p = (uint32_t*)0x945B00;
     size_t n = (size_t)MapAreaTiles;
-    t.map.assign((uint8_t *)p[0], (uint8_t *)p[0] + n * 4);
-    t.xs.assign((uint8_t *)p[1], (uint8_t *)p[1] + n * 2);
-    t.ys.assign((uint8_t *)p[2], (uint8_t *)p[2] + n * 2);
+    t.map.assign((uint8_t*)p[0], (uint8_t*)p[0] + n * 4);
+    t.xs.assign((uint8_t*)p[1], (uint8_t*)p[1] + n * 2);
+    t.ys.assign((uint8_t*)p[2], (uint8_t*)p[2] + n * 2);
 }
-void paths_put(const PathTabs &t) {
-    uint32_t *p = (uint32_t *)0x945B00;
-    memcpy((void *)p[0], t.map.data(), t.map.size());
-    memcpy((void *)p[1], t.xs.data(), t.xs.size());
-    memcpy((void *)p[2], t.ys.data(), t.ys.size());
+void paths_put(const PathTabs& t) {
+    uint32_t* p = (uint32_t*)0x945B00;
+    memcpy((void*)p[0], t.map.data(), t.map.size());
+    memcpy((void*)p[1], t.xs.data(), t.xs.size());
+    memcpy((void*)p[2], t.ys.data(), t.ys.size());
 }
 uint32_t g_paths_calls;
 
 /* ---- argument domains ---- */
-typedef uint32_t(__cdecl *Fn8)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+typedef uint32_t(__cdecl* Fn8)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 
 struct Domain {
-    std::vector<uint32_t> v;   /* values (for tiles: x, then y in v2) */
+    std::vector<uint32_t> v; /* values (for tiles: x, then y in v2) */
     std::vector<uint32_t> v2;
     bool tile = false;
 };
-void build_domain(const FcArg &a, Domain &d) {
+void build_domain(const FcArg& a, Domain& d) {
     auto range = [&](int lo, int hi) {
         for (int i = lo; i <= hi; i++) d.v.push_back((uint32_t)i);
     };
@@ -220,8 +224,8 @@ struct Call {
 };
 
 /* Runs one comparison; returns false on mismatch (and logs it). */
-bool compare_one(FcState &st, const Call &c, int nargs, const char *where) {
-    const FcFunc &f = *st.f;
+bool compare_one(FcState& st, const Call& c, int nargs, const char* where) {
+    const FcFunc& f = *st.f;
     bool mut = f.flags & FC_MUTATES;
     bool setbase = f.flags & FC_SETBASE;
     bool snap = mut || setbase; /* setup writes memory: restore after each side */
@@ -230,7 +234,7 @@ bool compare_one(FcState &st, const Call &c, int nargs, const char *where) {
     int32_t bufs[2][8][17];
     uint32_t ret[2];
     Snap s0, after[2];
-    uint32_t crt0 = oracle_crt_state(), game0 = *(uint32_t *)0x9BB568;
+    uint32_t crt0 = oracle_crt_state(), game0 = *(uint32_t*)0x9BB568;
     uint32_t clock0 = engine_logic_clock_state(); /* logic-clock sites (timeGetTime) see the same value */
     if (snap) take(s0);
     bool paths = f.flags & FC_PATHS;
@@ -270,11 +274,11 @@ bool compare_one(FcState &st, const Call &c, int nargs, const char *where) {
         }
         if (setbase) {
             /* set_base(a[0]) (and the original base_compute(1)); the other arguments shift down */
-            *(int32_t *)0x689370 = (int32_t)a[0];
-            *(uint32_t *)0x90EA30 = 0x97D040u + a[0] * 0x134u;
+            *(int32_t*)0x689370 = (int32_t)a[0];
+            *(uint32_t*)0x90EA30 = 0x97D040u + a[0] * 0x134u;
             if (f.flags & FC_COMPUTE) {
                 int cprev = oracle_patch_set("base_compute", 0);
-                ((void(__cdecl *)(int32_t))0x4EC3B0)(1);
+                ((void(__cdecl*)(int32_t))0x4EC3B0)(1);
                 if (cprev > 0) oracle_patch_set("base_compute", 1);
             }
             for (int i = 0; i < 7; i++) a[i] = a[i + 1];
@@ -295,9 +299,9 @@ bool compare_one(FcState &st, const Call &c, int nargs, const char *where) {
             put(s0);
         } else {
             after[side].crt = oracle_crt_state();
-            after[side].game = *(uint32_t *)0x9BB568;
+            after[side].game = *(uint32_t*)0x9BB568;
             oracle_crt_set_state(crt0);
-            *(uint32_t *)0x9BB568 = game0;
+            *(uint32_t*)0x9BB568 = game0;
         }
         engine_set_logic_clock_state(clock0);
     }
@@ -327,9 +331,9 @@ bool compare_one(FcState &st, const Call &c, int nargs, const char *where) {
     }
     if (why.empty() && mut) why = snap_diff(after[0], after[1]);
     if (why.empty() && paths) {
-        const char *names[3] = {"Paths.mapTable", "Paths.xTable", "Paths.yTable"};
-        const std::vector<uint8_t> *t0[3] = {&pt[0].map, &pt[0].xs, &pt[0].ys};
-        const std::vector<uint8_t> *t1[3] = {&pt[1].map, &pt[1].xs, &pt[1].ys};
+        const char* names[3] = {"Paths.mapTable", "Paths.xTable", "Paths.yTable"};
+        const std::vector<uint8_t>* t0[3] = {&pt[0].map, &pt[0].xs, &pt[0].ys};
+        const std::vector<uint8_t>* t1[3] = {&pt[1].map, &pt[1].xs, &pt[1].ys};
         for (int k = 0; k < 3 && why.empty(); k++)
             if (*t0[k] != *t1[k]) {
                 size_t i = 0;
@@ -361,13 +365,13 @@ bool compare_one(FcState &st, const Call &c, int nargs, const char *where) {
     return false;
 }
 
-void run_func(FcState &st, const char *where) {
-    const FcFunc &f = *st.f;
+void run_func(FcState& st, const char* where) {
+    const FcFunc& f = *st.f;
     int nargs = 0;
     while (nargs < 8 && f.args[nargs].kind != FA_NONE) nargs++;
     /* domains: a tile occupies two argument slots */
     std::vector<Domain> doms;
-    std::vector<int> slot;  /* first argument index of each domain */
+    std::vector<int> slot; /* first argument index of each domain */
     for (int i = 0; i < nargs; i++) {
         if (f.args[i].kind == FA_Y) continue;
         Domain d;
@@ -377,9 +381,9 @@ void run_func(FcState &st, const char *where) {
         slot.push_back(i);
     }
     double total = 1;
-    for (auto &d : doms) total *= (double)d.v.size();
+    for (auto& d : doms) total *= (double)d.v.size();
     int limit = (f.flags & FC_MUTATES) ? g_limit_mut : g_limit_pure;
-    auto fill = [&](Call &c, const std::vector<size_t> &idx) {
+    auto fill = [&](Call& c, const std::vector<size_t>& idx) {
         memset(&c, 0, sizeof(c));
         for (size_t k = 0; k < doms.size(); k++) {
             c.a[slot[k]] = doms[k].v[idx[k]];
@@ -426,9 +430,9 @@ void run_func(FcState &st, const char *where) {
 void write_summary() {
     char p[MAX_PATH];
     snprintf(p, sizeof(p), "%s\\fcompare_summary.txt", oracle_outdir());
-    FILE *f = fopen(p, "w");
+    FILE* f = fopen(p, "w");
     if (!f) return;
-    for (auto &st : g_funcs)
+    for (auto& st : g_funcs)
         fprintf(f, "FUNC %-24s calls=%llu mismatches=%llu\n", st.f->name, (unsigned long long)st.calls,
                 (unsigned long long)st.bad);
     fprintf(f, "TOTAL functions=%d calls=%llu mismatches=%llu\n", (int)g_funcs.size(),
@@ -436,14 +440,14 @@ void write_summary() {
     fclose(f);
 }
 
-const HybridPatch *find_patch(const char *name) {
-    for (const HybridPatch *p = kHybridPatches; p->func; p++)
+const HybridPatch* find_patch(const char* name) {
+    for (const HybridPatch* p = kHybridPatches; p->func; p++)
         if (!strcmp(p->name, name)) return p;
     return nullptr;
 }
 
-void select_func(const char *name, bool on) {
-    for (const FcFunc &f : kFcFuncs) {
+void select_func(const char* name, bool on) {
+    for (const FcFunc& f : kFcFuncs) {
         if (name && strcmp(f.name, name)) continue;
         bool have = false;
         for (size_t i = 0; i < g_funcs.size(); i++)
@@ -453,7 +457,7 @@ void select_func(const char *name, bool on) {
                 break;
             }
         if (on && !have) {
-            const HybridPatch *p = find_patch(f.name);
+            const HybridPatch* p = find_patch(f.name);
             if (!p) {
                 if (name) oracle_logf("fcompare: %s is not reconstructed\n", f.name);
                 continue;
@@ -470,10 +474,10 @@ void select_func(const char *name, bool on) {
 
 }  // namespace
 
-void fcompare_cmd(const char *args) {
+void fcompare_cmd(const char* args) {
     std::string s(args);
     std::vector<std::string> tok;
-    for (char *t = strtok(&s[0], " \t"); t; t = strtok(NULL, " \t")) tok.push_back(t);
+    for (char* t = strtok(&s[0], " \t"); t; t = strtok(NULL, " \t")) tok.push_back(t);
     if (tok.size() < 3) {
         oracle_logf("fcompare: usage: fcompare <from> <to> [hooks=..] [limit=p,m] <spec...>\n");
         return;
@@ -481,7 +485,7 @@ void fcompare_cmd(const char *args) {
     g_from = atoi(tok[0].c_str());
     g_to = atoi(tok[1].c_str());
     for (size_t i = 2; i < tok.size(); i++) {
-        const std::string &t = tok[i];
+        const std::string& t = tok[i];
         if (!t.compare(0, 6, "hooks=")) {
             g_hook_turn = t.find("turn") != std::string::npos;
             g_hook_faction = t.find("faction") != std::string::npos;
@@ -498,21 +502,20 @@ void fcompare_cmd(const char *args) {
         }
     }
     g_on = true;
-    oracle_logf("fcompare: %d functions, turns %d-%d, hooks%s%s%s, limits %d/%d\n", (int)g_funcs.size(), g_from,
-                g_to, g_hook_turn ? " turn" : "", g_hook_faction ? " faction" : "", g_hook_enemy ? " enemy" : "",
+    oracle_logf("fcompare: %d functions, turns %d-%d, hooks%s%s%s, limits %d/%d\n", (int)g_funcs.size(), g_from, g_to,
+                g_hook_turn ? " turn" : "", g_hook_faction ? " faction" : "", g_hook_enemy ? " enemy" : "",
                 g_limit_pure, g_limit_mut);
 }
 
-void fcompare_hook(const char *where, int arg) {
+void fcompare_hook(const char* where, int arg) {
     if (!g_on || CurrentTurn < g_from || CurrentTurn > g_to) return;
-    if ((where[0] == 't' && !g_hook_turn) || (where[0] == 'f' && !g_hook_faction) ||
-        (where[0] == 'e' && !g_hook_enemy))
+    if ((where[0] == 't' && !g_hook_turn) || (where[0] == 'f' && !g_hook_faction) || (where[0] == 'e' && !g_hook_enemy))
         return;
     g_rng = 0x9E3779B9u ^ (uint32_t)(CurrentTurn * 977 + arg * 31 + where[0]);
     uint64_t c0 = g_total_calls, b0 = g_total_bad;
     char w[32];
     snprintf(w, sizeof(w), "%s%d", where, arg);
-    for (auto &st : g_funcs) run_func(st, w);
+    for (auto& st : g_funcs) run_func(st, w);
     flog("T%d %s: %llu calls, %llu mismatches\n", CurrentTurn, w, (unsigned long long)(g_total_calls - c0),
          (unsigned long long)(g_total_bad - b0));
     oracle_logf("fcompare T%d %s: %llu calls, %llu mismatches\n", CurrentTurn, w,

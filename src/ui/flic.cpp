@@ -8,7 +8,9 @@
 #include "ui/colortables.h"
 
 static uint16_t rd16(const uint8_t* p) { return (uint16_t)(p[0] | (p[1] << 8)); }
-static uint32_t rd32(const uint8_t* p) { return (uint32_t)(p[0] | (p[1] << 8) | (p[2] << 16) | ((uint32_t)p[3] << 24)); }
+static uint32_t rd32(const uint8_t* p) {
+    return (uint32_t)(p[0] | (p[1] << 8) | (p[2] << 16) | ((uint32_t)p[3] << 24));
+}
 
 bool flc_load(const std::string& name, Flc* out, const Palette* target) {
     CrtFile* f = crt_fopen(name.c_str(), "rb");
@@ -36,7 +38,9 @@ bool flc_load(const std::string& name, Flc* out, const Palette* target) {
     for (int32_t i = 0; i < 256; i++) map[i] = target ? 0 : (uint8_t)i;
     auto remap = [&]() {
         for (int32_t i = 0; i < 256; i++)
-            map[i] = !target ? (uint8_t)i : (uint8_t)Palette_get_nearest_palette_index(const_cast<Palette*>(target), pal[i][0] << 2 >> 2, pal[i][1], pal[i][2], 1);
+            map[i] = !target ? (uint8_t)i
+                             : (uint8_t)Palette_get_nearest_palette_index(const_cast<Palette*>(target),
+                                                                          pal[i][0] << 2 >> 2, pal[i][1], pal[i][2], 1);
     };
     for (int32_t fr = 0; fr < frames && off + 16 <= d.size(); fr++) {
         uint32_t fsize = rd32(&d[off]);
@@ -169,4 +173,3 @@ void flc_draw(Buffer* s, const Flc* f, int32_t x0, int32_t y0, int32_t frame) {
         }
     }
 }
-

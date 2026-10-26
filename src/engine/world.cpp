@@ -115,10 +115,8 @@ void GAMEAPI world_alt_set(int32_t x, int32_t y, int32_t altitude, int32_t toggl
     for (int32_t i = 0; i < 8; i++) MapBaseSubmergedCount[i] = 0;
     for (int32_t i = 0; i < 8; i++) MapBaseIdClosestSubmergedVeh[i] = -1;
     if (map_in_bounds(x, y)) {
-        if (toggle)
-            alt_set_both(x, y, altitude);
-        else
-            alt_set(x, y, altitude);
+        if (toggle) alt_set_both(x, y, altitude);
+        else alt_set(x, y, altitude);
     }
     // Raise lower tiles around: ring r may be at most altitude - r.
     for (int32_t r = 1; r < altitude; r++) {
@@ -200,8 +198,7 @@ void GAMEAPI brush(int32_t x, int32_t y, int32_t altitude) {
                 int32_t ay = by + NearOffsetY[(d + 2) & 7];
                 int32_t cx2 = map_wrap_x(bx + NearOffsetX[d & 7]);
                 int32_t cy2 = by + NearOffsetY[d & 7];
-                if (map_in_bounds(ax, ay) && map_in_bounds(cx2, cy2) && map_is_ocean(ax, ay) &&
-                    map_is_ocean(cx2, cy2))
+                if (map_in_bounds(ax, ay) && map_in_bounds(cx2, cy2) && map_is_ocean(ax, ay) && map_is_ocean(cx2, cy2))
                     bridge = true;
             }
             if (bridge) continue;
@@ -318,8 +315,8 @@ void GAMEAPI world_erosion() {
         root_std = 1;
     }
     // Persist from tile to tile like the original's locals (always set before use).
-    int32_t ocean_near = 0;   // neighbours at altitude <= 2
-    int32_t separated = 0;    // land of another large landmass nearby
+    int32_t ocean_near = 0;  // neighbours at altitude <= 2
+    int32_t separated = 0;  // land of another large landmass nearby
     for (int32_t pass = 0; pass < 2; pass++) {
         if (pass != 0) world_shorelines();
         Path_continents(&Paths);
@@ -467,8 +464,10 @@ void GAMEAPI world_fungus() {
 void GAMEAPI world_riverbeds() {
     for (int32_t i = 0; i < game().map.tile_count; i++) game().map.tiles[i].items &= ~BIT_RIVER_SRC;
     int32_t placed = 0;
-    int32_t limit = (((WorldBuilder.rivers_rain_mod * MapCloudCover + WorldBuilder.rivers_base) *
-                      (4 - MapOceanCoverage)) / 3 * game().map.tile_count) / 3200;
+    int32_t limit =
+        (((WorldBuilder.rivers_rain_mod * MapCloudCover + WorldBuilder.rivers_base) * (4 - MapOceanCoverage)) / 3 *
+         game().map.tile_count) /
+        3200;
     for (int32_t attempts = 0;;) {
         if (placed >= limit) return;
         int32_t x = map_rand_mod(game().map.x);
@@ -516,10 +515,10 @@ void GAMEAPI world_rivers() {
             int32_t cur_alt = tile_alt(src);
             src->landmarks |= 0x800000;
             int32_t steps = 0;
-            int32_t merging = 0;      // the river runs into another one
-            int32_t mouth = 1;        // the river may end in a delta (BIT 0x200)
+            int32_t merging = 0;  // the river runs into another one
+            int32_t mouth = 1;  // the river may end in a delta (BIT 0x200)
             int32_t step_parity = 1;
-            int32_t level_run = 1;    // steps since the altitude last changed
+            int32_t level_run = 1;  // steps since the altitude last changed
             int32_t cur_detail = src->contour;
             int32_t x = sx, y = sy;
             bool ended_on_river = false;
@@ -826,8 +825,8 @@ void GAMEAPI world_rainfall() {
     }
     // Pass 2: sweep west to east carrying moisture across the land.
     int32_t moist = 0;  // carried moisture
-    int32_t belt = 0;   // flat land crossed while moist
-    int32_t run = 0;    // high land crossed
+    int32_t belt = 0;  // flat land crossed while moist
+    int32_t run = 0;  // high land crossed
     MAP* walk = game().map.tiles;
     for (int32_t y = 0; y < game().map.y; y++) {
         for (int32_t x = y & 1; x < game().map.x; x += 2, walk++) {
@@ -907,18 +906,13 @@ void GAMEAPI world_rainfall() {
             if ((lm & 0x80000004) == 4 && (climate & 0xE0) >= 0x60 && alt < 6) {  // jungle
                 int32_t code = (int32_t)lm >> 24;
                 if (code < 0) code = -code;
-                if (code < 49)
-                    rain += 2;
-                else if (code < 81 && alt < 5)
-                    rain += 2;
-                else
-                    rain++;
+                if (code < 49) rain += 2;
+                else if (code < 81 && alt < 5) rain += 2;
+                else rain++;
             }
             if ((lm & 0x80000040) == 0x40) rain = 0;  // dunes
-            if ((lm & 0x80004000) == 0x4000 || rain < 0)
-                rain = 0;
-            else if (rain > 2)
-                rain = 2;
+            if ((lm & 0x80004000) == 0x4000 || rain < 0) rain = 0;
+            else if (rain > 2) rain = 2;
             if (flags & 1) {
                 moist = 1;
                 if (rain < 2) rain++;
@@ -930,8 +924,8 @@ void GAMEAPI world_rainfall() {
             if (CurrentTurn != 0) {
                 int32_t old = (walk->climate >> 3) & 3;
                 if (old != rain && RainfallViewerBaseID < 0) {
-                    if (old > rain && (RainfallBaseFaction < 0 ||
-                                       !((uint8_t)(1 << (RainfallBaseFaction & 31)) & FactionStatus[0]))) {
+                    if (old > rain &&
+                        (RainfallBaseFaction < 0 || !((uint8_t)(1 << (RainfallBaseFaction & 31)) & FactionStatus[0]))) {
                         int32_t base_id = base_find(x, y);
                         if (base_id >= 0) RainfallBaseFaction = (uint8_t)game().bases[base_id].faction_id;
                     }
@@ -1037,10 +1031,8 @@ int32_t GAMEAPI world_site(int32_t x, int32_t y, int32_t sea) {
     score += rivers / 4;
     if (big_sea) score += sea ? -2 : 4;
     if (last->items & (BIT_CANAL_COAST | BIT_DOUBLE_SEA)) score += 4;
-    if (sea)
-        score += deep / 2 + (ocean - big_sea) / 2;
-    else
-        score += -(deep / 2) - (ocean - big_sea) / 2;
+    if (sea) score += deep / 2 + (ocean - big_sea) / 2;
+    else score += -(deep / 2) - (ocean - big_sea) / 2;
     int32_t total = (farm + 1) / 3 + score + (forest * 3 + 6) / 4;
     if (CurrentTurn > 150) total += fungus / -3;
     MAP* center = map_tile(x, y);
@@ -1194,8 +1186,7 @@ void GAMEAPI world_monsoon(int32_t x, int32_t y) {
                 int32_t y2 = sy + TableOffsetY[i];
                 if (map_in_bounds(x2, y2) && !map_is_ocean(x2, y2)) land++;
             }
-            return !map_is_ocean(sx, sy) && is_coast(sx, sy, 1) && land >= 40 &&
-                   (map_tile(sx, sy)->climate & 0x18) > 8;
+            return !map_is_ocean(sx, sy) && is_coast(sx, sy, 1) && land >= 40 && (map_tile(sx, sy)->climate & 0x18) > 8;
         };
         if (!find_landmark_site(x, y, draw, accept)) return;
     }
@@ -1223,10 +1214,8 @@ void GAMEAPI world_sargasso(int32_t x, int32_t y) {
         bit2_set(x2, y2, LM_SARGASSO, 1);
         code_set(x2, y2, i);
         if (i < 5) bit_set(x2, y2, 0x10000000, 1);
-        if ((gap || i < 25 || game_rand() % 24 != 0) && (i < 49 || game_rand() % 3 != 0))
-            bit_set(x2, y2, 0x20, 1);
-        else
-            gap = true;
+        if ((gap || i < 25 || game_rand() % 24 != 0) && (i < 49 || game_rand() % 3 != 0)) bit_set(x2, y2, 0x20, 1);
+        else gap = true;
     }
     new_landmark(x, y, natural_name(4));
 }
@@ -1240,10 +1229,8 @@ void GAMEAPI world_ruin(int32_t x, int32_t y) {
         world_alt_set(x2, y2, 3, 1);
         if (!map_is_ocean(x2, y2)) {
             bit_set(x2, y2, 0x100020, 1);
-            if (i == 0)
-                bit_set(x2, y2, 0x20, 0);
-            else if (i <= 8)
-                bit_set(x2, y2, 0x2000, 1);
+            if (i == 0) bit_set(x2, y2, 0x20, 0);
+            else if (i <= 8) bit_set(x2, y2, 0x2000, 1);
         } else if (i != 0 && i <= 8) {
             bit_set(x2, y2, 0x2000, 1);
         }

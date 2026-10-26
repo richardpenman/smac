@@ -41,8 +41,9 @@ ADDR(0x5304A0) int32_t THISCALL NetDaemon_open_channel(uint8_t* net, int32_t fac
 GLOBAL(int32_t[7], NetChannelRequests, 0x93F67C);
 GLOBAL(int32_t, NetTurnDoneMask, 0x93E8EC);  // multiplayer: factions that ended their turn
 // Multiplayer: sends a synchronisation message (does nothing in single player).
-ADDR(0x532E00) void THISCALL NetDaemon_synch(uint8_t* net, int32_t type, int32_t a2, int32_t a3, int32_t a4,
-                                            int32_t a5, int32_t a6, int32_t a7);
+ADDR(0x532E00)
+void THISCALL
+    NetDaemon_synch(uint8_t* net, int32_t type, int32_t a2, int32_t a3, int32_t a4, int32_t a5, int32_t a6, int32_t a7);
 // Multiplayer: sends a data message (type, a2..a5) to the other players.
 ADDR(0x592EE0) void GAMEAPI message_data(int32_t type, int32_t a2, int32_t a3, int32_t a4, int32_t a5, int32_t a6);
 // Multiplayer: sends a base-building message (type, veh_id, base name, a4) to the other players.

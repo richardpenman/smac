@@ -37,17 +37,17 @@ void set_layer_palettes(const uint8_t* layers, int32_t pitch, const Rgb* const* 
 // ---- input (the window procedure's messages) ----
 enum EventType : int32_t {
     EV_NONE = 0,
-    EV_QUIT,         // WM_CLOSE
-    EV_KEY_DOWN,     // WM_KEYDOWN: key = Windows virtual-key code, mods = MOD_* bits
-    EV_KEY_UP,       // WM_KEYUP
-    EV_CHAR,         // WM_CHAR: key = character (Windows-1252)
-    EV_MOUSE_MOVE,   // WM_MOUSEMOVE: x, y client coordinates
-    EV_LBUTTON_DOWN, // WM_LBUTTONDOWN
+    EV_QUIT,  // WM_CLOSE
+    EV_KEY_DOWN,  // WM_KEYDOWN: key = Windows virtual-key code, mods = MOD_* bits
+    EV_KEY_UP,  // WM_KEYUP
+    EV_CHAR,  // WM_CHAR: key = character (Windows-1252)
+    EV_MOUSE_MOVE,  // WM_MOUSEMOVE: x, y client coordinates
+    EV_LBUTTON_DOWN,  // WM_LBUTTONDOWN
     EV_LBUTTON_UP,
     EV_RBUTTON_DOWN,
     EV_RBUTTON_UP,
     EV_MOUSE_WHEEL,  // WM_MOUSEWHEEL: key = +1 (up) / -1 (down)
-    EV_EXPOSE,       // WM_PAINT: the window needs to be presented again
+    EV_EXPOSE,  // WM_PAINT: the window needs to be presented again
 };
 enum : int32_t { MOD_SHIFT = 1, MOD_CTRL = 2, MOD_ALT = 4 };
 struct Event {
@@ -69,9 +69,9 @@ void delay_ms(uint32_t ms);
 
 // ---- fonts (GDI CreateFontIndirect / GetTextMetrics / TextOut on an 8-bit DIB) ----
 struct FontMetrics {
-    int32_t height;            // tmHeight
-    int32_t ascent;            // tmAscent
-    int32_t descent;           // tmDescent
+    int32_t height;  // tmHeight
+    int32_t ascent;  // tmAscent
+    int32_t descent;  // tmDescent
     int32_t internal_leading;  // tmInternalLeading
     int32_t external_leading;  // tmExternalLeading
 };
@@ -84,8 +84,7 @@ bool font_metrics(int32_t handle, FontMetrics* out);
 int32_t font_text_width(int32_t handle, const char* text, int32_t len);
 // Rasterises text without antialiasing (as GDI on an 8-bit DIB): mask is w*h bytes, 1 = ink.
 // The mask is one text cell high (tmHeight); x advances by the text extent.
-bool font_render(int32_t handle, const char* text, int32_t len, std::vector<uint8_t>* mask, int32_t* w,
-                 int32_t* h);
+bool font_render(int32_t handle, const char* text, int32_t len, std::vector<uint8_t>* mask, int32_t* w, int32_t* h);
 
 // ---- files ----
 // Directory searched first for fonts the game ships (the game directory).
@@ -107,8 +106,8 @@ struct Pcm {
 };
 struct VoiceParams {
     float volume = 1.0f;  // linear gain
-    float pan = 0.0f;     // -1 left .. +1 right
-    float pitch = 1.0f;   // playback rate factor
+    float pan = 0.0f;  // -1 left .. +1 right
+    float pitch = 1.0f;  // playback rate factor
     bool loop = false;
 };
 // Opens the audio device; false (and every call below a no-op) when disabled or unavailable.
@@ -135,10 +134,31 @@ void audio_unlock();
 // Windows virtual-key codes (VK_*) used by the original's key handlers. Named VKEY_* so they do
 // not collide with <windows.h> macros in a native Windows build.
 enum : int32_t {
-    VKEY_BACK = 0x08, VKEY_TAB = 0x09, VKEY_RETURN = 0x0D, VKEY_SHIFT = 0x10, VKEY_CONTROL = 0x11,
-    VKEY_MENU = 0x12, VKEY_ESCAPE = 0x1B, VKEY_SPACE = 0x20, VKEY_PRIOR = 0x21, VKEY_NEXT = 0x22,
-    VKEY_END = 0x23, VKEY_HOME = 0x24, VKEY_LEFT = 0x25, VKEY_UP = 0x26, VKEY_RIGHT = 0x27, VKEY_DOWN = 0x28,
-    VKEY_INSERT = 0x2D, VKEY_DELETE = 0x2E, VKEY_NUMPAD0 = 0x60, VKEY_MULTIPLY = 0x6A, VKEY_ADD = 0x6B,
-    VKEY_SUBTRACT = 0x6D, VKEY_DIVIDE = 0x6F, VKEY_F1 = 0x70, VKEY_F12 = 0x7B, VKEY_OEM_PLUS = 0xBB,
+    VKEY_BACK = 0x08,
+    VKEY_TAB = 0x09,
+    VKEY_RETURN = 0x0D,
+    VKEY_SHIFT = 0x10,
+    VKEY_CONTROL = 0x11,
+    VKEY_MENU = 0x12,
+    VKEY_ESCAPE = 0x1B,
+    VKEY_SPACE = 0x20,
+    VKEY_PRIOR = 0x21,
+    VKEY_NEXT = 0x22,
+    VKEY_END = 0x23,
+    VKEY_HOME = 0x24,
+    VKEY_LEFT = 0x25,
+    VKEY_UP = 0x26,
+    VKEY_RIGHT = 0x27,
+    VKEY_DOWN = 0x28,
+    VKEY_INSERT = 0x2D,
+    VKEY_DELETE = 0x2E,
+    VKEY_NUMPAD0 = 0x60,
+    VKEY_MULTIPLY = 0x6A,
+    VKEY_ADD = 0x6B,
+    VKEY_SUBTRACT = 0x6D,
+    VKEY_DIVIDE = 0x6F,
+    VKEY_F1 = 0x70,
+    VKEY_F12 = 0x7B,
+    VKEY_OEM_PLUS = 0xBB,
     VKEY_OEM_MINUS = 0xBD,
 };

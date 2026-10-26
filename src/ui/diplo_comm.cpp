@@ -215,8 +215,7 @@ int32_t GAMEAPI communicate(int32_t f, int32_t fw, int32_t a3) {
         pop(StrBuffer, fw);
     } else if (flags & 0x20) {
         territory(fw, f, 0, &base_id, 0);
-        if (base_id >= 0 && (uint8_t)Bases[base_id].faction_id != fw &&
-            !(Bases[base_id].visibility & (1 << fw))) {
+        if (base_id >= 0 && (uint8_t)Bases[base_id].faction_id != fw && !(Bases[base_id].visibility & (1 << fw))) {
             spot_base(base_id, fw);
             draw_map(1);
         }
@@ -288,8 +287,7 @@ L_550a8b:
         int32_t help = DiploHelpFaction;
         if (!help || !wants_to_speak(f, fw)) goto L_55362d;
         help = DiploHelpFaction;
-        if (Factions[help].mil_strength_1 >= 2 * Factions[fw].mil_strength_1 &&
-            Factions[fw].energy_credits >= 10) {
+        if (Factions[help].mil_strength_1 >= 2 * Factions[fw].mil_strength_1 && Factions[fw].energy_credits >= 10) {
             // PLEA: faction_id_with asks for help against DiploHelpFaction and pays for it.
             int32_t energy = Factions[fw].energy_credits;
             amount = energy / 2 / 25 * 25;
@@ -474,8 +472,7 @@ L_551ecb:
         if (u && !(ds(f, u) & 0x8000008) &&
             !(human(u) && ((MultiplayerActive && Rules.tgl_humans_always_contact_net) ||
                            (PbemActive && Rules.tgl_humans_always_contact_pbem))) &&
-            !(ds(f, fw) & 0x31) && !great_satan(f, 0) &&
-            (Factions[f].ranking <= 5 || Factions[fw].ranking <= 4)) {
+            !(ds(f, fw) & 0x31) && !great_satan(f, 0) && (Factions[f].ranking <= 5 || Factions[fw].ranking <= 4)) {
             int32_t c = great_satan(DiploUnmetEnemy, 0);
             c += Factions[DiploUnmetEnemy].ranking > Factions[f].ranking;
             c += DiploPlayerPactCount == 0;
@@ -768,8 +765,7 @@ L_55362d:
         s14 = 1;
         variant = game_random(0, 4);
         if (s1c) variant = 8;
-        if (has_treaty(fw, f, 0x20) &&
-            (DiploFearScale || Factions[fw].mil_strength_1 < Factions[f].mil_strength_1))
+        if (has_treaty(fw, f, 0x20) && (DiploFearScale || Factions[fw].mil_strength_1 < Factions[f].mil_strength_1))
             variant = 9;
         if (great_satan(f, 0) && Factions[f].mil_strength_1 > Factions[fw].mil_strength_1 * 4 / 3 &&
             DiploPrevHostility == 2)
@@ -796,9 +792,7 @@ L_55362d:
             says_n(8, get_noun_phrase(f, has_treaty(fw, f, 0x20) ? 8 : 9));
             says_n(9, get_phrase(fw, 1));
             break;
-        case 3:
-            says_n(9, get_phrase(fw, 14));
-            break;
+        case 3: says_n(9, get_phrase(fw, 14)); break;
         case 5:
             if (!DiploFearScale && Factions[fw].diplo_combat_count[f] > Factions[f].diplo_combat_count[fw]) {
                 says("a");
@@ -809,11 +803,8 @@ L_55362d:
                 says("b");
             }
             break;
-        case 6:
-            says_n(9, get_noun_phrase(fw, 9));
-            break;
-        default:
-            break;
+        case 6: says_n(9, get_noun_phrase(fw, 9)); break;
+        default: break;
         }
         r = pop(StrBuffer, fw);
         int32_t pay;
@@ -881,8 +872,7 @@ L_553fdd:
     if (s38 || DiploFearScale) goto L_5540e7;
     if ((DiploExposedBaseCount || DiploAttackChance) && DiploTradeWantTech2 >= 0) goto L_5540e7;
     if (DiploTributeDemand <= Factions[f].energy_credits) goto L_5540e7;
-    if (!great_beelzebub(f, 0) &&
-        (Factions[f].ranking < 6 || (!DiploRivalStrongPacts && Factions[fw].ranking < 6)))
+    if (!great_beelzebub(f, 0) && (Factions[f].ranking < 6 || (!DiploRivalStrongPacts && Factions[fw].ranking < 6)))
         goto L_5540e7;
     {
         int32_t mult = (GameRules & RULES_INTENSE_RIVALRY) ? 2 : 3;
@@ -906,8 +896,8 @@ L_5540e7:
             goto L_554a4c;
         if (!DiploHostility && DiploConquestFear) goto L_554a4c;
         if ((DiploFearScale || has_treaty(fw, f, 1)) && !s1c) goto L_554a4c;
-        if (Factions[fw].tech_commerce_bonus > Factions[f].tech_commerce_bonus && FactionRankings[7] != f &&
-            !s1c && !has_treaty(fw, f, 0x20) && (has_treaty(fw, f, 2) || first_contact))
+        if (Factions[fw].tech_commerce_bonus > Factions[f].tech_commerce_bonus && FactionRankings[7] != f && !s1c &&
+            !has_treaty(fw, f, 0x20) && (has_treaty(fw, f, 2) || first_contact))
             goto L_554a4c;
         if (!wants_to_speak(f, fw)) goto L_554a4c;
         if (!has_treaty(fw, f, 0x11)) mention_prototypes(f, fw);
@@ -953,23 +943,15 @@ L_5540e7:
             say_num(variant);
             bool menu = false;
             switch (variant) {
-            case 0:
-                says_n(9, get_noun_phrase(f, 8));
-                break;
-            case 1:
-                says_n(9, get_phrase(f, 7));
-                break;
-            case 2:
-                says_n(9, get_phrase(f, 6));
-                break;
+            case 0: says_n(9, get_noun_phrase(f, 8)); break;
+            case 1: says_n(9, get_phrase(f, 7)); break;
+            case 2: says_n(9, get_phrase(f, 6)); break;
             case 9:
             case 10:
                 says_n(9, get_noun_phrase(fw, 9));
                 menu = true;
                 break;
-            default:
-                menu = variant >= 9 && variant < 12;
-                break;
+            default: menu = variant >= 9 && variant < 12; break;
             }
             if (!menu) {
                 r = pop(StrBuffer, fw);
@@ -1099,8 +1081,7 @@ L_554a4c:
         Faction& F = Factions[f];
         Faction& W = Factions[fw];
         if (F.energy_credits <= W.energy_credits || F.energy_credits < 200 || DiploReputation >= 4) goto L_5551f7;
-        if (F.energy_credits < W.energy_credits * 2 && (!has_treaty(f, fw, 1) || F.ranking <= W.ranking))
-            goto L_5551f7;
+        if (F.energy_credits < W.energy_credits * 2 && (!has_treaty(f, fw, 1) || F.ranking <= W.ranking)) goto L_5551f7;
         if (DiploHostility && !s20) goto L_5551f7;
         if (s14) goto L_5551f7;
         if (!s20 && s38 && !s48 && !has_treaty(f, fw, 1)) goto L_5551f7;
@@ -1156,8 +1137,7 @@ L_554a4c:
     }
 L_5551f7:
     // SOCIAL: faction_id_with's social priority (a pact ends or a vendetta begins).
-    if (!a3 && !s20 &&
-        (DiploRivalStrongPacts || !DiploFearScale || has_treaty(fw, f, 1) || has_agenda(fw, f, 0x400)) &&
+    if (!a3 && !s20 && (DiploRivalStrongPacts || !DiploFearScale || has_treaty(fw, f, 1) || has_agenda(fw, f, 0x400)) &&
         has_agenda(fw, f, 1) && !has_agenda(f, fw, 0x2000)) {
         const MFaction& m = MFactions[fw];
         int32_t cat = m.soc_priority_category;
@@ -1419,9 +1399,8 @@ L_556113:
     // Truce.
     if (has_treaty(fw, f, 0x10) && wants_to_speak(f, fw)) {
         int32_t ans;
-        if (DiploCanSurrender &&
-            (has_agenda(fw, f, 0x800) ||
-             (has_treaty(fw, f, 0x20) && game_random(0, has_treaty(fw, f, 0x400) ? 2 : 3) == 0))) {
+        if (DiploCanSurrender && (has_agenda(fw, f, 0x800) ||
+                                  (has_treaty(fw, f, 0x20) && game_random(0, has_treaty(fw, f, 0x400) ? 2 : 3) == 0))) {
             ans = 1;
             goto L_5564d7;
         }
@@ -1487,33 +1466,36 @@ L_556113:
                 }
             }
         }
-    L_556723: {
-        const Faction& F = Factions[f];
-        const Faction& W = Factions[fw];
-        int32_t mine = (F.mil_strength_2 + W.total_combat_units) *
-                           (F.diplo_combat_total[fw] + F.diplo_combat_count[fw]) / 4 + 1;
-        int32_t theirs = W.diplo_combat_total[f] + W.diplo_combat_count[f] + 1;
-        for (int32_t g = 0; g < 128; g++) {
-            if (!W.region_total_bases[g]) {
-                mine += F.region_force_rating[g] >> 1;
-            } else {
-                theirs += W.region_total_combat_units[g] + W.region_force_rating[g];
-                mine += F.region_force_rating[g];
-                for (int32_t i = 1; i < 8; i++) {
-                    if (has_treaty(i, fw, 1) || !has_treaty(i, f, 0x10)) theirs += Factions[i].region_force_rating[g];
+    L_556723:
+        {
+            const Faction& F = Factions[f];
+            const Faction& W = Factions[fw];
+            int32_t mine =
+                (F.mil_strength_2 + W.total_combat_units) * (F.diplo_combat_total[fw] + F.diplo_combat_count[fw]) / 4 +
+                1;
+            int32_t theirs = W.diplo_combat_total[f] + W.diplo_combat_count[f] + 1;
+            for (int32_t g = 0; g < 128; g++) {
+                if (!W.region_total_bases[g]) {
+                    mine += F.region_force_rating[g] >> 1;
+                } else {
+                    theirs += W.region_total_combat_units[g] + W.region_force_rating[g];
+                    mine += F.region_force_rating[g];
+                    for (int32_t i = 1; i < 8; i++) {
+                        if (has_treaty(i, fw, 1) || !has_treaty(i, f, 0x10))
+                            theirs += Factions[i].region_force_rating[g];
+                    }
+                }
+            }
+            if (s1c == 0) goto L_556b2c;
+            if (alien(fw)) goto L_556c2a;
+            if (!DiploCanSurrender) {
+                int32_t bc = W.base_count;
+                if (DiploFearScale < bc) goto L_556c2a;
+                if (bc > 1) {
+                    if (bc > mine / theirs || bc > 4 || W.mil_strength_1 >= F.mil_strength_1) goto L_556c2a;
                 }
             }
         }
-        if (s1c == 0) goto L_556b2c;
-        if (alien(fw)) goto L_556c2a;
-        if (!DiploCanSurrender) {
-            int32_t bc = W.base_count;
-            if (DiploFearScale < bc) goto L_556c2a;
-            if (bc > 1) {
-                if (bc > mine / theirs || bc > 4 || W.mil_strength_1 >= F.mil_strength_1) goto L_556c2a;
-            }
-        }
-    }
         // TRUCEPLEASE: surrender.
         {
             says_n(0, get_title(f));
@@ -1802,8 +1784,7 @@ L_55778a:
         int32_t max_mil = 0, min_mil = 9999, even = 0, losing = 0, strongest = 0;
         for (int32_t i = 1; i < 8; i++) {
             if (!alive(i) || i == f || i == fw) continue;
-            if (!has_treaty(fw, i, 0x10) || !has_treaty(fw, i, 8) || !has_treaty(fw, i, 0x8000) ||
-                !has_treaty(f, i, 8))
+            if (!has_treaty(fw, i, 0x10) || !has_treaty(fw, i, 8) || !has_treaty(fw, i, 0x8000) || !has_treaty(f, i, 8))
                 continue;
             if (!has_treaty(fw, i, 0x40) && !has_treaty(fw, f, 1)) continue;
             int32_t mil = Factions[i].mil_strength_1;
@@ -1939,8 +1920,7 @@ L_558152:
             if (MultiplayerActive && (GameState & 0x800)) break;
             int32_t choice = diplomacy_menu(f, fw);
             switch (choice) {
-            case 0:
-                goto END;
+            case 0: goto END;
             case 1:
             case 2:
                 make_a_proposal(f, fw, choice == 1);
@@ -1965,23 +1945,16 @@ L_558152:
                 net_pact_ends(f, fw, 1);
                 diplo_unlock();
                 break;
-            case 4:
-                demand_withdrawal(f, fw);
-                break;
-            case 5:
-                battle_plans(f, fw);
-                break;
-            case 6:
-                call_off_vendetta(f, fw);
-                break;
+            case 4: demand_withdrawal(f, fw); break;
+            case 5: battle_plans(f, fw); break;
+            case 6: call_off_vendetta(f, fw); break;
             case 7:
                 DiploCurrentProposal = 12;
                 DiploCounterProposal = 1;
                 make_a_proposal(f, fw, 1);
                 DiploMenuFlagA = 0;
                 break;
-            default:
-                break;
+            default: break;
             }
             pat++;
             if (pat >= get_patience(f, fw)) break;

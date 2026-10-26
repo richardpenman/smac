@@ -68,8 +68,8 @@ bool in_view(uint8_t* win, int32_t x, int32_t y) {
 // Buffer_line (0x5E09D0): a line from (x1, y1) to (x2, y2) in runs of `on` pixels of colour c1 and
 // `off` pixels of c2 (-1: transparent), starting at `phase` of the pattern; clipped to the clip
 // rectangle (the pattern starts at the first visible pixel). Drawn from the left end.
-void buffer_dashed_line(Buffer* b, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t c1, int32_t c2,
-                        int32_t on, int32_t off, int32_t phase) {
+void buffer_dashed_line(Buffer* b, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t c1, int32_t c2, int32_t on,
+                        int32_t off, int32_t phase) {
     if (!b->data) return;
     if (x2 < x1) {
         std::swap(x1, x2);
@@ -193,7 +193,8 @@ void THISCALL MapWin_dest_line(uint8_t* win, int32_t x1, int32_t y1, int32_t x2,
             }
             if (pass) {
                 if (unit_id >= 0)
-                    DestLineCost += hex_cost(unit_id, faction_id, x, y, nx, ny, speed_proto(unit_id) == Rules.move_rate_roads);
+                    DestLineCost +=
+                        hex_cost(unit_id, faction_id, x, y, nx, ny, speed_proto(unit_id) == Rules.move_rate_roads);
                 if (in_view(win, x, y) || in_view(win, nx, ny))
                     MapWin_direct_dest_line(win, x, y, nx, ny, mode, on, off, solid);
             }
@@ -254,8 +255,8 @@ void THISCALL MapWin_draw_base_dest(uint8_t* win, int32_t redraw) {
                                  2, 2, 0);
                 if (u.state & 0x2000000) {
                     for (int32_t i = 0; i < u.waypoint_count; i++)
-                        MapWin_dest_line(win, u.waypoint_x[i], u.waypoint_y[i], u.waypoint_x[i + 1], u.waypoint_y[i + 1],
-                                         u.unit_id, u.faction_id, triad, pflag, 2, 2, 0);
+                        MapWin_dest_line(win, u.waypoint_x[i], u.waypoint_y[i], u.waypoint_x[i + 1],
+                                         u.waypoint_y[i + 1], u.unit_id, u.faction_id, triad, pflag, 2, 2, 0);
                 }
             }
             drawn = true;

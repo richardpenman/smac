@@ -22,33 +22,44 @@
 #define SHADOWABLE(name) name##_impl_c
 
 #define SHADOW_STR2(x) #x
-#define SHADOW_STR(x) SHADOW_STR2(x)
+#define SHADOW_STR(x)  SHADOW_STR2(x)
 
 // name: function; nargs: cdecl argument count; resume: original address after the copied
 // prologue; prologue: the original prologue instructions (AT&T syntax, position independent).
-#define HYBRID_SHADOW_THUNK(ret, name, params, nargs, resume, prologue)                              \
-    extern "C" uint32_t name##_shadow_buf[256];                                                       \
-    uint32_t name##_shadow_buf[256];                                                                  \
-    extern "C" uint32_t name##_shadow_esi, name##_shadow_edi, name##_shadow_res, name##_shadow_ret;   \
-    uint32_t name##_shadow_esi, name##_shadow_edi, name##_shadow_res, name##_shadow_ret;              \
-    extern "C" __attribute__((naked, used)) void name##_shadow_orig() {                               \
-        __asm__(prologue "\n mov $" SHADOW_STR(resume) ", %eax\n jmp *%eax\n");                       \
-    }                                                                                                 \
-    __attribute__((naked)) ret GAMEAPI name params {                                                  \
-        __asm__(                                                                                      \
-            "mov %esi, _" #name "_shadow_esi\n mov %edi, _" #name "_shadow_edi\n"                     \
-            "lea -1024(%esp), %esi\n mov $_" #name "_shadow_buf, %edi\n mov $256, %ecx\n rep movsl\n" \
-            "mov _" #name "_shadow_esi, %esi\n mov _" #name "_shadow_edi, %edi\n"                     \
-            ".rept " #nargs "\n pushl (4*" #nargs ")(%esp)\n .endr\n"                                 \
-            "call _" #name "_impl_c\n"                               \
-            "add $(4*" #nargs "), %esp\n mov %eax, _" #name "_shadow_res\n"                           \
-            "mov %esi, _" #name "_shadow_esi\n mov %edi, _" #name "_shadow_edi\n"                     \
-            "mov $_" #name "_shadow_buf, %esi\n lea -1024(%esp), %edi\n mov $256, %ecx\n rep movsl\n" \
-            "mov _" #name "_shadow_esi, %esi\n mov _" #name "_shadow_edi, %edi\n"                     \
-            "pop %eax\n mov %eax, _" #name "_shadow_ret\n"                                            \
-            "push $1f\n jmp _" #name "_shadow_orig\n"                                                 \
-            "1:\n mov _" #name "_shadow_ret, %ecx\n mov %ecx, -4(%esp)\n"                              \
-            "mov _" #name "_shadow_res, %eax\n jmp *%ecx\n");                                         \
+#define HYBRID_SHADOW_THUNK(ret, name, params, nargs, resume, prologue)                             \
+    extern "C" uint32_t name##_shadow_buf[256];                                                     \
+    uint32_t name##_shadow_buf[256];                                                                \
+    extern "C" uint32_t name##_shadow_esi, name##_shadow_edi, name##_shadow_res, name##_shadow_ret; \
+    uint32_t name##_shadow_esi, name##_shadow_edi, name##_shadow_res, name##_shadow_ret;            \
+    extern "C" __attribute__((naked, used)) void name##_shadow_orig() {                             \
+        __asm__(prologue "\n mov $" SHADOW_STR(resume) ", %eax\n jmp *%eax\n");                     \
+    }                                                                                               \
+    __attribute__((naked)) ret GAMEAPI name params {                                                \
+        __asm__("mov %esi, _" #name "_shadow_esi\n mov %edi, _" #name                               \
+                "_shadow_edi\n"                                                                     \
+                "lea -1024(%esp), %esi\n mov $_" #name                                              \
+                "_shadow_buf, %edi\n mov $256, %ecx\n rep movsl\n"                                  \
+                "mov _" #name "_shadow_esi, %esi\n mov _" #name                                     \
+                "_shadow_edi, %edi\n"                                                               \
+                ".rept " #nargs "\n pushl (4*" #nargs                                               \
+                ")(%esp)\n .endr\n"                                                                 \
+                "call _" #name                                                                      \
+                "_impl_c\n"                                                                         \
+                "add $(4*" #nargs "), %esp\n mov %eax, _" #name                                     \
+                "_shadow_res\n"                                                                     \
+                "mov %esi, _" #name "_shadow_esi\n mov %edi, _" #name                               \
+                "_shadow_edi\n"                                                                     \
+                "mov $_" #name                                                                      \
+                "_shadow_buf, %esi\n lea -1024(%esp), %edi\n mov $256, %ecx\n rep movsl\n"          \
+                "mov _" #name "_shadow_esi, %esi\n mov _" #name                                     \
+                "_shadow_edi, %edi\n"                                                               \
+                "pop %eax\n mov %eax, _" #name                                                      \
+                "_shadow_ret\n"                                                                     \
+                "push $1f\n jmp _" #name                                                            \
+                "_shadow_orig\n"                                                                    \
+                "1:\n mov _" #name                                                                  \
+                "_shadow_ret, %ecx\n mov %ecx, -4(%esp)\n"                                          \
+                "mov _" #name "_shadow_res, %eax\n jmp *%ecx\n");                                   \
     }
 
 #else

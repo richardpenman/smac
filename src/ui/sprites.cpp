@@ -53,16 +53,22 @@ void GAMEAPI load_terrain() {
         for (int32_t k = 0; k < 2; k++, x += 0x39) tex(kTexRocky + (pass + 2 * k) * 0x70, &LoadingCanvas, x, 1);
     for (int32_t i = 0; i < 2; i++) tex(kTexWater + i * 0x70, &LoadingCanvas, 0x118, 0x4F + i * 0x39);
     tex(kTexArid, &LoadingCanvas, 1, 0x3A);
-    for (int32_t i = 0; i < 16; i++) tex(kTexMoist + i * 0x70, &LoadingCanvas, 1 + (i & 3) * 0x39, 0x73 + (i >> 2) * 0x39);
-    for (int32_t i = 0; i < 16; i++) tex(kTexRainy + i * 0x70, &LoadingCanvas, 1 + (i & 3) * 0x39, 0x157 + (i >> 2) * 0x39);
+    for (int32_t i = 0; i < 16; i++)
+        tex(kTexMoist + i * 0x70, &LoadingCanvas, 1 + (i & 3) * 0x39, 0x73 + (i >> 2) * 0x39);
+    for (int32_t i = 0; i < 16; i++)
+        tex(kTexRainy + i * 0x70, &LoadingCanvas, 1 + (i & 3) * 0x39, 0x157 + (i >> 2) * 0x39);
     for (int32_t r = 0; r < 4; r++)
         for (int32_t c = 0; c < 4 && !(r == 3 && c == 3); c++)
             tex(kTexJungle + (c + r * 4) * 0x70, &LoadingCanvas, 0x20E + c * 0x39, 0x103 + r * 0x39);
     tex(kTexDune, &LoadingCanvas, 0xE5, 1);
-    for (int32_t i = 0; i < 8; i++) tex(kTexMesa + i * 0x70, &LoadingCanvas, 0x300 + (i & 3) * 0x39, 0xF + (i >> 2) * 0x39);
-    for (int32_t i = 0; i < 9; i++) tex(kTexRoad + i * 0x70, &LoadingCanvas, 0x307 + (i % 3) * 0x39, 0x18B + (i / 3) * 0x39);
-    for (int32_t i = 0; i < 9; i++) tex(kTexMagTube + i * 0x70, &LoadingCanvas, 0x307 + (i % 3) * 0x39, 0x236 + (i / 3) * 0x39);
-    for (int32_t i = 0; i < 16; i++) tex(kTexRiver + i * 0x70, &LoadingCanvas, 0x118 + (i & 3) * 0x39, 0x103 + (i >> 2) * 0x39);
+    for (int32_t i = 0; i < 8; i++)
+        tex(kTexMesa + i * 0x70, &LoadingCanvas, 0x300 + (i & 3) * 0x39, 0xF + (i >> 2) * 0x39);
+    for (int32_t i = 0; i < 9; i++)
+        tex(kTexRoad + i * 0x70, &LoadingCanvas, 0x307 + (i % 3) * 0x39, 0x18B + (i / 3) * 0x39);
+    for (int32_t i = 0; i < 9; i++)
+        tex(kTexMagTube + i * 0x70, &LoadingCanvas, 0x307 + (i % 3) * 0x39, 0x236 + (i / 3) * 0x39);
+    for (int32_t i = 0; i < 16; i++)
+        tex(kTexRiver + i * 0x70, &LoadingCanvas, 0x118 + (i & 3) * 0x39, 0x103 + (i >> 2) * 0x39);
     for (int32_t i = 0; i < 3; i++) tex(kTexVolcano + i * 0x70, &LoadingCanvas, 1 + i * 0x39, 0x274);
     for (int32_t i = 0; i < 3; i++) tex(kTexCrater + i * 0x70, &LoadingCanvas, 1 + i * 0x39, 0x2AD);
     for (int32_t r = 0; r < 4; r++)
@@ -71,8 +77,10 @@ void GAMEAPI load_terrain() {
     for (int32_t r = 0; r < 4; r++)
         for (int32_t c = 0; c < 4 && !(r == 3 && c == 3); c++)
             tex(kTexSeaFungus + (c + r * 4) * 0x70, &LoadingCanvas, 0x1FC + c * 0x39, 0x204 + r * 0x39);
-    for (int32_t i = 0; i < 9; i++) tex(kTexFarm + i * 0x70, &LoadingCanvas, 0x307 + (i % 3) * 0x39, 0xDB + (i / 3) * 0x39);
-    for (int32_t i = 0; i < 16; i++) tex(kTexForest + i * 0x70, &LoadingCanvas, 0x20E + (i & 3) * 0x39, 6 + (i >> 2) * 0x39);
+    for (int32_t i = 0; i < 9; i++)
+        tex(kTexFarm + i * 0x70, &LoadingCanvas, 0x307 + (i % 3) * 0x39, 0xDB + (i / 3) * 0x39);
+    for (int32_t i = 0; i < 16; i++)
+        tex(kTexForest + i * 0x70, &LoadingCanvas, 0x20E + (i & 3) * 0x39, 6 + (i >> 2) * 0x39);
 
     // RAINFALL.PCX: the coast shapes and the territory border directions are drawn through
     // colour -> index tables into the work buffer and taken as textures.
@@ -83,7 +91,8 @@ void GAMEAPI load_terrain() {
     Sprite shape;
     pfncSpriteFromCanvasRectTrans(&shape, &LoadingCanvas, 0x109, 2, 0x14D, 0x71, 0x38, 0);
     for (int32_t j = 0, n = 0; j < 3; j++)
-        for (int32_t i = 0; i < 4; i++) CoastColors[n++] = (uint8_t)Buffer_get_pixel(&LoadingCanvas, 0x82 + i * 0xE, 0x158 + j * 0x11);
+        for (int32_t i = 0; i < 4; i++)
+            CoastColors[n++] = (uint8_t)Buffer_get_pixel(&LoadingCanvas, 0x82 + i * 0xE, 0x158 + j * 0x11);
     uint8_t table[256];
     std::memset(table, 0, sizeof(table));
     const uint8_t* shape_colors = mem::host(0x6846F8);
@@ -106,7 +115,10 @@ void GAMEAPI load_terrain() {
     cell(0x77979C, 0x66, 1);
 
     Buffer_load_pcx(&LoadingCanvas, "TER1WRECK.PCX", nullptr, 10, 0xEC);
-    static const struct { uint32_t addr; int16_t x, y; } kWreck[] = {
+    static const struct {
+        uint32_t addr;
+        int16_t x, y;
+    } kWreck[] = {
         {0x776994, 0x1A, 0x15},  {0x776910, 0x7F, 0x15},  {0x7769C0, 0xE4, 0x15},  {0x776860, 0x1A, 0x54},
         {0x77688C, 0x7F, 0x54},  {0x7768B8, 0xE4, 0x54},  {0x776834, 0x1A, 0x93},  {0x776758, 0x7F, 0x93},
         {0x776784, 0xE4, 0x93},  {0x776808, 0x1A, 0xD2},  {0x7767DC, 0x7F, 0xD2},  {0x7767B0, 0xE4, 0xD2},
@@ -128,9 +140,12 @@ void GAMEAPI load_terrain() {
         cell(0x7A99CC + i * 0x84, 1 + i * 0x65, 0x282);
         cell(0x7A99F8 + i * 0x84, 1 + i * 0x65, 0x2C1);
     }
-    static const struct { uint32_t addr; int16_t x, y; } kTer1[] = {
-        {0x77944C, 0x1FA, 1},    {kSprMine, 0x25F, 0x40},   {kSprMineSea, 0x1FA, 0x40}, {kSprSolar, 0x25F, 0x7F},
-        {kSprSolarSea, 0x1FA, 0x7F}, {0x798C40, 0x1FA, 0xBE}, {kSprKelp, 0x25F, 0xBE},  {kSprBunker, 0x1FA, 0x13C},
+    static const struct {
+        uint32_t addr;
+        int16_t x, y;
+    } kTer1[] = {
+        {0x77944C, 0x1FA, 1},        {kSprMine, 0x25F, 0x40},    {kSprMineSea, 0x1FA, 0x40}, {kSprSolar, 0x25F, 0x7F},
+        {kSprSolarSea, 0x1FA, 0x7F}, {0x798C40, 0x1FA, 0xBE},    {kSprKelp, 0x25F, 0xBE},    {kSprBunker, 0x1FA, 0x13C},
         {kSprAirbase, 0x25F, 0x13C}, {kSprSensor, 0x2C4, 0x13C},
     };
     for (const auto& c : kTer1) cell(c.addr, c.x, c.y);
@@ -140,11 +155,14 @@ void GAMEAPI load_terrain() {
         cell(kSprEnricher + k * 0x2C, 0x336, y);
         cell(kSprFarm + k * 0x2C, 0x39B, y);
     }
-    static const struct { uint32_t addr; int16_t x, y; } kTer1b[] = {
-        {kSprCondenser, 0x1FA, 0xFD}, {kSprMirror, 0x25F, 0xFD}, {kSprBorehole, 0x2C4, 0xFD},
-        {kSprBoreholeGeo, 0x2C4, 0xBE}, {0x78A700, 0x336, 0xFD}, {0x78A72C, 0x336, 0xBE},
-        {0x7AC11C, 0x1DE, 0x278}, {0x7AC0F0, 0x1DE, 0x2B7}, {0x7AC148, 0x243, 0x278},
-        {0x7AC098, 0x243, 0x2B7}, {0x7AC174, 0x2A8, 0x278}, {0x7AC0C4, 0x2A8, 0x2B7},
+    static const struct {
+        uint32_t addr;
+        int16_t x, y;
+    } kTer1b[] = {
+        {kSprCondenser, 0x1FA, 0xFD},   {kSprMirror, 0x25F, 0xFD}, {kSprBorehole, 0x2C4, 0xFD},
+        {kSprBoreholeGeo, 0x2C4, 0xBE}, {0x78A700, 0x336, 0xFD},   {0x78A72C, 0x336, 0xBE},
+        {0x7AC11C, 0x1DE, 0x278},       {0x7AC0F0, 0x1DE, 0x2B7},  {0x7AC148, 0x243, 0x278},
+        {0x7AC098, 0x243, 0x2B7},       {0x7AC174, 0x2A8, 0x278},  {0x7AC0C4, 0x2A8, 0x2B7},
     };
     for (const auto& c : kTer1b) cell(c.addr, c.x, c.y);
     for (int32_t r = 0; r < 3; r++) {
@@ -207,11 +225,11 @@ void GAMEAPI load_faction_art(int32_t faction_id) {
         }
     }
     // The faction's other pictures (24..36): the emblems, the leader, the logos.
-    static const int16_t kPic[13][4] = {{1, 0x1C9, 0x56, 0x48},     {1, 0x212, 0x56, 0x48},     {0x58, 0x1C9, 0x60, 0x73},
-                                        {0xB9, 0x1C9, 0x76, 0x90},  {0x130, 0x1C9, 0x83, 0x9D}, {0x1B4, 0x1C9, 0x41, 0x32},
-                                        {0x1F6, 0x1C9, 0xE9, 0x7C}, {0x213, 1, 0xA4, 0xC6},     {0x2BD, 1, 0x46, 0x46},
-                                        {0x2BD, 0x48, 0x46, 0x46},  {0x304, 1, 0x25, 0x1D},     {0x304, 0x1F, 0x25, 0x1D},
-                                        {0x304, 0x3D, 0x25, 0x1D}};
+    static const int16_t kPic[13][4] = {
+        {1, 0x1C9, 0x56, 0x48},     {1, 0x212, 0x56, 0x48},     {0x58, 0x1C9, 0x60, 0x73},  {0xB9, 0x1C9, 0x76, 0x90},
+        {0x130, 0x1C9, 0x83, 0x9D}, {0x1B4, 0x1C9, 0x41, 0x32}, {0x1F6, 0x1C9, 0xE9, 0x7C}, {0x213, 1, 0xA4, 0xC6},
+        {0x2BD, 1, 0x46, 0x46},     {0x2BD, 0x48, 0x46, 0x46},  {0x304, 1, 0x25, 0x1D},     {0x304, 0x1F, 0x25, 0x1D},
+        {0x304, 0x3D, 0x25, 0x1D}};
     for (int32_t i = 0; i < 13; i++)
         pfncSpriteFromCanvasRectTrans(&BaseSprites[faction_id][24 + i], &LoadingCanvas, kArtKey, kPic[i][0], kPic[i][1],
                                       kPic[i][2], kPic[i][3], 0);

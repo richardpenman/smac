@@ -10,8 +10,8 @@
 #pragma GCC diagnostic ignored "-Wpedantic"
 
 struct MAP {
-    uint8_t climate; // 000 00 000 | altitude (3 bit) ; rainfall (2 bit) ; temperature (3 bit)
-    uint8_t contour; // altitude details
+    uint8_t climate;  // 000 00 000 | altitude (3 bit) ; rainfall (2 bit) ; temperature (3 bit)
+    uint8_t contour;  // altitude details
     /*
     val2 & 0xF0:
     AI colonization priority returned by world_site()
@@ -31,13 +31,12 @@ struct MAP {
     */
     uint8_t region;
     uint8_t visibility;
-    uint8_t val3; // 00 000 000 | rocky (2 bit); lock faction_id (3 bit); using faction_id (3 bit)
-    uint8_t unk_1; // flags? bitfield
+    uint8_t val3;  // 00 000 000 | rocky (2 bit); lock faction_id (3 bit); using faction_id (3 bit)
+    uint8_t unk_1;  // flags? bitfield
     int8_t owner;
     uint32_t items;
     uint32_t landmarks;
     uint32_t visible_items[7];
-
 };
 
 struct Filefind {
@@ -62,7 +61,7 @@ struct AlphaIniPref {
 struct DefaultPref {
     int32_t difficulty;
     int32_t faction_id;
-    int32_t pad; // unused
+    int32_t pad;  // unused
     int32_t map_type;
     int32_t top_menu;
 };
@@ -74,20 +73,20 @@ struct Landmark {
 };
 
 struct Continent {
-    int32_t tile_count; // count of tiles in region
-    int32_t open_terrain; // count of non-rocky, non-fungus tiles (only 1 movement point to travel)
-    int32_t world_site; // highest world_site value (0-15)
-    int32_t pods; // current count of supply and unity pods in region
-    int32_t unk_5; // padding?
-    uint8_t sea_coasts[8]; // sea specific regions, connections to land regions? bitmask
+    int32_t tile_count;  // count of tiles in region
+    int32_t open_terrain;  // count of non-rocky, non-fungus tiles (only 1 movement point to travel)
+    int32_t world_site;  // highest world_site value (0-15)
+    int32_t pods;  // current count of supply and unity pods in region
+    int32_t unk_5;  // padding?
+    uint8_t sea_coasts[8];  // sea specific regions, connections to land regions? bitmask
 };
 
 struct Path {
     int32_t* mapTable;
     int16_t* xTable;
     int16_t* yTable;
-    int32_t index1; // specific territory count
-    int32_t index2; // overall territory count
+    int32_t index1;  // specific territory count
+    int32_t index2;  // overall territory count
     int32_t faction_id1;
     int32_t xDst;
     int32_t yDst;
@@ -129,7 +128,7 @@ struct MFaction {
     char noun_faction[24];
     int32_t noun_gender;
     int32_t is_noun_plural;
-    char adj_name_faction[128]; // drops 2nd entry on line (abbreviation value?)
+    char adj_name_faction[128];  // drops 2nd entry on line (abbreviation value?)
     char formal_name_faction[40];
     char insult_leader[24];
     char desc_name_faction[24];
@@ -166,42 +165,41 @@ struct MFaction {
     int32_t soc_opposition_model;
     int32_t soc_priority_effect;
     int32_t soc_opposition_effect;
-
 };
 
 struct Faction {
     uint32_t player_flags;
-    int32_t ranking; // 0 (lowest) to 7 (highest)
-    int32_t diff_level; // 3 for AIs, equal to diff_level setting for humans
-    int32_t base_name_offset; // Keep track which base names have been used
-    int32_t base_sea_name_offset; // Keep track which sea base names have been used
-    int32_t last_base_turn; // Turn for last built, captured or acquired (drone riot) base
+    int32_t ranking;  // 0 (lowest) to 7 (highest)
+    int32_t diff_level;  // 3 for AIs, equal to diff_level setting for humans
+    int32_t base_name_offset;  // Keep track which base names have been used
+    int32_t base_sea_name_offset;  // Keep track which sea base names have been used
+    int32_t last_base_turn;  // Turn for last built, captured or acquired (drone riot) base
     uint32_t diplo_status[8];
     uint32_t diplo_agenda[8];
     int32_t diplo_friction[8];
-    int32_t diplo_spoke[8]; // Turn for the last player-to-AI communication; -1 for never
-    int32_t diplo_merc[8]; // Possibly higher values indicate willingness for deal-making
-    int8_t diplo_patience[8]; // AI-to-player
-    int32_t sanction_turns; // Turns left for economic sanctions imposed by other factions for atrocities
-    int32_t loan_balance[8]; // Loan balance remaining this faction owes another to be paid over term
-    int32_t loan_payment[8]; // The per turn payment amount this faction owes another faction
-    int32_t unk_1[8]; // unused
+    int32_t diplo_spoke[8];  // Turn for the last player-to-AI communication; -1 for never
+    int32_t diplo_merc[8];  // Possibly higher values indicate willingness for deal-making
+    int8_t diplo_patience[8];  // AI-to-player
+    int32_t sanction_turns;  // Turns left for economic sanctions imposed by other factions for atrocities
+    int32_t loan_balance[8];  // Loan balance remaining this faction owes another to be paid over term
+    int32_t loan_payment[8];  // The per turn payment amount this faction owes another faction
+    int32_t unk_1[8];  // unused
     int32_t integrity_blemishes;
     int32_t diplo_reputation;
-    int32_t diplo_gifts[8]; // Gifts and bribes we have given to this faction
-    int32_t diplo_wrongs[8]; // Number of times we double crossed this faction
-    int32_t diplo_betrayed[8]; // Number of times double crossed by this faction
-    int32_t diplo_combat_total[8]; // score for all battles/base captures ever against this faction
-    int32_t diplo_combat_count[8]; // score in the current conflict, reset each time vendetta is declared
-    int32_t traded_maps; // bitfield of other factions that have traded maps with faction
-    int32_t base_governor_adv; // default advanced Governor settings
-    int32_t atrocities; // count committed by faction
-    int32_t major_atrocities; // count committed by faction
-    int32_t mind_control_total; // probe: mind control base (+4) / subvert unit (+1) total
-    int32_t diplo_mind_control[8]; // probe: mind control base (+4) / subvert unit (+1) per faction
-    int32_t diplo_stolen_techs[8]; // probe: successfully procured research data (tech/map) per faction
+    int32_t diplo_gifts[8];  // Gifts and bribes we have given to this faction
+    int32_t diplo_wrongs[8];  // Number of times we double crossed this faction
+    int32_t diplo_betrayed[8];  // Number of times double crossed by this faction
+    int32_t diplo_combat_total[8];  // score for all battles/base captures ever against this faction
+    int32_t diplo_combat_count[8];  // score in the current conflict, reset each time vendetta is declared
+    int32_t traded_maps;  // bitfield of other factions that have traded maps with faction
+    int32_t base_governor_adv;  // default advanced Governor settings
+    int32_t atrocities;  // count committed by faction
+    int32_t major_atrocities;  // count committed by faction
+    int32_t mind_control_total;  // probe: mind control base (+4) / subvert unit (+1) total
+    int32_t diplo_mind_control[8];  // probe: mind control base (+4) / subvert unit (+1) per faction
+    int32_t diplo_stolen_techs[8];  // probe: successfully procured research data (tech/map) per faction
     int32_t energy_credits;
-    int32_t hurry_cost_total; // Net MP: Total paid energy to hurry production (current turn)
+    int32_t hurry_cost_total;  // Net MP: Total paid energy to hurry production (current turn)
     int32_t SE_Politics_pending;
     int32_t SE_Economics_pending;
     int32_t SE_Values_pending;
@@ -257,7 +255,7 @@ struct Faction {
     int32_t SE_research_base;
     int32_t energy_surplus_total;
     int32_t facility_maint_total;
-    int32_t tech_commerce_bonus; // Increases commerce income
+    int32_t tech_commerce_bonus;  // Increases commerce income
     int32_t turn_commerce_income;
     int32_t unk_17;
     int32_t unk_18;
@@ -267,11 +265,11 @@ struct Faction {
     int32_t tech_fungus_unused;
     int32_t SE_alloc_psych;
     int32_t SE_alloc_labs;
-    int32_t tech_pact_shared_goals[12]; // Bitfield; Suggested tech_id goals from pacts (TEAMTECH)
-    int32_t tech_ranking; // Twice the number of techs discovered
+    int32_t tech_pact_shared_goals[12];  // Bitfield; Suggested tech_id goals from pacts (TEAMTECH)
+    int32_t tech_ranking;  // Twice the number of techs discovered
     int32_t unk_27;
     int32_t ODP_deployed;
-    int32_t tech_count_transcendent; // Transcendent Thoughts achieved
+    int32_t tech_count_transcendent;  // Transcendent Thoughts achieved
     int8_t tech_trade_source[92];
     int32_t tech_accumulated;
     int32_t tech_research_id;
@@ -287,18 +285,18 @@ struct Faction {
     int32_t target_y;
     int32_t best_mineral_output;
     int32_t council_call_turn;
-    int32_t unk_29[11]; // Council related
-    int32_t unk_30[11]; // Council related
-    uint8_t facility_announced[12]; // bitfield - used to determine one time play of fac audio blurb
-    int32_t clean_minerals_modifier; // Starts from zero and increases by one after each fungal pop
-    int32_t base_id_attack_target; // Battle planning of base to attack, -1 if not set
+    int32_t unk_29[11];  // Council related
+    int32_t unk_30[11];  // Council related
+    uint8_t facility_announced[12];  // bitfield - used to determine one time play of fac audio blurb
+    int32_t clean_minerals_modifier;  // Starts from zero and increases by one after each fungal pop
+    int32_t base_id_attack_target;  // Battle planning of base to attack, -1 if not set
     int32_t unk_37;
     char saved_queue_name[8][24];
     int32_t saved_queue_size[8];
     int32_t saved_queue_items[8][10];
-    int32_t social_support[8]; // SE_support from -4 to 3 minerals spent on unit support
-    int32_t social_psych[8][9]; // SE_talent from -3 to 4 / SE_police from -5 to 3
-    int32_t social_effic[9]; // SE_effic from 4 to -4 all energy lost on inefficiency
+    int32_t social_support[8];  // SE_support from -4 to 3 minerals spent on unit support
+    int32_t social_psych[8][9];  // SE_talent from -3 to 4 / SE_police from -5 to 3
+    int32_t social_effic[9];  // SE_effic from 4 to -4 all energy lost on inefficiency
     int32_t unk_45;
     int32_t unk_46;
     int32_t unk_47;
@@ -313,7 +311,7 @@ struct Faction {
     int32_t best_psi_land_defense;
     int32_t best_armor_value;
     int32_t best_land_speed;
-    int32_t enemy_best_weapon_value; // Enemy refers here to any non-pact faction
+    int32_t enemy_best_weapon_value;  // Enemy refers here to any non-pact faction
     int32_t enemy_best_armor_value;
     int32_t enemy_best_land_speed;
     int32_t enemy_best_psi_land_offense;
@@ -344,15 +342,15 @@ struct Faction {
     uint16_t region_total_combat_units[128];
     uint8_t region_total_bases[128];
     uint8_t region_total_offensive_units[128];
-    uint16_t region_force_rating[128]; // Combined offensive/morale rating of all units in the area
-    uint16_t region_flags[128]; // Movement planning flags
+    uint16_t region_force_rating[128];  // Combined offensive/morale rating of all units in the area
+    uint16_t region_flags[128];  // Movement planning flags
     uint16_t region_territory_tiles[128];
     uint16_t region_visible_tiles[128];
     uint16_t region_good_tiles[128];
-    uint16_t region_unk_5[128]; // Unknown reset_territory/enemy_move counter
-    uint8_t region_unk_6[128]; // Unknown enemy_strategy state
+    uint16_t region_unk_5[128];  // Unknown reset_territory/enemy_move counter
+    uint8_t region_unk_6[128];  // Unknown enemy_strategy state
     uint8_t region_territory_pods[128];
-    uint8_t region_base_plan[128]; // visible in map UI with omni view + debug mode under base name
+    uint8_t region_base_plan[128];  // visible in map UI with omni view + debug mode under base name
     /* End of block */
     Goal goals[75];
     Goal sites[25];
@@ -361,20 +359,20 @@ struct Faction {
     int32_t goody_artifact;
     int32_t goody_earthquake;
     int32_t goody_tech;
-    int32_t tech_achieved; // count of technology faction has discovered/achieved
-    int32_t time_bonus_count; // Net MP: Each is worth amount in seconds under Time Controls Extra
-    int32_t unk_99; // unused?
-    uint32_t secret_project_intel[8]; // Bitfield; News of SPs other factions are working on
+    int32_t tech_achieved;  // count of technology faction has discovered/achieved
+    int32_t time_bonus_count;  // Net MP: Each is worth amount in seconds under Time Controls Extra
+    int32_t unk_99;  // unused?
+    uint32_t secret_project_intel[8];  // Bitfield; News of SPs other factions are working on
     int32_t corner_market_turn;
     int32_t corner_market_cost;
     int32_t unk_101;
     int32_t unk_102;
-    int32_t bunglist_next; // next BungList entry to overwrite (0-63)
+    int32_t bunglist_next;  // next BungList entry to overwrite (0-63)
     uint32_t player_flags_ext;
     int32_t unk_105;
     int32_t unk_106;
     int32_t unk_107;
-    int32_t eliminated_count; // may decrease if some faction respawns
+    int32_t eliminated_count;  // may decrease if some faction respawns
     int32_t unk_109;
     int32_t unk_110;
     int32_t unk_111;
@@ -385,7 +383,6 @@ struct Faction {
     int32_t unk_116;
     int32_t unk_117;
     int32_t unk_118;
-
 };
 
 struct CRules {
@@ -414,8 +411,8 @@ struct CRules {
     int32_t extra_cost_prototype_land;
     int32_t extra_cost_prototype_sea;
     int32_t extra_cost_prototype_air;
-    int32_t psi_combat_ratio_atk[3]; // Numerator: LAND, SEA, AIR
-    int32_t psi_combat_ratio_def[3]; // Denominator: LAND, SEA, AIR
+    int32_t psi_combat_ratio_atk[3];  // Numerator: LAND, SEA, AIR
+    int32_t psi_combat_ratio_def[3];  // Denominator: LAND, SEA, AIR
     int32_t starting_energy_reserve;
     int32_t combat_bonus_intrinsic_base_def;
     int32_t combat_bonus_atk_road;
@@ -511,8 +508,8 @@ struct CFacility {
 struct CTech {
     int32_t flags;
     char* name;
-    char short_name[8]; // up to 7 characters in length
-    int32_t padding; // unused
+    char short_name[8];  // up to 7 characters in length
+    int32_t padding;  // unused
     int32_t AI_growth;
     int32_t AI_tech;
     int32_t AI_wealth;
@@ -536,11 +533,10 @@ struct CAbility {
     char* description;
     char* abbreviation;
     int32_t cost;
-    int32_t unk_1; // only referenced in NetDaemon::synch
+    int32_t unk_1;  // only referenced in NetDaemon::synch
     int32_t flags;
     int16_t preq_tech;
     int16_t pad;
-
 };
 
 struct CChassis {
@@ -594,7 +590,7 @@ struct CReactor {
     char* name;
     char* name_short;
     int16_t preq_tech;
-    int16_t power; // Fix: this value is not originally set
+    int16_t power;  // Fix: this value is not originally set
 };
 
 struct CWeapon {
@@ -938,5 +934,3 @@ SMAC_LAYOUT(FullChecksum, 0xBC);
 
 #pragma GCC diagnostic pop
 #pragma pack(pop)
-
-

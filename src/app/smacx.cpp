@@ -125,9 +125,9 @@ namespace {
 struct Options {
     std::string save, gamedir, image, ini, outdir, shot, snapshots, rng;  // defaults: main
     std::string dump, like;  // --dump FILE [--like REF]: map canvas dump (ui_mapdump_like)
-    std::string basedump;    // --basedump BASE:FILE: the base window's canvases (the oracle's basedump)
+    std::string basedump;  // --basedump BASE:FILE: the base window's canvases (the oracle's basedump)
     int scroll_x = -1, scroll_y = -1;  // --scroll-from X,Y: the dump's redraw scrolls from there
-    unsigned dump_options = 0;         // --dump-options HEX: display options OR'd in for the dump
+    unsigned dump_options = 0;  // --dump-options HEX: display options OR'd in for the dump
     int radius_x = 0, radius_y = 0, radius_r = -1;  // --dump-radius X,Y,R: then a partial redraw
     bool new_game = false;
     std::string new_args;
@@ -152,13 +152,13 @@ void write_state(const std::string& path) {
     };
     auto i32 = [](uint32_t addr) { return *reinterpret_cast<int32_t*>(mem::host(addr)); };
 #define REGION(name, addr, size) put(addr, mem::host(addr), size);
-#define REGION_VAR(name, addr, count_addr, elem)                                                     \
-    {                                                                                                \
-        uint32_t n = (uint32_t)i32(count_addr) * (elem);                                             \
-        const void* src = (addr) == 0x10000000   ? (const void*)MapTiles                             \
-                          : (addr) == 0x20000000 ? (const void*)MapAbstract                          \
-                                                 : (const void*)mem::host(addr);                     \
-        put(addr, src, src ? n : 0);                                                                 \
+#define REGION_VAR(name, addr, count_addr, elem)                                 \
+    {                                                                            \
+        uint32_t n = (uint32_t)i32(count_addr) * (elem);                         \
+        const void* src = (addr) == 0x10000000   ? (const void*)MapTiles         \
+                          : (addr) == 0x20000000 ? (const void*)MapAbstract      \
+                                                 : (const void*)mem::host(addr); \
+        put(addr, src, src ? n : 0);                                             \
     }
 #define MASK(addr, size)
 #include "../../harness/state_regions.h"
@@ -284,9 +284,12 @@ void observer_pause() {
         case VKEY_RIGHT: scroll(2, 0); break;
         case VKEY_UP: scroll(0, -2); break;
         case VKEY_DOWN: scroll(0, 2); break;
-        case VKEY_ADD: case VKEY_OEM_PLUS: zoom_step(1); break;
-        case VKEY_SUBTRACT: case VKEY_OEM_MINUS: zoom_step(-1); break;
-        case VKEY_F12: case 'S': {
+        case VKEY_ADD:
+        case VKEY_OEM_PLUS: zoom_step(1); break;
+        case VKEY_SUBTRACT:
+        case VKEY_OEM_MINUS: zoom_step(-1); break;
+        case VKEY_F12:
+        case 'S': {
             char name[64];
             std::snprintf(name, sizeof(name), "smacx_%03d.bmp", g_ui_shots++);
             ui_screenshot((fs::path(g_opt.outdir) / name).string());
@@ -576,7 +579,7 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         out->command = "popup " + tok.substr(6);
         return true;
     }
-        if (tok.rfind("CLICK:", 0) == 0 || tok.rfind("DCLICK:", 0) == 0) {  // CLICK:XxY, a left click at screen
+    if (tok.rfind("CLICK:", 0) == 0 || tok.rfind("DCLICK:", 0) == 0) {  // CLICK:XxY, a left click at screen
         // (X, Y) for a popup; DCLICK:XxY, the second click of a double click (modal windows)
         int32_t x = 0, y = 0;
         bool dbl = tok[0] == 'D';
@@ -584,12 +587,12 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         out->command = (dbl ? "dclick " : "click ") + std::to_string(x) + " " + std::to_string(y);
         return true;
     }
-        if (tok.rfind("S-RCLICK:", 0) == 0 || tok.rfind("C-RCLICK:", 0) == 0) {  // with shift / ctrl held
+    if (tok.rfind("S-RCLICK:", 0) == 0 || tok.rfind("C-RCLICK:", 0) == 0) {  // with shift / ctrl held
         if (!parse_key(tok.substr(2), out)) return false;
         out->vk |= tok[0] == 'S' ? 0x10000 : 0x20000;
         return true;
     }
-        if (tok.rfind("RCLICK:", 0) == 0 || tok.rfind("MOVE:", 0) == 0) {  // a right click / mouse move
+    if (tok.rfind("RCLICK:", 0) == 0 || tok.rfind("MOVE:", 0) == 0) {  // a right click / mouse move
         int32_t x = 0, y = 0;
         size_t c = tok.find(':');
         if (std::sscanf(tok.c_str() + c + 1, "%dx%d", &x, &y) != 2) return false;
@@ -606,7 +609,7 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         if (c3 != std::string::npos) out->command += " " + tok.substr(c3 + 1);
         return true;
     }
-        if (tok == "QUIT" || tok == "UNITS") {
+    if (tok == "QUIT" || tok == "UNITS") {
         out->command = tok == "QUIT" ? "quit" : "units";
         return true;
     }
@@ -615,12 +618,16 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         mods |= tok[0] == 'C' ? 0x20000 : (tok[0] == 'S' ? 0x10000 : 0x40000);
         tok = tok.substr(2);
     }
-    struct Named { const char* name; int32_t vk; };
-    static const Named kNamed[] = {
-        {"LEFT", VKEY_LEFT}, {"RIGHT", VKEY_RIGHT}, {"UP", VKEY_UP}, {"DOWN", VKEY_DOWN}, {"HOME", VKEY_HOME},
-        {"END", VKEY_END}, {"PGUP", VKEY_PRIOR}, {"PGDN", VKEY_NEXT}, {"ENTER", VKEY_RETURN},
-        {"SPACE", VKEY_SPACE}, {"TAB", VKEY_TAB}, {"BACK", VKEY_BACK}, {"ESC", VKEY_ESCAPE},
-        {"PLUS", VKEY_ADD}, {"MINUS", VKEY_SUBTRACT}, {"COMMA", 0xBC}, {"ALT", VKEY_MENU}};
+    struct Named {
+        const char* name;
+        int32_t vk;
+    };
+    static const Named kNamed[] = {{"LEFT", VKEY_LEFT},   {"RIGHT", VKEY_RIGHT}, {"UP", VKEY_UP},
+                                   {"DOWN", VKEY_DOWN},   {"HOME", VKEY_HOME},   {"END", VKEY_END},
+                                   {"PGUP", VKEY_PRIOR},  {"PGDN", VKEY_NEXT},   {"ENTER", VKEY_RETURN},
+                                   {"SPACE", VKEY_SPACE}, {"TAB", VKEY_TAB},     {"BACK", VKEY_BACK},
+                                   {"ESC", VKEY_ESCAPE},  {"PLUS", VKEY_ADD},    {"MINUS", VKEY_SUBTRACT},
+                                   {"COMMA", 0xBC},       {"ALT", VKEY_MENU}};
     for (const Named& n : kNamed) {
         if (tok == n.name) {
             out->vk = n.vk | mods;
@@ -655,13 +662,15 @@ bool parse_key(std::string tok, ScriptedKey* out) {
 }
 
 int usage() {
-    std::fprintf(stderr,
-                 "usage: smacx [--new [k=v ...] | --save FILE.sav] [--human N] [--viewer N] [--seed CRT,GAME|clock]\n"
-                 "             [--keys K1,K2,..] [--exit-after-keys] [--turns N] [--shot FILE.bmp] [--snapshots DIR] [--rng FILE]\n"
-                 "             [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR] [--gamedir DIR]\n"
-                 "             [--image FILE] [--ini FILE] [--dump FILE.smxmap [--like REF.smxmap] [--scroll-from X,Y]\n"
-                 "             [--dump-options HEX] [--dump-radius X,Y,R]]\n"
-                 "             [--nosound]\n");
+    std::fprintf(
+        stderr,
+        "usage: smacx [--new [k=v ...] | --save FILE.sav] [--human N] [--viewer N] [--seed CRT,GAME|clock]\n"
+        "             [--keys K1,K2,..] [--exit-after-keys] [--turns N] [--shot FILE.bmp] [--snapshots DIR] [--rng "
+        "FILE]\n"
+        "             [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR] [--gamedir DIR]\n"
+        "             [--image FILE] [--ini FILE] [--dump FILE.smxmap [--like REF.smxmap] [--scroll-from X,Y]\n"
+        "             [--dump-options HEX] [--dump-radius X,Y,R]]\n"
+        "             [--nosound]\n");
     return 2;
 }
 
@@ -674,7 +683,8 @@ int main(int argc, char** argv) {
         if (a == "--save") g_opt.save = next();
         else if (a == "--new") {
             g_opt.new_game = true;
-            while (i + 1 < argc && std::strchr(argv[i + 1], '=') && argv[i + 1][0] != '-') g_opt.new_args += std::string(argv[++i]) + " ";
+            while (i + 1 < argc && std::strchr(argv[i + 1], '=') && argv[i + 1][0] != '-')
+                g_opt.new_args += std::string(argv[++i]) + " ";
         } else if (a == "--human") g_opt.human = std::atoi(next().c_str());
         else if (a == "--seed") {
             std::string v = next();
@@ -684,8 +694,7 @@ int main(int argc, char** argv) {
                 std::fprintf(stderr, "--seed: CRT,GAME or clock\n");
                 return 2;
             }
-        }
-        else if (a == "--gamedir") g_opt.gamedir = next();
+        } else if (a == "--gamedir") g_opt.gamedir = next();
         else if (a == "--image") g_opt.image = next();
         else if (a == "--ini") g_opt.ini = next();
         else if (a == "--outdir") g_opt.outdir = next();
@@ -814,7 +823,11 @@ int main(int argc, char** argv) {
     // The end of a game (show_replay): the harness's runs exit; a game from the main menu goes back to
     // it (control_game's reload, ControlTurnB).
     if (menu) g_harness_game_end = [] { std::fprintf(stderr, "game over (turn %d)\n", CurrentTurn); };
-    else g_harness_game_end = [] { std::fprintf(stderr, "game over (turn %d)\n", CurrentTurn); std::exit(0); };
+    else
+        g_harness_game_end = [] {
+            std::fprintf(stderr, "game over (turn %d)\n", CurrentTurn);
+            std::exit(0);
+        };
     control_game();
     sound_shutdown();
     platform::video_shutdown();

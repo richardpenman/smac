@@ -6,9 +6,9 @@
 // ---- globals ------------------------------------------------------------------------------------
 GLOBAL(int32_t, RainfallBaseFaction, 0x9B22DC);  // world_rainfall: owner of a base that dried out
 GLOBAL(int32_t, RainfallViewerBaseID, 0x9B22E0);  // world_rainfall: viewer's base near a change
-GLOBAL(uint32_t, FungusClearItems, 0x6919EC);    // items removed when world_fungus plants fungus
-GLOBAL(int32_t[12], CanyonOffsets, 0x6858D8);    // TableOffset indices of the canyon shape
-GLOBAL(int32_t[13], RidgeOffsets, 0x685908);     // TableOffset indices of the ridge shape
+GLOBAL(uint32_t, FungusClearItems, 0x6919EC);  // items removed when world_fungus plants fungus
+GLOBAL(int32_t[12], CanyonOffsets, 0x6858D8);  // TableOffset indices of the canyon shape
+GLOBAL(int32_t[13], RidgeOffsets, 0x685908);  // TableOffset indices of the ridge shape
 
 // Value-noise grid used by world_erosion and world_fungus (a stack object in the original).
 // grid: 17x17 cells (row stride 19) with wrapped edges; seed: 19 rows of random 0..15.

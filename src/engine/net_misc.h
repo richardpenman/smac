@@ -9,11 +9,11 @@
 // Hotseat/PBEM tamper records: (key_a, key_b, turn, faction, count, key_c), 50 entries in a ring.
 GLOBAL(int32_t[50][6], TamperRecords, 0x93A060);
 GLOBAL(int32_t, TamperIndex, 0x93A9F8);  // next record to write
-GLOBAL(int32_t, TamperKeyA, 0x93A9AC);   // savegame identity (0: no checks)
+GLOBAL(int32_t, TamperKeyA, 0x93A9AC);  // savegame identity (0: no checks)
 GLOBAL(int32_t, TamperKeyB, 0x93A9B0);
 GLOBAL(int32_t, TamperKeyC, 0x93A9B4);
 GLOBAL(int32_t[8], TamperFaction, 0x93A9B8);  // per faction: player who reloaded the turn
-GLOBAL(int32_t[8], TamperCount, 0x93A9D8);    // per faction: number of reloads
+GLOBAL(int32_t[8], TamperCount, 0x93A9D8);  // per faction: number of reloads
 
 // Hotseat/PBEM: detects a savegame loaded twice for the same turn (registry records).
 ADDR(0x51E110) void GAMEAPI check_tamper();

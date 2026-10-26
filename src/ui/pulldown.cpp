@@ -17,7 +17,7 @@
 namespace {
 
 constexpr int32_t kMargin = 10;  // 0x696E04
-constexpr int32_t kBorder = 1;   // 0x696E1C (popups_normal)
+constexpr int32_t kBorder = 1;  // 0x696E1C (popups_normal)
 constexpr int32_t kKey = 9;
 
 std::vector<PullDown*> g_open;
@@ -255,7 +255,9 @@ int32_t PullDown_show(PullDown* self, int32_t x, int32_t y) {
     std::fprintf(stderr, "pulldown shown: %d items at %d,%d (%dx%d)\n", (int32_t)self->items.size(), x, y, self->w,
                  self->h);
     for (const PullDownItem& it : self->items)
-        if ((it.flags & 5) == 1) std::fprintf(stderr, "pulldown item %d%s: %s\n", it.id, (it.flags & 2) ? " (disabled)" : "", it.text.c_str());
+        if ((it.flags & 5) == 1)
+            std::fprintf(stderr, "pulldown item %d%s: %s\n", it.id, (it.flags & 2) ? " (disabled)" : "",
+                         it.text.c_str());
     // The modal loop (Win modal, vtable +0xE4).
     bool done = false;
     auto set_sel = [&](int32_t s) {
@@ -333,7 +335,8 @@ int32_t PullDown_show(PullDown* self, int32_t x, int32_t y) {
     g_open.erase(std::remove(g_open.begin(), g_open.end(), self), g_open.end());
     self->shown = false;
     ui_invalidate();
-    std::fprintf(stderr, "pulldown answer: %d (id %d)\n", self->selected, pulldown_item_id(self, PullDown_get_selected(self)));
+    std::fprintf(stderr, "pulldown answer: %d (id %d)\n", self->selected,
+                 pulldown_item_id(self, PullDown_get_selected(self)));
     return self->selected;
 }
 

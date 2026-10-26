@@ -61,43 +61,42 @@ namespace {
 constexpr int32_t kCancel = 0x10, kReset = 0x1B, kOk = 0x1C;
 
 struct SocialWinState : ScreenWin {
-    int32_t faction = -1;         // +0xCF4
-    int32_t choices[4]{};         // +0xCF8: the tentative choice
-    int32_t effects[11]{};        // +0xD08: its effects
-    int32_t effects_prev[11]{};   // +0xD34: the effects before the last change
-    int32_t net_income = 0;       // +0xD60
-    int32_t breakthrough = 0;     // +0xD64
-    int32_t alloc_open[3]{};      // +0x2C38: economy, psych, labs when the window opened
-    int32_t alloc[3]{};           // +0x2C44: the shares the buttons step
-    int32_t alloc_work[3]{};      // +0x2C50: rebalanced shares
-    int32_t limit_hit = 0;        // +0x2C5C
-    int32_t locks[3]{};           // the three CheckButtons' states (+0xA14 of each)
-    int32_t effect_focus = -1;    // +0x2C24 (an effect button is applying its choice)
-    int32_t resetting = 0;        // +0x2C28
-    int32_t effect_selected = -1; // the effect button group's selection (ButtonGroup 2)
+    int32_t faction = -1;  // +0xCF4
+    int32_t choices[4]{};  // +0xCF8: the tentative choice
+    int32_t effects[11]{};  // +0xD08: its effects
+    int32_t effects_prev[11]{};  // +0xD34: the effects before the last change
+    int32_t net_income = 0;  // +0xD60
+    int32_t breakthrough = 0;  // +0xD64
+    int32_t alloc_open[3]{};  // +0x2C38: economy, psych, labs when the window opened
+    int32_t alloc[3]{};  // +0x2C44: the shares the buttons step
+    int32_t alloc_work[3]{};  // +0x2C50: rebalanced shares
+    int32_t limit_hit = 0;  // +0x2C5C
+    int32_t locks[3]{};  // the three CheckButtons' states (+0xA14 of each)
+    int32_t effect_focus = -1;  // +0x2C24 (an effect button is applying its choice)
+    int32_t resetting = 0;  // +0x2C28
+    int32_t effect_selected = -1;  // the effect button group's selection (ButtonGroup 2)
     BaseButton* model_btn[16]{};
     BaseButton* effect_btn[10]{};
     Font *font_title = nullptr, *font_button = nullptr, *font_text = nullptr, *font_small = nullptr;
-    Buffer tiles[6];              // +0x3EF0: allocation bar tiles of socwin.pcx (14 x 14)
-    Sprite checks[2];             // +0x3D90: lock check box, off / on
-    Sprite plusminus[6];          // +0x3DE8: the -/+ buttons' states
+    Buffer tiles[6];  // +0x3EF0: allocation bar tiles of socwin.pcx (14 x 14)
+    Sprite checks[2];  // +0x3D90: lock check box, off / on
+    Sprite plusminus[6];  // +0x3DE8: the -/+ buttons' states
 
     void redraw() override;
     void on_button(int32_t id) override;
     void on_key(int32_t key) override;
-    void on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool right,
-                  bool dbl) override;
+    void on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool right, bool dbl) override;
     void log_state() override;
 
     // The original's methods.
     void select_model(int32_t cat, int32_t model);  // FUN_004aebf0
-    void reset();                                   // FUN_004aece0
-    void accept();                                  // FUN_004aef10
-    void effect_choice(int32_t effect);             // FUN_004af110
-    void group_clicked(int32_t id);                 // FUN_004b1ce0
-    void alloc_clicked(int32_t id);                 // FUN_004b2470
-    void rebalance(int32_t index, int32_t value);   // FUN_004b1ff0
-    void refresh_buttons();                         // ButtonGroup_set of the models
+    void reset();  // FUN_004aece0
+    void accept();  // FUN_004aef10
+    void effect_choice(int32_t effect);  // FUN_004af110
+    void group_clicked(int32_t id);  // FUN_004b1ce0
+    void alloc_clicked(int32_t id);  // FUN_004b2470
+    void rebalance(int32_t index, int32_t value);  // FUN_004b1ff0
+    void refresh_buttons();  // ButtonGroup_set of the models
 };
 
 SocialWinState g_sw;
@@ -238,12 +237,30 @@ void SocialWinState::rebalance(int32_t index, int32_t value) {
 void SocialWinState::alloc_clicked(int32_t id) {
     int32_t index, delta;
     switch (id) {
-    case 0x1D: index = 0; delta = -1; break;
-    case 0x1E: index = 0; delta = 1; break;
-    case 0x1F: index = 2; delta = -1; break;
-    case 0x20: index = 2; delta = 1; break;
-    case 0x21: index = 1; delta = -1; break;
-    case 0x22: index = 1; delta = 1; break;
+    case 0x1D:
+        index = 0;
+        delta = -1;
+        break;
+    case 0x1E:
+        index = 0;
+        delta = 1;
+        break;
+    case 0x1F:
+        index = 2;
+        delta = -1;
+        break;
+    case 0x20:
+        index = 2;
+        delta = 1;
+        break;
+    case 0x21:
+        index = 1;
+        delta = -1;
+        break;
+    case 0x22:
+        index = 1;
+        delta = 1;
+        break;
     default: return;
     }
     alloc[index] += delta;
@@ -421,7 +438,8 @@ void SocialWinState::redraw() {
     int32_t lh = font_text->height, y = sb.top + 6, x = sb.left + 6;
     sw_text(this, m, sw_label(0xEFC) + ": " + std::to_string(FactionCurrentNetIncome), x, y);
     y += lh;
-    sw_text(this, m, sw_label(600) + ": " + std::to_string(FactionCurrentBreakthroughTurns) + " " + sw_label(0xC4), x, y);
+    sw_text(this, m, sw_label(600) + ": " + std::to_string(FactionCurrentBreakthroughTurns) + " " + sw_label(0xC4), x,
+            y);
     y += lh;
     {
         // The allocation's inefficiency (EFFIC below 4 with a share above 50%).
@@ -648,7 +666,8 @@ void socialwin_point(int32_t which, int32_t* x, int32_t* y) {
     UiRect r{};
     bool iface = which >= 30;
     if (which < 4) r = cat_rect(which);
-    else if (which >= 10 && which < 20) r = {0x274, 0x1D + (which - 10) * 0x16, 0x303, 0x1D + (which - 10) * 0x16 + 0x14};
+    else if (which >= 10 && which < 20)
+        r = {0x274, 0x1D + (which - 10) * 0x16, 0x303, 0x1D + (which - 10) * 0x16 + 0x14};
     else if (which == 20) r = {0x271, 4, 0x306, 0xFA};
     else if (which == 21) r = {0x271, 0xFD, 0x306, 0x12D};
     else if (which == 22) r = {0x1E4, 0x13A, 0x286, 0x14E};

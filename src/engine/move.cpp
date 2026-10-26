@@ -23,8 +23,10 @@ int32_t unit_raw_triad(int32_t unit_id) { return Chassis[unit_raw(unit_id).chass
 // (Path_move for some units); Factions[-1] lies in the vehicle table (plain data in the image).
 int32_t se_planet_raw(int32_t faction_id) {
     int32_t v;
-    std::memcpy(&v, reinterpret_cast<const uint8_t*>(&game().factions[0]) + faction_id * (int32_t)sizeof(Faction) +
-                        offsetof(Faction, SE_planet), 4);
+    std::memcpy(&v,
+                reinterpret_cast<const uint8_t*>(&game().factions[0]) + faction_id * (int32_t)sizeof(Faction) +
+                    offsetof(Faction, SE_planet),
+                4);
     return v;
 }
 // Whether faction_id owns the Xenoempathy Dome (secret project 8).
@@ -55,8 +57,8 @@ int32_t GAMEAPI hex_cost(int32_t unit_id, int32_t faction_id, int32_t x1, int32_
     if ((from_items & 5) || ((from_items & 0x20) && faction_id > 0 && owns_xenoempathy(faction_id))) {
         if ((to_items & 5) && faction_id != 0) return 1;
     }
-    if (faction_id >= 0 &&
-        (owns_xenoempathy(faction_id) || faction_id == 0 || unit_id == 8 || unit_id == 15) && (to_items & 0x20))
+    if (faction_id >= 0 && (owns_xenoempathy(faction_id) || faction_id == 0 || unit_id == 8 || unit_id == 15) &&
+        (to_items & 0x20))
         return 1;  // fungus for natives (Mind Worms, Spore Launchers) and Xenoempathy Dome owners
     // Along a river.
     if ((from_items & 0x80) && (to_items & 0x80)) {
@@ -72,7 +74,7 @@ int32_t GAMEAPI hex_cost(int32_t unit_id, int32_t faction_id, int32_t x1, int32_
     if (unit.chassis_id == 2 || has_abil(unit_id, 0x400)) return Rules.move_rate_roads;  // hovertank, antigrav
     int32_t cost = Rules.move_rate_roads;
     if ((to->val3 & 0xC0) > 0x40 && !ignore_terrain) cost += Rules.move_rate_roads;  // rocky
-    if ((to_items & 0x200000) && !ignore_terrain) cost += Rules.move_rate_roads;     // forest
+    if ((to_items & 0x200000) && !ignore_terrain) cost += Rules.move_rate_roads;  // forest
     if (faction_id != 0 && (to_items & 0x20)) {
         if (unit_id < 64 && Weapon[unit.weapon_id].offense_value < 0) return cost;
         if (unit.plan != 9 && unit.plan != 12 && se_planet_raw(faction_id) <= 0)
@@ -131,10 +133,8 @@ int32_t GAMEAPI supply_options(int32_t veh_id, int32_t base_id) {
     if (veh.home_base_id >= 0) parse_says(3, game().bases[veh.home_base_id].name, -1, -1);
     int32_t item = base.queue_items[0];
     int32_t cost;
-    if (item < 0)
-        cost = cost_factor(faction_id, 1, -1) * Facility[-item].cost;
-    else
-        cost = veh_cost(item, base_id, nullptr) * cost_factor(faction_id, 1, -1);
+    if (item < 0) cost = cost_factor(faction_id, 1, -1) * Facility[-item].cost;
+    else cost = veh_cost(item, base_id, nullptr) * cost_factor(faction_id, 1, -1);
     parse_num(0, base.minerals_accumulated);
     parse_num(1, cost);
     // Menu items (the SUPPLYMENU texts): cancel, help build a secret project or a prototype,

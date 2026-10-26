@@ -33,22 +33,25 @@
 // 51 of them at 0x78D528).
 struct BoxDef {
     Sprite* corner[4];  // +0x00: top left, top right, bottom left, bottom right
-    Sprite* edge[4];    // +0x10: top, bottom, left, right (tiled)
-    Buffer* center;     // +0x20: tiled over the inside; also painted over corner/edge pixels of `key`
-    int32_t key;        // +0x24
+    Sprite* edge[4];  // +0x10: top, bottom, left, right (tiled)
+    Buffer* center;  // +0x20: tiled over the inside; also painted over corner/edge pixels of `key`
+    int32_t key;  // +0x24
 };
 BoxDef* box_def(int32_t index);  // 0x78D528 + index * 0x28
-BoxDef* box_def_large();         // 0x6846B0: the larger frame (interface windows)
+BoxDef* box_def_large();  // 0x6846B0: the larger frame (interface windows)
 ADDR_NATIVE(0x453A70) void GAMEAPI load_box_sprites();
 ADDR_NATIVE(0x5E2DD3) void THISCALL Buffer_box_sprite(Buffer* self, const UiRect* rect, const BoxDef* box);
 // Tiles a sprite / canvas over (x, y, w, h) with the pattern origin at (x - sx % w, y - sy % h).
-ADDR_NATIVE(0x5DA9F0) int32_t THISCALL Buffer_tile_2(Buffer* self, Sprite* tile, int32_t sx, int32_t sy, int32_t x,
-                                                    int32_t y, int32_t w, int32_t h);
-ADDR_NATIVE(0x5DA860) int32_t THISCALL Buffer_tile(Buffer* self, Buffer* tile, int32_t sx, int32_t sy, int32_t x,
-                                                  int32_t y, int32_t w, int32_t h);
+ADDR_NATIVE(0x5DA9F0)
+int32_t THISCALL
+    Buffer_tile_2(Buffer* self, Sprite* tile, int32_t sx, int32_t sy, int32_t x, int32_t y, int32_t w, int32_t h);
+ADDR_NATIVE(0x5DA860)
+int32_t THISCALL
+    Buffer_tile(Buffer* self, Buffer* tile, int32_t sx, int32_t sy, int32_t x, int32_t y, int32_t w, int32_t h);
 // As Buffer_tile, only over pixels of colour `mask` (Buffer_copy_mask).
-ADDR_NATIVE(0x5DA6C0) int32_t THISCALL Buffer_tile_mask(Buffer* self, Buffer* tile, int32_t sx, int32_t sy, int32_t x,
-                                                       int32_t y, int32_t w, int32_t h, int32_t mask);
+ADDR_NATIVE(0x5DA6C0)
+int32_t THISCALL Buffer_tile_mask(Buffer* self, Buffer* tile, int32_t sx, int32_t sy, int32_t x, int32_t y, int32_t w,
+                                  int32_t h, int32_t mask);
 
 // ---- interface art and colours used by popups (load_interface, textcolor_init, config_popups) ----
 // Loads interface.pcx's popup pieces (button bars, check box marks, box sprites), the text
@@ -133,22 +136,26 @@ const char* BasePop_caption(BasePop* self);
 // pops_18: start `label` of `file` (initial selection `active`, edit default `edit`), the picture
 // `pcx` at scale scale_d/scale_s, check boxes from DialogChoices; exec; DialogChoices and
 // DialogToggle (the pressed #button) updated. Returns the answer, -1 if the section is missing.
-ADDR_NATIVE(0x6276A0) int32_t GAMEAPI pops_18(const char* file, const char* label, int32_t active, const char* edit,
-                                             uint32_t flags, const char* pcx, int32_t scale_d, int32_t scale_s,
-                                             int32_t a9);
-ADDR_NATIVE(0x6272C0) int32_t GAMEAPI pop_9(const char* file, const char* label, int32_t active, const char* edit,
-                                           uint32_t flags, int32_t a6);
+ADDR_NATIVE(0x6276A0)
+int32_t GAMEAPI pops_18(const char* file, const char* label, int32_t active, const char* edit, uint32_t flags,
+                        const char* pcx, int32_t scale_d, int32_t scale_s, int32_t a9);
+ADDR_NATIVE(0x6272C0)
+int32_t GAMEAPI
+    pop_9(const char* file, const char* label, int32_t active, const char* edit, uint32_t flags, int32_t a6);
 // Edit field popup (flags | 0x44: edit group with Cancel); the texts go to the parse slots.
-ADDR_NATIVE(0x627910) int32_t GAMEAPI pop_ask_6(const char* file, const char* label, int32_t active, const char* edit,
-                                               int32_t a5, uint32_t flags);
+ADDR_NATIVE(0x627910)
+int32_t GAMEAPI
+    pop_ask_6(const char* file, const char* label, int32_t active, const char* edit, int32_t a5, uint32_t flags);
 // As pop_9 / pops_18 / pop_ask_6 with the alien scripts tried first (Crossfire).
-ADDR_NATIVE(0x5BF480) int32_t GAMEAPI X_pop_9(const char* file, const char* label, int32_t active, const char* edit,
-                                             uint32_t flags, int32_t a6);
-ADDR_NATIVE(0x5BF930) int32_t GAMEAPI X_pops_18(const char* file, const char* label, int32_t active,
-                                               const char* edit, uint32_t flags, const char* pcx, int32_t scale_d,
-                                               int32_t scale_s, int32_t a9);
-ADDR_NATIVE(0x5BFBC0) int32_t GAMEAPI X_pop_ask_6(const char* file, const char* label, int32_t active,
-                                                 const char* edit, int32_t a5, uint32_t flags);
+ADDR_NATIVE(0x5BF480)
+int32_t GAMEAPI
+    X_pop_9(const char* file, const char* label, int32_t active, const char* edit, uint32_t flags, int32_t a6);
+ADDR_NATIVE(0x5BF930)
+int32_t GAMEAPI X_pops_18(const char* file, const char* label, int32_t active, const char* edit, uint32_t flags,
+                          const char* pcx, int32_t scale_d, int32_t scale_s, int32_t a9);
+ADDR_NATIVE(0x5BFBC0)
+int32_t GAMEAPI
+    X_pop_ask_6(const char* file, const char* label, int32_t active, const char* edit, int32_t a5, uint32_t flags);
 // Popup styles: PopupDialogState 0 (normal) / 2 (tutorial).
 ADDR_NATIVE(0x588460) void GAMEAPI popups_normal();
 ADDR_NATIVE(0x5888E0) void GAMEAPI popups_tutorial();

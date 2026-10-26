@@ -181,8 +181,8 @@ int32_t GAMEAPI veh_stealth(int32_t veh_id) {
 }
 
 void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
-    int32_t temples = 0;     // monoliths around
-    int32_t saw_tower = 0;   // met natives: fungal tower
+    int32_t temples = 0;  // monoliths around
+    int32_t saw_tower = 0;  // met natives: fungal tower
     int32_t saw_native = 0;  // met natives: other native units
     if (!MultiplayerActive) flag = 1;
     VEH& veh = game().vehs[veh_id];
@@ -195,12 +195,11 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
     int32_t sensor;
     if (has_abil(veh.unit_id, 2) || (is_sensor(x, y) && whose_territory(faction_id, x, y, nullptr, 0) == faction_id))
         sensor = 1;
-    else
-        sensor = 0;
+    else sensor = 0;
     MAP* here = map_tile(x, y);
     const int32_t at_sea = (here->climate & 0xE0) < 0x60;
-    uint32_t met = 0;     // factions encountered (bit mask)
-    int32_t redraw = 0;   // redraw level of the area
+    uint32_t met = 0;  // factions encountered (bit mask)
+    int32_t redraw = 0;  // redraw level of the area
     if (faction_id == 0) veh.visibility &= here->visibility;
 
     // Viewer's unit with the "highlight unseen" preference: redraw level of the area only.
@@ -474,8 +473,8 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                 add_goal(faction_id, 6, submarine ? 3 : 2, x2, y2, -1);
             }
             if (!(status & 7)) add_goal(faction_id, 0, faction_id ? 3 : 1, x2, y2, -1);
-            if ((uint8_t)Units[veh.unit_id].plan > 7 && !(status & 1) && whose_territory(other_id, x2, y2, nullptr, 0) == other_id &&
-                (uint8_t)Units[other.unit_id].plan > 7) {
+            if ((uint8_t)Units[veh.unit_id].plan > 7 && !(status & 1) &&
+                whose_territory(other_id, x2, y2, nullptr, 0) == other_id && (uint8_t)Units[other.unit_id].plan > 7) {
                 add_goal(other_id, 2, 2, x2, y2, -1);
                 add_goal(other_id, 0, 1, x2, y2, -1);
                 add_goal(other_id, 3, 1, x2, y2, -1);
@@ -887,13 +886,13 @@ int32_t GAMEAPI stack_check(int32_t veh_id, int32_t type, int32_t cond1, int32_t
             if ((cond2 < 0 || faction_id == cond2) && (uint8_t)u.group_id == (uint32_t)cond1) count++;
             break;
         case 18:  // aircraft with range > 1
-            if ((cond1 < 0 || faction_id == cond1) && unit_triad(unit_id) == 2 && Chassis[u.chassis_id].range > 1) count++;
+            if ((cond1 < 0 || faction_id == cond1) && unit_triad(unit_id) == 2 && Chassis[u.chassis_id].range > 1)
+                count++;
             break;
         case 19:  // unarmed
             if ((cond1 < 0 || faction_id == cond1) && Weapon[u.weapon_id].offense_value == 0) count++;
             break;
-        default:
-            break;
+        default: break;
         }
     }
     return count;

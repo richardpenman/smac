@@ -1,7 +1,8 @@
-# Target style of the reconstruction (docs/CLEANUP_PLAN.md, "Formatting"). Kept out of the root
-# (no .clang-format there) so format-on-save does not reformat whole files before the planned
-# one-time reformat. Format only the lines you change:
-#   git clang-format --style=file:src/tools/clang-format.yml
+# Style of the reconstruction (docs/CLEANUP_PLAN.md, "Formatting"); the whole tree was formatted
+# with it once (increment 6). third_party/ keeps its own style (DisableFormat there);
+# harness/oracle/ui_rng_sites.h is generated and left as written. Includes are not sorted: some
+# headers depend on their order (engine/types/all.h), and the order of inline globals decides
+# their initialisation order.
 BasedOnStyle: Google
 IndentWidth: 4
 ContinuationIndentWidth: 4
@@ -17,7 +18,7 @@ AllowShortCaseLabelsOnASingleLine: true
 AllowShortBlocksOnASingleLine: Empty
 SpacesBeforeTrailingComments: 2
 IncludeBlocks: Preserve
-SortIncludes: CaseSensitive
+SortIncludes: Never
 AlignConsecutiveMacros: Consecutive
 AlignTrailingComments: false
 ReflowComments: false

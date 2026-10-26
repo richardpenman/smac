@@ -424,7 +424,7 @@ int32_t THISCALL pfncMapGetCornerYOffset(uint8_t* win, int32_t x, int32_t y, int
     if (cached != -1) return cached;
     uint32_t lm = sq->landmarks;
     int32_t off = 0;
-    if (lm & 2) off = landmark_detail(0x7D3B74, lm, corner, false);   // volcano
+    if (lm & 2) off = landmark_detail(0x7D3B74, lm, corner, false);  // volcano
     else if (lm & 1) off = landmark_detail(0x7F65D0, lm, corner, true);  // crater
     else if (lm & 0x200) off = landmark_detail(0x7F655C, lm, corner, true);  // canyon
     else if (lm & 0x100) off = landmark_detail(0x7D3A78, lm, corner, true);  // mesa
@@ -494,10 +494,22 @@ void GAMEAPI MapWin_compute_lighting_table() {
             for (int32_t r = -3, r_rev = 3; r <= 3; r++, r_rev--) {
                 int32_t a = 0, b = 0;
                 switch (dir) {
-                case 0: a = c; b = r; break;
-                case 1: a = r_rev; b = c; break;
-                case 2: a = c_rev; b = r_rev; break;
-                case 3: a = r; b = c_rev; break;
+                case 0:
+                    a = c;
+                    b = r;
+                    break;
+                case 1:
+                    a = r_rev;
+                    b = c;
+                    break;
+                case 2:
+                    a = c_rev;
+                    b = r_rev;
+                    break;
+                case 3:
+                    a = r;
+                    b = c_rev;
+                    break;
                 }
                 a *= 100;
                 b *= 100;
@@ -670,7 +682,8 @@ void THISCALL pfncDrawMap(uint8_t* win, int32_t faction_id, int32_t terrain_only
         for_each_tile(0, [&](int32_t tx, int32_t ty) {
             int32_t tpx, tpy;
             pfncTileToPoint(win, tx, ty, &tpx, &tpy);
-            MapWin_gen_terrain_poly(canvas, win, mw(win, kMwZoom), faction_id, -1, mw(win, kMwOptions), tx, ty, tpx, tpy);
+            MapWin_gen_terrain_poly(canvas, win, mw(win, kMwZoom), faction_id, -1, mw(win, kMwOptions), tx, ty, tpx,
+                                    tpy);
         });
     }
     for_each_tile(2, [&](int32_t tx, int32_t ty) {
@@ -757,7 +770,8 @@ void THISCALL pfncRedrawMap(uint8_t* win, int32_t flag) {
     auto tile_point = [&](int32_t tx, int32_t ty, int32_t* px, int32_t* py) {
         pfncTileToPoint(win, tx, ty, px, py);
         *py += (pfncMapGetCornerYOffset(win, tx, ty, 4) + pfncMapGetCornerYOffset(win, tx, ty, 3) +
-                pfncMapGetCornerYOffset(win, tx, ty, 2) + pfncMapGetCornerYOffset(win, tx, ty, 1)) >> 2;
+                pfncMapGetCornerYOffset(win, tx, ty, 2) + pfncMapGetCornerYOffset(win, tx, ty, 1)) >>
+               2;
     };
     int32_t nx, ny, px0, py0;
     tile_point(ox, oy, &nx, &ny);

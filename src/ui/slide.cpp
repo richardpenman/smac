@@ -43,11 +43,13 @@ void load() {
     if (!Buffer_load_pcx(&b, small ? "console_x_A.pcx" : "console_x2_A.pcx", nullptr, 10, 0xEC)) {
         static const int32_t kX[2][4] = {{0x2C9, 0x2D9, 0x2E2, 0x2EB}, {0x2AB, 699, 0x2C4, 0x2CD}};
         static const int32_t kW[4] = {0xF, 8, 8, 0xF};
-        for (int32_t i = 0; i < 4; i++) pfncSpriteFromCanvasRectTrans(&g_arm[i], &b, 9, kX[small][i], 1, kW[i], 0x211, 0);
+        for (int32_t i = 0; i < 4; i++)
+            pfncSpriteFromCanvasRectTrans(&g_arm[i], &b, 9, kX[small][i], 1, kW[i], 0x211, 0);
         // MainInterface_init's scroll rail (+0x216F4 .. +0x21778): the top cap, the middle (tiled),
         // the bottom cap and the part below it (tiled), 0x20 wide, at x 1 of the same art.
         static const int32_t kRailY[4] = {0x117, 0x132, 0x155, 0x16F}, kRailH[4] = {0x1A, 0x22, 0x19, 0x22};
-        for (int32_t i = 0; i < 4; i++) pfncSpriteFromCanvasRectTrans(&g_rail[i], &b, 9, 1, kRailY[i], 0x20, kRailH[i], 0);
+        for (int32_t i = 0; i < 4; i++)
+            pfncSpriteFromCanvasRectTrans(&g_rail[i], &b, 9, 1, kRailY[i], 0x20, kRailH[i], 0);
     }
     Wave_init(main_menu_wave(), "fx\\main menu.wav", 4);
     Wave_set_volume(main_menu_wave(), 0x23);
@@ -95,7 +97,8 @@ void frame(const std::vector<uint8_t>& screen, Buffer* scr, const Buffer* win, i
 }
 
 void wait_frame(uint32_t start) {
-    while ((int32_t)(platform::ticks_ms() - start) < *reinterpret_cast<int32_t*>(mem::host(0x691AF8))) platform::delay_ms(1);
+    while ((int32_t)(platform::ticks_ms() - start) < *reinterpret_cast<int32_t*>(mem::host(0x691AF8)))
+        platform::delay_ms(1);
 }
 
 }  // namespace
@@ -148,7 +151,8 @@ void slide_hide_window(const Buffer* win, int32_t sx, int32_t sy) {
     Buffer pic;
     Buffer_ctor(&pic);
     Buffer_init(&pic, win->width, win->height, 8, 0);
-    for (int32_t j = 0; j < win->height; j++) std::memcpy(pic.data + (size_t)j * pic.stride, win->data + (size_t)j * win->stride, (size_t)win->width);
+    for (int32_t j = 0; j < win->height; j++)
+        std::memcpy(pic.data + (size_t)j * pic.stride, win->data + (size_t)j * win->stride, (size_t)win->width);
     UiRect l{0, 0, 0x17, pic.height}, r{pic.width - 0x17, 0, pic.width, pic.height};
     Buffer_fill_3(&pic, &l, 9);
     Buffer_fill_3(&pic, &r, 9);
@@ -190,7 +194,8 @@ void build_strip(Buffer* strip, int32_t h) {
     if (g_rail[1].width) Buffer_tile_2(strip, &g_rail[1], 0, 0, 0, 3, g_rail[1].full_width, len);
     if (g_rail[3].width) Buffer_tile_2(strip, &g_rail[3], 0, len + 3, 0, len, g_rail[3].full_width, h - len);
     if (g_rail[0].width) pfncSpriteStretchCopyToCanvas(&g_rail[0], strip, g_rail[0].key, 0, 3);
-    if (g_rail[2].width) pfncSpriteStretchCopyToCanvas(&g_rail[2], strip, g_rail[2].key, 0, len - g_rail[2].full_height + 3);
+    if (g_rail[2].width)
+        pfncSpriteStretchCopyToCanvas(&g_rail[2], strip, g_rail[2].key, 0, len - g_rail[2].full_height + 3);
     if (arm.width) pfncSpriteStretchCopyToCanvas(const_cast<Sprite*>(&arm), strip, arm.key, w - arm.full_width, 0);
 }
 void blit_key9(Buffer* dst, const Buffer* src, int32_t x, int32_t y, const UiRect& clip) {
@@ -307,7 +312,8 @@ void scroll_hide_window(Buffer* win, int32_t sx, int32_t sy) {
         Buffer_ctor(&strip);
         Buffer_init(&strip, W, win->height, 8, 0);
         for (int32_t j = 0; j < win->height; j++)
-            std::memcpy(strip.data + (size_t)j * strip.stride, win->data + (size_t)j * win->stride + (win->width - W), (size_t)W);
+            std::memcpy(strip.data + (size_t)j * strip.stride, win->data + (size_t)j * win->stride + (win->width - W),
+                        (size_t)W);
         ui_present();
         std::vector<uint8_t> screen(scr->data, scr->data + (size_t)scr->stride * scr->height);
         const int32_t d = MultiplayerActive ? 8 : 4;
@@ -331,7 +337,8 @@ void scroll_hide_window(Buffer* win, int32_t sx, int32_t sy) {
     if (arm.width) {
         BlitDestScale = BlitSourceScale = 1;
         Buffer_set_clip(win, &r);
-        pfncSpriteStretchCopyToCanvas(const_cast<Sprite*>(&arm), win, arm.key, win->width - arm.full_width - 0x20, top0 - T);
+        pfncSpriteStretchCopyToCanvas(const_cast<Sprite*>(&arm), win, arm.key, win->width - arm.full_width - 0x20,
+                                      top0 - T);
         UiRect all{0, 0, win->width, win->height};
         Buffer_set_clip(win, &all);
     }

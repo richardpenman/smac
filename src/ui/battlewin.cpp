@@ -46,9 +46,9 @@ Buffer* canvas() { return basewin_mi_canvas(); }
 int32_t mem_i(uint32_t a) { return *reinterpret_cast<int32_t*>(mem::host(a)); }
 
 bool g_init = false;
-uint32_t g_deadline = 0;           // Time_pulse(BattleWin_timer_callback_daemon_2, 5000)
-std::vector<uint8_t> g_snapshot;   // the main interface's canvas with the report
-Sprite g_slide[2];                 // iface_up / iface_down (MainInterface +0x22F30 / +0x22F5C)
+uint32_t g_deadline = 0;  // Time_pulse(BattleWin_timer_callback_daemon_2, 5000)
+std::vector<uint8_t> g_snapshot;  // the main interface's canvas with the report
+Sprite g_slide[2];  // iface_up / iface_down (MainInterface +0x22F30 / +0x22F5C)
 bool g_slide_loaded = false;
 
 // BattleWin_init (0x4219E0): the rectangles from the left pane (+0xD80) and the slid centre pane
@@ -135,7 +135,8 @@ void mi_slide_draw(Buffer* mi) {
 bool battlewin_shown() { return InfcList[InfcUsed] == 10 && !g_snapshot.empty(); }
 
 void battlewin_compose(Buffer* mi) {
-    if (g_snapshot.size() == (size_t)mi->stride * mi->height) std::memcpy(mi->data, g_snapshot.data(), g_snapshot.size());
+    if (g_snapshot.size() == (size_t)mi->stride * mi->height)
+        std::memcpy(mi->data, g_snapshot.data(), g_snapshot.size());
 }
 
 void battlewin_tick() {
@@ -236,8 +237,9 @@ void THISCALL BattleWin_battle_report(uint8_t*, int32_t atk, int32_t def, int32_
     const UNIT& ua = Units[Vehs[atk].unit_id];
     const UNIT& ud = Units[Vehs[def].unit_id];
     bool probes = ua.plan == 0xB && ud.plan == 0xB;
-    bool psi = off >= 0 && dstr >= 0 &&
-               (Weapon[ua.weapon_id].offense_value < 0 || Armor[ud.armor_id].defense_value < 0 || Vehs[atk].faction_id == 0);
+    bool psi =
+        off >= 0 && dstr >= 0 &&
+        (Weapon[ua.weapon_id].offense_value < 0 || Armor[ud.armor_id].defense_value < 0 || Vehs[atk].faction_id == 0);
     int32_t fa = Vehs[atk].faction_id, fd = Vehs[def].faction_id;
     // The emblems and the factions' names.
     Buffer_set_font(c, find_font(0xE, 1), nullptr, nullptr, nullptr);
@@ -279,7 +281,8 @@ void THISCALL BattleWin_battle_report(uint8_t*, int32_t atk, int32_t def, int32_
         int32_t y = (big ? picw : 4) + top;
         std::string s;
         int32_t vf = Vehs[v].faction_id;
-        if (vf && vf != CurrentPlayerFaction && GameLanguage == 0) s += std::string(MFactions[vf].adj_name_faction) + " ";
+        if (vf && vf != CurrentPlayerFaction && GameLanguage == 0)
+            s += std::string(MFactions[vf].adj_name_faction) + " ";
         s += u.name;
         if (vf && vf != CurrentPlayerFaction && GameLanguage != 0) {
             PluralDefault = MFactions[vf].is_noun_plural;

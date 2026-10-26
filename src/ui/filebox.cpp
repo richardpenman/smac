@@ -66,14 +66,14 @@ std::string host(const std::string& p) {
 }
 
 // FileList's state (FileList_set_path / add_ext; the FileBox object in the memory image is not used).
-std::string g_path;               // +0x410 the name, +0x531 the directory (FileList_set_path)
+std::string g_path;  // +0x410 the name, +0x531 the directory (FileList_set_path)
 std::vector<std::string> g_exts;  // +0x518 (FileList_add_ext, up to 4)
-std::string g_cwd = "";           // the browsing directory, relative to the game directory
+std::string g_cwd = "";  // the browsing directory, relative to the game directory
 char g_result[1024];
 
 struct FileBoxWin : ScreenWin {
-    int32_t kind = 200;      // +0x638: 100 save, 200 load, 300 cancelled
-    bool in_game = false;    // pfncWinIsVisible(main interface)
+    int32_t kind = 200;  // +0x638: 100 save, 200 load, 300 cancelled
+    bool in_game = false;  // pfncWinIsVisible(main interface)
     struct Entry {
         std::string name;
         int32_t type;  // 0 directory, 1 file, 2 ".."
@@ -144,13 +144,13 @@ struct FileBoxWin : ScreenWin {
         }
         Font_ctor(&btn_font);
         Font_init(&btn_font, "Arial", 0xE, 1);  // MainInterface +0x2166C
-        list_font = find_font(0xC, 0);          // MainInterface +0x21694: Arial 12
+        list_font = find_font(0xC, 0);  // MainInterface +0x21694: Arial 12
         title_font = find_font(0xE, 1);
         for (const UiRect* r : {&ok, &cancel}) {
             const char* label = r == &ok ? label_get(101) : label_get(102);
             std::string t = sw_upper(label);
-            sw_button(this, t.c_str(), r == &ok ? -1 : -2, r->left, r->top, r->right - r->left, r->bottom - r->top,
-                      0, &btn_font);
+            sw_button(this, t.c_str(), r == &ok ? -1 : -2, r->left, r->top, r->right - r->left, r->bottom - r->top, 0,
+                      &btn_font);
         }
         // jackal.pcx: the up, folder and file icons (FUN_00613BA0).
         Buffer j;
@@ -248,7 +248,8 @@ struct FileBoxWin : ScreenWin {
         bool absolute = name[0] == '/' || name[0] == '\\' || (name.size() > 1 && name[1] == ':');
         std::string full = absolute ? name : join(g_cwd, name);
         std::error_code ec;
-        std::string part = name.substr(name.find_last_of("\\/") == std::string::npos ? 0 : name.find_last_of("\\/") + 1);
+        std::string part =
+            name.substr(name.find_last_of("\\/") == std::string::npos ? 0 : name.find_last_of("\\/") + 1);
         bool has_dot = part.find('.') != std::string::npos;
         if (!has_ext(name, g_exts.empty() ? "" : g_exts[0]) && fs::is_directory(host(full), ec)) {
             fill(full);  // a directory: entered
@@ -261,7 +262,8 @@ struct FileBoxWin : ScreenWin {
             if (has_ext(name, x)) ext_ok = true;
         if (!ext_ok && !has_dot && !g_exts.empty()) full += g_exts[0];
         bool exists = fs::is_regular_file(host(full), ec);
-        std::string file = full.substr(full.find_last_of("\\/") == std::string::npos ? 0 : full.find_last_of("\\/") + 1);
+        std::string file =
+            full.substr(full.find_last_of("\\/") == std::string::npos ? 0 : full.find_last_of("\\/") + 1);
         if (kind == 200) {
             if (!exists) {
                 parse_says(0, file.c_str(), -1, -1);
@@ -378,7 +380,8 @@ char* run(int32_t kind) {
                 break;
             }
         // EditBox_set_text: the proposed name, the extension added when it has none.
-        if (!found && kind == 100) w.edit = name.find('.') == std::string::npos && !g_exts.empty() ? name + g_exts[0] : name;
+        if (!found && kind == 100)
+            w.edit = name.find('.') == std::string::npos && !g_exts.empty() ? name + g_exts[0] : name;
         if (!found && kind == 200) w.edit.clear();
     }
     std::fprintf(stderr, "filebox %s: %s (%d entries, path %s)\n", kind == 100 ? "save" : "load", g_cwd.c_str(),

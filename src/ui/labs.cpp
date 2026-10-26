@@ -41,15 +41,15 @@ namespace {
 
 // ReportWin's tree fields.
 struct Tree {
-    int32_t col[3]{};          // +0x594C..: the columns' x (prerequisites, centre, successors)
-    int32_t cy = 0, y0 = 0, y4 = 0;            // +0x5958..: the centre row, the outer rows of three
-    int32_t ya = 0, yb = 0, yc = 0, yd = 0;    // +0x5964..: the rows of four (and of two: yb, yc)
-    int32_t bw = 0, bh = 0, cw = 0;            // +0x59A0..: button width, height; centre width
-    UiRect centre{};                           // +0xA28
-    int32_t centre_h = 0;                      // +0xA24: the centre box's text height
-    UiRect btn[6]{};                           // the buttons' rectangles (ids 0x379..0x37E)
+    int32_t col[3]{};  // +0x594C..: the columns' x (prerequisites, centre, successors)
+    int32_t cy = 0, y0 = 0, y4 = 0;  // +0x5958..: the centre row, the outer rows of three
+    int32_t ya = 0, yb = 0, yc = 0, yd = 0;  // +0x5964..: the rows of four (and of two: yb, yc)
+    int32_t bw = 0, bh = 0, cw = 0;  // +0x59A0..: button width, height; centre width
+    UiRect centre{};  // +0xA28
+    int32_t centre_h = 0;  // +0xA24: the centre box's text height
+    UiRect btn[6]{};  // the buttons' rectangles (ids 0x379..0x37E)
     bool shown[6]{};
-    int32_t hover = -1;                        // the button under the mouse
+    int32_t hover = -1;  // the button under the mouse
 };
 
 Tree g_tree;

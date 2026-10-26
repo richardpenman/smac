@@ -66,7 +66,7 @@ int32_t GAMEAPI tut_check2(int32_t bit) {
     return 1;
 }
 
-GLOBAL(int32_t, DestLinesVeh, 0x6874C4);    // the unit whose go-to path draw_my_dest shows (-1)
+GLOBAL(int32_t, DestLinesVeh, 0x6874C4);  // the unit whose go-to path draw_my_dest shows (-1)
 GLOBAL(int32_t, VehStackSortOff, 0x7D3934);  // the stack row is not sorted
 
 namespace {
@@ -132,7 +132,9 @@ int32_t wrap_cent_font(Buffer* c, Font* font, const std::string& s, int32_t x, i
 
 const char* lbl(uint32_t off) { return label_get((int32_t)(off / 4)); }
 
-int32_t fac_int(int32_t f, uint32_t off) { return *reinterpret_cast<int32_t*>(reinterpret_cast<uint8_t*>(&Factions[f]) + off); }
+int32_t fac_int(int32_t f, uint32_t off) {
+    return *reinterpret_cast<int32_t*>(reinterpret_cast<uint8_t*>(&Factions[f]) + off);
+}
 
 // say_morale (0x4B3FD0): the morale word, and its modifiers as '+' marks in parentheses (" (-)":
 // the home base's drone riots, "(d)": the unit is damaged... as the original writes them).
@@ -215,7 +217,8 @@ void tile_words(Buffer* c, int32_t x, int32_t y, UiRect* r, int32_t* py, int32_t
         if (e >= 0) widest = e;
         *py += lh;
     }
-    std::string s = std::string(lbl(depth < 0 ? 0x30 : 0x2C)) + ": " + num(std::abs(pfncGetElevation(x, y))) + lbl(0x34);
+    std::string s =
+        std::string(lbl(depth < 0 ? 0x30 : 0x2C)) + ": " + num(std::abs(pfncGetElevation(x, y))) + lbl(0x34);
     int32_t last = write_x(c, s, left, *py);
     *py += lh;
     int32_t height = (int32_t)sq->contour - MapSeaLevel;
@@ -249,8 +252,10 @@ void tile_words(Buffer* c, int32_t x, int32_t y, UiRect* r, int32_t* py, int32_t
         *py += lh;
         line.clear();
         uint32_t lm = sq->landmarks;
-        static const struct { uint32_t bit; int32_t natural; } kMarks[] = {
-            {2, 1}, {1, 0}, {4, 2}, {8, 3}, {0x40, 6}, {0x100, 8}, {0x200, 9}, {0x800, 11}, {0x2000, 13}};
+        static const struct {
+            uint32_t bit;
+            int32_t natural;
+        } kMarks[] = {{2, 1}, {1, 0}, {4, 2}, {8, 3}, {0x40, 6}, {0x100, 8}, {0x200, 9}, {0x800, 11}, {0x2000, 13}};
         for (const auto& m : kMarks) {
             if ((lm & (0x80000000u | m.bit)) != m.bit) continue;
             if (m.bit == 4 && (sq->climate & 0xE0) < 0x60) continue;
@@ -433,7 +438,7 @@ void THISCALL StatusWin_draw_active(uint8_t* self, int32_t veh_id, int32_t base_
                 int32_t e = write_x(c, std::string(lbl(0x30C)) + ": ", x0, y);
                 int32_t left = std::min(std::max(sp - v.moves_spent, 0), 999);
                 int32_t mr = Rules.move_rate_roads;
-                s = num(sp * ((range + (left == 0)) - v.movement_turns) - v.moves_spent) ;
+                s = num(sp * ((range + (left == 0)) - v.movement_turns) - v.moves_spent);
                 s = num((sp * (range + (left == 0 ? 1 : 0) - v.movement_turns) - v.moves_spent) / mr) + "/" +
                     num(sp * range / mr);
                 Buffer_set_text_color(c, 0xFA, -1, 1, 1);
@@ -683,7 +688,8 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
         if (((GameState & STATE_SCENARIO_EDITOR) && (GameState & STATE_DEBUG_MODE)) || py < r.bottom - lh) {
             std::string s = "(" + num(x) + " , " + num(y) + ")";
             Buffer_set_text_color(c, tc(0x8C6BA4), tc(0x8C6BA8), 1, 1);
-            write(c, s, r.right - 2 - Buffer_text_width_2(c, s.c_str(), (int32_t)s.size()), r.bottom - lh);  // Buffer_write_right_l_5
+            write(c, s, r.right - 2 - Buffer_text_width_2(c, s.c_str(), (int32_t)s.size()),
+                  r.bottom - lh);  // Buffer_write_right_l_5
         }
     }
     UiRect all{0, 0, c->width, c->height};
@@ -716,8 +722,7 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
         if (!(GameState & STATE_OMNISCIENT_VIEW) && Bases[b].faction_id != CurrentPlayerFaction &&
             !((1 << (CurrentPlayerFaction & 31)) & Bases[b].visibility))
             b = -1;
-        else
-            count = 1;
+        else count = 1;
     }
     if (shown >= 0) {
         int32_t v = shown;
@@ -846,8 +851,8 @@ void maininfc_redraw_complete() {
 // ---- WorldWin ----
 
 namespace {
-Buffer g_world_map;    // the world map MapWin's canvas (WorldWin + 0x152C, + 0x1970)
-Buffer g_world_terr;   // + 0xFA4: the terrain image
+Buffer g_world_map;  // the world map MapWin's canvas (WorldWin + 0x152C, + 0x1970)
+Buffer g_world_terr;  // + 0xFA4: the terrain image
 Buffer g_world_final;  // + 0xA1C: with the bases
 int32_t g_world_ox = 0, g_world_oy = 0;  // +0x239C4 / +0x239C8: the image's offset in the pane
 }  // namespace

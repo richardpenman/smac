@@ -86,8 +86,8 @@ bool animate() { return !g_ui_exit_when_script_done || std::getenv("SMACX_ANIM")
 int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
     sound_log("boom %d %d %d", x, y, flags);
     int32_t first = VehDrawAttackID, second = VehDrawDefendID;  // [ebp-0x1C], [ebp-0x14]
-    int32_t anim = flags & 0x70;                                // local_24
-    int32_t psi_or_num = 0, row_or_den = 0, shot_table = 0;     // [ebp-0x10], [ebp-0xC], local_38
+    int32_t anim = flags & 0x70;  // local_24
+    int32_t psi_or_num = 0, row_or_den = 0, shot_table = 0;  // [ebp-0x10], [ebp-0xC], local_38
     if (!anim) {
         if (unit_of(first).chassis_id == 8 && (flags & 1)) {
             FX_play_loc(&Sounds, 0x52, Vehs[first].x, Vehs[first].y);
@@ -205,7 +205,8 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
     if (shot) {
         if (!psi_or_num) {
             if (unit_of(second).weapon_id == 0) FX_play(&Sounds, 1);
-            static const int8_t kWeapon[15] = {-1, 4, 0x49, 0x4A, 0x59, 0x4C, 0x4D, 0x4E, 0x4F, 0x50, 0x51, 0x58, 0x55, 0x56, 0x57};
+            static const int8_t kWeapon[15] = {-1,   4,    0x49, 0x4A, 0x59, 0x4C, 0x4D, 0x4E,
+                                               0x4F, 0x50, 0x51, 0x58, 0x55, 0x56, 0x57};
             int32_t w = unit_of(second).weapon_id;
             if (w >= 1 && w <= 14) FX_play_loc(&Sounds, kWeapon[w], Vehs[second].x, Vehs[second].y);
             if (Vehs[first].unit_id == 0xF) FX_play_loc(&Sounds, 0x5A, Vehs[second].x, Vehs[second].y);
@@ -236,7 +237,9 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
                     Sprite* s;
                     int32_t table;
                     if (!shot) {
-                        int32_t kind = (flags & 0x100) ? 3 : (flags & 0x80) ? 2 : (Units[Vehs[second].unit_id].reactor_id > 1 ? 1 : 0);
+                        int32_t kind = (flags & 0x100)  ? 3
+                                       : (flags & 0x80) ? 2
+                                                        : (Units[Vehs[second].unit_id].reactor_id > 1 ? 1 : 0);
                         s = boom_sprite(kind, f);
                         table = kind == 3 ? 6 : 0;
                     } else {
@@ -249,10 +252,11 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
                     Buffer fb;
                     Buffer_ctor(&fb);
                     Buffer_init(&fb, g_buster.width, g_buster.height, 8, 0);
-                    const std::vector<uint8_t>& px = g_buster.frames[(size_t)(g_buster_frame % (int32_t)g_buster.frames.size())];
+                    const std::vector<uint8_t>& px =
+                        g_buster.frames[(size_t)(g_buster_frame % (int32_t)g_buster.frames.size())];
                     for (int32_t yy = 0; yy < g_buster.height; yy++)
-                        std::copy(px.begin() + (size_t)yy * g_buster.width, px.begin() + (size_t)(yy + 1) * g_buster.width,
-                                  fb.data + (size_t)yy * fb.stride);
+                        std::copy(px.begin() + (size_t)yy * g_buster.width,
+                                  px.begin() + (size_t)(yy + 1) * g_buster.width, fb.data + (size_t)yy * fb.stride);
                     g_buster_frame++;
                     int32_t fac = first >= 0 ? Vehs[first].faction_id : 0;
                     Buffer_draw_multi_table_dest_2(&fb, nat->canvas, 0xFF, rect[i].left, rect[i].top,

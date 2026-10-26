@@ -210,26 +210,19 @@ int32_t GAMEAPI facility_avail(int32_t facility_id, int32_t faction_id, int32_t 
         return 0;
     if (!(game().mfactions[faction_id].rule_flags & 0x80) && facility_id == 40) return 0;
     switch (facility_id) {
-    case 3:
-        return !built_or_queued(base_id, 26, queue_count);
+    case 3: return !built_or_queued(base_id, 26, queue_count);
     case 5:
         if (built_or_queued(base_id, 4, queue_count)) return 1;
         return project_owned_by(5, (uint32_t)faction_id);
     case 11:
         if (!built_or_queued(base_id, 6, queue_count)) return 0;
         return !project_owned_by(6, (uint32_t)faction_id);
-    case 14:
-        return built_or_queued(base_id, 13, queue_count);
-    case 16:
-        return built_or_queued(base_id, 15, queue_count);
-    case 18:
-        return built_or_queued(base_id, 17, queue_count);
-    case 10:
-        return !(game().mfactions[faction_id].rule_flags & 0x200);
-    case 23:
-        return !built_or_queued(base_id, 12, queue_count);
-    case 25:
-        return built_or_queued(base_id, 24, queue_count);
+    case 14: return built_or_queued(base_id, 13, queue_count);
+    case 16: return built_or_queued(base_id, 15, queue_count);
+    case 18: return built_or_queued(base_id, 17, queue_count);
+    case 10: return !(game().mfactions[faction_id].rule_flags & 0x200);
+    case 23: return !built_or_queued(base_id, 12, queue_count);
+    case 25: return built_or_queued(base_id, 24, queue_count);
     }
     if ((facility_id > 64 && facility_id < 69) || facility_id == 41) {
         if (!built_or_queued(base_id, 29, queue_count) &&
@@ -349,8 +342,7 @@ void GAMEAPI tech_achieved(int32_t faction_id, int32_t tech_id, int32_t from, in
             MAP* sq = &game().map.tiles[i];
             if ((uint8_t)from_bit & sq->visibility) {
                 sq->visibility |= bit;
-                if (faction_id && from)
-                    sq->visible_items[faction_id - 1] |= sq->visible_items[from - 1] & sq->items;
+                if (faction_id && from) sq->visible_items[faction_id - 1] |= sq->visible_items[from - 1] & sq->items;
             }
         }
         for (int32_t i = 0; i < game().base_count; i++)
@@ -370,8 +362,8 @@ void GAMEAPI tech_achieved(int32_t faction_id, int32_t tech_id, int32_t from, in
     }
     if (tech_id >= 97) {  // a unit design
         const UNIT& u = Units[tech_id - 97];
-        int32_t unit_id = propose_proto(faction_id, u.chassis_id, u.weapon_id, u.armor_id, u.ability_flags,
-                                        u.reactor_id, -2, u.name);
+        int32_t unit_id =
+            propose_proto(faction_id, u.chassis_id, u.weapon_id, u.armor_id, u.ability_flags, u.reactor_id, -2, u.name);
         if (unit_id >= 0) {
             if (MultiplayerActive && (bit & FactionStatus[0])) {
                 Units[unit_id].unit_flags |= 0x100;
@@ -404,8 +396,8 @@ void GAMEAPI tech_achieved(int32_t faction_id, int32_t tech_id, int32_t from, in
             if (!(u.unit_flags & UNIT_ACTIVE) || (bit & u.obsolete_factions) || u.reactor_id >= reactor) continue;
             // (The original scans the faction's designs here without using the result.)
             int32_t plan = (u.unit_flags & UNIT_PROTOTYPED) ? -2 : -1;
-            int32_t new_id = propose_proto(faction_id, u.chassis_id, u.weapon_id, u.armor_id, u.ability_flags,
-                                           reactor, plan, nullptr);
+            int32_t new_id = propose_proto(faction_id, u.chassis_id, u.weapon_id, u.armor_id, u.ability_flags, reactor,
+                                           plan, nullptr);
             if (new_id != unit_id) {
                 if (MultiplayerActive && (bit & FactionStatus[0])) {
                     Units[new_id].unit_flags |= 0x100;
@@ -451,10 +443,8 @@ void GAMEAPI tech_achieved(int32_t faction_id, int32_t tech_id, int32_t from, in
             PluralDefault = game().mfactions[from].is_noun_plural;
             parse_says(2, game().mfactions[from].noun_faction, -1, -1);
         } else if (from < 0) {
-            if (from == -1)
-                parse_say(2, Facility[81].name, -1, -1);
-            else
-                parse_says(2, label_get(215), -1, -1);
+            if (from == -1) parse_say(2, Facility[81].name, -1, -1);
+            else parse_says(2, label_get(215), -1, -1);
         }
         int32_t flags = 0;
         if (faction_id == CurrentPlayerFaction) {
@@ -696,8 +686,8 @@ int32_t GAMEAPI tech_val(int32_t tech_id, int32_t faction_id, int32_t is_simple)
     const CTech& t = Tech[tech_id];
     int32_t value = (f.AI_power * weight + 1) * t.AI_power + (f.AI_tech * weight + 1) * t.AI_tech +
                     (f.AI_wealth * weight + 1) * t.AI_wealth + (f.AI_growth * weight + 1) * t.AI_growth;
-    if ((!t.AI_power || (!f.AI_power && !vendettas)) && (!t.AI_tech || !f.AI_tech) &&
-        (!t.AI_wealth || !f.AI_wealth) && (!t.AI_growth || (!f.AI_growth && f.base_count >= 4)))
+    if ((!t.AI_power || (!f.AI_power && !vendettas)) && (!t.AI_tech || !f.AI_tech) && (!t.AI_wealth || !f.AI_wealth) &&
+        (!t.AI_growth || (!f.AI_growth && f.base_count >= 4)))
         value = (value + 1) / 2;
     bool human = is_human(faction_id);
     if (!human && !has_tech(tech_id, faction_id)) {
@@ -790,19 +780,15 @@ int32_t GAMEAPI tech_val(int32_t tech_id, int32_t faction_id, int32_t is_simple)
          leads_to(tech_id, Facility[31].preq_tech, 9998) || leads_to(tech_id, Facility[32].preq_tech, 9998)))
         value += per_base;
     if (game().mfactions[faction_id].rule_population > 0) {
-        if (leads_to(tech_id, Facility[24].preq_tech, 9998))
-            value *= 2;
-        else if (leads_to(tech_id, Facility[25].preq_tech, 9998) && CurrentTurn > 250)
-            value = value * 3 / 2;
+        if (leads_to(tech_id, Facility[24].preq_tech, 9998)) value *= 2;
+        else if (leads_to(tech_id, Facility[25].preq_tech, 9998) && CurrentTurn > 250) value = value * 3 / 2;
     }
     if (f.AI_power) {
         for (int32_t i = 0; i < 26; i++) {
             if (!Weapon[i].offense_value) continue;
             int32_t preq = Weapon[i].preq_tech;
-            if (tech_id == preq)
-                value *= human + 3;
-            else if (leads_to(tech_id, preq, 0))
-                value *= human + 2;
+            if (tech_id == preq) value *= human + 3;
+            else if (leads_to(tech_id, preq, 0)) value *= human + 2;
         }
     }
     if (f.AI_tech || !f.AI_power) {
@@ -853,10 +839,8 @@ int32_t GAMEAPI tech_ai(int32_t faction_id) {
             value = (value << 8) / preq_depth(i);
         }
         int32_t roll;
-        if (!human)
-            roll = value < 1 ? 0 : game_rand() % (value + 1);
-        else
-            roll = game_random(0, value + 1);
+        if (!human) roll = value < 1 ? 0 : game_rand() % (value + 1);
+        else roll = game_random(0, value + 1);
         if (roll > best_value) {
             best = i;
             best_value = roll;
@@ -980,25 +964,19 @@ int32_t GAMEAPI tech_rate(int32_t faction_id) {
     int32_t diff_factor = human ? 3 : DiffLevel;
     int32_t cost = human ? diff * 4 + 8 : 29 - diff * 3;
     int32_t lo = 12 - techs, hi = techs + 12;
-    if (cost < lo || hi < lo)
-        cost = lo;
-    else if (cost > hi)
-        cost = hi;
+    if (cost < lo || hi < lo) cost = lo;
+    else if (cost > hi) cost = hi;
     uint32_t scale = (uint32_t)(GameRules & RULES_TECH_STAGNATION) | 0x40;
     int32_t turn_techs = CurrentTurn / (int32_t)(scale >> 3);
     int32_t lag = (int32_t)((scale >> 5) * (uint32_t)cost) >> 1;
     int32_t behind = techs - turn_techs;
-    if (behind < 0 || lag < 0)
-        lag = 0;
-    else if (behind <= lag)
-        lag = behind;
+    if (behind < 0 || lag < 0) lag = 0;
+    else if (behind <= lag) lag = behind;
     cost += lag;
     int32_t cap = cost * diff_factor / 10 + 1;
     int32_t catch_up = (leader_techs - diff_factor - techs + 7) / (8 - diff_factor);
-    if (catch_up < 0 || cap < 0)
-        catch_up = 0;
-    else if (catch_up > cap)
-        catch_up = cap;
+    if (catch_up < 0 || cap < 0) catch_up = 0;
+    else if (catch_up > cap) catch_up = cap;
     cost -= catch_up;
     int32_t research = f.SE_research_base > 0 ? 1 : (f.SE_research_base >= 0) - 1;
     techs -= research;

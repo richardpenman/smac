@@ -88,8 +88,7 @@ int32_t WantsToAttackResidue[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
 // The body of wants_to_attack; slots: the residue array (read, and updated as the original's
 // frame is when the region scan is reached).
-static int32_t wants_to_attack_core(int32_t faction_id, int32_t faction_id_tgt, int32_t odds_override,
-                                    int32_t* slots) {
+static int32_t wants_to_attack_core(int32_t faction_id, int32_t faction_id_tgt, int32_t odds_override, int32_t* slots) {
     if (is_alien(faction_id) && is_alien(faction_id_tgt)) return 1;
     Faction& f1 = game().factions[faction_id];
     Faction& f2 = game().factions[faction_id_tgt];
@@ -187,10 +186,8 @@ static int32_t wants_to_attack_core(int32_t faction_id, int32_t faction_id_tgt, 
     if (odds_override > 0 && !great_satan(odds_override, 0)) score--;
     if ((f1.diplo_agenda[faction_id_tgt] & 0x200) && !(GameRules & RULES_INTENSE_RIVALRY)) score--;
     int32_t integrity = (f2.integrity_blemishes - f1.integrity_blemishes + 2) / 3;
-    if (integrity < 0)
-        integrity = 0;
-    else if (integrity > 2)
-        integrity = 2;
+    if (integrity < 0) integrity = 0;
+    else if (integrity > 2) integrity = 2;
     score -= integrity;
     int32_t morale = f1.SE_morale_pending;
     morale = morale < -4 ? -4 : (morale > 4 ? 4 : morale);
@@ -225,7 +222,8 @@ int32_t GAMEAPI wants_to_attack(int32_t faction_id, int32_t faction_id_tgt, int3
 int32_t(GAMEAPI* g_harness_wants_to_attack_fresh)(int32_t, int32_t, int32_t) = nullptr;
 
 int32_t wants_to_attack_fresh(int32_t faction_id, int32_t faction_id_tgt, int32_t odds_override) {
-    if (g_harness_wants_to_attack_fresh) return g_harness_wants_to_attack_fresh(faction_id, faction_id_tgt, odds_override);
+    if (g_harness_wants_to_attack_fresh)
+        return g_harness_wants_to_attack_fresh(faction_id, faction_id_tgt, odds_override);
     for (int32_t k = 0; k < 8; k++) WantsToAttackResidue[k] = 0;
     return wants_to_attack(faction_id, faction_id_tgt, odds_override);
 }
@@ -363,10 +361,8 @@ void GAMEAPI pact_unpact(int32_t faction_id, int32_t faction_id_with) {
 void GAMEAPI enemies_unpact(int32_t faction_id, int32_t faction_id_with) {
     if (!(status(faction_id, faction_id_with) & 1)) return;
     int32_t v = CurrentPlayerFaction;
-    if (status(faction_id, v) & 1)
-        pact_unpact(faction_id, faction_id_with);
-    else if (status(faction_id_with, v) & 1)
-        pact_unpact(faction_id_with, faction_id);
+    if (status(faction_id, v) & 1) pact_unpact(faction_id, faction_id_with);
+    else if (status(faction_id_with, v) & 1) pact_unpact(faction_id_with, faction_id);
     if ((status(v, faction_id) & 0x1000) || viewer_has_empath_guild() ||
         (v == GovernorFaction && !is_alien(faction_id)) || (status(v, faction_id_with) & 0x1000) ||
         viewer_has_empath_guild() || (v == GovernorFaction && !is_alien(faction_id_with)) ||
@@ -569,8 +565,7 @@ void GAMEAPI enemies_treaty(int32_t faction_id, int32_t faction_id_with, int32_t
             } else {
                 uint32_t a = status(p1, i);
                 if ((a & 7) || (status(p2, i) & 7)) continue;
-                if (status(p1, p2) & 1)
-                    common_enemy = true;
+                if (status(p1, p2) & 1) common_enemy = true;
                 else if ((a & 0x10) && (game().factions[p1].ranking < game().factions[i].ranking ||
                                         game().factions[p2].ranking < game().factions[i].ranking))
                     common_enemy = true;
@@ -591,10 +586,8 @@ void GAMEAPI enemies_treaty(int32_t faction_id, int32_t faction_id_with, int32_t
             say_noun(2, i);
             StrBuffer[0] = 0;
             crt_strcat(StrBuffer, "ENEMIESTEAMUP");
-            if (i != v)
-                crt_strcat(StrBuffer, "1");
-            else if (!(status(p1, i) & 0x10) && !(status(p2, i) & 0x10))
-                crt_strcat(StrBuffer, "0");
+            if (i != v) crt_strcat(StrBuffer, "1");
+            else if (!(status(p1, i) & 0x10) && !(status(p2, i) & 0x10)) crt_strcat(StrBuffer, "0");
             NetMsg_pop(&NetMsg, StrBuffer, 5000, 0, nullptr);
             return;
         }
@@ -752,10 +745,8 @@ int32_t GAMEAPI territory(int32_t faction_id, int32_t faction_id_with, int32_t f
         if (dist <= 4 || (status(faction_id, faction_id_with) & 0xC20) || DiploFriction > 12) {
             if (count_out && (veh.flags & 1)) (*count_out)++;
             veh.flags |= 3;
-            if (!(veh.state & 0x800) && SunspotDuration < 1)
-                veh.state |= 0x800;
-            else
-                count += ((status(faction_id, faction_id_with) & 2) << 1) | 1;
+            if (!(veh.state & 0x800) && SunspotDuration < 1) veh.state |= 0x800;
+            else count += ((status(faction_id, faction_id_with) & 2) << 1) | 1;
         }
     }
     if (count) game().factions[faction_id].player_flags |= 0x10000;
@@ -834,10 +825,8 @@ void GAMEAPI atrocity(int32_t faction_id, int32_t faction_id_vs, int32_t count_i
     crt_strcat(StrBuffer, "ATROCITY");
     // BUG(original): "1" is meant for the victim being the viewer; the test is victim == f.
     COMPAT_ORIGINAL(atrocity_label_victim);
-    if (f == CurrentPlayerFaction)
-        crt_strcat(StrBuffer, "2");
-    else if (faction_id_vs == f)
-        crt_strcat(StrBuffer, "1");
+    if (f == CurrentPlayerFaction) crt_strcat(StrBuffer, "2");
+    else if (faction_id_vs == f) crt_strcat(StrBuffer, "1");
     if (!is_alien(f)) NetMsg_pop(&NetMsg, StrBuffer, 5000, 0, nullptr);
     fac.sanction_turns += atrocities * 10;
 }
@@ -1019,8 +1008,8 @@ void GAMEAPI give_a_base(int32_t base_id, int32_t faction_id) {
         bool land = (map_tile(veh.x, veh.y)->climate & 0xE0) >= 0x60;
         if (dist > (land ? 1 : 0)) continue;
         int32_t plan = (uint8_t)Units[veh.unit_id].plan;
-        bool transfer = ((plan == 2 || plan == 3) && dist == 0) ||
-                        (unit_triad(veh.unit_id) == 1 && (dist == 0 || land));
+        bool transfer =
+            ((plan == 2 || plan == 3) && dist == 0) || (unit_triad(veh.unit_id) == 1 && (dist == 0 || land));
         if (!transfer) {
             base.faction_id = (uint8_t)faction_id;
             int32_t nb = base_find_faction(bx, by, old);

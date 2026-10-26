@@ -61,20 +61,22 @@ int32_t g_show_datalinks = 0;  // dword_945818: the text box shows the datalinks
 // ---- PickWin ----
 
 struct PickWin : ScreenWin {
-    int32_t mode = 0;        // +0x5DA0 (config_game's mode)
-    int32_t result = -1;     // +0x5DA8: the chosen faction (-1: cancelled)
-    int32_t action = 0;      // +0x5DA4: 0 OK / 0x105 random / 0x106 CHANGE NAME / 0x107 INFO
-    int32_t group = 0x104;   // the radio group: 0x104 play selected, 0x105 play random
-    int32_t sel = 1;         // the list's selected id (1..7)
-    int32_t saved_sel = 1;   // +0x5DB4 (the selection while PLAY RANDOM is on)
-    int32_t customs = 0;     // +0x5DB0
+    int32_t mode = 0;  // +0x5DA0 (config_game's mode)
+    int32_t result = -1;  // +0x5DA8: the chosen faction (-1: cancelled)
+    int32_t action = 0;  // +0x5DA4: 0 OK / 0x105 random / 0x106 CHANGE NAME / 0x107 INFO
+    int32_t group = 0x104;  // the radio group: 0x104 play selected, 0x105 play random
+    int32_t sel = 1;  // the list's selected id (1..7)
+    int32_t saved_sel = 1;  // +0x5DB4 (the selection while PLAY RANDOM is on)
+    int32_t customs = 0;  // +0x5DB0
     std::vector<std::string> files, nouns;  // +0x5DB8 / +0x5FF8: every faction of the lists
     Buffer pickfac;
     Sprite pics[9], arrows[3], pointer;
     UiRect list{}, title{}, inner{};
     Font* font = nullptr;
 
-    UiRect row(int32_t i) const { return UiRect{list.left, list.top + i * 0x13, list.right, list.top + (i + 1) * 0x13}; }
+    UiRect row(int32_t i) const {
+        return UiRect{list.left, list.top + i * 0x13, list.right, list.top + (i + 1) * 0x13};
+    }
 
     void load() {
         // PickWin_init: the factions of the three lists, their nouns, the art of pickfac.pcx.
@@ -113,8 +115,8 @@ struct PickWin : ScreenWin {
         int32_t key = mem_i32(0x696D14);
         for (int32_t r = 0; r < 3; r++)
             for (int32_t c = 0; c < 3; c++)
-                pfncSpriteFromCanvasRectTrans(&pics[c * 3 + r], &pickfac, key, 1 + c * 0x103, 1 + r * 0x5B, 0x102,
-                                              0x5A, 0);
+                pfncSpriteFromCanvasRectTrans(&pics[c * 3 + r], &pickfac, key, 1 + c * 0x103, 1 + r * 0x5B, 0x102, 0x5A,
+                                              0);
         for (int32_t i = 0; i < 3; i++)
             pfncSpriteFromCanvasRectTrans(&arrows[i], &pickfac, key, 1, 0x139 + i * 0x11, 0x10, 0x10, 0);
         pfncSpriteFromCanvasRectTrans(&pointer, &pickfac, key, 1, 0x139 + 3 * 0x11, 7, 0xD, 0);
@@ -162,7 +164,8 @@ struct PickWin : ScreenWin {
         add(sw_label(0x1184), 0x104, inner.left + 2, list.top - 2, 0xD8, 0x16);
         add(sw_label(0x1180), 0x105, inner.left + 2, list.top - 2 + 0x19, 0xD8, 0x16);
         spot_init(&spots[0], 16);
-        for (int32_t i = 0; i < 7; i++) spot_add(&spots[0], i + 1, 0, list.left, list.top + i * 0x13, list.right - list.left, 0x13);
+        for (int32_t i = 0; i < 7; i++)
+            spot_add(&spots[0], i + 1, 0, list.left, list.top + i * 0x13, list.right - list.left, 0x13);
     }
 
     std::string slot_text(int32_t f) {
@@ -306,10 +309,18 @@ struct PickWin : ScreenWin {
         switch (key & 0xFFFF) {
         case VKEY_ESCAPE: on_button(0x103); break;
         case VKEY_RETURN: on_button(0x108); break;
-        case VKEY_UP: if (group == 0x104) select(sel > 1 ? sel - 1 : sel); break;
-        case VKEY_DOWN: if (group == 0x104) select(sel < 7 ? sel + 1 : sel); break;
-        case VKEY_HOME: if (group == 0x104) select(1); break;
-        case VKEY_END: if (group == 0x104) select(7); break;
+        case VKEY_UP:
+            if (group == 0x104) select(sel > 1 ? sel - 1 : sel);
+            break;
+        case VKEY_DOWN:
+            if (group == 0x104) select(sel < 7 ? sel + 1 : sel);
+            break;
+        case VKEY_HOME:
+            if (group == 0x104) select(1);
+            break;
+        case VKEY_END:
+            if (group == 0x104) select(7);
+            break;
         default: break;
         }
     }
@@ -391,8 +402,7 @@ void GAMEAPI thumb_routine(int32_t f) {
     BasePop_hide(g_thumb);
     BasePop_start(g_thumb, MFactions[f].filename, g_show_datalinks ? "DATALINKS1" : "BLURB", -1, nullptr, 0x10500,
                   nullptr);
-    if (g_show_datalinks)
-        BasePop_start(g_thumb, MFactions[f].filename, "DATALINKS2", -1, nullptr, 0x80, nullptr);
+    if (g_show_datalinks) BasePop_start(g_thumb, MFactions[f].filename, "DATALINKS2", -1, nullptr, 0x80, nullptr);
     char pic[16];
     std::snprintf(pic, sizeof(pic), "faction:%d", f);
     BasePop_set_picture(g_thumb, pic);
@@ -438,9 +448,9 @@ void GAMEAPI planetfall(int32_t f) {
 
 int32_t GAMEAPI config_game(uint32_t mode) {
     BasePop* pop = popup_new();
-    int32_t pick = 0;        // esi: the player's faction
-    uint32_t players = 0;    // ebx: the human players of a hotseat / PBEM game
-    int32_t action = 0;      // the picker's action (DAT_008284BC)
+    int32_t pick = 0;  // esi: the player's faction
+    uint32_t players = 0;  // ebx: the human players of a hotseat / PBEM game
+    int32_t action = 0;  // the picker's action (DAT_008284BC)
     auto quit = [&](int32_t r) {
         popup_delete(pop);
         pick_close();
@@ -505,7 +515,7 @@ L_589da1:  // DIFFICULTY
             for (;;) {
                 current();
                 uint32_t g = (uint32_t)GameRules, c = 0;
-                static const uint32_t kBits[16] = {0x800, 2, 8, 4, 0x1000, 1, 0x10, 0x20,
+                static const uint32_t kBits[16] = {0x800,  2,     8,    4,     0x1000, 1,      0x10, 0x20,
                                                    0x4000, 0x200, 0x40, 0x100, 0x2000, 0x8000, 0x80, 0x400};
                 for (int32_t i = 0; i < 16; i++)
                     if (i == 11 ? !(g & kBits[i]) : (g & kBits[i]) != 0) c |= 1u << i;

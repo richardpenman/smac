@@ -23,48 +23,48 @@ struct Rect6 {  // x0, y0, x1, y1 (inclusive), width, height
 
 // The surface (0x9BB448) and the renderer (0x9BB478, 0x80 bytes).
 struct Renderer {
-    uint32_t flags = 0;                   // +0x00: bit 0 flips the depth
-    Rect6 rect{};                         // +0x08: bounds of the model (vx_bounds)
-    Rect6 srect{};                        // +0x20: bounds of the shadow
-    Rect6 clip{};                         // +0x38
-    std::vector<uint8_t> colors;          // +0x50: the current shading table (0x1800)
-    uint8_t shadow_table[256]{};          // +0x54
-    uint8_t shadow_value = 0x80;          // +0x68
+    uint32_t flags = 0;  // +0x00: bit 0 flips the depth
+    Rect6 rect{};  // +0x08: bounds of the model (vx_bounds)
+    Rect6 srect{};  // +0x20: bounds of the shadow
+    Rect6 clip{};  // +0x38
+    std::vector<uint8_t> colors;  // +0x50: the current shading table (0x1800)
+    uint8_t shadow_table[256]{};  // +0x54
+    uint8_t shadow_value = 0x80;  // +0x68
 };
 
 bool g_ready = false;
-Buffer g_color;                  // 0x9B9108: model canvas (key 9)
-Buffer g_shadow;                 // 0x9B96B0: shadow canvas (key 0)
-std::vector<uint16_t> g_depth;   // 0x9B9100: 256 x 256
-Renderer g_r;                    // *0x9BB478
+Buffer g_color;  // 0x9B9108: model canvas (key 9)
+Buffer g_shadow;  // 0x9B96B0: shadow canvas (key 0)
+std::vector<uint16_t> g_depth;  // 0x9B9100: 256 x 256
+Renderer g_r;  // *0x9BB478
 uint8_t g_default_colors[0x1800];  // 0x9B9C38
-UiRect g_dirty{};                // 0x9B9690: canvas area drawn since the last clear
-UiRect g_sdirty{};               // 0x9BB438: shadow area
-bool g_busy = false;             // 0x9BE6C4
-VoxelScene* g_scene = nullptr;   // 0x9BB470
+UiRect g_dirty{};  // 0x9B9690: canvas area drawn since the last clear
+UiRect g_sdirty{};  // 0x9BB438: shadow area
+bool g_busy = false;  // 0x9BE6C4
+VoxelScene* g_scene = nullptr;  // 0x9BB470
 
 // View (0x9C0ACC..): model space -> canvas: x, y in pixels, z in depth units.
-float T[3];      // 0x9C0ACC translation
-float M[9];      // 0x9C0AD8 matrix
-float g_persp;   // 0x9C0AFC
-float S;         // 0x9C0B00 scale
-float ZS;        // 0x9C0B04 depth scale
-int32_t VR[6];   // 0x9C0B08 view rectangle
-float sT[3];     // 0x9C0B20 shadow translation
-float sM[9];     // 0x9C0B2C shadow matrix
+float T[3];  // 0x9C0ACC translation
+float M[9];  // 0x9C0AD8 matrix
+float g_persp;  // 0x9C0AFC
+float S;  // 0x9C0B00 scale
+float ZS;  // 0x9C0B04 depth scale
+int32_t VR[6];  // 0x9C0B08 view rectangle
+float sT[3];  // 0x9C0B20 shadow translation
+float sM[9];  // 0x9C0B2C shadow matrix
 float s_lx, s_ly;  // 0x9C0B50, 0x9C0B54: lengths of the shadow axes
-int32_t SR[6];   // 0x9C0B58 shadow rectangle
+int32_t SR[6];  // 0x9C0B58 shadow rectangle
 float g_proj[9] = {1.0f, 0.0f, 0.1f, 0.0f, 1.0f, 0.1f, 0.0f, 0.0f, 0.0f};  // 0x698A78
 
 // Node matrix in 8.8 fixed point (0x63FA80) and the voxel steps (0x6404F0).
-float m256[9];        // 0x9C0A7C
-int16_t A[6];         // 0x9C0A40: x row (A[0..2]), y row (A[3..5])
-int32_t AZ[3];        // 0x9C0A4C: z row
-int32_t D[26][3];     // 0x9C0840: dx, dy (8.8), dz (16.16) per direction code
-float g_inv[9];       // 0x9C0AA0
-float g_lv[3];        // 0x9C0A64
+float m256[9];  // 0x9C0A7C
+int16_t A[6];  // 0x9C0A40: x row (A[0..2]), y row (A[3..5])
+int32_t AZ[3];  // 0x9C0A4C: z row
+int32_t D[26][3];  // 0x9C0840: dx, dy (8.8), dz (16.16) per direction code
+float g_inv[9];  // 0x9C0AA0
+float g_lv[3];  // 0x9C0A64
 const uint8_t* g_light = nullptr;  // 0x9BE6A0: light level by normal (11 bits)
-int32_t g_vis_done = 0;            // 0x9C0AC8
+int32_t g_vis_done = 0;  // 0x9C0AC8
 
 int32_t round_away(float v) {  // x * 256 +- 0.5, __ftol (the callers pass x * 256)
     const double d = (double)v * 256.0;
@@ -74,7 +74,8 @@ int32_t round_away(float v) {  // x * 256 +- 0.5, __ftol (the callers pass x * 2
 bool rect_empty(const UiRect& r) { return r.right <= r.left || r.bottom <= r.top; }
 // IntersectRect / UnionRect (user32).
 UiRect rect_intersect(const UiRect& a, const UiRect& b) {
-    UiRect r{std::max(a.left, b.left), std::max(a.top, b.top), std::min(a.right, b.right), std::min(a.bottom, b.bottom)};
+    UiRect r{std::max(a.left, b.left), std::max(a.top, b.top), std::min(a.right, b.right),
+             std::min(a.bottom, b.bottom)};
     if (rect_empty(r)) r = UiRect{0, 0, 0, 0};
     return r;
 }
@@ -102,11 +103,11 @@ void vx_steps() {
     // The 26 neighbour steps (i, j, k) in {-1, 0, 1}^3 without the centre, in the original's order
     // (0x9C0840 + code * 16): x = i * A[0] + j * A[1] + k * A[2], y likewise with A[3..5], depth
     // with AZ (<< 8).
-    static const int8_t kStep[26][3] = {
-        {-1, -1, -1}, {-1, -1, 0}, {-1, -1, 1}, {-1, 0, -1}, {-1, 0, 0}, {-1, 0, 1}, {-1, 1, -1},
-        {-1, 1, 0},   {-1, 1, 1},  {0, -1, -1}, {0, -1, 0},  {0, -1, 1}, {0, 0, -1}, {0, 0, 1},
-        {0, 1, -1},   {0, 1, 0},   {0, 1, 1},   {1, -1, -1}, {1, -1, 0}, {1, -1, 1}, {1, 0, -1},
-        {1, 0, 0},    {1, 0, 1},   {1, 1, -1},  {1, 1, 0},   {1, 1, 1}};
+    static const int8_t kStep[26][3] = {{-1, -1, -1}, {-1, -1, 0}, {-1, -1, 1}, {-1, 0, -1}, {-1, 0, 0}, {-1, 0, 1},
+                                        {-1, 1, -1},  {-1, 1, 0},  {-1, 1, 1},  {0, -1, -1}, {0, -1, 0}, {0, -1, 1},
+                                        {0, 0, -1},   {0, 0, 1},   {0, 1, -1},  {0, 1, 0},   {0, 1, 1},  {1, -1, -1},
+                                        {1, -1, 0},   {1, -1, 1},  {1, 0, -1},  {1, 0, 0},   {1, 0, 1},  {1, 1, -1},
+                                        {1, 1, 0},    {1, 1, 1}};
     for (int32_t d = 0; d < 26; d++) {
         const int32_t i = kStep[d][0], j = kStep[d][1], k = kStep[d][2];
         D[d][0] = i * A[0] + j * A[1] + k * A[2];
@@ -186,7 +187,8 @@ void vx_select_light(const float* m, const float* light, float s, const float* c
         lon_rounded = true;
     }
     const int32_t i = x87_ftol(0.5 - x87_mul(lat, (ext)-14.642254829406738f));
-    int32_t j = x87_ftol(0.5 - (lon_rounded ? lon_d * (double)-14.164789199829102f : x87_mul(lon, (ext)-14.164789199829102f)));
+    int32_t j =
+        x87_ftol(0.5 - (lon_rounded ? lon_d * (double)-14.164789199829102f : x87_mul(lon, (ext)-14.164789199829102f)));
     if (j == 0x59) j = 0;
     uint32_t table = 0;
     std::memcpy(&table, mem::host(0x6A5A00 + 4 * (uint32_t)i), 4);
@@ -203,10 +205,10 @@ void vx_select_light(const float* m, const float* light, float s, const float* c
 // starts) are not used by the game's models and are not reconstructed.
 
 struct SpanArgs {
-    int32_t x, y, z;    // 8.8, 8.8, depth (<< 8 inside)
+    int32_t x, y, z;  // 8.8, 8.8, depth (<< 8 inside)
     int32_t count;
     const uint8_t* data;
-    uint32_t flags;     // 1 small, 0x10 segmented, 0x20 skip the last voxel
+    uint32_t flags;  // 1 small, 0x10 segmented, 0x20 skip the last voxel
 };
 
 inline void plot(uint32_t idx, uint16_t z, uint8_t c) {

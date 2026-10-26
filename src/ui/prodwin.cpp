@@ -52,27 +52,27 @@ Sprite* basewin_facility_picture(int32_t fac);  // basewin_draw.cpp
 
 namespace {
 
-struct ProdItem {        // the three StringStruct lists of the window (+0xA788, +0xA7B8, +0xA7E8)
-    int32_t id = 0;      // unit id or facility id
+struct ProdItem {  // the three StringStruct lists of the window (+0xA788, +0xA7B8, +0xA7E8)
+    int32_t id = 0;  // unit id or facility id
     uint32_t flags = 0;  // mandate (0..3) | 0x10 facility | 0x20 unit | 0x80 prototype cost
     std::string name, turns, stats;
 };
 
 struct ProdWin : ScreenWin {
     std::vector<ProdItem> items;
-    int32_t sel = -1;      // +0xA774
-    int32_t mode = 0;      // +0xA778: the button's action (FUN_004945D0)
-    int32_t top = 0;       // +0xA77C: first shown cell
-    int32_t cur = 0;       // the lists' current entry (StringStruct_current_entry)
-    int32_t faction = 0;   // +0xA76C
-    int32_t slot = 0;      // +0xB68: the queue slot (0: production)
-    int32_t spin = 0;      // +0xB64
+    int32_t sel = -1;  // +0xA774
+    int32_t mode = 0;  // +0xA778: the button's action (FUN_004945D0)
+    int32_t top = 0;  // +0xA77C: first shown cell
+    int32_t cur = 0;  // the lists' current entry (StringStruct_current_entry)
+    int32_t faction = 0;  // +0xA76C
+    int32_t slot = 0;  // +0xB68: the queue slot (0: production)
+    int32_t spin = 0;  // +0xB64
     int32_t cols = 5, rows = 3, cw = 0, ch = 0x6C, visible = 0;  // +0xA810.. +0xA82C
     int32_t nbuttons = 0, bwidth = 100;  // +0xB6C, +0xB70
     Font f_name, f_big, f_small, f_button;  // +0xA9C, +0xAC4, +0xAEC, +0xB14
-    VoxelScene scene;                       // +0x926C
+    VoxelScene scene;  // +0x926C
     bool scene_ready = false, shown = false;
-    Buffer dim;                             // BaseWin_production's window under the picker
+    Buffer dim;  // BaseWin_production's window under the picker
     void redraw() override;
 };
 
@@ -84,8 +84,11 @@ int32_t line_h(const Font* f) { return f->field_0 < 0 ? f->height : f->ascent_ab
 uint32_t unit_mandate(int32_t u) {
     if (u >= 0x40 && !(Units[u].unit_flags & 4)) return 1;
     switch (Units[u].plan) {
-    case 3: case 7: case 8: return 0;
-    case 9: case 10: return 2;
+    case 3:
+    case 7:
+    case 8: return 0;
+    case 9:
+    case 10: return 2;
     case 0xB: return 1;
     default: return 3;
     }
@@ -95,9 +98,19 @@ uint32_t unit_mandate(int32_t u) {
 uint32_t facility_mandate(int32_t fac) {
     if (fac > 0x45) return 1;
     switch (fac) {
-    case 3: case 0x1F: case 0x20: return 0;
-    case 4: case 0x1B: case 0x1C: case 0x1D: case 0x1E: case 0x44: return 3;
-    case 8: case 0xF: case 0x10: case 0x11: return 1;
+    case 3:
+    case 0x1F:
+    case 0x20: return 0;
+    case 4:
+    case 0x1B:
+    case 0x1C:
+    case 0x1D:
+    case 0x1E:
+    case 0x44: return 3;
+    case 8:
+    case 0xF:
+    case 0x10:
+    case 0x11: return 1;
     default: return 2;
     }
 }
@@ -122,7 +135,8 @@ void build_list(ProdWin* w) {
         it.id = u;
         it.name = Units[u].name;
         if (GameState & STATE_OMNISCIENT_VIEW) {
-            it.name += "(" + num(Factions[w->faction].units_active[u]) + "/" + num(Factions[w->faction].units_queue[u]) + ")";
+            it.name +=
+                "(" + num(Factions[w->faction].units_active[u]) + "/" + num(Factions[w->faction].units_queue[u]) + ")";
         }
         int32_t proto = 0;
         int32_t base_cost = cost_factor((uint8_t)b.faction_id, 1, -1) * Units[u].cost;
@@ -134,7 +148,8 @@ void build_list(ProdWin* w) {
                 int32_t m = b.minerals_accumulated_2;
                 if (base_making(u, CurrentBaseID) != base_making(last, CurrentBaseID) &&
                     Factions[w->faction].diff_level >= 2 && Rules.retool_exemption < m)
-                    m = (m - Rules.retool_exemption) * (100 - Rules.retool_penalty_prod_change) / 100 + Rules.retool_exemption;
+                    m = (m - Rules.retool_exemption) * (100 - Rules.retool_penalty_prod_change) / 100 +
+                        Rules.retool_exemption;
                 base_cost -= m;
                 cost -= m;
             }
@@ -164,10 +179,10 @@ void build_list(ProdWin* w) {
         it.name += Strings_get(&StringTable, Facility[fac].name);
         int32_t cost = cost_factor((uint8_t)b.faction_id, 1, -1) * Facility[fac].cost;
         if (w->slot == 0) {
-            if (base_making(-fac, CurrentBaseID) == base_making(last, CurrentBaseID) || Factions[w->faction].diff_level < 2)
+            if (base_making(-fac, CurrentBaseID) == base_making(last, CurrentBaseID) ||
+                Factions[w->faction].diff_level < 2)
                 cost -= b.minerals_accumulated;
-            else
-                cost -= b.minerals_accumulated / 2;
+            else cost -= b.minerals_accumulated / 2;
         }
         if (fac == 0x45) {
             int32_t e = std::min(std::max((surplus + 1) / 2, 0), 9999);
@@ -262,7 +277,8 @@ void draw_cell(ProdWin* w, int32_t i) {
         int32_t angle = w->sel == i ? w->spin : 0;
         ZoomNum = s;
         ZoomDenom = 100;
-        if (veh_draw(c, fake, (r.right - r.left) / 2 - s / 2 + r.left, (r.bottom - r.top) / 2 - hh / 2 + r.top, 1, 0xCC, 0)) {
+        if (veh_draw(c, fake, (r.right - r.left) / 2 - s / 2 + r.left, (r.bottom - r.top) / 2 - hh / 2 + r.top, 1, 0xCC,
+                     0)) {
             if (!w->scene_ready) {
                 Scene_ctor(&w->scene);
                 Scene_init(&w->scene);
@@ -344,15 +360,27 @@ void ProdWin::redraw() {
 // FUN_004945D0: a button.
 void on_button(ProdWin* w, int32_t id, bool* done) {
     switch (id) {
-    case 0: if (w->sel == -1) return; w->mode = 1; break;
+    case 0:
+        if (w->sel == -1) return;
+        w->mode = 1;
+        break;
     case 1: w->mode = 2; break;
-    case 2: if (w->sel == -1) return; w->mode = 7; break;
+    case 2:
+        if (w->sel == -1) return;
+        w->mode = 7;
+        break;
     case 7: w->mode = 7; break;
     case 3: w->mode = 3; break;
     case 4: w->mode = 4; break;
-    case 5: if (w->sel == -1) return; w->mode = 5; break;
+    case 5:
+        if (w->sel == -1) return;
+        w->mode = 5;
+        break;
     case 6: w->mode = 6; break;
-    case -2: w->mode = 0; w->sel = -1; break;
+    case -2:
+        w->mode = 0;
+        w->sel = -1;
+        break;
     case -1: w->mode = 0; break;
     default: return;
     }
@@ -393,28 +421,34 @@ void on_key(ProdWin* w, int32_t vk) {
         w->top = 0;
         w->sel = 0;
         break;
-    case 0x25: case 0x64:    // Left
-    case 0x27: case 0x66: {  // Right
+    case 0x25:
+    case 0x64:  // Left
+    case 0x27:
+    case 0x66: {  // Right
         int32_t lo = (old_sel / cols) * cols, hi = std::min(cols - 1 + lo, n - 1);
         int32_t s = old_sel + ((vk == 0x25 || vk == 0x64) ? -1 : 1);
         w->sel = (lo <= s && lo <= hi) ? std::min(s, hi) : lo;
         break;
     }
-    case 0x26: case 0x68: {  // Up
+    case 0x26:
+    case 0x68: {  // Up
         if (old_sel < cols) return;
         int32_t s = old_sel;
-        do s -= cols; while (w->visible + old_top <= s);
+        do s -= cols;
+        while (w->visible + old_top <= s);
         w->sel = s;
         if (s < old_top) w->top = old_top - cols;
         break;
     }
-    case 0x28: case 0x62: {  // Down
+    case 0x28:
+    case 0x62: {  // Down
         if (n - cols - 1 < old_sel) {
             if (n <= w->visible) return;
             w->top = set_pos(pos + 1) * cols;
         } else {
             int32_t s = old_sel;
-            do s += cols; while (s < old_top);
+            do s += cols;
+            while (s < old_top);
             w->sel = s;
             if (w->visible + old_top <= s) w->top = cols + old_top;
         }
@@ -515,7 +549,8 @@ int32_t prodwin_pick(int32_t faction, int32_t slot, int32_t* mode) {
         bool ai = !((1u << (faction & 31)) & (uint8_t)FactionStatus[0]) ||
                   ((GameState & STATE_SCENARIO_EDITOR) && (b.governor_flags & 0x80000000) && (b.governor_flags & 1));
         w->nbuttons = slot ? 6 : (ai ? 5 : 4);
-        int32_t x = ((w->canvas.width - (w->bwidth + 3) * w->nbuttons) - 0x20) / 2 + (w->nbuttons - 1) * (w->bwidth + 3);
+        int32_t x =
+            ((w->canvas.width - (w->bwidth + 3) * w->nbuttons) - 0x20) / 2 + (w->nbuttons - 1) * (w->bwidth + 3);
         int32_t y = w->ch * w->rows + 8;
         auto add = [&](uint32_t label, int32_t id, bool upper) {
             std::string t = label_get(label / 4);
@@ -543,8 +578,8 @@ int32_t prodwin_pick(int32_t faction, int32_t slot, int32_t* mode) {
     w->redraw();
     std::fprintf(stderr, "prodwin shown: slot %d, %d items, selected %d\n", slot, (int32_t)w->items.size(), w->sel);
     for (BaseButton* b : w->buttons)
-        std::fprintf(stderr, "prodwin button %d %s at %d,%d\n", b->id, b->name.c_str(), w->x + (b->r.left + b->r.right) / 2,
-                     w->y + (b->r.top + b->r.bottom) / 2);
+        std::fprintf(stderr, "prodwin button %d %s at %d,%d\n", b->id, b->name.c_str(),
+                     w->x + (b->r.left + b->r.right) / 2, w->y + (b->r.top + b->r.bottom) / 2);
     // The modal loop (Win_set_modal).
     bool done = false;
     BaseButton* pressed = nullptr;

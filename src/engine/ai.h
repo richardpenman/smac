@@ -15,8 +15,7 @@ ADDR(0x560D30) int32_t GAMEAPI defensive_check(int32_t base_id);
 // Number of offensive units faction_id wants in a region for guard duty.
 ADDR(0x560D50) int32_t GAMEAPI guard_check(int32_t faction_id, int32_t region);
 // AI: the former order (ORDER_* terraform id) worth doing at (x, y) for base_id's needs, or 0.
-ADDR(0x565320) int32_t GAMEAPI can_terraform(int32_t faction_id, int32_t x, int32_t y, int32_t flag,
-                                             int32_t base_id);
+ADDR(0x565320) int32_t GAMEAPI can_terraform(int32_t faction_id, int32_t x, int32_t y, int32_t flag, int32_t base_id);
 // AI strategy of faction_id for the turn: region plans, goals and production priorities.
 ADDR(0x561080) void GAMEAPI enemy_strategy(int32_t faction_id);
 
@@ -45,8 +44,8 @@ ADDR(0x564EB0) int32_t GAMEAPI good_sensor(int32_t faction_id, int32_t x, int32_
 // FUN_00565160 (no callers): energy bonus tile, or next to an own/pact base with ocean access.
 ADDR(0x565160) int32_t GAMEAPI ocean_access_near_base(int32_t faction_id, int32_t x, int32_t y);
 // AI attack odds adjustment: odds scaled by stack values, goals, terrain and unit kinds.
-ADDR(0x565F20) int32_t GAMEAPI compute_odds(int32_t odds, int32_t faction_id, int32_t veh_id, int32_t veh_id_tgt,
-                                            int32_t base_id);
+ADDR(0x565F20)
+int32_t GAMEAPI compute_odds(int32_t odds, int32_t faction_id, int32_t veh_id, int32_t veh_id_tgt, int32_t base_id);
 // Native unit target: nearest weighted base reachable from (x, y) (sets BaseFindDist), or -1.
 ADDR(0x5665D0) int32_t GAMEAPI alien_base(int32_t veh_id, int32_t x, int32_t y);
 // Native (alien) unit move.
@@ -59,5 +58,4 @@ ADDR(0x56A8A0) int32_t GAMEAPI enemy_planet_buster(int32_t veh_id);
 // Whether veh_id can reach (x, y) (same region, or by sea/port connections).
 ADDR(0x56B320) int32_t GAMEAPI get_there(int32_t veh_id, int32_t x, int32_t y);
 // For own territory at (x, y): index (1-8) of the first neighbour that is ocean or foreign, 0 none.
-ADDR(0x56B480) int32_t GAMEAPI coast_or_border(int32_t x, int32_t y, int32_t x_dst, int32_t y_dst,
-                                               int32_t faction_id);
+ADDR(0x56B480) int32_t GAMEAPI coast_or_border(int32_t x, int32_t y, int32_t x_dst, int32_t y_dst, int32_t faction_id);

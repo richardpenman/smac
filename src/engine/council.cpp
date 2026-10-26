@@ -87,8 +87,7 @@ void THISCALL CouncilWin_session(uint8_t* self, int32_t proposal, int32_t candid
                 int32_t vote;
                 if (!is_human(i) || (i != CurrentPlayerFaction && !MultiplayerActive && !PbemActive))
                     vote = council_get_vote(i, s.proposal, candidate);
-                else
-                    vote = 0;
+                else vote = 0;
                 s.votes[i] = vote;
                 if (!is_alive(i)) s.votes[i] = -5;
             }
@@ -279,8 +278,8 @@ int32_t THISCALL CouncilWin_key(uint8_t* self, int32_t, int32_t key) {
     CouncilSession& s = session(self);
     if (key != 0x1B && key != 0x0D) return 1;
     int32_t viewer = CurrentPlayerFaction;
-    if (is_human(viewer) &&
-        (!(GameState & STATE_SCENARIO_EDITOR) || !(GameState & STATE_DEBUG_MODE) || PbemActive) && !s.result) {
+    if (is_human(viewer) && (!(GameState & STATE_SCENARIO_EDITOR) || !(GameState & STATE_DEBUG_MODE) || PbemActive) &&
+        !s.result) {
         if (!PbemActive || !CouncilSessionPending || !s.votes[viewer]) {
             // The human has not decided yet: fill in the votes of the AI factions.
             for (int32_t i = 0; i < 8; i++) {

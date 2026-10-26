@@ -8,18 +8,18 @@ namespace {
 // Edge of the scan converter (Texture_setup_edge_gouraud 0x61FC90 / Texture_setup_edge
 // 0x624D80; 15 dwords on the original's stack).
 struct Edge {
-    int32_t dir;     // vertex order: -1 left edge, +1 right edge
-    int32_t count;   // rows left on this edge
-    int32_t end;     // end vertex
-    int32_t u, v;    // 16.16 (gouraud: + 0x8000)
+    int32_t dir;  // vertex order: -1 left edge, +1 right edge
+    int32_t count;  // rows left on this edge
+    int32_t end;  // end vertex
+    int32_t u, v;  // 16.16 (gouraud: + 0x8000)
     int32_t du, dv;  // per row
-    int32_t x;       // integer x
-    int32_t xstep;   // integer part of dx / dy
-    int32_t sign;    // +-1: Bresenham correction step
-    int32_t err;     // Bresenham error
-    int32_t rem;     // |dx| % dy
+    int32_t x;  // integer x
+    int32_t xstep;  // integer part of dx / dy
+    int32_t sign;  // +-1: Bresenham correction step
+    int32_t err;  // Bresenham error
+    int32_t rem;  // |dx| % dy
     int32_t dy;
-    int32_t light;   // 16.16
+    int32_t light;  // 16.16
     int32_t dlight;
 };
 
@@ -107,7 +107,7 @@ void step_edge(Edge* e) {
 // reciprocal of the span width and the products with it are truncated to 24 significant bits.
 struct Recip {
     uint64_t m = 0;  // mantissa, 2^23 <= m < 2^24
-    int32_t s = 0;   // value = m * 2^-s
+    int32_t s = 0;  // value = m * 2^-s
 };
 
 int32_t bit_length(uint64_t v) {
@@ -155,25 +155,25 @@ int16_t fist16(int64_t v) {
 }
 
 enum SpanKind {
-    SPAN_TEX,          // Texture_draw_2: texel + light
-    SPAN_TEX_LAG,      // pfncImageCopytoCanvas2 (dithered): odd rows texel(k - 1) + light
-    SPAN_TRANS,        // Texture_draw_trans_4
-    SPAN_TRANS_DITHER, // Texture_draw_trans_5
-    SPAN_THRESH,       // Texture_draw
-    SPAN_THRESH_DITHER,// Texture_draw_4
-    SPAN_UPPER,        // Texture_draw_upper_threshold_trans
-    SPAN_UPPER_DITHER, // Texture_draw_upper_threshold_trans_2
-    SPAN_COAST,        // Texture_draw_coast
-    SPAN_COAST_DITHER, // Texture_draw_coast_2
-    SPAN_MASK_DEST,    // Texture_draw_mask_dest
+    SPAN_TEX,  // Texture_draw_2: texel + light
+    SPAN_TEX_LAG,  // pfncImageCopytoCanvas2 (dithered): odd rows texel(k - 1) + light
+    SPAN_TRANS,  // Texture_draw_trans_4
+    SPAN_TRANS_DITHER,  // Texture_draw_trans_5
+    SPAN_THRESH,  // Texture_draw
+    SPAN_THRESH_DITHER,  // Texture_draw_4
+    SPAN_UPPER,  // Texture_draw_upper_threshold_trans
+    SPAN_UPPER_DITHER,  // Texture_draw_upper_threshold_trans_2
+    SPAN_COAST,  // Texture_draw_coast
+    SPAN_COAST_DITHER,  // Texture_draw_coast_2
+    SPAN_MASK_DEST,  // Texture_draw_mask_dest
 };
 
 struct Draw {
     SpanKind kind;
-    uint8_t color = 0;      // DAT_009BB494
-    uint8_t key = 0;        // DAT_009BB514 (TextureKey or threshold)
+    uint8_t color = 0;  // DAT_009BB494
+    uint8_t key = 0;  // DAT_009BB514 (TextureKey or threshold)
     const Texture* shape = nullptr;  // coast shape (DAT_009BB558)
-    const uint8_t* mask = nullptr;   // DAT_009BB550
+    const uint8_t* mask = nullptr;  // DAT_009BB550
     const uint8_t* table = nullptr;  // DAT_009BB564
 };
 
@@ -181,15 +181,15 @@ struct Draw {
 struct Span {
     uint8_t* dst;
     int32_t count;
-    const uint8_t* tex;    // texture bits
+    const uint8_t* tex;  // texture bits
     const uint8_t* shape;  // coast shape bits (same layout) or nullptr
-    int32_t start;         // offset of the span start's integer (u, v) in the texture
-    int32_t off;           // esi: offset from `start`
-    uint32_t edx;          // v fraction << 16 | u step fraction
-    uint16_t ufrac;        // sp
+    int32_t start;  // offset of the span start's integer (u, v) in the texture
+    int32_t off;  // esi: offset from `start`
+    uint32_t edx;  // v fraction << 16 | u step fraction
+    uint16_t ufrac;  // sp
     int32_t step0, step1;  // texel offset steps without / with a v carry
-    uint32_t vstep_hi;     // v step fraction << 16
-    uint16_t light;        // cx: 8.8
+    uint32_t vstep_hi;  // v step fraction << 16
+    uint16_t light;  // cx: 8.8
     uint16_t dlight;
     uint8_t texel() const { return tex[start + off]; }
     uint8_t shape_texel() const { return shape[start + off]; }
@@ -305,8 +305,8 @@ void raster(const Texture* t, Buffer* dest, const Poly& poly, const Draw& d) {
         }
     }
     if (top_y >= bottom_y) return;
-    int32_t row = top_y;           // DAT_009BB508 as a row number
-    int32_t parity = top_y & 1;    // DAT_009BB4D0
+    int32_t row = top_y;  // DAT_009BB508 as a row number
+    int32_t parity = top_y & 1;  // DAT_009BB4D0
     Edge l{}, r{};
     l.dir = -1;
     if (!setup_edge(p, &l, top)) return;

@@ -44,14 +44,14 @@ namespace {
 bool g_log = false;
 
 struct WaveState {
-    std::string file;       // +0x4C
-    uint32_t flags = 0;     // +0x54: 1 static, 2 created, 4 load on play, 8 3D, 0x10 fire and forget
-    bool loop = false;      // Wave_init flag 2 (+0x48(1))
-    int32_t group = 16;     // +0x68 (16: none)
-    int32_t volume = 127;   // +4
-    int32_t pan = 0;        // +8
-    int32_t pitch = 0;      // +0x58
-    int32_t fade_ms = 1000; // +0x38
+    std::string file;  // +0x4C
+    uint32_t flags = 0;  // +0x54: 1 static, 2 created, 4 load on play, 8 3D, 0x10 fire and forget
+    bool loop = false;  // Wave_init flag 2 (+0x48(1))
+    int32_t group = 16;  // +0x68 (16: none)
+    int32_t volume = 127;  // +4
+    int32_t pan = 0;  // +8
+    int32_t pitch = 0;  // +0x58
+    int32_t fade_ms = 1000;  // +0x38
     std::shared_ptr<const platform::Pcm> pcm;  // the soundx handle (+0x3C)
     int32_t voice = 0;
     uint32_t start = 0, length = 0;  // +0x64, +0x60
@@ -59,7 +59,7 @@ struct WaveState {
 std::map<const uint8_t*, WaveState> g_waves;
 
 struct Group {
-    bool on = true;        // +0x24
+    bool on = true;  // +0x24
     int32_t volume = 127;  // +0x28
 };
 Group g_groups[16];
@@ -67,11 +67,11 @@ int32_t g_master = 127;
 bool g_master_on = true;
 
 // The original's statics.
-int32_t g_ambience = -1;       // 0x683BF0
-int32_t g_ambience_veh = -1;   // 0x683BF4
-int32_t g_engine_slot = -1;    // Sounds +0x28EC
-int32_t g_voice_id = 0;        // 0x74DAA4
-int32_t g_ok_pitch = 0;        // 0x74DAA8
+int32_t g_ambience = -1;  // 0x683BF0
+int32_t g_ambience_veh = -1;  // 0x683BF4
+int32_t g_engine_slot = -1;  // Sounds +0x28EC
+int32_t g_voice_id = 0;  // 0x74DAA4
+int32_t g_ok_pitch = 0;  // 0x74DAA8
 
 WaveState& W(const uint8_t* wave) { return g_waves[wave]; }
 uint8_t* fx(uint8_t* sounds, int32_t id) { return sounds + id * 0x6C; }
@@ -108,9 +108,7 @@ void release(WaveState& w) {
     w.pcm.reset();
 }
 
-void fade(WaveState& w, int32_t ms) {
-    platform::audio_stop(w.voice, ms);
-}
+void fade(WaveState& w, int32_t ms) { platform::audio_stop(w.voice, ms); }
 
 // Finds a game file (fx\NAME.wav) case-insensitively in the game directory.
 bool file_ok(const std::string& name) { return win32::file_exists(name.c_str()); }
@@ -376,23 +374,51 @@ void THISCALL FX_init(uint8_t* sounds) {
         int32_t group;
     };
     static const Entry kFx[] = {
-        {0, "psi attack.wav", 0, 1},       {1, "energy1.wav", 0xC0, 1},         {2, "projectile1.wav", 0xC0, 1},
-        {3, "projectile2.wav", 0xC0, 1},   {56, "mindworms", 0xC0, 1},          {59, "planet buster lead.wav", 0xC0, 1},
-        {60, "planet buster.wav", 0xC0, 1}, {57, "cpu turn complete", 0x80, 0}, {58, "cpu new data", 0x80, 0},
-        {61, "psi blow", 0xC0, 1},         {62, "boom", 0xC0, 1},               {64, "infantry", 0xC0, 1},
-        {65, "military land", 0xC0, 1},    {66, "non military land", 0xC0, 1},  {67, "grav ship", 0xC0, 1},
-        {68, "hover", 0xC0, 1},            {69, "military ship", 0xC0, 1},      {70, "ship", 0xC0, 1},
-        {71, "jet", 0xC0, 1},              {72, "engine2", 0xC0, 1},            {75, "missile", 0xC0, 1},
-        {4, "wpn laser2.wav", 0xC0, 1},    {73, "wpn particle.wav", 0xC0, 1},   {74, "wpn gatlin laser.wav", 0xC0, 1},
-        {76, "wpn chaos gun.wav", 0xC0, 1}, {77, "wpn fusion laser.wav", 0xC0, 1}, {78, "wpn tachyon bolt.wav", 0xC0, 1},
-        {79, "wpn plasma shard.wav", 0xC0, 1}, {80, "wpn quantum laser.wav", 0xC0, 1},
-        {81, "wpn graviton gun.wav", 0xC0, 1}, {85, "wpn Resonance Laser.wav", 0xC0, 1},
-        {86, "wpn res bolt.wav", 0xC0, 1},  {87, "wpn string disruptor.wav", 0xC0, 1},
-        {90, "wpn spore launcher.wav", 0xC0, 1}, {88, "wpn singularity laser.wav", 0xC0, 1},
-        {89, "wpn missile launcher.wav", 0xC0, 1}, {82, "wpn conventional payload.wav", 0xC0, 1},
-        {83, "wpn tetonic payload.wav", 0xC0, 1}, {84, "wpn fungal payload.wav", 0xC0, 1},
-        {91, "alien infantry.wav", 0xC0, 1}, {92, "alien non military.wav", 0xC0, 1}, {93, "alien ogre.wav", 0xC0, 1},
-        {94, "spore launcher.wav", 0xC0, 1}, {95, "sea lurker.wav", 0xC0, 1}, {96, "isle of the deep.wav", 0xC0, 1},
+        {0, "psi attack.wav", 0, 1},
+        {1, "energy1.wav", 0xC0, 1},
+        {2, "projectile1.wav", 0xC0, 1},
+        {3, "projectile2.wav", 0xC0, 1},
+        {56, "mindworms", 0xC0, 1},
+        {59, "planet buster lead.wav", 0xC0, 1},
+        {60, "planet buster.wav", 0xC0, 1},
+        {57, "cpu turn complete", 0x80, 0},
+        {58, "cpu new data", 0x80, 0},
+        {61, "psi blow", 0xC0, 1},
+        {62, "boom", 0xC0, 1},
+        {64, "infantry", 0xC0, 1},
+        {65, "military land", 0xC0, 1},
+        {66, "non military land", 0xC0, 1},
+        {67, "grav ship", 0xC0, 1},
+        {68, "hover", 0xC0, 1},
+        {69, "military ship", 0xC0, 1},
+        {70, "ship", 0xC0, 1},
+        {71, "jet", 0xC0, 1},
+        {72, "engine2", 0xC0, 1},
+        {75, "missile", 0xC0, 1},
+        {4, "wpn laser2.wav", 0xC0, 1},
+        {73, "wpn particle.wav", 0xC0, 1},
+        {74, "wpn gatlin laser.wav", 0xC0, 1},
+        {76, "wpn chaos gun.wav", 0xC0, 1},
+        {77, "wpn fusion laser.wav", 0xC0, 1},
+        {78, "wpn tachyon bolt.wav", 0xC0, 1},
+        {79, "wpn plasma shard.wav", 0xC0, 1},
+        {80, "wpn quantum laser.wav", 0xC0, 1},
+        {81, "wpn graviton gun.wav", 0xC0, 1},
+        {85, "wpn Resonance Laser.wav", 0xC0, 1},
+        {86, "wpn res bolt.wav", 0xC0, 1},
+        {87, "wpn string disruptor.wav", 0xC0, 1},
+        {90, "wpn spore launcher.wav", 0xC0, 1},
+        {88, "wpn singularity laser.wav", 0xC0, 1},
+        {89, "wpn missile launcher.wav", 0xC0, 1},
+        {82, "wpn conventional payload.wav", 0xC0, 1},
+        {83, "wpn tetonic payload.wav", 0xC0, 1},
+        {84, "wpn fungal payload.wav", 0xC0, 1},
+        {91, "alien infantry.wav", 0xC0, 1},
+        {92, "alien non military.wav", 0xC0, 1},
+        {93, "alien ogre.wav", 0xC0, 1},
+        {94, "spore launcher.wav", 0xC0, 1},
+        {95, "sea lurker.wav", 0xC0, 1},
+        {96, "isle of the deep.wav", 0xC0, 1},
     };
     for (const Entry& e : kFx) {
         fx_wave(fx(sounds, e.slot), e.file, e.flags);
@@ -402,16 +428,51 @@ void THISCALL FX_init(uint8_t* sounds) {
     }
     // The CPU voices (wave_it, popups' #wave): 0x74C5F0 [45], loaded when played; 19 and 31 have
     // no file.
-    static const char* const kCpu[45] = {
-        "pod recovered", "data pod recovered", "invalid command", "invalid base site", "invalid terraform",
-        "improved already", "lacks ability", "combat units only", "nocando", "insufficient energy",
-        "nn already linked", "PT insufficient exp", "system error", "combat report", "artifact lost",
-        "faction gone", "indigenous lifeforms", "improvement destroyed", "enemy pt gone", nullptr,
-        "terraform complete", "mission accomplished", "pt compromised", "mission aborted", "resource shortfall",
-        "prod complete", "max population", "new orders", "drone riots", "drone riots over", "golden age begun",
-        nullptr, "request confirmation", "time up", "units engaged", "are you certain1", "project initiated",
-        "project complete", "enemy project initiated", "unit lost", "nutrient resources", "energy resources",
-        "mineral resources", "please don't go", "review your options"};
+    static const char* const kCpu[45] = {"pod recovered",
+                                         "data pod recovered",
+                                         "invalid command",
+                                         "invalid base site",
+                                         "invalid terraform",
+                                         "improved already",
+                                         "lacks ability",
+                                         "combat units only",
+                                         "nocando",
+                                         "insufficient energy",
+                                         "nn already linked",
+                                         "PT insufficient exp",
+                                         "system error",
+                                         "combat report",
+                                         "artifact lost",
+                                         "faction gone",
+                                         "indigenous lifeforms",
+                                         "improvement destroyed",
+                                         "enemy pt gone",
+                                         nullptr,
+                                         "terraform complete",
+                                         "mission accomplished",
+                                         "pt compromised",
+                                         "mission aborted",
+                                         "resource shortfall",
+                                         "prod complete",
+                                         "max population",
+                                         "new orders",
+                                         "drone riots",
+                                         "drone riots over",
+                                         "golden age begun",
+                                         nullptr,
+                                         "request confirmation",
+                                         "time up",
+                                         "units engaged",
+                                         "are you certain1",
+                                         "project initiated",
+                                         "project complete",
+                                         "enemy project initiated",
+                                         "unit lost",
+                                         "nutrient resources",
+                                         "energy resources",
+                                         "mineral resources",
+                                         "please don't go",
+                                         "review your options"};
     for (int32_t i = 0; i < 45; i++) {
         if (!kCpu[i]) continue;
         std::string f = std::string("fx\\CPU ") + kCpu[i] + ".wav";
@@ -662,4 +723,3 @@ void GAMEAPI ambience_veh(int32_t veh_id) {
     }
     try_play(0x38);  // mind worms (unit 8)
 }
-

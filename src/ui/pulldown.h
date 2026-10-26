@@ -18,20 +18,20 @@
 #include "ui/gfx.h"
 
 struct PullDownItem {  // +0xA18 + i * 0x14
-    std::string text;       // +0x00 (the label without its '&')
-    std::string shortcut;   // +0x04 (after '|'; drawn right-aligned)
-    int32_t id = -1;        // +0x08
-    uint32_t flags = 0;     // +0x0C: 1 shown, 2 disabled, 4 separator, 8 checked
-    int32_t accel = -1;     // +0x10: index of the accelerator character in text (-1 none)
+    std::string text;  // +0x00 (the label without its '&')
+    std::string shortcut;  // +0x04 (after '|'; drawn right-aligned)
+    int32_t id = -1;  // +0x08
+    uint32_t flags = 0;  // +0x0C: 1 shown, 2 disabled, 4 separator, 8 checked
+    int32_t accel = -1;  // +0x10: index of the accelerator character in text (-1 none)
 };
 
 struct PullDown {
     std::vector<PullDownItem> items;  // +0xF20 count (at most 64)
-    int32_t max_width = 0;            // +0xF24
-    int32_t selected = -1;            // +0xF28
-    int32_t lines = 0;                // +0xF2C: rows (items and separators)
-    bool dirty = true;                // +0xF34: size to compute again
-    bool menu = false;                // +0xF30 / +0xF30: a pull-down of the menu bar (+0xC4 parent)
+    int32_t max_width = 0;  // +0xF24
+    int32_t selected = -1;  // +0xF28
+    int32_t lines = 0;  // +0xF2C: rows (items and separators)
+    bool dirty = true;  // +0xF34: size to compute again
+    bool menu = false;  // +0xF30 / +0xF30: a pull-down of the menu bar (+0xC4 parent)
     // Window (native): position and size on the screen, canvas.
     int32_t x = 0, y = 0, w = 0, h = 0;
     Buffer canvas;
@@ -44,11 +44,11 @@ void PullDown_init(PullDown* self, bool menu = false);
 // id is taken, 3 no text / id -1.
 int32_t PullDown_add_item(PullDown* self, int32_t id, const char* text);
 int32_t PullDown_add_separator(PullDown* self, int32_t id);  // 0x5F8BE0
-int32_t PullDown_hide_item(PullDown* self, int32_t id);      // 0x5F8CB0
-int32_t PullDown_show_item(PullDown* self, int32_t id);      // 0x5F8D20
-int32_t PullDown_disable_item(PullDown* self, int32_t id);   // 0x5F8D90
-int32_t PullDown_enable_item(PullDown* self, int32_t id);    // 0x5F8DF0
-int32_t PullDown_check_item(PullDown* self, int32_t id);     // 0x5F9040
+int32_t PullDown_hide_item(PullDown* self, int32_t id);  // 0x5F8CB0
+int32_t PullDown_show_item(PullDown* self, int32_t id);  // 0x5F8D20
+int32_t PullDown_disable_item(PullDown* self, int32_t id);  // 0x5F8D90
+int32_t PullDown_enable_item(PullDown* self, int32_t id);  // 0x5F8DF0
+int32_t PullDown_check_item(PullDown* self, int32_t id);  // 0x5F9040
 // PullDown_show (0x5F9170): shows the list at (x, y) (screen; a free pull-down opens at x+1, y+1
 // and flips left / up at the screen's edges) and runs the modal loop. Returns the selected index
 // (-1: none).

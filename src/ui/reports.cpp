@@ -86,35 +86,35 @@ namespace {
 enum { kIntel = 0, kLabs = 2, kEnergy = 3, kOps = 4, kProjects = 5, kSat = 6, kSecurity = 7, kScore = 8 };
 
 // Persistent state of the original's globals.
-int32_t g_ops_sort = 0;        // DAT_0087BE80: the sort key (0 none, 1..8)
-int32_t g_ops_ids[512];        // ReportIf + 0x1E254: base ids in display order
+int32_t g_ops_sort = 0;  // DAT_0087BE80: the sort key (0 none, 1..8)
+int32_t g_ops_ids[512];  // ReportIf + 0x1E254: base ids in display order
 int32_t g_ops_keys[512];
 bool g_ops_ids_ready = false;
-int32_t g_ops_view = 0;        // ReportWin + 0x1F230 (0x8B3..0x8B5): production, citizens, garrison
-int32_t g_sec_filter = 4;      // DAT_008A417C: land, naval, air, non-combat, all
-int32_t g_intel_target = 0;    // DAT_008A4164
-int32_t g_energy_subject = -1; // ReportWin + 0x59AC (DAT_0087BE24): the energy budget's base / facility
-int32_t g_energy_base = 0;     // ReportWin + 0x59B0: 1 a base, 0 a facility
+int32_t g_ops_view = 0;  // ReportWin + 0x1F230 (0x8B3..0x8B5): production, citizens, garrison
+int32_t g_sec_filter = 4;  // DAT_008A417C: land, naval, air, non-combat, all
+int32_t g_intel_target = 0;  // DAT_008A4164
+int32_t g_energy_subject = -1;  // ReportWin + 0x59AC (DAT_0087BE24): the energy budget's base / facility
+int32_t g_energy_base = 0;  // ReportWin + 0x59B0: 1 a base, 0 a facility
 
 struct ReportScreen : ScreenWin {
-    int32_t faction = 0;         // ReportIf + 0x1E228 (DAT_008A4160)
-    int32_t scroll = 0;          // ReportWin + 0xC0FC: first row shown
-    int32_t rows_shown = 0;      // rows that fit
+    int32_t faction = 0;  // ReportIf + 0x1E228 (DAT_008A4160)
+    int32_t scroll = 0;  // ReportWin + 0xC0FC: first row shown
+    int32_t rows_shown = 0;  // rows that fit
     int32_t rows_total = 0;
-    uint32_t selected[16]{};     // ReportWin + 0x59B4: selected bases (bits)
-    int32_t last_click = 0;      // ReportWin + 0x59AC
+    uint32_t selected[16]{};  // ReportWin + 0x59B4: selected bases (bits)
+    int32_t last_click = 0;  // ReportWin + 0x59AC
     Font *f_title = nullptr, *f_text = nullptr, *f_bold = nullptr, *f_small = nullptr;
-    Sprite buttons[7][3];        // report.pcx: the report buttons, three states
+    Sprite buttons[7][3];  // report.pcx: the report buttons, three states
     BaseButton* report_btn[7]{};
-    BaseButton* ops_btn[3]{};    // the views of base operations (ids 0x8B3..0x8B5)
-    BaseButton* sat_btn[2]{};    // the satellites' views: the table (0xD3C), the animation (0xD3D)
-    BaseButton* sat_target[8]{}; // ORBITAL ATTACK VIEW: the target factions (ReportIf +0x13778, group 0x6A)
-    BaseButton* sat_type[5]{};   // the satellite kinds (+0x18720, ids 0x41.., group 0xCE)
+    BaseButton* ops_btn[3]{};  // the views of base operations (ids 0x8B3..0x8B5)
+    BaseButton* sat_btn[2]{};  // the satellites' views: the table (0xD3C), the animation (0xD3D)
+    BaseButton* sat_target[8]{};  // ORBITAL ATTACK VIEW: the target factions (ReportIf +0x13778, group 0x6A)
+    BaseButton* sat_type[5]{};  // the satellite kinds (+0x18720, ids 0x41.., group 0xCE)
     BaseButton* sat_attack_btn = nullptr;  // ATTACK (0xD3E, ReportWin)
     std::vector<BaseButton*> ops_iface;  // GOVERNOR / BEST BASES tabs, the governor buttons
-    bool ops_best = false;       // the BEST BASES tab (0xD0B) is shown
+    bool ops_best = false;  // the BEST BASES tab (0xD0B) is shown
     std::vector<BaseButton*> labs_iface;  // TECHNOLOGY / BASES tabs (0x92, 0x93)
-    int32_t labs_tab = 1;        // ReportIf + 0x1E1D8: 1 the technologies, 0 the bases
+    int32_t labs_tab = 1;  // ReportIf + 0x1E1D8: 1 the technologies, 0 the bases
     struct Row {
         std::string text;
         int32_t id;
@@ -124,9 +124,9 @@ struct ReportScreen : ScreenWin {
     int32_t energy_top = 0, energy_itop[2] = {0, 0};
     int32_t list_keep[8] = {-2, -2, -2, -2, -2, -2, -2, -2};  // the selection last kept in view
     ScrollBar list_bars[8];
-    ScrollBar page_bar;          // the window's scroll bar (ReportWin's Scroll 0x882584)
-    bool rail_shown = false;     // DAT_00882570: scroll_show ran
-    bool drawn = false;          // drawn since the window opened
+    ScrollBar page_bar;  // the window's scroll bar (ReportWin's Scroll 0x882584)
+    bool rail_shown = false;  // DAT_00882570: scroll_show ran
+    bool drawn = false;  // drawn since the window opened
     int32_t* list_top(int32_t type) {
         switch (type) {
         case 4: return &labs_top;
@@ -281,9 +281,19 @@ std::string governor_text(int32_t base_id) {
 // FUN_00493B70: the mandate whose colour a facility is drawn in.
 int32_t report_facility_mandate(int32_t fac) {
     switch (fac) {
-    case 3: case 0x1F: case 0x20: return 0;
-    case 4: case 0x1B: case 0x1C: case 0x1D: case 0x1E: case 0x44: return 3;
-    case 8: case 0xF: case 0x10: case 0x11: return 1;
+    case 3:
+    case 0x1F:
+    case 0x20: return 0;
+    case 4:
+    case 0x1B:
+    case 0x1C:
+    case 0x1D:
+    case 0x1E:
+    case 0x44: return 3;
+    case 8:
+    case 0xF:
+    case 0x10:
+    case 0x11: return 1;
     default: return 2;
     }
 }
@@ -316,7 +326,8 @@ void ReportScreen::draw_ops() {
         if (Bases[g_ops_ids[i]].faction_id == faction) list.push_back(g_ops_ids[i]);
     rows_total = (int32_t)list.size();
     static const char* kViews[3] = {"production", "citizens", "garrison"};
-    state.push_back(std::string("ops sort ") + num(g_ops_sort) + " view " + kViews[g_ops_view] + " bases " + num(rows_total));
+    state.push_back(std::string("ops sort ") + num(g_ops_sort) + " view " + kViews[g_ops_view] + " bases " +
+                    num(rows_total));
     for (int32_t r = 0; r < rows_total; r++) {
         int32_t base_id = list[r];
         set_base(base_id);
@@ -374,7 +385,8 @@ void ReportScreen::draw_ops() {
             if (b.mineral_surplus < 1) {
                 turns = sw_label(0x10C);
             } else {
-                int32_t n = cost - have <= 0 ? 0 : (b.mineral_surplus - 1 + cost - have) / std::min(b.mineral_surplus, 99999);
+                int32_t n =
+                    cost - have <= 0 ? 0 : (b.mineral_surplus - 1 + cost - have) / std::min(b.mineral_surplus, 99999);
                 turns = sw_label(0xC4) + ":  " + num(std::min(n, 999999));
             }
             // The item's picture (ReportWin_draw_ops 0x8B3): a facility's or project's in its
@@ -397,10 +409,11 @@ void ReportScreen::draw_ops() {
             } else {
                 const uint8_t* u = reinterpret_cast<const uint8_t*>(&Units[item]);
                 int32_t plan = (int8_t)u[0x2A];
-                mandate = (item > 0x3F && !(u[0x30] & 4)) ? 1
+                mandate = (item > 0x3F && !(u[0x30] & 4))         ? 1
                           : (plan == 3 || plan == 7 || plan == 8) ? 0
-                          : (plan == 9 || plan == 10) ? 2
-                          : plan == 11 ? 1 : 3;  // FUN_00493AF0
+                          : (plan == 9 || plan == 10)             ? 2
+                          : plan == 11                            ? 1
+                                                                  : 3;  // FUN_00493AF0
                 int32_t v = veh_fake(item, (uint8_t)b.faction_id);
                 Buffer_set_clip(c, &row);
                 veh_draw(c, v, col, row.top + 4, -8, 0x4C, 0);
@@ -420,7 +433,8 @@ void ReportScreen::draw_ops() {
             // the UI generator (Random_reseed(timeGetTime())). Aliens: ALIENCIT.PCX's.
             int32_t workers = b.pop_size - b.talent_total - b.specialist_total - std::max(b.drone_total, 0);
             const int32_t left = in.left + 0x2D, right = row.right;
-            int32_t step = b.pop_size < 2 ? 0x22 : std::max(1, std::min(0x22, ((right - left) - 0xE2) / (b.pop_size - 1)));
+            int32_t step =
+                b.pop_size < 2 ? 0x22 : std::max(1, std::min(0x22, ((right - left) - 0xE2) / (b.pop_size - 1)));
             int32_t x = step - 0x20 + right;
             const int32_t fy = row.top + 0x28 - 0x2A / 2 - 0x12;
             const bool al = ExpansionEnabled && (MFactions[faction].rule_flags & 0x80);
@@ -431,7 +445,8 @@ void ReportScreen::draw_ops() {
             };
             for (int32_t i = 0; i < b.specialist_total; i++) {
                 int32_t idx = b.specialist_total - i - 1;
-                int32_t type = idx < 0x10 ? (b.specialist_types[idx >> 3] >> ((idx & 7) << 2)) & 0xF : best_specialist();
+                int32_t type =
+                    idx < 0x10 ? (b.specialist_types[idx >> 3] >> ((idx & 7) << 2)) & 0xF : best_specialist();
                 put((al ? 0x75B710u : 0x779B78u) + (uint32_t)type * 0x2C);
             }
             for (int32_t i = 0; i < b.drone_total; i++) {
@@ -439,9 +454,10 @@ void ReportScreen::draw_ops() {
                 put(al ? 0x75B180u + (uint32_t)mood * 0x2C : 0x776420u + (uint32_t)(mood + g_ui_rand(0, 2) * 4) * 0x2C);
             }
             for (int32_t i = 0; i < workers; i++) put(al ? 0x75B1ACu : 0x77644Cu + (uint32_t)g_ui_rand(0, 2) * 0xB0);
-            for (int32_t i = 0; i < b.talent_total; i++) put(al ? 0x75B180u : 0x776420u + (uint32_t)g_ui_rand(0, 2) * 0xB0);
-            std::string s = num(b.talent_total) + " talents, " + num(std::max(workers, 0)) + " workers, " + num(b.drone_total) +
-                            " drones, " + num(b.specialist_total) + " specialists";
+            for (int32_t i = 0; i < b.talent_total; i++)
+                put(al ? 0x75B180u : 0x776420u + (uint32_t)g_ui_rand(0, 2) * 0xB0);
+            std::string s = num(b.talent_total) + " talents, " + num(std::max(workers, 0)) + " workers, " +
+                            num(b.drone_total) + " drones, " + num(b.specialist_total) + " specialists";
             line += " citizens " + s;
         } else {
             int32_t v = veh_at(b.x, b.y);
@@ -523,7 +539,7 @@ void ops_governor(ReportScreen* s, int32_t id) {
         return;
     }
     if (id == 0xCF4) {  // ADVANCED SETTINGS: the governor dialog of the first selected base, then
-                        // its settings (Faction.base_governor_adv) for every selected base
+        // its settings (Faction.base_governor_adv) for every selected base
         log_say_values("Global governor advanced set", 0, 0, 0);
         bool asked = false;
         for (int32_t i = 0; i < BaseCount; i++) {
@@ -699,8 +715,8 @@ void ReportScreen::iface_labs() {
         Buffer_set_clip(m, &all);
         y += 0xF;
         Buffer_set_text_color3(m, mandate_color(k), -1, 1, 1);
-        std::string l = "[" + std::string(label_get(0x824 / 4 + k)) + "   " + num(known[k] * 100 / std::max(total[k], 1)) +
-                        "%]";
+        std::string l =
+            "[" + std::string(label_get(0x824 / 4 + k)) + "   " + num(known[k] * 100 / std::max(total[k], 1)) + "%]";
         Buffer_write_l_3(m, l.c_str(), x + 2, (seg - lh) / 2 + y, (int32_t)l.size());
         texts.push_back(l);
         state.push_back("labs progress " + num(k) + " " + num(known[k]) + "/" + num(total[k]));
@@ -719,8 +735,8 @@ void ReportScreen::draw_energy() {
     int32_t lh = line_h12();
     UiRect in = inner();
     int32_t mid = (in.left + in.right) / 2;
-    int32_t t_bottom = lh + 9 + in.top;          // local_48
-    int32_t h_bottom = lh + 9 + t_bottom;        // local_58
+    int32_t t_bottom = lh + 9 + in.top;  // local_48
+    int32_t h_bottom = lh + 9 + t_bottom;  // local_58
     UiRect title_r{in.left + 3, in.top + 3, in.right - 3, t_bottom};
     UiRect lhead{in.left + 3, t_bottom + 2, mid - 1, h_bottom};
     UiRect rhead{mid + 2, t_bottom + 2, in.right - 3, h_bottom};
@@ -829,8 +845,8 @@ void ReportScreen::draw_energy() {
     }
     y += lh * 2;
     left("{" + std::string(label_get(0xEFC / 4)) + ": ");
-    right("{" + std::string(FactionCurrentNetIncome > 0 ? "+" : "") + num(FactionCurrentNetIncome) + label_get(0x5EC / 4) +
-          "}");
+    right("{" + std::string(FactionCurrentNetIncome > 0 ? "+" : "") + num(FactionCurrentNetIncome) +
+          label_get(0x5EC / 4) + "}");
     // The right column's subject: the first base when none.
     if (g_energy_subject == -1) {
         g_energy_base = 0;
@@ -954,12 +970,12 @@ void ReportScreen::iface_energy() {
         int32_t n = EnergyFacilityCount[i];
         if (!n) continue;
         int32_t mt = fac_maint(i, faction) * n;
-        std::string s = num(n) + " " + Facility[i].name + "|-" + (half ? num(mt / 2) + ((mt & 1) ? ".5" : "") : num(mt)) +
-                        label_get(0x5EC / 4);
+        std::string s = num(n) + " " + Facility[i].name + "|-" +
+                        (half ? num(mt / 2) + ((mt & 1) ? ".5" : "") : num(mt)) + label_get(0x5EC / 4);
         facs.push_back({s, i});
     }
-    pane(mi_rect(kMiPaneRight), "[" + std::string(label_get(0xF08 / 4)) + "]", facs, g_energy_base ? -1 : g_energy_subject,
-         -1, energy_itop[1], 7, "energy facilities");
+    pane(mi_rect(kMiPaneRight), "[" + std::string(label_get(0xF08 / 4)) + "]", facs,
+         g_energy_base ? -1 : g_energy_subject, -1, energy_itop[1], 7, "energy facilities");
     state.push_back("energy reserves " + num(f.energy_credits) + " maintenance " + num(f.facility_maint_total) +
                     " net " + num(FactionCurrentNetIncome) + " subject " + num(g_energy_subject) + " base " +
                     num(g_energy_base));
@@ -1048,10 +1064,9 @@ void ReportScreen::draw_projects() {
         std::string where;
         if (e.base >= 0 && e.base < BaseCount && (owner == faction || spying(owner) || e.built))
             where = Bases[e.base].name;
-        else if (owner >= 0)
-            where = MFactions[owner].noun_faction;
-        std::string status = e.built ? std::string(owner >= 0 ? MFactions[owner].noun_faction : "")
-                                     : std::string(sw_label(0x6BC));
+        else if (owner >= 0) where = MFactions[owner].noun_faction;
+        std::string status =
+            e.built ? std::string(owner >= 0 ? MFactions[owner].noun_faction : "") : std::string(sw_label(0x6BC));
         if (e.built) {
             name = "{" + name + "}";
             where = "{" + where + "}";
@@ -1101,7 +1116,7 @@ struct SatAnim {
     uint32_t elast = 0;
 } g_sat;
 int32_t g_sat_target = -1;  // DAT_008996A0: the target faction's button (group 0x6A)
-int32_t g_sat_kind = -1;    // DAT_0089E648: the satellite kind's button (0x41..0x45, group 0xCE)
+int32_t g_sat_kind = -1;  // DAT_0089E648: the satellite kind's button (0x41..0x45, group 0xCE)
 // The bases of faction f with Facility 41 (bitmask(0x29)).
 int32_t sat_pods(int32_t f) {
     int32_t n = 0;
@@ -1230,8 +1245,8 @@ void sat_start_attack(Buffer* c, int32_t f, int32_t target, int32_t kind, int32_
     Buffer_copy_4(c, &a.ebg, a.ex, a.ey, 0, 0, 0x2B, 0x2F);
     a.expl = true;
     a.elast = platform::ticks_ms();
-    std::fprintf(stderr, "sat attack start: faction %d on %d kind %d base %d (explosion at %d,%d)\n", f, target, kind, base,
-                 a.ex, a.ey);
+    std::fprintf(stderr, "sat attack start: faction %d on %d kind %d base %d (explosion at %d,%d)\n", f, target, kind,
+                 base, a.ex, a.ey);
     // Unattended runs: the frames at once (as the slides).
     if (g_ui_exit_when_script_done)
         while (a.expl) sat_expl_step(c);
@@ -1264,7 +1279,8 @@ void ReportScreen::draw_sat() {
         if (has_tech(Facility[65].preq_tech, f)) any = true;
     if (!any) {
         sw_font(c, f_bold, 0xE1);
-        sw_text_cent(this, c, sw_label(0xCC4), {in.left, (in.top + in.bottom) / 2 - 10, in.right, (in.top + in.bottom) / 2 + 10});
+        sw_text_cent(this, c, sw_label(0xCC4),
+                     {in.left, (in.top + in.bottom) / 2 - 10, in.right, (in.top + in.bottom) / 2 + 10});
         state.push_back("sat none");
         return;
     }
@@ -1307,7 +1323,8 @@ void ReportScreen::draw_sat() {
                 continue;
             }
             const Faction& fa = Factions[f];
-            const int32_t sat[4] = {fa.satellites_nutrient, fa.satellites_mineral, fa.satellites_energy, fa.satellites_ODP};
+            const int32_t sat[4] = {fa.satellites_nutrient, fa.satellites_mineral, fa.satellites_energy,
+                                    fa.satellites_ODP};
             bool some = k == 4 ? pods != 0 : sat[k] != 0;
             sw_font(c, f_text, some ? kColor[k] : 0xF8);
             std::string v;
@@ -1404,13 +1421,15 @@ void ReportScreen::iface_sat() {
         Buffer_set_clip(m, &all);
     }
     if (g_sat_view == 0xD3C && sat_attack_btn) sat_attack_btn->shown = false;
-    std::string l = "sat iface view " + num(g_sat_view) + " target " + num(g_sat_target) + " kind " + num(g_sat_kind) +
-                    " targets";
+    std::string l =
+        "sat iface view " + num(g_sat_view) + " target " + num(g_sat_target) + " kind " + num(g_sat_kind) + " targets";
     for (int32_t f = 1; f < 8; f++)
-        if (sat_target[f] && sat_target[f]->shown) l += " " + num(f) + "@" + num(sat_target[f]->r.left) + "," + num(sat_target[f]->r.top);
+        if (sat_target[f] && sat_target[f]->shown)
+            l += " " + num(f) + "@" + num(sat_target[f]->r.left) + "," + num(sat_target[f]->r.top);
     l += " kinds";
     for (int32_t k = 0; k < 5; k++)
-        if (sat_type[k] && sat_type[k]->shown) l += " " + num(k) + "@" + num(sat_type[k]->r.left) + "," + num(sat_type[k]->r.top);
+        if (sat_type[k] && sat_type[k]->shown)
+            l += " " + num(k) + "@" + num(sat_type[k]->r.left) + "," + num(sat_type[k]->r.top);
     l += std::string(" attack ") + (sat_attack_btn && sat_attack_btn->shown ? "shown" : "hidden");
     state.push_back(l);
 }
@@ -1493,8 +1512,8 @@ void ReportScreen::draw_security() {
         StrBuffer[0] = 0;
         say_stats(StrBuffer, id, nullptr);
         std::string stats = StrBuffer;
-        std::string counts = "{" + num(active) + " " + sw_label(0x614) + ", }" + num(prod) + " " + sw_label(0x618) + ", [" +
-                             num(lost) + " " + sw_label(0x61C) + "]";
+        std::string counts = "{" + num(active) + " " + sw_label(0x614) + ", }" + num(prod) + " " + sw_label(0x618) +
+                             ", [" + num(lost) + " " + sw_label(0x61C) + "]";
         state.push_back("security " + num(id) + " " + name + " " + stats + " " + counts);
         if (r < scroll || r >= scroll + rows_shown) continue;
         int32_t y = top + (r - scroll) * row_h;
@@ -1616,10 +1635,10 @@ void ReportScreen::draw_intel() {
     line(std::string(m.title_leader) + " " + m.name_leader + " " + sw_label(0x2D0) + " " + m.noun_faction, 0xFF);
     std::string status;
     uint32_t d = Factions[faction].diplo_status[t];
-    if (d & 0x10) status = sw_label(0x358);      // VENDETTA
-    else if (d & 1) status = sw_label(0x34C);    // PACT
-    else if (d & 2) status = sw_label(0x350);    // TREATY
-    else if (d & 4) status = sw_label(0x354);    // TRUCE
+    if (d & 0x10) status = sw_label(0x358);  // VENDETTA
+    else if (d & 1) status = sw_label(0x34C);  // PACT
+    else if (d & 2) status = sw_label(0x350);  // TREATY
+    else if (d & 4) status = sw_label(0x354);  // TRUCE
     line(sw_label(0xE98) + ":  " + status);
     line(sw_label(0x5A0) + ":  " + sw_label(f.AI_fight < 1 ? (f.AI_fight < 0 ? 0x5AC : 0x5A8) : 0x5A4));
     std::string interests;
@@ -1641,9 +1660,7 @@ void ReportScreen::draw_intel() {
     line(sw_label(0xF00) + ":  " + num(council_votes(t)));
 }
 
-void ReportScreen::iface_common(const std::string& head) {
-    (void)head;
-}
+void ReportScreen::iface_common(const std::string& head) { (void)head; }
 
 void ReportScreen::redraw() {
     Buffer* c = &canvas;
@@ -1667,20 +1684,37 @@ void ReportScreen::redraw() {
         std::string h = up(adj(faction)) + " " + up(sw_label(names[k])) + ",  " + sw_label(0xB68) + " " +
                         num(game_year(CurrentTurn));
         sw_font(&mi, f_bold, 0xE1);
-        if (k != kLabs && k != kEnergy) sw_text_cent(this, &mi, h, {cp.left, cp.top + 4, cp.right, cp.top + 4 + f_bold->height});
+        if (k != kLabs && k != kEnergy)
+            sw_text_cent(this, &mi, h, {cp.left, cp.top + 4, cp.right, cp.top + 4 + f_bold->height});
         if (k == kOps) {
             sw_font(&mi, f_small, 0xF2);
-            sw_text_cent(this, &mi, up(sw_label(0xE4)) + ": " + num(Factions[faction].energy_credits),
-                         {cp.left, cp.top + 6 + f_bold->height, cp.right, cp.top + 6 + f_bold->height + f_small->height});
+            sw_text_cent(
+                this, &mi, up(sw_label(0xE4)) + ": " + num(Factions[faction].energy_credits),
+                {cp.left, cp.top + 6 + f_bold->height, cp.right, cp.top + 6 + f_bold->height + f_small->height});
         }
     }
     switch (kind()) {
-    case kLabs: draw_labs(); iface_labs(); break;
-    case kEnergy: draw_energy(); iface_energy(); break;
-    case kOps: draw_ops(); iface_ops(); break;
+    case kLabs:
+        draw_labs();
+        iface_labs();
+        break;
+    case kEnergy:
+        draw_energy();
+        iface_energy();
+        break;
+    case kOps:
+        draw_ops();
+        iface_ops();
+        break;
     case kProjects: draw_projects(); break;
-    case kSat: draw_sat(); iface_sat(); break;
-    case kSecurity: draw_security(); iface_security(); break;
+    case kSat:
+        draw_sat();
+        iface_sat();
+        break;
+    case kSecurity:
+        draw_security();
+        iface_security();
+        break;
     case kScore: draw_score(); break;
     default: draw_intel(); break;
     }
@@ -1821,12 +1855,12 @@ void ReportScreen::on_key(int32_t key) {
     int32_t page = std::max(rows_shown, 1);
     int32_t last = std::max(rows_total - rows_shown, 0);
     switch (vk) {
-    case 0x21: scroll -= page; break;              // PgUp
-    case 0x22: scroll += page; break;              // PgDn
-    case 0x23: scroll = last; break;               // End
-    case 0x24: scroll = 0; break;                  // Home
-    case 0x26: scroll -= 1; break;                 // Up
-    case 0x28: scroll += 1; break;                 // Down
+    case 0x21: scroll -= page; break;  // PgUp
+    case 0x22: scroll += page; break;  // PgDn
+    case 0x23: scroll = last; break;  // End
+    case 0x24: scroll = 0; break;  // Home
+    case 0x26: scroll -= 1; break;  // Up
+    case 0x28: scroll += 1; break;  // Down
     case 0x25: switch_report((kind() + 4) % 7 + 2); return;  // Left: (kind + 6 - 2) % 7 + 2
     case 0x27: switch_report((kind() + 6) % 7 + 2); return;  // Right
     default: break;
@@ -1844,7 +1878,8 @@ void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t
         int32_t f = type - 80, k = index;
         if (k < 4 && faction != 0) {
             Faction& fa = Factions[f];
-            int32_t* v[4] = {&fa.satellites_nutrient, &fa.satellites_mineral, &fa.satellites_energy, &fa.satellites_ODP};
+            int32_t* v[4] = {&fa.satellites_nutrient, &fa.satellites_mineral, &fa.satellites_energy,
+                             &fa.satellites_ODP};
             if (!(ui_key_state(0x10) & 0x8000)) {
                 ++*v[k];
             } else {
@@ -1937,7 +1972,8 @@ void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t
         BASE& b = Bases[base_id];
         uint32_t g = (uint32_t)b.governor_flags;
         if (!(g & 0x80000000) || !(g & 0x8000000)) {
-            int32_t mode = (g & 0x1000000) ? 0 : ((g & 0x2000000) ? 1 : (int32_t)((~g & 0x4000000 | 0x8000000) >> 0x1A));
+            int32_t mode =
+                (g & 0x1000000) ? 0 : ((g & 0x2000000) ? 1 : (int32_t)((~g & 0x4000000 | 0x8000000) >> 0x1A));
             b.governor_flags = (int32_t)((g | 0x80000000) & 0xF0FFFFFF);
             static const uint32_t bits[4] = {0x2000000, 0x4000000, 0x8000000, 0x1000000};
             if (mode >= 0 && mode < 4) b.governor_flags |= (int32_t)bits[mode];
@@ -1983,8 +2019,8 @@ void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t
 // ---- the base locator (ReportIf_bl_anim 0x4A4060, bl_daemon every 150 ms) ----
 
 namespace {
-Sprite g_dots[4];          // ReportIf +0x20254: dot0.pcx .. dot3.pcx (12 x 12)
-int32_t g_bl = 11;         // +0x1E248: the animation's step (-1 .. 10)
+Sprite g_dots[4];  // ReportIf +0x20254: dot0.pcx .. dot3.pcx (12 x 12)
+int32_t g_bl = 11;  // +0x1E248: the animation's step (-1 .. 10)
 int32_t g_bl_x = 0, g_bl_y = 0;  // +0x1E24C: in the world map pane
 uint32_t g_bl_last = 0;
 }  // namespace
@@ -2105,14 +2141,14 @@ void open_reports(int32_t k) {
     int32_t lefts[3] = {bx, bw / 3 + bx, bx + 2 + (bw / 3) * 2};
     int32_t rights[3] = {bw / 3 - 2 + bx, bx + (bw / 3) * 2, bx + bw};
     for (int32_t i = 0; i < 3; i++) {
-        s->ops_btn[i] = sw_button(s, up(sw_label(labels[i])).c_str(), 0x8B3 + i, lefts[i], by, rights[i] - lefts[i], 0x14, 0,
-                                  s->f_bold);
+        s->ops_btn[i] = sw_button(s, up(sw_label(labels[i])).c_str(), 0x8B3 + i, lefts[i], by, rights[i] - lefts[i],
+                                  0x14, 0, s->f_bold);
     }
     // The satellites' two views (ReportIf_on_status: labels 0xCB0 / 0xCB4, the halves of the same
     // row; the table set).
     s->sat_btn[0] = sw_button(s, up(sw_label(0xCB0)).c_str(), 0xD3C, bx, by, bw / 2 - 1, 0x14, 0, s->f_bold);
-    s->sat_btn[1] = sw_button(s, up(sw_label(0xCB4)).c_str(), 0xD3D, bw / 2 + 1 + bx, by, bx + bw - (bw / 2 + 1 + bx), 0x14,
-                              0, s->f_bold);
+    s->sat_btn[1] = sw_button(s, up(sw_label(0xCB4)).c_str(), 0xD3D, bw / 2 + 1 + bx, by, bx + bw - (bw / 2 + 1 + bx),
+                              0x14, 0, s->f_bold);
     g_sat_view = 0xD3C;
     // ReportIf_on_status: the ORBITAL ATTACK VIEW's buttons: the target factions in the left pane
     // (9 in, from 0x20 below its top, 0x16 apart; those with the satellites' technologies,
@@ -2134,18 +2170,19 @@ void open_reports(int32_t k) {
             ty += 0x16;
         }
         for (int32_t k = 0; k < 5; k++) {
-            s->sat_type[k] = sw_button(s, k == 4 ? Facility[41].name : Facility[65 + k].name, 0xCE41 + k, tx, ty, tw, 0x14, 1,
-                                       s->f_bold);
+            s->sat_type[k] = sw_button(s, k == 4 ? Facility[41].name : Facility[65 + k].name, 0xCE41 + k, tx, ty, tw,
+                                       0x14, 1, s->f_bold);
             s->sat_type[k]->shown = false;
         }
         const UiRect& vb = s->sat_btn[1]->r;
-        s->sat_attack_btn = sw_button(s, sw_label(0xCB8).c_str(), 0xD3E, vb.left, in.bottom - 0x1A, vb.right - vb.left, 0x14, 0,
-                                      s->f_bold);
+        s->sat_attack_btn = sw_button(s, sw_label(0xCB8).c_str(), 0xD3E, vb.left, in.bottom - 0x1A, vb.right - vb.left,
+                                      0x14, 0, s->f_bold);
         s->sat_attack_btn->box[0] = box_def(47);
         s->sat_attack_btn->box[1] = box_def(46);
         s->sat_attack_btn->box[2] = box_def(45);
-        for (Sprite** sp : {s->sat_attack_btn->left, s->sat_attack_btn->right, s->sat_attack_btn->top, s->sat_attack_btn->bottom,
-                            s->sat_attack_btn->tl, s->sat_attack_btn->tr, s->sat_attack_btn->bl, s->sat_attack_btn->br})
+        for (Sprite** sp :
+             {s->sat_attack_btn->left, s->sat_attack_btn->right, s->sat_attack_btn->top, s->sat_attack_btn->bottom,
+              s->sat_attack_btn->tl, s->sat_attack_btn->tr, s->sat_attack_btn->bl, s->sat_attack_btn->br})
             sp[0] = sp[1] = sp[2] = nullptr;
         s->sat_attack_btn->shown = false;
         g_sat_target = g_sat_kind = -1;
@@ -2158,7 +2195,8 @@ void open_reports(int32_t k) {
     s->ops_iface.clear();
     const UiRect& q = mi_rect(kMiPaneQueue);
     int32_t gx = q.left + 9, gw = (q.right - q.left) - 0x12;
-    s->ops_iface.push_back(sw_button(s, up(sw_label(0x7B8)).c_str(), 0xD0A, gx, q.top + 9, gw / 2 - 1, 0x14, 1, s->f_bold));
+    s->ops_iface.push_back(
+        sw_button(s, up(sw_label(0x7B8)).c_str(), 0xD0A, gx, q.top + 9, gw / 2 - 1, 0x14, 1, s->f_bold));
     s->ops_iface.push_back(
         sw_button(s, up(sw_label(0xAA8)).c_str(), 0xD0B, gx + gw / 2 + 1, q.top + 9, gw / 2, 0x14, 1, s->f_bold));
     int32_t gy = q.top + 0x23;
@@ -2177,7 +2215,8 @@ void open_reports(int32_t k) {
     // technology: the research (0 with blind research or none).
     s->labs_iface.clear();
     s->labs_iface.push_back(sw_button(s, sw_label(0x5D4).c_str(), 0x92, gx, q.top + 9, gw / 2 - 1, 0x14, 1, s->f_bold));
-    s->labs_iface.push_back(sw_button(s, sw_label(0x5D8).c_str(), 0x93, gx + gw / 2 + 1, q.top + 9, gw / 2, 0x14, 1, s->f_bold));
+    s->labs_iface.push_back(
+        sw_button(s, sw_label(0x5D8).c_str(), 0x93, gx + gw / 2 + 1, q.top + 9, gw / 2, 0x14, 1, s->f_bold));
     s->labs_tab = 1;
     s->labs_top = 0;
     g_energy_subject = -1;

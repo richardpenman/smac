@@ -44,9 +44,9 @@
 
 namespace {
 
-GLOBAL(int32_t, GotoToBase, 0x688348);    // the go-to list routes a unit (1) or finds a base (0)
+GLOBAL(int32_t, GotoToBase, 0x688348);  // the go-to list routes a unit (1) or finds a base (0)
 GLOBAL(int32_t, GotoLastBase, 0x68834C);  // base chosen last in a go-to list (-1: none)
-GLOBAL(int32_t, GotoFromX, 0x915680);     // the go-to list's route start (PlanWin)
+GLOBAL(int32_t, GotoFromX, 0x915680);  // the go-to list's route start (PlanWin)
 GLOBAL(int32_t, GotoFromY, 0x915650);
 
 uint8_t* main_view() { return MapWins[0]; }
@@ -401,7 +401,8 @@ void THISCALL Console_convoy(uint8_t* self, int32_t veh_id) {
         }
         // What the tile would yield to the home base, by resource (nutrients, minerals, energy).
         for (int32_t i = 0; i < 3; i++) {
-            int32_t n = resource_yield(i, mw(self, kConFaction), veh(veh_id).home_base_id, veh(veh_id).x, veh(veh_id).y);
+            int32_t n =
+                resource_yield(i, mw(self, kConFaction), veh(veh_id).home_base_id, veh(veh_id).x, veh(veh_id).y);
             parse_num(i, n);
             parse_say(i, n == 1 ? ResName[i].name_singular : ResName[i].name_plural, -1, -1);
         }
@@ -568,8 +569,7 @@ void THISCALL Console_disband(uint8_t* self, int32_t veh_id) {
     int32_t triad = triad_of(veh_id);
     if (MFactions[mw(self, kConFaction)].rule_flags & 0x80)
         pcx = triad == TRIAD_AIR ? "alair_sm.pcx" : (triad == TRIAD_SEA ? "navun_sm.pcx" : "alunit_sm.pcx");
-    else
-        pcx = triad == TRIAD_AIR ? "air_sm.pcx" : (triad == TRIAD_SEA ? "navun_sm.pcx" : "unit_sm.pcx");
+    else pcx = triad == TRIAD_AIR ? "air_sm.pcx" : (triad == TRIAD_SEA ? "navun_sm.pcx" : "unit_sm.pcx");
     int32_t r = popp(ScriptFileName, StrBuffer, 0, pcx, 0);
     if (!r) {
         net_unlock_veh();
@@ -674,8 +674,7 @@ void THISCALL Console_give_veh(uint8_t* self, int32_t veh_id) {
         const char* pcx;
         if (MFactions[mw(self, kConFaction)].rule_flags & 0x80)
             pcx = triad == TRIAD_AIR ? "alair_sm.pcx" : (triad == TRIAD_SEA ? "navun_sm.pcx" : "alunit_sm.pcx");
-        else
-            pcx = triad == TRIAD_AIR ? "air_sm.pcx" : (triad == TRIAD_SEA ? "navun_sm.pcx" : "unit_sm.pcx");
+        else pcx = triad == TRIAD_AIR ? "air_sm.pcx" : (triad == TRIAD_SEA ? "navun_sm.pcx" : "unit_sm.pcx");
         r = popp(ScriptFileName, "CANGIVE", 0, pcx, 0);
     }
     if (!r) {
@@ -1010,12 +1009,12 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
     // run, -1 the base's rally point of a triad, -2 find a base (centre the view), -3 psi gate.
     StackPop pop;
     int32_t saved_options = mw(main_view(), kMwOptions);  // [ebp-0x58]
-    int32_t sort = prefs_get_int("Base Sort", 0, 0);         // [ebp-0x34]
-    int32_t artifact = 0;                                   // [ebp-0x40]: carries an artifact
-    int32_t faction_id, x, y;                              // [ebp-0x28], [ebp-0x20], [ebp-0x1c]
-    int32_t triad = -1;                                     // [ebp-0x30]
-    int32_t range = 0, home_x = 0, home_y = 0;              // [ebp-0x18], [ebp-0x44], [ebp-0x48]
-    int32_t base_id = -1;                                   // the rally point's base
+    int32_t sort = prefs_get_int("Base Sort", 0, 0);  // [ebp-0x34]
+    int32_t artifact = 0;  // [ebp-0x40]: carries an artifact
+    int32_t faction_id, x, y;  // [ebp-0x28], [ebp-0x20], [ebp-0x1c]
+    int32_t triad = -1;  // [ebp-0x30]
+    int32_t range = 0, home_x = 0, home_y = 0;  // [ebp-0x18], [ebp-0x44], [ebp-0x48]
+    int32_t base_id = -1;  // the rally point's base
     bool base_locked = false;
     GotoToBase = 1;
     auto restore_view = [&]() {
@@ -1135,8 +1134,8 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
         }
     }
     MAP* here = map_tile(x, y);
-    int32_t region = here->region;                       // [ebp-0x50]
-    int32_t is_sea = (here->climate & 0xE0) < 0x60;      // [ebp-0x60]
+    int32_t region = here->region;  // [ebp-0x50]
+    int32_t is_sea = (here->climate & 0xE0) < 0x60;  // [ebp-0x60]
     std::vector<int32_t> order(BaseCount > 0 ? BaseCount : 0), key(BaseCount > 0 ? BaseCount : 0);
     for (;;) {
         StrBuffer[0] = 0;
@@ -1244,7 +1243,8 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
                         else if (left > 999) left = 999;
                         int32_t d = (std::abs(y - by) + dx) >> 1;
                         int32_t reach_tiles =
-                            (speed(id, 0) * (Chassis[unit_of(id).chassis_id].range - veh(id).movement_turns - 1) + left) /
+                            (speed(id, 0) * (Chassis[unit_of(id).chassis_id].range - veh(id).movement_turns - 1) +
+                             left) /
                             Rules.move_rate_roads;
                         if (d > reach_tiles) continue;
                     }
@@ -1345,7 +1345,8 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
         if (mode == -2) {
             Console_cursor_next(&MainConsole, t.x, t.y);
             pfncMoveMap(main_view(), t.x, t.y, 1);
-            if (button == 4 && (uint8_t)t.faction_id == (uint32_t)CurrentPlayerFaction) BaseWin_zoom(&BaseWin, chosen, 0);
+            if (button == 4 && (uint8_t)t.faction_id == (uint32_t)CurrentPlayerFaction)
+                BaseWin_zoom(&BaseWin, chosen, 0);
             restore_view();
             return;
         }

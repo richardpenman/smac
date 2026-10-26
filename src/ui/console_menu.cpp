@@ -36,8 +36,8 @@
 #include "ui/reports.h"
 #include "ui/win.h"
 
-GLOBAL(int32_t, TutorialTourKind, 0x8CC228);     // the tour TutWin_tour shows (the Help menu's tours)
-GLOBAL(int32_t, ConsoleMenuPending, 0x93A944);   // a menu event came before the game was ready
+GLOBAL(int32_t, TutorialTourKind, 0x8CC228);  // the tour TutWin_tour shows (the Help menu's tours)
+GLOBAL(int32_t, ConsoleMenuPending, 0x93A944);  // a menu event came before the game was ready
 GLOBAL(int32_t, DesktopRedrawFlag, 0x939ED8);
 
 namespace {
@@ -341,10 +341,16 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
         else NetMsg_pop(&NetMsg, "PROTECTED", 5000, 0, nullptr);
         break;
     case 0x201: view_mode(self); break;
-    case 0x203: case 0x204: case 0x205: case 0x206: case 0x207: case 0x208:
-        pfncProcZoomKey(self, id, 0);
-        break;
-    case 0x209: case 0x20A: case 0x20B: case 0x20C: console_toggle_pref(id); break;
+    case 0x203:
+    case 0x204:
+    case 0x205:
+    case 0x206:
+    case 0x207:
+    case 0x208: pfncProcZoomKey(self, id, 0); break;
+    case 0x209:
+    case 0x20A:
+    case 0x20B:
+    case 0x20C: console_toggle_pref(id); break;
     case 0x20D:
         DesktopRedrawFlag = 0;
         desktop_init(1);
@@ -385,7 +391,8 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
     }
     case 0x217: Console_next_cursor(self); break;
     // Action
-    case 0x300: case 0x301: Console_new_base(self, veh(self)); break;
+    case 0x300:
+    case 0x301: Console_new_base(self, veh(self)); break;
     case 0x302: Console_oblit(self, veh(self)); break;
     case 0x304: {
         int32_t v = veh(self);
@@ -398,20 +405,24 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
     case 0x306: Console_automate(self, veh(self), 10); break;
     case 0x307: Console_automate(self, veh(self), 0xB); break;
     case 0x308: Console_convoy(self, veh(self)); break;
-    case 0x309: case 0x30A: Console_use_ability(self, veh(self)); break;
+    case 0x309:
+    case 0x30A: Console_use_ability(self, veh(self)); break;
     case 0x310: Console_go_to(self, veh(self), -3, 0); break;
     case 0x311: Console_destroy(self, veh(self)); break;
     case 0x312:
-        if (!MapWinInVehMode) Console_disband_2(self, MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
+        if (!MapWinInVehMode)
+            Console_disband_2(self, MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
         else Console_disband(self, veh(self));
         break;
     case 0x313:
-        if (!Console_edit_lock(self)) Console_activate(self, MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex], 1);
+        if (!Console_edit_lock(self))
+            Console_activate(self, MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex], 1);
         else NetMsg_pop(&NetMsg, "PROTECTED", 5000, 0, nullptr);
         break;
     case 0x314: Console_automate(self, veh(self), 0); break;
     case 0x315: Console_hold(self, veh(self), 0); break;
-    case 0x316: case 0x317: Console_go_home(self, veh(self)); break;
+    case 0x316:
+    case 0x317: Console_go_home(self, veh(self)); break;
     case 0x318: Console_go_to(self, veh(self), 0x18, 0); break;
     case 0x319: Console_go_to(self, veh(self), 0x18, 1); break;
     case 0x31A: Console_assemble(self); break;
@@ -441,12 +452,30 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
     case 0x70C: help_topic(0xB, 0); break;
     case 0x70D: help_topic(0xC, 0); break;
     case 0x70E: help_topic(0xF, 0); break;
-    case 0x720: TutorialTourKind = 0; TutWin_tour(&TutWin); break;
-    case 0x721: TutorialTourKind = 3; TutWin_tour(&TutWin); break;
-    case 0x722: TutorialTourKind = 1; TutWin_tour(&TutWin); break;
-    case 0x723: TutorialTourKind = 5; TutWin_tour(&TutWin); break;
-    case 0x724: TutorialTourKind = 7; TutWin_tour(&TutWin); break;
-    case 0x725: TutorialTourKind = 6; TutWin_tour(&TutWin); break;
+    case 0x720:
+        TutorialTourKind = 0;
+        TutWin_tour(&TutWin);
+        break;
+    case 0x721:
+        TutorialTourKind = 3;
+        TutWin_tour(&TutWin);
+        break;
+    case 0x722:
+        TutorialTourKind = 1;
+        TutWin_tour(&TutWin);
+        break;
+    case 0x723:
+        TutorialTourKind = 5;
+        TutWin_tour(&TutWin);
+        break;
+    case 0x724:
+        TutorialTourKind = 7;
+        TutWin_tour(&TutWin);
+        break;
+    case 0x725:
+        TutorialTourKind = 6;
+        TutWin_tour(&TutWin);
+        break;
     case 0x750: show_credits(); break;
     case 0x751:
         parse_says(0, "RELEASE 2.0", -1, -1);  // EngineVersion (0x691870), EngineDate (0x691874)
@@ -461,7 +490,8 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
     case 0x804: Console_time_controls(self); break;
     case 0x805: Console_zoom_to_upkeep_base(self); break;
     case 0x806: Console_use_time_bonus(self); break;
-    case 0x807: case 0x808: Console_end_my_turn(self); break;
+    case 0x807:
+    case 0x808: Console_end_my_turn(self); break;
     // Terraform: roads / tubes to, the formers' automation
     case 0x9F0: Console_road_to(self, veh(self), 0x1B); break;
     case 0x9F1: Console_road_to(self, veh(self), 0x1C); break;
@@ -535,7 +565,11 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
         case 0x619: Console_editor_redo(); return;
         case 0xA00: Console_editor_save(); return;
         case 0xA01: Console_editor_load(); return;
-        case 0xA10: case 0xA11: case 0xA12: case 0xA13: case 0xA14: Console_editor_paints(id - 0xA10); return;
+        case 0xA10:
+        case 0xA11:
+        case 0xA12:
+        case 0xA13:
+        case 0xA14: Console_editor_paints(id - 0xA10); return;
         case 0xA15: Console_editor_terrain(); return;
         case 0xA16: Console_editor_paints(5); return;
         case 0xA19: Console_editor_minor(); return;

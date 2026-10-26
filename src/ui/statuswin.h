@@ -24,8 +24,9 @@ ADDR_NATIVE(0x4B89C0) void THISCALL StatusWin_arrow_left(uint8_t* self);
 ADDR_NATIVE(0x4B8BD0) void THISCALL StatusWin_arrow_right(uint8_t* self);
 
 // The battle report (battlewin.cpp).
-ADDR_NATIVE(0x421B50) void THISCALL BattleWin_battle_report(uint8_t* win, int32_t veh_atk, int32_t veh_def, int32_t offense,
-                                                           int32_t defense, uint32_t flags);
+ADDR_NATIVE(0x421B50)
+void THISCALL BattleWin_battle_report(uint8_t* win, int32_t veh_atk, int32_t veh_def, int32_t offense, int32_t defense,
+                                      uint32_t flags);
 ADDR_NATIVE(0x422CC0) void THISCALL BattleWin_on_status(uint8_t* win, int32_t on);
 ADDR_NATIVE(0x45D380) void THISCALL SubInterface_release_iface_mode(uint8_t* win);
 

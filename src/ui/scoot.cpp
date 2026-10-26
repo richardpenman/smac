@@ -62,7 +62,7 @@ void wait_ms(uint32_t* last, int32_t ms) {
 struct WinMove {
     bool on = false;
     int32_t sx = 0, sy = 0, dx = 0, dy = 0;  // tile points (minus the half tile height)
-    UiRect r{};                               // the saved background
+    UiRect r{};  // the saved background
     Buffer bg;
 };
 
@@ -115,7 +115,8 @@ void GAMEAPI veh_scoot(int32_t veh_id, int32_t x, int32_t y, int32_t dir, int32_
                 m.sy -= mwi(win, kMwHalfH);
                 m.dy -= mwi(win, kMwHalfH);
                 int32_t tw = mwi(win, kMwTileW), th = mwi(win, kMwTileH), hh = mwi(win, kMwHalfH);
-                UiRect r{std::min(m.sx, m.dx), std::min(m.sy, m.dy), std::max(m.sx, m.dx) + tw, std::max(m.sy, m.dy) + th + hh};
+                UiRect r{std::min(m.sx, m.dx), std::min(m.sy, m.dy), std::max(m.sx, m.dx) + tw,
+                         std::max(m.sy, m.dy) + th + hh};
                 int32_t qw = (r.right - r.left) / 4, qh = (r.bottom - r.top) / 4;
                 r = {r.left - qw, r.top - qh - th, r.right + qw, r.bottom + qh};
                 m.r = r;
@@ -158,9 +159,9 @@ void GAMEAPI veh_scoot(int32_t veh_id, int32_t x, int32_t y, int32_t dir, int32_
                     const char* shot = std::getenv("SMACX_SCOOT_SHOT");
                     if (shot && *shot && f == frames / 2) {  // test aid: the screen at the half way
                         for (int32_t i = 0; i < 8; i++)
-                            if (mv[i].on) veh_draw(ui_mapwin_native(MapWins[i])->canvas, veh_id,
-                                                   (mv[i].sx + mv[i].dx) / 2, (mv[i].sy + mv[i].dy) / 2,
-                                                   mwi(MapWins[i], kMwZoom), 0x22, f);
+                            if (mv[i].on)
+                                veh_draw(ui_mapwin_native(MapWins[i])->canvas, veh_id, (mv[i].sx + mv[i].dx) / 2,
+                                         (mv[i].sy + mv[i].dy) / 2, mwi(MapWins[i], kMwZoom), 0x22, f);
                         ui_screenshot(g_ui_outdir + "/" + shot);
                         for (int32_t i = 0; i < 8; i++)
                             if (mv[i].on)
@@ -173,7 +174,9 @@ void GAMEAPI veh_scoot(int32_t veh_id, int32_t x, int32_t y, int32_t dir, int32_
         } else {
             no_final = true;  // (the original's path skips to the end)
         }
-        if (drawing && std::getenv("SMACX_ANIM")) std::fprintf(stderr, "scoot anim: veh %d dir %d turn %d slide %d\n", veh_id, dir, turn, (flags & 1) ? 0 : frames);
+        if (drawing && std::getenv("SMACX_ANIM"))
+            std::fprintf(stderr, "scoot anim: veh %d dir %d turn %d slide %d\n", veh_id, dir, turn,
+                         (flags & 1) ? 0 : frames);
     } else {
         if (drawing) {
             draw_tile(x, y, 0);

@@ -8,7 +8,8 @@
 
 // Saves a global on construction and restores it on destruction, so a test can set game state in
 // the memory image without leaking it into other tests.
-template <class T> class SaveGlobal {
+template <class T>
+class SaveGlobal {
 public:
     explicit SaveGlobal(T& ref) : ref_(ref) { std::memcpy(&saved_, &ref, sizeof(T)); }
     ~SaveGlobal() { std::memcpy(&ref_, &saved_, sizeof(T)); }

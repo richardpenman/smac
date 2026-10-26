@@ -22,10 +22,8 @@ int32_t GAMEAPI htoi(const char* str) {
     int32_t value = 0;
     while (crt_isxdigit((int8_t)*str)) {
         value <<= 4;
-        if (crt_isdigit((int8_t)*str))
-            value += (int8_t)*str - '0';
-        else
-            value += crt_toupper((int8_t)*str) - 0x37;
+        if (crt_isdigit((int8_t)*str)) value += (int8_t)*str - '0';
+        else value += crt_toupper((int8_t)*str) - 0x37;
         str++;
     }
     return value;
@@ -36,17 +34,12 @@ int32_t GAMEAPI stoi(const char* str) {
         str++;
         switch (*str) {
         case 'B':
-        case 'b':
-            return btoi(str + 1);
+        case 'b': return btoi(str + 1);
         case 'D':
-        case 'd':
-            str++;
-            break;
+        case 'd': str++; break;
         case 'X':
-        case 'x':
-            return htoi(str + 1);
-        default:
-            break;
+        case 'x': return htoi(str + 1);
+        default: break;
         }
     }
     return crt_atoi(str);

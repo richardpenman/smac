@@ -13,8 +13,8 @@ namespace win32 {
 
 // GetPrivateProfileStringA: copies the value of key in section (or def if missing) into buf,
 // truncated to size - 1 characters; returns the number of characters copied.
-uint32_t GetPrivateProfileStringA(const char* section, const char* key, const char* def, char* buf,
-                                  uint32_t size, const char* file);
+uint32_t GetPrivateProfileStringA(const char* section, const char* key, const char* def, char* buf, uint32_t size,
+                                  const char* file);
 // WritePrivateProfileStringA: sets key in section (creating section/file as needed). Returns
 // non-zero on success.
 int32_t WritePrivateProfileStringA(const char* section, const char* key, const char* value, const char* file);

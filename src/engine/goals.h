@@ -29,8 +29,8 @@ ADDR(0x579FF0) void GAMEAPI monolith_sites(int32_t x, int32_t y);
 // Top of the stack containing veh_id, or -1.
 ADDR(0x579920) int32_t GAMEAPI veh_top(int32_t veh_id);
 // Adds an AI goal of a type and priority for a faction at (x, y).
-ADDR(0x579A30) void GAMEAPI add_goal(int32_t faction_id, int32_t type, int32_t priority, int32_t x, int32_t y,
-                                     int32_t base_id);
+ADDR(0x579A30)
+void GAMEAPI add_goal(int32_t faction_id, int32_t type, int32_t priority, int32_t x, int32_t y, int32_t base_id);
 // Clears all AI goals and sites of faction_id (type -1).
 ADDR(0x579E00) void GAMEAPI init_goals(int32_t faction_id);
 // Removes faction_id's AI sites of a type within distance of (x, y).

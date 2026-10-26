@@ -376,74 +376,74 @@ class BasePop {
 public:
     // ---- script contents ----
     std::vector<std::unique_ptr<char[]>> owned;  // string storage
-    std::vector<TextLine> strings;               // +0x2180 list (text lines)
-    std::vector<const char*> buttons;            // +0x2150 list (#button), count +0x20F4
+    std::vector<TextLine> strings;  // +0x2180 list (text lines)
+    std::vector<const char*> buttons;  // +0x2150 list (#button), count +0x20F4
     struct Item {
         const char* text;
         int32_t id;
         int32_t lines;  // wrapped lines (RadioButton_calculate_dimensions)
     };
-    std::vector<Item> items;           // dialog items (+0xC4 list of the Dialog)
-    std::vector<std::string> edit;     // EditGroup texts (one per item)
-    std::string edit_default;          // EditGroup_set_default
-    bool edit_default_given = false;   // BasePop_start's edit default argument was given
-    uint32_t flags = 0;                // +0x30A8
-    int32_t mode = 0;                  // +0x30AC: #extra + PopupDialogState * 10000
+    std::vector<Item> items;  // dialog items (+0xC4 list of the Dialog)
+    std::vector<std::string> edit;  // EditGroup texts (one per item)
+    std::string edit_default;  // EditGroup_set_default
+    bool edit_default_given = false;  // BasePop_start's edit default argument was given
+    uint32_t flags = 0;  // +0x30A8
+    int32_t mode = 0;  // +0x30AC: #extra + PopupDialogState * 10000
     int32_t wave = -1, wave_vol = 0x7F;  // the show sound block (+0x2E64): #wave (+0x104), #vol (+0x108)
-    int32_t item_type = 0x10;          // +0x2350: 1 check box, 2 list box, 4 edit group, 0x10 radio, -1 none
-    int32_t active = -1;               // +0xA44: initial selection (edit groups: text limit)
-    int32_t choice = 0;                // +0xA40
-    int32_t button = 0;                // +0x3100: #button pressed (0: OK)
-    int32_t check_bits = 0;            // +0x2314: check box states
-    char* caption = nullptr;           // +0xA48
-    Sprite picture;                    // +0x2118 (+0x2144 when loaded)
+    int32_t item_type = 0x10;  // +0x2350: 1 check box, 2 list box, 4 edit group, 0x10 radio, -1 none
+    int32_t active = -1;  // +0xA44: initial selection (edit groups: text limit)
+    int32_t choice = 0;  // +0xA40
+    int32_t button = 0;  // +0x3100: #button pressed (0: OK)
+    int32_t check_bits = 0;  // +0x2314: check box states
+    char* caption = nullptr;  // +0xA48
+    Sprite picture;  // +0x2118 (+0x2144 when loaded)
     bool has_picture = false;
     int32_t pic_scale_d = 1, pic_scale_s = 1;  // +0x3104 / +0x3108
     std::string ok_text = "OK", cancel_text = "Cancel";  // BasePop_set_ok_text / set_cancel_text
     // ---- dialog (item group) geometry: +0x21D0 virtual base ----
-    int32_t dlg_flags = 0;             // +0x21F0 bits 0/1: fixed height/width
-    int32_t dlg_width = 0;             // +0x21FC (#xs)
-    int32_t dlg_height = 0;            // +0x2200 (#ys)
-    int32_t icon_w = 3;                // +0x2204
-    int32_t margin = 0;                // +0x2210
-    int32_t spacing = 3;               // +0x2214
-    int32_t row_h = 0x13;              // +0x2218
-    int32_t cols = 1;                  // +0x221C (#col)
-    int32_t max_rows = 12;             // +0x2220 (#listbox N / #checkbox N; Dialog_close: DAT_006970A4, 12)
-    int32_t total_w = 0;               // +0x222C
-    int32_t total_h = 0;               // +0x2230
-    int32_t item_w = 0;                // +0x2234
-    int32_t item_h = 0;                // +0x2238
-    int32_t rows = 0;                  // +0x2228
-    int32_t selected = 0;              // +0x22BC
+    int32_t dlg_flags = 0;  // +0x21F0 bits 0/1: fixed height/width
+    int32_t dlg_width = 0;  // +0x21FC (#xs)
+    int32_t dlg_height = 0;  // +0x2200 (#ys)
+    int32_t icon_w = 3;  // +0x2204
+    int32_t margin = 0;  // +0x2210
+    int32_t spacing = 3;  // +0x2214
+    int32_t row_h = 0x13;  // +0x2218
+    int32_t cols = 1;  // +0x221C (#col)
+    int32_t max_rows = 12;  // +0x2220 (#listbox N / #checkbox N; Dialog_close: DAT_006970A4, 12)
+    int32_t total_w = 0;  // +0x222C
+    int32_t total_h = 0;  // +0x2230
+    int32_t item_w = 0;  // +0x2234
+    int32_t item_h = 0;  // +0x2238
+    int32_t rows = 0;  // +0x2228
+    int32_t selected = 0;  // +0x22BC
     int32_t hover = -1;
-    int32_t top_item = 0;              // list box scroll position
+    int32_t top_item = 0;  // list box scroll position
     // ---- margins and computed layout ----
     int32_t def_left = 0x1A, def_right = 0x3A, def_top = 3, def_bottom = 0x32;  // +0x21B0..0x21BC
-    int32_t def_hpad = 0, def_vspace = 4;                                      // +0x21C0, +0x21C4
-    int32_t text_indent = 0;           // +0x21C8
-    int32_t text_x = -1;               // +0x21CC
-    int32_t n_buttons = 0;             // +0x30B0
-    int32_t win_x = 0, win_y = 0;      // +0x30B4, +0x30B8
-    int32_t width = 0, height = 0;     // +0x30BC, +0x30C0
-    int32_t dlg_h = 0;                 // +0x30C4
+    int32_t def_hpad = 0, def_vspace = 4;  // +0x21C0, +0x21C4
+    int32_t text_indent = 0;  // +0x21C8
+    int32_t text_x = -1;  // +0x21CC
+    int32_t n_buttons = 0;  // +0x30B0
+    int32_t win_x = 0, win_y = 0;  // +0x30B4, +0x30B8
+    int32_t width = 0, height = 0;  // +0x30BC, +0x30C0
+    int32_t dlg_h = 0;  // +0x30C4
     int32_t button_w = 0, button_h = 0;  // +0x30CC, +0x30D0
-    int32_t text_h = 0;                // +0x30D4
-    int32_t pic_w = 0, pic_h = 0;      // +0x30D8, +0x30DC
-    int32_t hpad = 0, vspace = 4;      // +0x30E0, +0x30E4
+    int32_t text_h = 0;  // +0x30D4
+    int32_t pic_w = 0, pic_h = 0;  // +0x30D8, +0x30DC
+    int32_t hpad = 0, vspace = 4;  // +0x30E0, +0x30E4
     int32_t top = 3, bottom = 0x32, left = 0x1A, right = 0x3A;  // +0x30E8..0x30F4
-    int32_t req_x = 0x1000, req_y = 0x1000;                    // +0x30F8, +0x30FC
-    int32_t item_x = 0, item_y = 0;    // where the dialog was attached
+    int32_t req_x = 0x1000, req_y = 0x1000;  // +0x30F8, +0x30FC
+    int32_t item_x = 0, item_y = 0;  // where the dialog was attached
     // ---- fonts and colours ----
-    Font* str_font[4] = {};            // +0x3110
-    int32_t str_color[4][4] = {};      // +0x3120 colour, +0x3130 shadow, +0x3140 dx, +0x3150 dy
-    Font* btn_font[3] = {};            // +0x316C
+    Font* str_font[4] = {};  // +0x3110
+    int32_t str_color[4][4] = {};  // +0x3120 colour, +0x3130 shadow, +0x3140 dx, +0x3150 dy
+    Font* btn_font[3] = {};  // +0x316C
     int32_t btn_color = 0, btn_shadow = -1;
     Font* dlg_font[3] = {};
     // ---- window ----
-    Buffer canvas;                     // the GraphicWin's Buffer (+0x444)
+    Buffer canvas;  // the GraphicWin's Buffer (+0x444)
     bool shown = false;
-    bool scroll_shown = false;         // scroll_show ran (the rail is in the window)
+    bool scroll_shown = false;  // scroll_show ran (the rail is in the window)
     void (*select_cb)(int32_t) = nullptr;  // +0x3280: called with the item's id when the selection changes
     int32_t select_seen = -1;
     bool select_fired = false;
@@ -453,9 +453,9 @@ public:
         const char* text;
     };
     std::vector<Button> btns;
-    int32_t pressed_button = 0x7FFF;   // button under the mouse while held
-    bool edit_fresh = true;            // the edit text is still the selected default
-    std::string label;                 // the (last) section read, for the log
+    int32_t pressed_button = 0x7FFF;  // button under the mouse while held
+    bool edit_fresh = true;  // the edit text is still the selected default
+    std::string label;  // the (last) section read, for the log
     // The external window (+0xA14..+0xA24, BasePop_set_external_window): DiploPop's window, the
     // popup drawn into it at its origin (screen ext_x, ext_y) with its size.
     bool ext = false;
@@ -476,7 +476,10 @@ namespace {
 std::vector<BasePop*> g_windows;  // shown popups, bottom to top
 
 // BasePop_set_def_external_window's defaults (0x9B8D04.., copied by BasePop_close).
-struct { bool on = false; int32_t x = 0, y = 0, w = 0, h = 0; } g_def_ext;
+struct {
+    bool on = false;
+    int32_t x = 0, y = 0, w = 0, h = 0;
+} g_def_ext;
 
 // A popup's text colour pair i (0 caption, 1..3 the strings, 4..6 the items by state): text.pcx's
 // popup pairs (0x8C6C6C..) or, in DiploPop's window, DiploPop's (0x8C6E2C..).
@@ -539,8 +542,6 @@ void basepop_init(BasePop* p, uint32_t flags) {
 int32_t scaled(BasePop* p, int32_t v) {
     return (!p->ext && !(p->flags & 0x400) && ScreenWidth > 0x3FF) ? v * 3 / 2 : v;
 }
-
-
 
 int32_t atoi_s(const char* s) { return std::atoi(s); }
 
@@ -768,10 +769,10 @@ void BasePop_set_picture(BasePop* self, const char* pcx) {
     if (std::sscanf(pcx, "faction:%d", &faction) == 1 && faction >= 0 && faction < 8) {
         // A leader portrait (FactionPortraits, load_faction_art): sprite 28 of the faction's art.
         std::string file = std::string(MFactions[faction].filename) + ".pcx";
-        if (Buffer_load_pcx(&b, file.c_str(), nullptr, 10, 0xEC) && Buffer_load_pcx(&b, "faction.pcx", nullptr, 10, 0xEC))
+        if (Buffer_load_pcx(&b, file.c_str(), nullptr, 10, 0xEC) &&
+            Buffer_load_pcx(&b, "faction.pcx", nullptr, 10, 0xEC))
             return;
-        if (!pfncSpriteFromCanvasRectTrans(&self->picture, &b, 9, 0x130, 0x1C9, 0x83, 0x9D, 0) ||
-            self->picture.width) {
+        if (!pfncSpriteFromCanvasRectTrans(&self->picture, &b, 9, 0x130, 0x1C9, 0x83, 0x9D, 0) || self->picture.width) {
             self->has_picture = true;
             self->picture.full_width = 0x83;
             self->picture.full_height = 0x9D;
@@ -780,8 +781,7 @@ void BasePop_set_picture(BasePop* self, const char* pcx) {
     }
     if (Buffer_load_pcx(&b, pcx, nullptr, 10, 0xEC)) return;
     // Sprite_init: the whole picture (index 255 -> 9 transparent).
-    if (!pfncSpriteFromCanvasRectTrans(&self->picture, &b, 0x109, 0, 0, b.width, b.height, 0) ||
-        self->picture.width) {
+    if (!pfncSpriteFromCanvasRectTrans(&self->picture, &b, 0x109, 0, 0, b.width, b.height, 0) || self->picture.width) {
         self->has_picture = true;
         self->picture.full_width = b.width;
         self->picture.full_height = b.height;
@@ -841,7 +841,9 @@ void set_string_fonts(BasePop* p) {
     Buffer_set_font(b, p->str_font[0], p->str_font[1], p->str_font[2], p->str_font[3]);
 }
 
-void set_dialog_fonts(BasePop* p) { Buffer_set_font(&p->canvas, p->dlg_font[0], p->dlg_font[1], p->dlg_font[2], nullptr); }
+void set_dialog_fonts(BasePop* p) {
+    Buffer_set_font(&p->canvas, p->dlg_font[0], p->dlg_font[1], p->dlg_font[2], nullptr);
+}
 
 // RadioButton_calculate_dimensions (0x60D380) / CheckBox_calculate_dimensions (0x60ED10) /
 // EditGroup_calculate_dimensions (0x612150) / ListBox_calculate_dimensions (0x60A1E0, as a radio
@@ -972,8 +974,8 @@ int32_t calculate(BasePop* p) {
     p->left = p->def_left;
     p->right = p->def_right;
     if (p->has_picture) {
-        p->pic_w = p->picture.full_width * p->pic_scale_d / p->pic_scale_s + p->hpad +
-                   (p->strings.empty() ? 0 : p->vspace);
+        p->pic_w =
+            p->picture.full_width * p->pic_scale_d / p->pic_scale_s + p->hpad + (p->strings.empty() ? 0 : p->vspace);
         p->pic_h = p->picture.full_height * p->pic_scale_d / p->pic_scale_s;
     } else {
         p->pic_w = p->pic_h = 0;
@@ -1365,9 +1367,12 @@ int32_t key_char(int32_t key) {
     if (vk >= 'A' && vk <= 'Z') return shift ? vk : vk + 0x20;
     if (vk >= '0' && vk <= '9') return shift ? ")!@#$%^&*("[vk - '0'] : vk;
     if (vk == VKEY_SPACE) return ' ';
-    struct Oem { int32_t vk; char plain, shifted; };
-    static const Oem kOem[] = {{0xBA, ';', ':'}, {0xBB, '=', '+'}, {0xBC, ',', '<'}, {0xBD, '-', '_'},
-                               {0xBE, '.', '>'}, {0xBF, '/', '?'}, {0xC0, '`', '~'}, {0xDB, '[', '{'},
+    struct Oem {
+        int32_t vk;
+        char plain, shifted;
+    };
+    static const Oem kOem[] = {{0xBA, ';', ':'},  {0xBB, '=', '+'}, {0xBC, ',', '<'}, {0xBD, '-', '_'},
+                               {0xBE, '.', '>'},  {0xBF, '/', '?'}, {0xC0, '`', '~'}, {0xDB, '[', '{'},
                                {0xDC, '\\', '|'}, {0xDD, ']', '}'}, {0xDE, '\'', '"'}};
     for (const Oem& o : kOem)
         if (o.vk == vk) return shift ? o.shifted : o.plain;
@@ -1453,8 +1458,8 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
     g_windows.push_back(p);
     p->shown = true;
     ui_invalidate();
-    std::fprintf(stderr, "popup %s shown: %dx%d at %d,%d (%d items)\n", p->label.c_str(), p->width, p->height,
-                 p->win_x, p->win_y, (int32_t)p->items.size());
+    std::fprintf(stderr, "popup %s shown: %dx%d at %d,%d (%d items)\n", p->label.c_str(), p->width, p->height, p->win_x,
+                 p->win_y, (int32_t)p->items.size());
     // The #buttons' centres on the screen (a test can click them).
     for (const auto& b : p->btns)
         if (b.id > 0)
@@ -1508,14 +1513,26 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
                 // RadioButton_on_key_down (0x60E020) / CheckBox / ListBox: arrows (and the keypad).
                 int32_t s = p->selected, rows = std::max(1, p->rows);
                 switch (vk) {
-                case VKEY_UP: case 0x68: s = std::max(0, s - 1); break;
-                case VKEY_DOWN: case 0x62: s = std::min(n - 1, s + 1); break;
-                case VKEY_LEFT: case 0x64: s = s - rows < 0 ? s : s - rows; break;
-                case VKEY_RIGHT: case 0x66: s = s + rows >= n ? s : s + rows; break;
-                case VKEY_PRIOR: if (p->item_type == 2) s = std::max(0, s - rows); break;
-                case VKEY_NEXT: if (p->item_type == 2) s = std::min(n - 1, s + rows); break;
-                case VKEY_HOME: if (p->item_type == 2) s = 0; break;
-                case VKEY_END: if (p->item_type == 2) s = n - 1; break;
+                case VKEY_UP:
+                case 0x68: s = std::max(0, s - 1); break;
+                case VKEY_DOWN:
+                case 0x62: s = std::min(n - 1, s + 1); break;
+                case VKEY_LEFT:
+                case 0x64: s = s - rows < 0 ? s : s - rows; break;
+                case VKEY_RIGHT:
+                case 0x66: s = s + rows >= n ? s : s + rows; break;
+                case VKEY_PRIOR:
+                    if (p->item_type == 2) s = std::max(0, s - rows);
+                    break;
+                case VKEY_NEXT:
+                    if (p->item_type == 2) s = std::min(n - 1, s + rows);
+                    break;
+                case VKEY_HOME:
+                    if (p->item_type == 2) s = 0;
+                    break;
+                case VKEY_END:
+                    if (p->item_type == 2) s = n - 1;
+                    break;
                 case VKEY_SPACE:
                     if (p->item_type == 1) p->check_bits ^= 1 << s;  // CheckBox_flip_state_id
                     break;

@@ -87,31 +87,30 @@ std::string tech_name(int32_t t, int32_t f) {
 }
 
 struct TechWinState : ScreenWin {
-    int32_t faction = 0;              // +0xA20
-    int32_t count = 0;                // +0xA2C
-    int32_t cols = 1, rows = 1;       // +0xA24, +0xA28
-    int32_t pw = 0, ph = 0;           // +0xA14, +0xA18: panel size
-    int32_t spacing = 10;             // +0xA1C
-    int32_t sel = 0, sel_valid = 0;   // +0xA38, +0xA3C
-    int32_t list[89]{};               // +0xA58
+    int32_t faction = 0;  // +0xA20
+    int32_t count = 0;  // +0xA2C
+    int32_t cols = 1, rows = 1;  // +0xA24, +0xA28
+    int32_t pw = 0, ph = 0;  // +0xA14, +0xA18: panel size
+    int32_t spacing = 10;  // +0xA1C
+    int32_t sel = 0, sel_valid = 0;  // +0xA38, +0xA3C
+    int32_t list[89]{};  // +0xA58
     bool chosen = false;
     std::string caption;
-    Font fonts[4];                    // +0xBBC, +0xBE4, +0xC0C (text), +0xC34
+    Font fonts[4];  // +0xBBC, +0xBE4, +0xC0C (text), +0xC34
     // FUN_00484C60's cursors.
     int32_t px = 0, pwidth = 0, ptop = 0, pbottom = 0, a54 = 0;
 
     void redraw() override;
     void on_key(int32_t key) override;
-    void on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool right,
-                  bool dbl) override;
+    void on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool right, bool dbl) override;
     void log_state() override;
 
     UiRect panel_rect(int32_t i) const;
     int32_t draw_panel(int32_t i, int32_t highlight);  // FUN_004863F0
     int32_t draw_content(int32_t t, const UiRect& r);  // FUN_00484C60
-    void bottom_line(const std::string& s);            // FUN_00484B80
-    void mouse_move(int32_t x, int32_t y);             // FUN_00485FC0
-    void key(int32_t ch, int32_t vk);                  // FUN_00486170
+    void bottom_line(const std::string& s);  // FUN_00484B80
+    void mouse_move(int32_t x, int32_t y);  // FUN_00485FC0
+    void key(int32_t ch, int32_t vk);  // FUN_00486170
 };
 
 TechWinState* g_techwin = nullptr;
@@ -194,8 +193,7 @@ int32_t TechWinState::draw_content(int32_t t, const UiRect& r) {
             scaled = ZoomNum * 0xD7 / ZoomDenom;
         }
         Sprite* sp = tech_picture(t);
-        if (sp && sp->width)
-            Sprite_draw_mono_2(sp, c, 9, (pwidth - scaled) / 2 + r.left, ptop, MandateColors[cat * 2]);
+        if (sp && sp->width) Sprite_draw_mono_2(sp, c, 9, (pwidth - scaled) / 2 + r.left, ptop, MandateColors[cat * 2]);
         ptop += scaled + spacing;
         BlitDestScale = 1;
         BlitSourceScale = 1;
@@ -316,15 +314,25 @@ void TechWinState::key(int32_t ch, int32_t vk) {
     int32_t col = sel % cols, row = sel / cols;
     bool confirm = false;
     switch (vk) {
-    case 0x28: case 0x62: row = (row + 1) % rows; break;
-    case 8: case 0x25: case 0x64:
+    case 0x28:
+    case 0x62: row = (row + 1) % rows; break;
+    case 8:
+    case 0x25:
+    case 0x64:
         if (--col < 0) col = cols - 1;
         break;
-    case 9: case 0x27: case 0x66: col = (col + 1) % cols; break;
-    case 0x26: case 0x68:
+    case 9:
+    case 0x27:
+    case 0x66: col = (col + 1) % cols; break;
+    case 0x26:
+    case 0x68:
         if (--row < 0) row = rows - 1;
         break;
-    case 0xD: case 0x20: case 0x48: case 0x70: case 0x1000D: confirm = true; break;
+    case 0xD:
+    case 0x20:
+    case 0x48:
+    case 0x70:
+    case 0x1000D: confirm = true; break;
     default: break;
     }
     if (!confirm) {
@@ -432,16 +440,15 @@ int32_t techwin_run(int32_t f, const int32_t* list, int32_t n, const char* label
     return w.list[s];
 }
 
-
 // ---- NewTechWin (0x811E40) ----------------------------------------------------------------------
 
 struct NewTechWinState : ScreenWin {
-    int32_t tech = 0, from = 0;       // +0xB24, +0xB28
+    int32_t tech = 0, from = 0;  // +0xB24, +0xB28
     UiRect outer{}, ok{}, title{}, picture{}, blurb{}, b1{}, b2{};
-    UiRect header[4]{}, box[4]{};     // the sections: headers and their text boxes
+    UiRect header[4]{}, box[4]{};  // the sections: headers and their text boxes
     HelpText sections[4];
     HelpText quote;
-    int32_t link = -1;                // DAT_00686960: the link clicked
+    int32_t link = -1;  // DAT_00686960: the link clicked
     BaseButton* ok_button = nullptr;
 
     void redraw() override;
@@ -459,9 +466,7 @@ struct NewTechWinState : ScreenWin {
         link = std::atoi(target->c_str());
         sw_close(this);
     }
-    void log_state() override {
-        std::fprintf(stderr, "newtechwin tech %d from %d\n", tech, from);
-    }
+    void log_state() override { std::fprintf(stderr, "newtechwin tech %d from %d\n", tech, from); }
 };
 
 void NewTechWinState::redraw() {
@@ -580,8 +585,8 @@ int32_t THISCALL NewTechWin_exec(uint8_t*, int32_t tech_id, int32_t from) {
     }
     help_load_text(&w.quote, "BLURBSX", ("TECH" + std::to_string(tech_id)).c_str(), true);
     sw_init(&w, (ScreenWidth - W) / 2, (ScreenHeight - H) / 2, W, H, false);
-    w.ok_button = sw_button(&w, label_get(101), -1, w.ok.left, w.ok.top, w.ok.right - w.ok.left,
-                            w.ok.bottom - w.ok.top, 0, find_font(0xE, 1));
+    w.ok_button = sw_button(&w, label_get(101), -1, w.ok.left, w.ok.top, w.ok.right - w.ok.left, w.ok.bottom - w.ok.top,
+                            0, find_font(0xE, 1));
     // The voice clip (voices\techN.mp3 on FacilityVoice, at the voices group's volume) when the
     // viewer is human and voiceovers are on (GameMorePreferences 0x4000).
     std::string voice = "voices\\tech" + std::to_string(tech_id) + ".mp3";
@@ -606,8 +611,7 @@ int32_t THISCALL NewTechWin_exec(uint8_t*, int32_t tech_id, int32_t from) {
     return 0;
 }
 
-namespace {
-}  // namespace
+namespace {}  // namespace
 
 Sprite* tech_picture(int32_t t) {
     if (t < 0 || t >= 89) return nullptr;
@@ -655,8 +659,7 @@ int32_t GAMEAPI tech_pick(int32_t f, int32_t is_free, int32_t from, const char* 
                 if (!has_tech(Tech[t].preq_tech1, f) && !has_tech(Tech[t].preq_tech2, f)) continue;
             } else {
                 if (!tech_avail(t, f)) continue;
-                if (listed && !is_free && (t + (f - fa.tech_ranking)) % 3 == 0 && (t > 6 || fa.tech_ranking))
-                    continue;
+                if (listed && !is_free && (t + (f - fa.tech_ranking)) % 3 == 0 && (t > 6 || fa.tech_ranking)) continue;
             }
             if (tech_category(t) != category) continue;
             // The display weights: drawn and discarded.
@@ -711,6 +714,7 @@ void THISCALL Console_set_ai(uint8_t*, int32_t f) {
 void techwin_log_state() {
     int32_t f = CurrentPlayerFaction;
     const Faction& fa = Factions[f];
-    std::fprintf(stderr, "techstate f%d research %d accumulated %d cost %d ai %d %d %d %d rules %#x\n", f, fa.tech_research_id,
-                 fa.tech_accumulated, fa.tech_cost, fa.AI_fight, fa.AI_growth, fa.AI_tech, fa.AI_wealth, (uint32_t)GameRules & 0xFFFF);
+    std::fprintf(stderr, "techstate f%d research %d accumulated %d cost %d ai %d %d %d %d rules %#x\n", f,
+                 fa.tech_research_id, fa.tech_accumulated, fa.tech_cost, fa.AI_fight, fa.AI_growth, fa.AI_tech,
+                 fa.AI_wealth, (uint32_t)GameRules & 0xFFFF);
 }

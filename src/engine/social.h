@@ -13,8 +13,9 @@
 // some penalties); unless choices_only, also Ascetic Virtues, Living Refinery, temples, the
 // faction's base modifiers (SE_*_base) and the faction's SOCIAL floor/halving bonuses.
 // `unused` is not read.
-ADDR(0x5B4210) void GAMEAPI social_calc(const int32_t* choices, int32_t* effects, int32_t faction_id,
-                                        int32_t unused, int32_t choices_only);
+ADDR(0x5B4210)
+void GAMEAPI
+    social_calc(const int32_t* choices, int32_t* effects, int32_t faction_id, int32_t unused, int32_t choices_only);
 // Start of the faction's turn: adopts the pending choice and recomputes all effect arrays.
 ADDR(0x5B44D0) void GAMEAPI social_upkeep(int32_t faction_id);
 // Energy cost of switching from the current choice to `choices` (0 if unchanged).
@@ -29,8 +30,9 @@ ADDR(0x5B4730) int32_t GAMEAPI society_avail(int32_t category, int32_t model, in
 // AI settings; picks the best choice, pays the upheaval and applies it. With `out`: writes the best
 // choice for the given priorities (growth, tech, wealth, power; growth_or_effect > 100 selects
 // effect index growth_or_effect - 100 with the faction's settings) without applying it.
-ADDR(0x5B4790) void GAMEAPI social_ai(int32_t faction_id, int32_t growth_or_effect, int32_t tech, int32_t wealth,
-                                      int32_t power, int32_t* out);
+ADDR(0x5B4790)
+void GAMEAPI
+    social_ai(int32_t faction_id, int32_t growth_or_effect, int32_t tech, int32_t wealth, int32_t power, int32_t* out);
 // Social engineering dialog for faction_id (human players), then applies the choice.
 ADDR(0x5B5620) void GAMEAPI social_select(int32_t faction_id);
 // Bubble sort of id_list by ascending value_list (both of count entries); restarts after each swap.

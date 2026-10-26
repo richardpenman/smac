@@ -136,16 +136,11 @@ int32_t GAMEAPI parse_string(const char* src, char* dst) {
             }
             if (select) {
                 int32_t skip;
-                if (colons == 1)
-                    skip = plural != 0;
-                else if (colons == 2)
-                    skip = gender;
-                else if (colons == 3)
-                    skip = (gender != 0) + (plural ? 2 : 0);
-                else if (colons == 5)
-                    skip = (plural ? 3 : 0) + gender;
-                else
-                    skip = colons;
+                if (colons == 1) skip = plural != 0;
+                else if (colons == 2) skip = gender;
+                else if (colons == 3) skip = (gender != 0) + (plural ? 2 : 0);
+                else if (colons == 5) skip = (plural ? 3 : 0) + gender;
+                else skip = colons;
                 while (skip) {
                     if (*p++ == ':') skip--;
                 }

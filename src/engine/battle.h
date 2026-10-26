@@ -50,19 +50,20 @@ ADDR(0x500560) int32_t GAMEAPI shoot(int32_t faction_id_atk, int32_t faction_id_
 ADDR(0x500B60) void GAMEAPI planet_busting(int32_t veh_id, int32_t x, int32_t y);
 // Terrain defense multiplier (2: x1, 3: x1.5, 4: x2) of faction_id's unit veh_id_def at (x, y)
 // against veh_id_atk (-1 none). Sets VehBattleDisplayTerrain.
-ADDR(0x5010C0) int32_t GAMEAPI defense_value(int32_t faction_id, int32_t x, int32_t y, int32_t veh_id_def,
-                                             int32_t veh_id_atk);
+ADDR(0x5010C0)
+int32_t GAMEAPI defense_value(int32_t faction_id, int32_t x, int32_t y, int32_t veh_id_def, int32_t veh_id_atk);
 // Morale level of a native (faction 0) vehicle.
 ADDR(0x501350) int32_t GAMEAPI morale_alien(int32_t veh_id, int32_t faction_id_vs_native);
 // Psi combat value scaled by the faction's PSI rule and psi-related secret projects (is_attack: 1 offense).
 ADDR(0x501500) int32_t GAMEAPI psi_factor(int32_t value, int32_t faction_id, int32_t is_attack, int32_t is_fungal_twr);
 // Offense strength of veh_id (weapon x morale), as attacker (is_defender 0) or as the defender
 // fighting back in an artillery duel (1). Stores the morale used in VehBasicBattleMorale.
-ADDR(0x5015B0) int32_t GAMEAPI get_basic_offense(int32_t veh_id, int32_t veh_id_def, int32_t psi_combat,
-                                                 int32_t is_bombard, int32_t is_defender);
+ADDR(0x5015B0)
+int32_t GAMEAPI
+    get_basic_offense(int32_t veh_id, int32_t veh_id_def, int32_t psi_combat, int32_t is_bombard, int32_t is_defender);
 // Defense strength of veh_id (armor x morale) against veh_id_atk (-1 none).
-ADDR(0x501940) int32_t GAMEAPI get_basic_defense(int32_t veh_id, int32_t veh_id_atk, int32_t psi_combat,
-                                                 int32_t is_bombard);
+ADDR(0x501940)
+int32_t GAMEAPI get_basic_defense(int32_t veh_id, int32_t veh_id_atk, int32_t psi_combat, int32_t is_bombard);
 // Clears the battle display modifiers (VehBattleModCount, VehBattleState).
 ADDR(0x501D30) void GAMEAPI battle_init();
 // Adds a modifier line (percent value, text) to the battle display of a side (0 offense, 1 defense).
@@ -70,8 +71,9 @@ ADDR(0x501D50) void GAMEAPI add_bat(int32_t side, int32_t value, const char* tex
 // Offense and defense strengths of a battle with all modifiers (the odds display lines in
 // VehBattleDisplay/VehBattleModifier). combat_type bits: 1 artillery, 2 artillery duel, 8/0x10
 // air-to-air. Always returns 0.
-ADDR(0x501DA0) int32_t GAMEAPI battle_compute(int32_t veh_id_atk, int32_t veh_id_def, int32_t* offense_out,
-                                              int32_t* defense_out, int32_t combat_type);
+ADDR(0x501DA0)
+int32_t GAMEAPI battle_compute(int32_t veh_id_atk, int32_t veh_id_def, int32_t* offense_out, int32_t* defense_out,
+                               int32_t combat_type);
 // Best defender of the stack of veh_id_def against veh_id_atk (-1 none).
 ADDR(0x5044D0) int32_t GAMEAPI best_defender(int32_t veh_id_def, int32_t veh_id_atk, int32_t check_arty);
 // Explosion/combat animation at (x, y) (UI: animation and sound only; the result is unused).
@@ -79,14 +81,17 @@ ADDR(0x5044D0) int32_t GAMEAPI best_defender(int32_t veh_id_def, int32_t veh_id_
 ADDR_NATIVE(0x504AA0) int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags);
 // A unit dies in battle: counted in units_lost; a captured non-combat unit (killer of a unit that
 // is an artifact... see battle.cpp) changes sides instead. Returns 1 if the vehicle was killed.
-ADDR(0x505D80) int32_t GAMEAPI battle_kill(int32_t veh_id, int32_t* kill_count, int32_t* capture_count,
-                                           int32_t* energy, int32_t veh_id_killer, int32_t faction_id_killer);
+ADDR(0x505D80)
+int32_t GAMEAPI battle_kill(int32_t veh_id, int32_t* kill_count, int32_t* capture_count, int32_t* energy,
+                            int32_t veh_id_killer, int32_t faction_id_killer);
 // battle_kill on every vehicle of a stack.
-ADDR(0x506130) void GAMEAPI battle_kill_stack(int32_t veh_id, int32_t* kill_count, int32_t* capture_count,
-                                              int32_t* energy, int32_t veh_id_killer, int32_t faction_id_killer);
+ADDR(0x506130)
+void GAMEAPI battle_kill_stack(int32_t veh_id, int32_t* kill_count, int32_t* capture_count, int32_t* energy,
+                               int32_t veh_id_killer, int32_t faction_id_killer);
 // battle_kill on the dead (and native) vehicles of a stack.
-ADDR(0x5061B0) void GAMEAPI battle_kill_chaff(int32_t veh_id, int32_t* kill_count, int32_t* capture_count,
-                                              int32_t* energy, int32_t veh_id_killer, int32_t faction_id_killer);
+ADDR(0x5061B0)
+void GAMEAPI battle_kill_chaff(int32_t veh_id, int32_t* kill_count, int32_t* capture_count, int32_t* energy,
+                               int32_t veh_id_killer, int32_t faction_id_killer);
 // Possible promotion of a battle winner.
 ADDR(0x5062B0) void GAMEAPI promote(int32_t veh_id);
 // After a base became empty: transports of AI factions at war nearby head for it.
@@ -99,10 +104,11 @@ ADDR(0x506650) int32_t GAMEAPI interceptor(int32_t faction_id_def, int32_t facti
 ADDR(0x477210) void GAMEAPI mon_enemy_destroyed(int32_t faction_id, int32_t faction_id_killed);
 // Attack by veh_id in direction dir (artillery: dir indexes TableOffset instead of NearOffset);
 // returns battle_fight_2's result.
-ADDR(0x506A60) int32_t GAMEAPI battle_fight(int32_t veh_id, int32_t dir, int32_t is_arty, int32_t is_real,
-                                         int32_t* def_out);
+ADDR(0x506A60)
+int32_t GAMEAPI battle_fight(int32_t veh_id, int32_t dir, int32_t is_arty, int32_t is_real, int32_t* def_out);
 // Attack by veh_id on (x, y). is_real 0: returns the odds (x8, or x4 for artillery) without fighting
 // and the defender in def_out. Otherwise fights; returns 1 if the attacker cannot act any more...
 // (see battle.cpp).
-ADDR(0x506AF0) int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y, int32_t is_arty,
-                                              int32_t is_real, int32_t* def_out);
+ADDR(0x506AF0)
+int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y, int32_t is_arty, int32_t is_real,
+                               int32_t* def_out);

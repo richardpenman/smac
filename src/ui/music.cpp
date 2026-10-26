@@ -198,7 +198,8 @@ bool load_amb(const char* path, AmbSet* set) {
                     uint8_t type = p[1];
                     p += 2;
                     uint32_t l = vlq();
-                    if (type == 0x51 && l == 3 && p + 3 <= e && t == 0) set->us_per_beat = p[0] << 16 | p[1] << 8 | p[2];
+                    if (type == 0x51 && l == 3 && p + 3 <= e && t == 0)
+                        set->us_per_beat = p[0] << 16 | p[1] << 8 | p[2];
                     p += l;
                     continue;
                 }
@@ -251,7 +252,7 @@ public:
     std::vector<Player> players;
     std::vector<Note> notes;
     std::map<int32_t, int32_t> pitch;  // group -> cents
-    std::map<int32_t, bool> looping;    // group -> +0xB0 flag
+    std::map<int32_t, bool> looping;  // group -> +0xB0 flag
     float volume = 63.0f / 127.0f;
     bool running = false;
     int32_t stream = 0, next_id = 1, rate = 44100;
@@ -342,7 +343,8 @@ public:
                 if (!p.loop) p.repeats--;
                 auto it = set->groups.find(p.group);
                 if (it != set->groups.end()) {
-                    int32_t lo = std::max(1, it->second.first), hi = std::min((int32_t)set->tracks.size() - 1, it->second.last);
+                    int32_t lo = std::max(1, it->second.first),
+                            hi = std::min((int32_t)set->tracks.size() - 1, it->second.last);
                     if (hi >= lo) p.track = lo + random(hi - lo + 1);
                 }
                 p.next = 0;
@@ -367,7 +369,8 @@ public:
                 advance(p, ticks, rate);
                 if (p.track < 0) {
                     auto it = set->groups.find(p.group);
-                    if (it != set->groups.end() && it->second.type == 1 && it->second.next >= 0) chain.push_back(it->second.next);
+                    if (it != set->groups.end() && it->second.type == 1 && it->second.next >= 0)
+                        chain.push_back(it->second.next);
                 }
             }
             players.erase(std::remove_if(players.begin(), players.end(), [](const Player& p) { return p.track < 0; }),
@@ -378,7 +381,8 @@ public:
                 int64_t len = (int64_t)s.samples.size() / s.channels;
                 bool loops = n.held && n.zone->loop_end > n.zone->loop_start && n.zone->loop_start >= 0 &&
                              n.zone->loop_end <= len;
-                float gl = n.gain * volume * (n.pan > 0 ? 1 - n.pan : 1), gr = n.gain * volume * (n.pan < 0 ? 1 + n.pan : 1);
+                float gl = n.gain * volume * (n.pan > 0 ? 1 - n.pan : 1),
+                      gr = n.gain * volume * (n.pan < 0 ? 1 + n.pan : 1);
                 for (int32_t i = 0; i < nf; i++) {
                     if (loops && n.pos >= (double)n.zone->loop_end)
                         n.pos -= (double)(n.zone->loop_end - n.zone->loop_start);
@@ -404,7 +408,8 @@ public:
                     }
                 }
             }
-            notes.erase(std::remove_if(notes.begin(), notes.end(), [](const Note& n) { return n.fade <= 0; }), notes.end());
+            notes.erase(std::remove_if(notes.begin(), notes.end(), [](const Note& n) { return n.fade <= 0; }),
+                        notes.end());
         }
         return true;
     }
@@ -493,11 +498,11 @@ struct MusicObj {
     virtual void m140() {}
     virtual void m144() {}
     virtual void m148() {}
-    virtual void m14c() { f6c = true; }   // 0x447270
+    virtual void m14c() { f6c = true; }  // 0x447270
     virtual void m150() { f6c = false; }  // 0x447280
     virtual void m154() {}
     virtual void m158() {}
-    virtual void m15c() { f6d = true; }   // 0x447290
+    virtual void m15c() { f6d = true; }  // 0x447290
     virtual void m160() { f6d = false; }  // 0x4472A0
     virtual void m164() {}
 };
@@ -511,7 +516,7 @@ struct MusicA : MusicObj {
         play(3);
     }
     void m130() override { f58++; }  // 0x448280
-    void m13c() override {           // 0x447DD0
+    void m13c() override {  // 0x447DD0
         S.c00683c30++;
         if (S.c00683c38 == 1) {
             if (S.c00683c30 % 7 != 0) {
@@ -658,9 +663,9 @@ struct MusicS : MusicObj {
         base_play();
         play(0x11);
     }
-    void m130() override { f58++; }    // 0x4476E0
+    void m130() override { f58++; }  // 0x4476E0
     void m138() override { play(0xF); }  // 0x447840
-    void m13c() override {             // 0x4476F0
+    void m13c() override {  // 0x4476F0
         if (S.c00683c14 > 0x12) S.c00683c14 = 0x11;
         bool due = S.c0074dacc > 1;
         S.c0074dacc++;
@@ -876,7 +881,8 @@ bool music_render(const char* path, int32_t seconds) {
         peak = std::max(peak, std::fabs(c));
     }
     std::fclose(f);
-    std::fprintf(stderr, "musicrender %s: %d s, rms %.4f, peak %.3f\n", path, seconds, std::sqrt(sum / buf.size()), peak);
+    std::fprintf(stderr, "musicrender %s: %d s, rms %.4f, peak %.3f\n", path, seconds, std::sqrt(sum / buf.size()),
+                 peak);
     return true;
 }
 

@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <cstddef>
 
-
 const int MaxNaturalNum = 16;
 const int MaxLandmarkNum = 64;
 const int MaxRegionNum = 128;
@@ -46,7 +45,7 @@ const int MaxResourceNum = 4;
 const int MaxEnergyNum = 3;
 
 const int MaxMandateNum = 4;
-const int MaxFacilityNum = 64; // 0 slot unused
+const int MaxFacilityNum = 64;  // 0 slot unused
 const int MaxSecretProjectNum = 64;
 const int MaxTerrainNum = 20;
 const int MaxSocialCatNum = 4;
@@ -85,8 +84,8 @@ const int SP_Destroyed = -2;
 const int SP_ID_First = 70;
 const int SP_ID_Last = 133;
 const int Fac_ID_First = 1;
-const int Fac_ID_Last = 64; // facilities that can be built on the base
-const int Fac_All_ID_Last = 69; // includes satellites and stockpile energy
+const int Fac_ID_Last = 64;  // facilities that can be built on the base
+const int Fac_All_ID_Last = 69;  // includes satellites and stockpile energy
 const int Tech_ID_First = 0;
 const int Tech_ID_Last = 88;
 
@@ -343,21 +342,21 @@ enum GameStateFlag {
     STATE_GAME_DONE = 0x1,
     STATE_UNK_2 = 0x2,
     STATE_UNK_4 = 0x4,
-    STATE_FINAL_SCORE_DONE = 0x8, // end game score screen has been shown to player
+    STATE_FINAL_SCORE_DONE = 0x8,  // end game score screen has been shown to player
     STATE_IS_SCENARIO = 0x10,
     STATE_SCENARIO_CHEATED_FLAG = 0x20,
     STATE_SCENARIO_EDITOR = 0x40,
     STATE_OMNISCIENT_VIEW = 0x80,
-    STATE_UNK_100 = 0x100, // Path_continents
-    STATE_UNK_200 = 0x200, // rankings
+    STATE_UNK_100 = 0x100,  // Path_continents
+    STATE_UNK_200 = 0x200,  // rankings
     STATE_UNK_400 = 0x400,
-    STATE_UNK_800 = 0x800, // time expired? MP related? NOBONUSATEND
+    STATE_UNK_800 = 0x800,  // time expired? MP related? NOBONUSATEND
     STATE_DEBUG_MODE = 0x1000,
     STATE_VICTORY_CONQUER = 0x2000,
-    STATE_DISPLAYED_COUNCIL_AVAIL_MSG = 0x4000, // set when #COUNCILOPEN is displayed to show once
+    STATE_DISPLAYED_COUNCIL_AVAIL_MSG = 0x4000,  // set when #COUNCILOPEN is displayed to show once
     STATE_SCN_VICT_TERRITORY_COUNT_OBJ = 0x8000,
-    STATE_COUNCIL_HAS_CONVENED = 0x10000, // set 1st time Planetary Council is convened
-    STATE_VOLCANO_ERUPTED = 0x20000, // #VOLCANO, tied to Planet ecology; can only be triggered once
+    STATE_COUNCIL_HAS_CONVENED = 0x10000,  // set 1st time Planetary Council is convened
+    STATE_VOLCANO_ERUPTED = 0x20000,  // #VOLCANO, tied to Planet ecology; can only be triggered once
     STATE_SCN_VICT_ALL_ARTIFACTS_OBJ_UNIT = 0x40000,
     STATE_SCN_VICT_HIGHEST_AC_SCORE_WINS = 0x80000,
     STATE_PERIHELION_ACTIVE = 0x100000,
@@ -368,7 +367,7 @@ enum GameStateFlag {
     STATE_SCN_VICT_TERRAIN_ENH_COUNT_OBJ = 0x2000000,
     STATE_SCN_VICT_BASE_FACIL_COUNT_OBJ = 0x4000000,
     STATE_EDITOR_ONLY_MODE = 0x8000000,
-    STATE_UNK_10000000 = 0x10000000, // save_daemon
+    STATE_UNK_10000000 = 0x10000000,  // save_daemon
     STATE_SCN_VICT_POPULATION_COUNT_OBJ = 0x20000000,
     STATE_SCN_VICT_TECH_COUNT_OBJ = 0x40000000,
     STATE_SCN_VICT_CREDITS_COUNT_OBJ = 0x80000000,
@@ -414,9 +413,9 @@ enum GameMoreRulesFlag {
     MRULES_SCN_UNITY_PODS_NO_TECH = 0x2,
     MRULES_NO_PLANETARY_COUNCIL = 0x4,
     MRULES_NO_SOCIAL_ENGINEERING = 0x8,
-    MRULES_UNK_10 = 0x10, // multiplayer simultaneous moves related
-    MRULES_UNK_20 = 0x20, // save_daemon / load_daemon
-    MRULES_UNK_40 = 0x40, // control_turn
+    MRULES_UNK_10 = 0x10,  // multiplayer simultaneous moves related
+    MRULES_UNK_20 = 0x20,  // save_daemon / load_daemon
+    MRULES_UNK_40 = 0x40,  // control_turn
     MRULES_UNK_80 = 0x80,
 };
 
@@ -429,7 +428,7 @@ enum GameWarningsFlag {
     WARN_STOP_GOLDEN_AGE = 0x20,
     WARN_STOP_GOLDEN_AGE_END = 0x40,
     WARN_STOP_NUTRIENT_SHORTAGE = 0x80,
-    WARN_STOP_UNK_100 = 0x100, // no text, not visible in PrefWin; set with default warning
+    WARN_STOP_UNK_100 = 0x100,  // no text, not visible in PrefWin; set with default warning
     WARN_STOP_BUILD_OUT_OF_DATE = 0x200,
     WARN_STOP_COMBAT_VEH_BUILT = 0x400,
     WARN_STOP_POP_LIMIT_REACHED = 0x800,
@@ -444,36 +443,36 @@ enum GameWarningsFlag {
 enum GamePreferencesFlag {
     PREF_BSC_PAUSE_END_TURN = 0x1,
     PREF_BSC_AUTOSAVE_EACH_TURN = 0x2,
-    PREF_BSC_DONT_QUICK_MOVE_ENEMY_VEH = 0x4, // flag set when unchecked
+    PREF_BSC_DONT_QUICK_MOVE_ENEMY_VEH = 0x4,  // flag set when unchecked
     PREF_ADV_FAST_BATTLE_RESOLUTION = 0x8,
-    PREF_UNK_10 = 0x10, // no text, not visible in PrefWin; set with default preferences
+    PREF_UNK_10 = 0x10,  // no text, not visible in PrefWin; set with default preferences
     PREF_BSC_TUTORIAL_MSGS = 0x20,
     //
     PREF_AV_MAP_ANIMATIONS = 0x80,
     PREF_MAP_SHOW_GRID = 0x100,
     PREF_MAP_SHOW_BASE_GRID = 0x200,
     PREF_AV_VOLUME_SFX_TOGGLE = 0x400,
-    PREF_AV_SOUND_EFFECTS = 0x400, // not displayed
+    PREF_AV_SOUND_EFFECTS = 0x400,  // not displayed
     PREF_AV_VOLUME_MUSIC_TOGGLE = 0x800,
-    PREF_AV_BACKGROUND_MUSIC = 0x800, // not displayed
+    PREF_AV_BACKGROUND_MUSIC = 0x800,  // not displayed
     PREF_BSC_MOUSE_EDGE_SCROLL_VIEW = 0x1000,
     //
     PREF_BSC_AUTO_DESIGN_VEH = 0x4000,
-    PREF_BSC_DONT_QUICK_MOVE_ALLY_VEH = 0x8000, // flag set when unchecked
+    PREF_BSC_DONT_QUICK_MOVE_ALLY_VEH = 0x8000,  // flag set when unchecked
     PREF_AUTO_AIR_VEH_RET_HOME_FUEL_RNG = 0x10000,
     PREF_AUTO_FORMER_RAISE_LWR_TERRAIN = 0x20000,
-    PREF_AV_INTERLUDES_DISABLED = 0x40000, // flag set when unchecked
+    PREF_AV_INTERLUDES_DISABLED = 0x40000,  // flag set when unchecked
     PREF_ADV_NO_CENTER_VEH_ORDERS = 0x80000,
     PREF_AUTO_END_MOVE_SPOT_VEH_PACT = 0x100000,
     PREF_AUTO_END_MOVE_SPOT_VEH_TREATY = 0x200000,
     PREF_AUTO_END_MOVE_SPOT_VEH_TRUCE = 0x400000,
     PREF_AUTO_END_MOVE_SPOT_VEH_WAR = 0x800000,
     PREF_AUTO_FORMER_PLANT_FORESTS = 0x1000000,
-    PREF_AUTO_FORMER_BUILD_ADV = 0x2000000, // condensers, boreholes, etc.
+    PREF_AUTO_FORMER_BUILD_ADV = 0x2000000,  // condensers, boreholes, etc.
     //
     PREF_AV_SLIDING_WINDOWS = 0x8000000,
     PREF_AV_SECRET_PROJECT_MOVIES = 0x10000000,
-    PREF_ADV_RADIO_BTN_NOT_SEL_SING_CLK = 0x20000000, // flag set when unchecked
+    PREF_ADV_RADIO_BTN_NOT_SEL_SING_CLK = 0x20000000,  // flag set when unchecked
     PREF_AUTO_DONT_END_MOVE_DIFF_TRIAD = 0x40000000,
     PREF_AUTO_WAKE_VEH_TRANS_REACH_LAND = 0x80000000,
 };
@@ -494,7 +493,7 @@ enum GameMorePreferencesFlag {
     MPREF_MAP_SHOW_PROD_WITH_BASE_NAMES = 0x1000,
     MPREF_MAP_SHOW_BASE_NAMES = 0x2000,
     MPREF_AV_VOLUME_VOICE_TOGGLE = 0x4000,
-    MPREF_AV_VOICEOVER_TECH_FAC = 0x4000, // not displayed
+    MPREF_AV_VOICEOVER_TECH_FAC = 0x4000,  // not displayed
     MPREF_ADV_CONFIRM_ODDS_BF_ATTACKING = 0x8000,
     MPREF_MAP_SHOW_FLAT_TERRAIN = 0x10000,
     MPREF_AV_VOICEOVER_STOP_CLOSE_POPUP = 0x20000,
@@ -502,10 +501,10 @@ enum GameMorePreferencesFlag {
     MPREF_AV_SLIDING_SCROLLBARS = 0x80000,
     MPREF_BSC_AUTO_PRUNE_OBS_VEH = 0x100000,
     MPREF_ADV_DETAIL_MAIN_MENUS = 0x200000,
-    MPREF_AUTO_FORMER_CANT_BUILD_ROADS = 0x400000, // or tubes; flag set when unchecked
+    MPREF_AUTO_FORMER_CANT_BUILD_ROADS = 0x400000,  // or tubes; flag set when unchecked
     MPREF_MAP_SHOW_GRID_OCEAN_SQ = 0x800000,
-    MPREF_AV_MONUMENTS_DISABLED = 0x1000000, // flag set when unchecked
-    MPREF_MAP_HIDE_ACTIVE_VEH_GOTO_PATH = 0x2000000, // flag set when unchecked
+    MPREF_AV_MONUMENTS_DISABLED = 0x1000000,  // flag set when unchecked
+    MPREF_MAP_HIDE_ACTIVE_VEH_GOTO_PATH = 0x2000000,  // flag set when unchecked
 };
 
 enum DiffLevel {
@@ -631,24 +630,24 @@ enum DiploStatus {
     DIPLO_UNK_800 = 0x800,
     DIPLO_HAVE_INFILTRATOR = 0x1000,
     DIPLO_WANT_TO_TALK = 0x2000,
-    DIPLO_UNK_4000 = 0x4000, // introduce
-    DIPLO_UNK_8000 = 0x8000, // act_of_aggression, removed when vendetta ends
-    DIPLO_UNK_10000 = 0x10000, // "informal" truce status?
+    DIPLO_UNK_4000 = 0x4000,  // introduce
+    DIPLO_UNK_8000 = 0x8000,  // act_of_aggression, removed when vendetta ends
+    DIPLO_UNK_10000 = 0x10000,  // "informal" truce status?
     DIPLO_UNK_20000 = 0x20000,
-    DIPLO_ATROCITY_VICTIM = 0x40000, // atrocity / major_atrocity
-    DIPLO_MAJOR_ATROCITY_VICTIM = 0x80000, // major_atrocity
-    DIPLO_UNK_100000 = 0x100000, // treaty_off
+    DIPLO_ATROCITY_VICTIM = 0x40000,  // atrocity / major_atrocity
+    DIPLO_MAJOR_ATROCITY_VICTIM = 0x80000,  // major_atrocity
+    DIPLO_UNK_100000 = 0x100000,  // treaty_off
     DIPLO_UNK_200000 = 0x200000,
     DIPLO_UNK_400000 = 0x400000,
-    DIPLO_UNK_800000 = 0x800000, // treaty_on
-    DIPLO_UNK_1000000 = 0x1000000, // treaty_off
+    DIPLO_UNK_800000 = 0x800000,  // treaty_on
+    DIPLO_UNK_1000000 = 0x1000000,  // treaty_off
     DIPLO_HAVE_SURRENDERED = 0x2000000,
-    DIPLO_UNK_4000000 = 0x4000000, // wants_to_attack
-    DIPLO_UNK_8000000 = 0x8000000, // whose_territory
-    DIPLO_UNK_10000000 = 0x10000000, // setup_player
-    DIPLO_UNK_20000000 = 0x20000000, // enemy_diplomacy
-    DIPLO_UNK_40000000 = 0x40000000, // encounter
-    DIPLO_UNK_80000000 = 0x80000000, // treaty_on
+    DIPLO_UNK_4000000 = 0x4000000,  // wants_to_attack
+    DIPLO_UNK_8000000 = 0x8000000,  // whose_territory
+    DIPLO_UNK_10000000 = 0x10000000,  // setup_player
+    DIPLO_UNK_20000000 = 0x20000000,  // enemy_diplomacy
+    DIPLO_UNK_40000000 = 0x40000000,  // encounter
+    DIPLO_UNK_80000000 = 0x80000000,  // treaty_on
 };
 
 enum DiploAgenda {
@@ -671,24 +670,24 @@ enum DiploAgenda {
 };
 
 enum PlayerFlags {
-    PFLAG_MULTI_TECH_ACHIEVED = 0x2, // tech_achieved during network multiplayer
-    PFLAG_UNK_4 = 0x4, // study_artifact
-    PFLAG_UNK_10 = 0x10, // study_artifact
-    PFLAG_SELF_AWARE_COLONY_LOST_MAINT = 0x20, // used to even out lossy integer division
-    PFLAG_FIRST_SECRETS = 0x40, // set in tech_achieved for first faction gaining TFLAG_SECRETS
-    PFLAG_UNK_100 = 0x100, // setup_player
+    PFLAG_MULTI_TECH_ACHIEVED = 0x2,  // tech_achieved during network multiplayer
+    PFLAG_UNK_4 = 0x4,  // study_artifact
+    PFLAG_UNK_10 = 0x10,  // study_artifact
+    PFLAG_SELF_AWARE_COLONY_LOST_MAINT = 0x20,  // used to even out lossy integer division
+    PFLAG_FIRST_SECRETS = 0x40,  // set in tech_achieved for first faction gaining TFLAG_SECRETS
+    PFLAG_UNK_100 = 0x100,  // setup_player
     PFLAG_MAP_REVEALED = 0x200,
-    PFLAG_GENETIC_PLAGUE_INTRO = 0x400, // +1 to defense against after 1st time faction experiences
-    PFLAG_UNK_800 = 0x800, // enemy_strategy
-    PFLAG_UNK_1000 = 0x1000, // setup_player
-    PFLAG_UNK_2000 = 0x2000, // turn_upkeep
+    PFLAG_GENETIC_PLAGUE_INTRO = 0x400,  // +1 to defense against after 1st time faction experiences
+    PFLAG_UNK_800 = 0x800,  // enemy_strategy
+    PFLAG_UNK_1000 = 0x1000,  // setup_player
+    PFLAG_UNK_2000 = 0x2000,  // turn_upkeep
     PFLAG_UNK_4000 = 0x4000,
-    PFLAG_BEEN_ELECTED_GOVERNOR = 0x8000, // used to determine whether #GOVERNOR has been displayed
+    PFLAG_BEEN_ELECTED_GOVERNOR = 0x8000,  // used to determine whether #GOVERNOR has been displayed
     PFLAG_UNK_10000 = 0x10000,
-    PFLAG_UNK_20000 = 0x20000, // compute_score
-    PFLAG_UNK_40000 = 0x40000, // compute_score
-    PFLAG_UNK_80000 = 0x80000, // alt_set
-    PFLAG_UNK_100000 = 0x100000, // compute_score
+    PFLAG_UNK_20000 = 0x20000,  // compute_score
+    PFLAG_UNK_40000 = 0x40000,  // compute_score
+    PFLAG_UNK_80000 = 0x80000,  // alt_set
+    PFLAG_UNK_100000 = 0x100000,  // compute_score
     PFLAG_STRAT_ATK_ENEMY_HQ = 0x200000,
     PFLAG_COOP_WITH_HUMAN = 0x400000,
     PFLAG_TEAM_UP_VS_HUMAN = 0x800000,
@@ -721,63 +720,62 @@ enum MapItem {
     BIT_FUNGUS = 0x20,
     BIT_SOLAR = 0x40,
     BIT_RIVER = 0x80,
-    BIT_RIVER_SRC = 0x100, // River begins here for visual effect
-    BIT_RIVER_LAKE = 0x200, // Shows more water for visual effect
+    BIT_RIVER_SRC = 0x100,  // River begins here for visual effect
+    BIT_RIVER_LAKE = 0x200,  // Shows more water for visual effect
     BIT_BONUS_RES = 0x400,
     BIT_BUNKER = 0x800,
-    BIT_BASE_RADIUS = 0x1000, // Production radius; 21 tiles per base
+    BIT_BASE_RADIUS = 0x1000,  // Production radius; 21 tiles per base
     BIT_MONOLITH = 0x2000,
-    BIT_CANAL_COAST = 0x4000, // Land continent (this tile) + 1-tile canal + another continent.
+    BIT_CANAL_COAST = 0x4000,  // Land continent (this tile) + 1-tile canal + another continent.
     // Both regions must also meet certain tile count threshold.
     BIT_FARM = 0x8000,
     BIT_ENERGY_RES = 0x10000,
     BIT_MINERAL_RES = 0x20000,
     BIT_AIRBASE = 0x40000,
     BIT_SOIL_ENRICHER = 0x80000,
-    BIT_SUPPLY_REMOVE = 0x100000, // Prevent randomly generated pods from appearing here
+    BIT_SUPPLY_REMOVE = 0x100000,  // Prevent randomly generated pods from appearing here
     BIT_FOREST = 0x200000,
     BIT_CONDENSER = 0x400000,
     BIT_ECH_MIRROR = 0x800000,
     BIT_THERMAL_BORE = 0x1000000,
-    BIT_UNK_2000000 = 0x2000000, // Monolith on this tile has been used at least once
-    BIT_UNK_4000000 = 0x4000000, // This tile has supply pod when no unity scattering
-    BIT_UNK_8000000 = 0x8000000, // This tile has supply pod when no unity scattering
+    BIT_UNK_2000000 = 0x2000000,  // Monolith on this tile has been used at least once
+    BIT_UNK_4000000 = 0x4000000,  // This tile has supply pod when no unity scattering
+    BIT_UNK_8000000 = 0x8000000,  // This tile has supply pod when no unity scattering
     BIT_SUPPLY_POD = 0x10000000,
     BIT_NUTRIENT_RES = 0x20000000,
-    BIT_DOUBLE_SEA = 0x40000000, // Iterate adjacent 8 sea tiles, set bit if there are
+    BIT_DOUBLE_SEA = 0x40000000,  // Iterate adjacent 8 sea tiles, set bit if there are
     // more than one group of sea tiles separated by land tiles, can be same sea region.
     BIT_SENSOR = 0x80000000,
 };
 
-const uint32_t TerraformRules[20][2] = { // terrain enhancement, incompatible on same tile
-    {BIT_FARM,          BIT_FOREST}, // farm
-    {BIT_SOIL_ENRICHER, BIT_FOREST}, // soil enricher
-    {BIT_MINE,          BIT_MINE | BIT_SOLAR | BIT_FOREST | BIT_CONDENSER | BIT_ECH_MIRROR
-                        | BIT_THERMAL_BORE | BIT_SENSOR}, // mine
-    {BIT_SOLAR,         BIT_MINE | BIT_SOLAR | BIT_FOREST | BIT_CONDENSER | BIT_ECH_MIRROR
-                        | BIT_THERMAL_BORE | BIT_SENSOR}, // solar collector / tidal harness
-    {BIT_FOREST,        BIT_MINE | BIT_FUNGUS | BIT_SOLAR | BIT_FARM | BIT_SOIL_ENRICHER
-                        | BIT_FOREST | BIT_CONDENSER | BIT_ECH_MIRROR | BIT_THERMAL_BORE}, // forest
-    {BIT_ROAD,          0}, // road
-    {BIT_MAGTUBE,       0}, // magtube
-    {BIT_BUNKER,        BIT_AIRBASE}, // bunker
-    {BIT_AIRBASE,       BIT_BUNKER}, // airbase
-    {BIT_SENSOR,        BIT_MINE | BIT_SOLAR | BIT_CONDENSER | BIT_ECH_MIRROR
-                        | BIT_THERMAL_BORE}, // sensor
-    {0,                 BIT_FUNGUS}, // fungus remove
-    {BIT_FUNGUS,        BIT_MINE | BIT_SOLAR | BIT_FARM | BIT_SOIL_ENRICHER
-                        | BIT_FOREST}, // fungus plant
-    {BIT_CONDENSER,     BIT_MINE | BIT_SOLAR | BIT_FOREST | BIT_CONDENSER | BIT_ECH_MIRROR
-                        | BIT_THERMAL_BORE | BIT_SENSOR}, // condenser
-    {BIT_ECH_MIRROR,    BIT_MINE | BIT_SOLAR | BIT_FOREST | BIT_CONDENSER | BIT_ECH_MIRROR
-                        | BIT_THERMAL_BORE | BIT_SENSOR}, // echelon mirror
-    {BIT_THERMAL_BORE,  BIT_MINE | BIT_SOLAR | BIT_FARM | BIT_FOREST | BIT_CONDENSER
-                        | BIT_ECH_MIRROR | BIT_THERMAL_BORE | BIT_SENSOR}, // thermal borehole
-    {0,                 0}, // aquifer
-    {0,                 0}, // raise land
-    {0,                 0}, // lower land
-    {0,                 0}, // level terrain
-    {BIT_MONOLITH,      BIT_SUPPLY_POD | BIT_NUTRIENT_RES | BIT_BONUS_RES}, // monolith
+const uint32_t TerraformRules[20][2] = {
+    // terrain enhancement, incompatible on same tile
+    {BIT_FARM, BIT_FOREST},  // farm
+    {BIT_SOIL_ENRICHER, BIT_FOREST},  // soil enricher
+    {BIT_MINE,
+     BIT_MINE | BIT_SOLAR | BIT_FOREST | BIT_CONDENSER | BIT_ECH_MIRROR | BIT_THERMAL_BORE | BIT_SENSOR},  // mine
+    {BIT_SOLAR, BIT_MINE | BIT_SOLAR | BIT_FOREST | BIT_CONDENSER | BIT_ECH_MIRROR | BIT_THERMAL_BORE |
+                    BIT_SENSOR},  // solar collector / tidal harness
+    {BIT_FOREST, BIT_MINE | BIT_FUNGUS | BIT_SOLAR | BIT_FARM | BIT_SOIL_ENRICHER | BIT_FOREST | BIT_CONDENSER |
+                     BIT_ECH_MIRROR | BIT_THERMAL_BORE},  // forest
+    {BIT_ROAD, 0},  // road
+    {BIT_MAGTUBE, 0},  // magtube
+    {BIT_BUNKER, BIT_AIRBASE},  // bunker
+    {BIT_AIRBASE, BIT_BUNKER},  // airbase
+    {BIT_SENSOR, BIT_MINE | BIT_SOLAR | BIT_CONDENSER | BIT_ECH_MIRROR | BIT_THERMAL_BORE},  // sensor
+    {0, BIT_FUNGUS},  // fungus remove
+    {BIT_FUNGUS, BIT_MINE | BIT_SOLAR | BIT_FARM | BIT_SOIL_ENRICHER | BIT_FOREST},  // fungus plant
+    {BIT_CONDENSER,
+     BIT_MINE | BIT_SOLAR | BIT_FOREST | BIT_CONDENSER | BIT_ECH_MIRROR | BIT_THERMAL_BORE | BIT_SENSOR},  // condenser
+    {BIT_ECH_MIRROR, BIT_MINE | BIT_SOLAR | BIT_FOREST | BIT_CONDENSER | BIT_ECH_MIRROR | BIT_THERMAL_BORE |
+                         BIT_SENSOR},  // echelon mirror
+    {BIT_THERMAL_BORE, BIT_MINE | BIT_SOLAR | BIT_FARM | BIT_FOREST | BIT_CONDENSER | BIT_ECH_MIRROR |
+                           BIT_THERMAL_BORE | BIT_SENSOR},  // thermal borehole
+    {0, 0},  // aquifer
+    {0, 0},  // raise land
+    {0, 0},  // lower land
+    {0, 0},  // level terrain
+    {BIT_MONOLITH, BIT_SUPPLY_POD | BIT_NUTRIENT_RES | BIT_BONUS_RES},  // monolith
 };
 
 enum MapLandmark {
@@ -798,9 +796,9 @@ enum MapLandmark {
     LM_UNITY = 0x4000,
     LM_FOSSIL = 0x8000,
     LM_UNK_200000 = 0x200000,
-    LM_UNK_400000 = 0x400000, // set_dirty()
+    LM_UNK_400000 = 0x400000,  // set_dirty()
     LM_UNK_800000 = 0x800000,
-    LM_DISABLE = 0x80000000, // most landmark effects skipped
+    LM_DISABLE = 0x80000000,  // most landmark effects skipped
 };
 
 enum TerrainAltitude {
@@ -827,14 +825,14 @@ enum TerrainType {
     LEVEL_ROCKY = 2,
 };
 
-enum BaseResType { // base production, convoy types, cost factor
+enum BaseResType {  // base production, convoy types, cost factor
     RSC_NUTRIENT = 0,
     RSC_MINERAL = 1,
     RSC_ENERGY = 2,
     RSC_UNUSED = 3,
 };
 
-enum ResType { // bonus_at
+enum ResType {  // bonus_at
     RES_NONE = 0,
     RES_NUTRIENT = 1,
     RES_MINERAL = 2,
@@ -843,18 +841,18 @@ enum ResType { // bonus_at
 
 enum AIGoal {
     AI_GOAL_UNUSED = -1,
-    AI_GOAL_ATTACK = 0, // 'a', red
-    AI_GOAL_DEFEND = 2, // 'd', yellow
-    AI_GOAL_SCOUT = 3, // 's', pink
-    AI_GOAL_UNK_1 = 6, // 'n', blue ; related to tile visibility
-    AI_GOAL_UNK_2 = 7, // related to movement
-    AI_GOAL_COLONIZE = 8, // 'c', teal
-    AI_GOAL_TERRAFORM_LAND = 9, // 'f', green ' ;
-    AI_GOAL_UNK_3 = 11, // related to combat
+    AI_GOAL_ATTACK = 0,  // 'a', red
+    AI_GOAL_DEFEND = 2,  // 'd', yellow
+    AI_GOAL_SCOUT = 3,  // 's', pink
+    AI_GOAL_UNK_1 = 6,  // 'n', blue ; related to tile visibility
+    AI_GOAL_UNK_2 = 7,  // related to movement
+    AI_GOAL_COLONIZE = 8,  // 'c', teal
+    AI_GOAL_TERRAFORM_LAND = 9,  // 'f', green ' ;
+    AI_GOAL_UNK_3 = 11,  // related to combat
     AI_GOAL_ECHELON_MIRROR = 13,
     AI_GOAL_PREV_DEFEND = 16,
     AI_GOAL_TERRAFORM_WATER = 25,
-    AI_GOAL_UNK_4 = 41, // '^', white
+    AI_GOAL_UNK_4 = 41,  // '^', white
     AI_GOAL_CONDENSER = 73,
     AI_GOAL_THERMAL_BOREHOLE = 105,
     AI_GOAL_SENSOR_ARRAY = 121,
@@ -965,33 +963,33 @@ enum VictoryType {
 };
 
 enum MapWinState {
-    MAPWIN_DRAW_TRANSLUCENT = 0x1, // render translucent sprites, farm/forest/kelp excl. fungus
+    MAPWIN_DRAW_TRANSLUCENT = 0x1,  // render translucent sprites, farm/forest/kelp excl. fungus
     MAPWIN_UNK_2 = 0x2,
-    MAPWIN_DRAW_SITES = 0x4, // debug overlay
-    MAPWIN_UNK_10 = 0x10, // render some random yellow sprites
-    MAPWIN_DRAW_IMPROVEMENTS = 0x20, // render terrain improvements
+    MAPWIN_DRAW_SITES = 0x4,  // debug overlay
+    MAPWIN_UNK_10 = 0x10,  // render some random yellow sprites
+    MAPWIN_DRAW_IMPROVEMENTS = 0x20,  // render terrain improvements
     MAPWIN_DRAW_UNITS = 0x40,
     MAPWIN_DRAW_BASE_TILES = 0x80,
-    MAPWIN_DRAW_BONUS_RES = 0x200, // render supply pods, bonus resources, landmarks
+    MAPWIN_DRAW_BONUS_RES = 0x200,  // render supply pods, bonus resources, landmarks
     MAPWIN_DRAW_RIVERS = 0x400,
     MAPWIN_DRAW_BASE_NAMES = 0x800,
-    MAPWIN_HIDE_UNITS_BASES = 0x1000, // hide units/base tiles
-    MAPWIN_DRAW_GOALS = 0x2000, // debug overlay
-    MAPWIN_UNK_4000 = 0x4000, // zeros in almost every tile
+    MAPWIN_HIDE_UNITS_BASES = 0x1000,  // hide units/base tiles
+    MAPWIN_DRAW_GOALS = 0x2000,  // debug overlay
+    MAPWIN_UNK_4000 = 0x4000,  // zeros in almost every tile
     MAPWIN_DRAW_BORDERS = 0x10000,
     MAPWIN_DRAW_CURSOR_COMPASS = 0x20000,
     MAPWIN_UNK_40000 = 0x40000,
-    MAPWIN_DRAW_DIPLO_STATE = 0x100000, // show faction treaty status matrix in window corner
+    MAPWIN_DRAW_DIPLO_STATE = 0x100000,  // show faction treaty status matrix in window corner
     MAPWIN_SUPPORT_VIEW = 0x200000,
-    MAPWIN_UNK_400000 = 0x400000, // MapWin_draw_base_dest
-    MAPWIN_UNK_800000 = 0x800000, // MapWin_draw_base_dest
-    MAPWIN_DRAW_SOLID_RADIUS = 0x1000000, // faction base radius solid color terrain view
-    MAPWIN_HIDE_OCEAN_BASE = 0x2000000, // stop rendering ocean base layer
+    MAPWIN_UNK_400000 = 0x400000,  // MapWin_draw_base_dest
+    MAPWIN_UNK_800000 = 0x800000,  // MapWin_draw_base_dest
+    MAPWIN_DRAW_SOLID_RADIUS = 0x1000000,  // faction base radius solid color terrain view
+    MAPWIN_HIDE_OCEAN_BASE = 0x2000000,  // stop rendering ocean base layer
     MAPWIN_UNK_4000000 = 0x4000000,
-    MAPWIN_HIDE_TERRAIN = 0x10000000, // stop rendering all terrain
+    MAPWIN_HIDE_TERRAIN = 0x10000000,  // stop rendering all terrain
     MAPWIN_UNK_20000000 = 0x20000000,
     MAPWIN_UNK_40000000 = 0x40000000,
-    MAPWIN_DRAW_SOLID_BORDERS = 0x80000000, // faction borders solid color terrain view
+    MAPWIN_DRAW_SOLID_BORDERS = 0x80000000,  // faction borders solid color terrain view
 };
 
 enum WinState {
@@ -1085,5 +1083,3 @@ enum TextLabel {
     TL_Horizontal = 1090,
     TL_Vertical = 1091,
 };
-
-

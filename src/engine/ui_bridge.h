@@ -32,7 +32,7 @@ void ui_mapwins_clear_alt(int32_t x, int32_t y);
 // MapWin fields by byte offset of the original class (UI objects, opaque otherwise).
 inline int32_t& mapwin_field(uint8_t* win, uint32_t offset) { return *reinterpret_cast<int32_t*>(win + offset); }
 constexpr uint32_t kMapWinActive = 0x1DD74;  // non-zero while the window is in use
-GLOBAL(uint8_t, WorldMapWin, 0x8EB48C);      // the world window's map view (MapWin)
+GLOBAL(uint8_t, WorldMapWin, 0x8EB48C);  // the world window's map view (MapWin)
 // Fields of the main view (MainConsole's MapWin; CurrentPlayerFaction is its owner field).
 GLOBAL(int32_t, MapWinInVehMode, 0x939288);
 GLOBAL(int32_t, MapWinField23BE4, 0x939294);
@@ -50,7 +50,7 @@ void ui_editor_panel_show(bool show);
 
 // ---- PBEM diplomatic message lists (StringStruct objects, a UI class) ----
 // Each list object is 0x30 bytes: +0x10 entry count, +0x14 position; the rest are heap links.
-GLOBAL(uint8_t[8][0x30], DiploTextLists, 0x93A7B0);        // [1..7] used
+GLOBAL(uint8_t[8][0x30], DiploTextLists, 0x93A7B0);  // [1..7] used
 GLOBAL(uint8_t[8][8][0x30], DiploMessageLists, 0x737CD8);  // [i][j] used for 1 <= i < j <= 7
 // Not original functions: the list operations game_data performs inline.
 // Removes every entry and resets the position (and the flags word at +0x18).
@@ -82,8 +82,8 @@ void ui_pact_ends_dialog(int32_t withdrawn);
 int32_t THISCALL Console_upgrade_human(uint8_t* console, int32_t veh_id);
 
 // ---- popups ----
-ADDR_NATIVE(0x48C0A0) int32_t GAMEAPI popp(const char* file, const char* label, int32_t flags, const char* pcx,
-                                           int32_t flags2);
+ADDR_NATIVE(0x48C0A0)
+int32_t GAMEAPI popp(const char* file, const char* label, int32_t flags, const char* pcx, int32_t flags2);
 // Popup from a text file (X_pop_9 without picture); returns the choice (0: first).
 ADDR_NATIVE(0x5BF330) int32_t GAMEAPI X_pop_2(const char* label, const char* pcx, int32_t flags);
 
@@ -129,8 +129,8 @@ ADDR_NATIVE(0x459680) int32_t THISCALL MainInterface_init(uint8_t* self, int32_t
 ADDR_NATIVE(0x4219E0) int32_t THISCALL BattleWin_init(uint8_t* self);
 ADDR_NATIVE(0x51D890) int32_t THISCALL Console_init(uint8_t* self, int32_t flag);
 ADDR_NATIVE(0x51D7D0) void THISCALL Console_close(uint8_t* self);
-ADDR_NATIVE(0x5C9860) int32_t THISCALL MultiDebug_init(uint8_t* self, uint8_t* net_state, uint8_t* console,
-                                                       uint8_t* param);
+ADDR_NATIVE(0x5C9860)
+int32_t THISCALL MultiDebug_init(uint8_t* self, uint8_t* net_state, uint8_t* console, uint8_t* param);
 ADDR_NATIVE(0x5C98E0) void THISCALL MultiDebug_close(uint8_t* self);
 ADDR_NATIVE(0x471D50) int32_t THISCALL MessageWin_init(uint8_t* self);
 ADDR_NATIVE(0x429300) int32_t THISCALL Datalink_init(uint8_t* self);
@@ -156,8 +156,9 @@ void ui_delete_object(uint8_t* obj, bool with_vbase);
 typedef uint8_t*(GAMEAPI* BasePopAllocFn)();
 GLOBAL_NATIVE(BasePopAllocFn, BasePopAlloc, 0x696ECC);
 // Shows popup `label` of text file `file`. Returns 0 (choice in BasePop_choice) or an error code.
-ADDR_NATIVE(0x601BF0) int32_t THISCALL BasePop_start(uint8_t* pop, const char* file, const char* label, int32_t a3,
-                                                     int32_t a4, int32_t a5, int32_t a6);
+ADDR_NATIVE(0x601BF0)
+int32_t THISCALL
+    BasePop_start(uint8_t* pop, const char* file, const char* label, int32_t a3, int32_t a4, int32_t a5, int32_t a6);
 ADDR_NATIVE(0x6018A0) int32_t GAMEAPI BasePop_set_def_ok_text(const char* text);
 ADDR_NATIVE(0x601910) int32_t GAMEAPI BasePop_set_def_cancel_text(const char* text);
 // Error popup of SCRIPT.txt (veh module).
@@ -216,13 +217,13 @@ ADDR_NATIVE(0x607550) void THISCALL BaseButton_set_bubble_text(uint8_t* button, 
 ADDR_NATIVE(0x453710) void GAMEAPI load_faction_art(int32_t faction_id);
 
 // ---- vehicles, spotting (veh/stack modules) ----
-GLOBAL(uint8_t, Sounds, 0x749CF8);       // sound effects object (FX)
-GLOBAL(uint8_t, NetMsg, 0x805338);       // message box object
-GLOBAL(uint8_t, InfoWindow, 0x7AD2A0);   // status/info pane (Thinker's InfoWin)
+GLOBAL(uint8_t, Sounds, 0x749CF8);  // sound effects object (FX)
+GLOBAL(uint8_t, NetMsg, 0x805338);  // message box object
+GLOBAL(uint8_t, InfoWindow, 0x7AD2A0);  // status/info pane (Thinker's InfoWin)
 ADDR_NATIVE(0x446A00) void THISCALL FX_play(uint8_t* sounds, int32_t id);
 ADDR_NATIVE(0x446AD0) void THISCALL FX_fade(uint8_t* sounds, int32_t id);
-ADDR_NATIVE(0x47A890) int32_t THISCALL NetMsg_pop(uint8_t* msg, const char* label, int32_t delay, int32_t a3,
-                                                  const char* pcx);
+ADDR_NATIVE(0x47A890)
+int32_t THISCALL NetMsg_pop(uint8_t* msg, const char* label, int32_t delay, int32_t a3, const char* pcx);
 ADDR_NATIVE(0x458910) void THISCALL InfoWin_on_redraw(uint8_t* win);
 ADDR_NATIVE(0x5D5A70) void THISCALL GraphicWin_redraw(uint8_t* win);
 // Base window: recomputes and redraws the shown base (base_compute(1)) when it is visible and
@@ -265,8 +266,8 @@ ADDR_NATIVE(0x51E090) void GAMEAPI set_tamper();
 // Research choice dialog (TechWin on the stack; 0x5BEB70 runs FUN_00486510). AI factions (and
 // unattended viewers) choose without a dialog: tech_ai, or the best tech_val among the listed
 // techs. Headless: the AI choice for every faction.
-ADDR_NATIVE(0x5BEB70) int32_t GAMEAPI tech_pick(int32_t faction_id, int32_t is_free, int32_t from_faction_id,
-                                                const char* label);
+ADDR_NATIVE(0x5BEB70)
+int32_t GAMEAPI tech_pick(int32_t faction_id, int32_t is_free, int32_t from_faction_id, const char* label);
 ADDR_NATIVE(0x47A7D0) void THISCALL NetMsg_close(uint8_t* msg);
 // Shows the monuments window after a new monument (UI only).
 ADDR_NATIVE(0x476A50) void GAMEAPI monument(int32_t is_new);
@@ -287,8 +288,8 @@ void ui_tech_popup_open();
 void ui_tech_popup_show(int32_t tech_id, int32_t flags, int32_t faction_id, bool with_help);
 void ui_tech_popup_exec();
 // Alert popup (shown only to the viewer, with sound): label of SCRIPT.txt.
-ADDR_NATIVE(0x48C650) int32_t GAMEAPI popb(const char* label, int32_t flags, int32_t sound_id, const char* pcx,
-                                           int32_t a5);
+ADDR_NATIVE(0x48C650)
+int32_t GAMEAPI popb(const char* label, int32_t flags, int32_t sound_id, const char* pcx, int32_t a5);
 // Refreshes the main console's status displays.
 ADDR_NATIVE(0x514880) void THISCALL Console_update_data(uint8_t* console, int32_t a1);
 // Centers a map window on (x, y).
@@ -338,7 +339,7 @@ ADDR_NATIVE(0x58FBC0) char* GAMEAPI get_his_her(int32_t faction_id, int32_t mode
 // Discards pending keyboard and mouse input.
 ADDR_NATIVE(0x5FD120) void GAMEAPI flush_input();
 // Blitter scale factors (video module), reset to 1 by crash_landing.
-GLOBAL(int32_t, BlitDestScale, 0x696D18);    // piDestScale
+GLOBAL(int32_t, BlitDestScale, 0x696D18);  // piDestScale
 GLOBAL(int32_t, BlitSourceScale, 0x696D1C);  // piSourceScale
 // Not original functions: the UI parts of crash_landing (a function that keeps its windows,
 // buffers and flic players on its stack). drop: the landing sound (preference 0x400) and the
@@ -383,7 +384,8 @@ ADDR_NATIVE(0x5ADBF0) void GAMEAPI show_replay();
 // Main menu (new game, load, ...). Non-zero: quit.
 ADDR_NATIVE(0x58E360) int32_t GAMEAPI top_menu(int32_t a1);
 // Multiplayer lobby launch check (command line); non-zero when started from a lobby.
-ADDR_NATIVE(0x62D9E0) int32_t THISCALL Net_check_for_lobby(uint8_t* net, char* cmd_line, uint8_t* a2, int32_t a3, int32_t a4);
+ADDR_NATIVE(0x62D9E0)
+int32_t THISCALL Net_check_for_lobby(uint8_t* net, char* cmd_line, uint8_t* a2, int32_t a3, int32_t a4);
 // Sound effects initialisation (FX object Sounds).
 ADDR_NATIVE(0x445CD0) void THISCALL FX_init(uint8_t* sounds);
 ADDR_NATIVE(0x4C6B10) int32_t THISCALL Wave_is_playing(uint8_t* wave);
@@ -394,7 +396,7 @@ ADDR_NATIVE(0x58DB30) int32_t GAMEAPI multiplayer_init(int32_t a1);
 GLOBAL(uint8_t, DesktopWin, 0x937118);  // background GraphicWin behind the game windows
 ADDR_NATIVE(0x5D5250) void THISCALL GraphicWin_fill(uint8_t* win, int32_t color);
 ADDR_NATIVE(0x5ED9D0) void THISCALL Win_show(uint8_t* win, int32_t a1);
-GLOBAL(char[256], ReloadFilePath, 0x9B2078);   // control_game: alternate path for game_reload
+GLOBAL(char[256], ReloadFilePath, 0x9B2078);  // control_game: alternate path for game_reload
 GLOBAL(char[256], ReloadFileSource, 0x93AA0C);
 // Not original functions: the parts of control_game, control_turn and call_council that work on
 // windows, the registry or popup objects on the original's stack.
@@ -425,8 +427,9 @@ GLOBAL(uint8_t, ImgMapSoilEnr, 0x79A794);
 GLOBAL(uint8_t, ImgMapMine, 0x776A50);
 GLOBAL(uint8_t, ImgMapSolar, 0x7991F8);
 // Tutorial hint `label` at (x, y) (veh_id or -1) with an optional picture. Headless: nothing.
-ADDR_NATIVE(0x4BE650) void THISCALL TutWin_tut_map(uint8_t* win, const char* label, int32_t x, int32_t y, int32_t veh_id,
-                                                  uint8_t* image, int32_t a6, int32_t a7, int32_t a8);
+ADDR_NATIVE(0x4BE650)
+void THISCALL TutWin_tut_map(uint8_t* win, const char* label, int32_t x, int32_t y, int32_t veh_id, uint8_t* image,
+                             int32_t a6, int32_t a7, int32_t a8);
 // Base window: redraws when it shows veh_id's location.
 ADDR_NATIVE(0x41A8B0) void THISCALL BaseWin_check_veh(uint8_t* win, int32_t veh_id);
 // Sound effect id at a map location.
@@ -461,8 +464,9 @@ ADDR_NATIVE(0x45D310) void THISCALL SubInterface_set_iface_mode(uint8_t* win);
 ADDR_NATIVE(0x422C50) void THISCALL BattleWin_clear(uint8_t* win);
 ADDR_NATIVE(0x421B20) void THISCALL BattleWin_pulse_timer(uint8_t* win);
 ADDR_NATIVE(0x421B40) void THISCALL BattleWin_stop_timer(uint8_t* win);
-ADDR_NATIVE(0x4B8830) void THISCALL StatusWin_draw(uint8_t* win, int32_t veh_id_atk, int32_t veh_id_def, int32_t offense,
-                                                   int32_t defense, int32_t flag);
+ADDR_NATIVE(0x4B8830)
+void THISCALL StatusWin_draw(uint8_t* win, int32_t veh_id_atk, int32_t veh_id_def, int32_t offense, int32_t defense,
+                             int32_t flag);
 ADDR_NATIVE(0x4B9EA0) void THISCALL StatusWin_redraw(uint8_t* win);
 ADDR_NATIVE(0x4B8970) void THISCALL StatusWin_reset(uint8_t* win);
 GLOBAL(int32_t, InfoWinBattleShown, 0x8C6B3C);  // InfoWin field: a battle is shown in the pane
@@ -470,8 +474,8 @@ GLOBAL(int32_t, InfoWinBattleShown, 0x8C6B3C);  // InfoWin field: a battle is sh
 GLOBAL(int32_t, BaseWinMultiplayerRefresh, 0x6E8150);
 ADDR_NATIVE(0x415DD0) void THISCALL BaseWin_focus(uint8_t* win);
 // Redraws two tiles (attacker and defender) with their surroundings.
-ADDR_NATIVE(0x46B040) void GAMEAPI draw_tile_fixup_pair(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t a5,
-                                                     int32_t a6);
+ADDR_NATIVE(0x46B040)
+void GAMEAPI draw_tile_fixup_pair(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t a5, int32_t a6);
 // Popup of SCRIPT.txt shown to faction_id with the map centred on (x, y). Headless: 0.
 ADDR_NATIVE(0x4055A0) int32_t GAMEAPI POP3(const char* label, int32_t a2, int32_t faction_id, int32_t x, int32_t y);
 // Tutorial hint `bit` due (once per game, recorded in TutorialHintsShown) for a single-player

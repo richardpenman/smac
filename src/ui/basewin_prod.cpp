@@ -45,8 +45,7 @@ void refresh_base(uint8_t* self) {
     int32_t was = cur_base().worked_tiles;
     set_base(bwf(kBwBase));
     base_compute(0);
-    if (MultiplayerActive && !ControlTurnC && was != Bases[bwf(kBwBase)].worked_tiles &&
-        !bw_lock_base(CurrentBaseID))
+    if (MultiplayerActive && !ControlTurnC && was != Bases[bwf(kBwBase)].worked_tiles && !bw_lock_base(CurrentBaseID))
         bw_unlock_base(CurrentBaseID);
 }
 
@@ -182,24 +181,24 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
                 int32_t r = BasePop_exec_3(pop, 0, 0);
                 popup_delete(pop);
                 switch (r) {
-                    case 0:
-                        if (!no_lock) bw_unlock_base(CurrentBaseID);
-                        queue_count(faction, 1);
-                        return;
-                    case 1: cb.minerals_accumulated = kept; break;
-                    case 2: {
-                        for (int32_t j = 9; j > 1; j--) cb.queue_items[j] = cb.queue_items[j - 1];
-                        int32_t n = cb.queue_size + 1;
-                        cb.queue_size = n < 0 ? 0 : n > 9 ? 9 : n;
-                        slot = 1;
-                        cb.queue_items[1] = item;
-                        break;
-                    }
-                    case 3:
-                        if (cb.queue_size < 9) cb.queue_size++;
-                        slot = cb.queue_size;
-                        cb.queue_items[slot] = item;
-                        break;
+                case 0:
+                    if (!no_lock) bw_unlock_base(CurrentBaseID);
+                    queue_count(faction, 1);
+                    return;
+                case 1: cb.minerals_accumulated = kept; break;
+                case 2: {
+                    for (int32_t j = 9; j > 1; j--) cb.queue_items[j] = cb.queue_items[j - 1];
+                    int32_t n = cb.queue_size + 1;
+                    cb.queue_size = n < 0 ? 0 : n > 9 ? 9 : n;
+                    slot = 1;
+                    cb.queue_items[1] = item;
+                    break;
+                }
+                case 3:
+                    if (cb.queue_size < 9) cb.queue_size++;
+                    slot = cb.queue_size;
+                    cb.queue_items[slot] = item;
+                    break;
                 }
             }
         }
@@ -394,9 +393,7 @@ void THISCALL BaseWin_garrison_click(uint8_t* self, int32_t veh_id, int32_t x, i
         if (Win_is_visible(&BaseWin)) bw_close_window(self);
         else if (Win_is_visible(&ReportWindow)) console_not_reconstructed("ReportIf_done");
         return;
-    case 0x5A:
-        Console_editor_edit_veh(&MainConsole, veh_id);
-        break;
+    case 0x5A: Console_editor_edit_veh(&MainConsole, veh_id); break;
     default: break;
     }
     net_unlock_veh();

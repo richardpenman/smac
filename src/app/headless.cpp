@@ -83,13 +83,13 @@ static void write_state(const std::string& path) {
     };
     auto i32 = [](uint32_t addr) { return *reinterpret_cast<int32_t*>(mem::host(addr)); };
 #define REGION(name, addr, size) put(addr, mem::host(addr), size);
-#define REGION_VAR(name, addr, count_addr, elem)                                                     \
-    {                                                                                                \
-        uint32_t n = (uint32_t)i32(count_addr) * (elem);                                             \
-        const void* src = (addr) == 0x10000000   ? (const void*)MapTiles                             \
-                          : (addr) == 0x20000000 ? (const void*)MapAbstract                          \
-                                                 : (const void*)mem::host(addr);                     \
-        put(addr, src, src ? n : 0);                                                                 \
+#define REGION_VAR(name, addr, count_addr, elem)                                 \
+    {                                                                            \
+        uint32_t n = (uint32_t)i32(count_addr) * (elem);                         \
+        const void* src = (addr) == 0x10000000   ? (const void*)MapTiles         \
+                          : (addr) == 0x20000000 ? (const void*)MapAbstract      \
+                                                 : (const void*)mem::host(addr); \
+        put(addr, src, src ? n : 0);                                             \
     }
 #define MASK(addr, size)
 #include "state_regions.h"
@@ -125,7 +125,8 @@ static int32_t script_invoke(R (*fn)(A...), const int32_t* a, std::index_sequenc
         return static_cast<int32_t>(fn(static_cast<A>(a[I])...));
     }
 }
-template <typename R, typename... A> static int32_t script_invoke(R (*fn)(A...), const int32_t* a) {
+template <typename R, typename... A>
+static int32_t script_invoke(R (*fn)(A...), const int32_t* a) {
     static_assert(sizeof...(A) <= 8, "at most 8 arguments");
     return script_invoke(fn, a, std::index_sequence_for<A...>{});
 }
@@ -134,13 +135,17 @@ struct ScriptCall {
     int32_t (*fn)(const int32_t*);
     bool has_result;  // false: void (the oracle logs no result either)
 };
-template <typename R, typename... A> constexpr bool script_returns_value(R (*)(A...)) { return !std::is_void_v<R>; }
+template <typename R, typename... A>
+constexpr bool script_returns_value(R (*)(A...)) {
+    return !std::is_void_v<R>;
+}
 #define SCRIPT_CALL(name, addr, has_result) \
     static_assert(script_returns_value(&name) == (has_result), "script_calls.h: wrong result flag of " #name);
 #include "script_calls.h"
 #undef SCRIPT_CALL
 static const ScriptCall kScriptCalls[] = {
-#define SCRIPT_CALL(name, addr, has_result) {#name, [](const int32_t* a) { return script_invoke(&name, a); }, has_result},
+#define SCRIPT_CALL(name, addr, has_result) \
+    {#name, [](const int32_t* a) { return script_invoke(&name, a); }, has_result},
 #include "script_calls.h"
 #undef SCRIPT_CALL
 };
@@ -165,8 +170,8 @@ static bool setup_command(const char* cmd, char* args) {
     } else if (!std::strcmp(cmd, "poketile")) {
         int x = 0, y = 0, off = 0, size = 0;
         long long v = 0;
-        if (std::sscanf(args, "%d %d %i %d %lli", &x, &y, &off, &size, &v) == 5 && size >= 1 && size <= 4 &&
-            off >= 0 && off + size <= (int)sizeof(MAP) && x >= 0 && x < MapAreaX && y >= 0 && y < MapAreaY) {
+        if (std::sscanf(args, "%d %d %i %d %lli", &x, &y, &off, &size, &v) == 5 && size >= 1 && size <= 4 && off >= 0 &&
+            off + size <= (int)sizeof(MAP) && x >= 0 && x < MapAreaX && y >= 0 && y < MapAreaY) {
             poke_bytes(reinterpret_cast<uint8_t*>(map_tile(x, y)) + off, size, v);
             logf_("poketile %d %d %d %d %lld\n", x, y, off, size, v);
         } else {
@@ -175,8 +180,8 @@ static bool setup_command(const char* cmd, char* args) {
     } else if (!std::strcmp(cmd, "call")) {
         char name[64] = "";
         int32_t a[8] = {};
-        int n = std::sscanf(args, "%63s %i %i %i %i %i %i %i %i", name, &a[0], &a[1], &a[2], &a[3], &a[4], &a[5],
-                            &a[6], &a[7]);
+        int n = std::sscanf(args, "%63s %i %i %i %i %i %i %i %i", name, &a[0], &a[1], &a[2], &a[3], &a[4], &a[5], &a[6],
+                            &a[7]);
         for (const ScriptCall& c : kScriptCalls) {
             if (std::strcmp(c.name, name)) continue;
             int32_t r = c.fn(a);
@@ -344,8 +349,8 @@ static void cmd_newgame(char* args) {
     GameTimeControl = 0;
     VehCount = 0;
     logf_("newgame size=%d %dx%d ocean=%d erosion=%d orbit=%d clouds=%d natives=%d diff=%d rules=%08X crt=%u game=%u\n",
-          size, MapAreaX, MapAreaY, ocean, erosion, orbit, clouds, natives, diff, (uint32_t)GameRules,
-          crt_rand_state(), game_random_state());
+          size, MapAreaX, MapAreaY, ocean, erosion, orbit, clouds, natives, diff, (uint32_t)GameRules, crt_rand_state(),
+          game_random_state());
     world_build();
     setup_game(0);
     if (ExpansionEnabled) alien_start();
@@ -443,7 +448,8 @@ int main(int argc, char** argv) {
         else script = a;
     }
     if (script.empty()) {
-        std::fprintf(stderr, "usage: smacx_headless <script.cmd> [--outdir DIR] [--gamedir DIR] [--image FILE] [--ini FILE]\n");
+        std::fprintf(stderr,
+                     "usage: smacx_headless <script.cmd> [--outdir DIR] [--gamedir DIR] [--image FILE] [--ini FILE]\n");
         return 2;
     }
     g_outdir = fs::absolute(g_outdir).string();

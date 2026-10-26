@@ -74,7 +74,7 @@ namespace {
 constexpr int32_t kPopWait = 0x5398E0;
 
 // ---- DiploPop state ----
-int32_t g_faction = -1;       // +0xA94: the faction on the commlink
+int32_t g_faction = -1;  // +0xA94: the faction on the commlink
 std::string g_bioscan, g_portrait;
 uint32_t g_start_ms = 0;
 bool g_animate = false;
@@ -154,15 +154,16 @@ void diplowin_log_state() {
     int32_t v = CurrentPlayerFaction;
     int32_t techs = 0;
     for (int32_t t = 0; t < 89; t++) techs += has_tech(t, v) ? 1 : 0;
-    std::fprintf(stderr, "diplostate f%d credits %d techs %d bases %d governor %d\n", v, Factions[v].energy_credits, techs,
-                 Factions[v].base_count, GovernorFaction);
+    std::fprintf(stderr, "diplostate f%d credits %d techs %d bases %d governor %d\n", v, Factions[v].energy_credits,
+                 techs, Factions[v].base_count, GovernorFaction);
     for (int32_t i = 1; i < 8; i++) {
         if (i == v || !(FactionStatus[1] & (1 << i))) continue;
         const Faction& F = Factions[v];
-        std::fprintf(stderr, "diplo %d status %08X agenda %08X friction %d patience %d loan %d/%d credits %d bases %d techs %d\n",
-                     i, F.diplo_status[i], F.diplo_agenda[i], Factions[i].diplo_friction[v],
-                     Factions[i].diplo_patience[v], F.loan_balance[i], F.loan_payment[i], Factions[i].energy_credits,
-                     Factions[i].base_count, tech_count(i));
+        std::fprintf(
+            stderr,
+            "diplo %d status %08X agenda %08X friction %d patience %d loan %d/%d credits %d bases %d techs %d\n", i,
+            F.diplo_status[i], F.diplo_agenda[i], Factions[i].diplo_friction[v], Factions[i].diplo_patience[v],
+            F.loan_balance[i], F.loan_payment[i], Factions[i].energy_credits, Factions[i].base_count, tech_count(i));
     }
 }
 
@@ -909,10 +910,8 @@ void GAMEAPI make_a_proposal(int32_t f, int32_t fw, int32_t direct) {
             DiploMapMsg = 1;
         }
         return;
-    case 10:
-        return;
-    default:
-        break;
+    case 10: return;
+    default: break;
     }
     if (p == 8 && (ds(fw, f) & 1) && (ds(fw, f) & 0x2000000)) {
         propose_attack(f, fw);
@@ -923,23 +922,13 @@ void GAMEAPI make_a_proposal(int32_t f, int32_t fw, int32_t direct) {
         return;
     }
     switch (p) {
-    case 8:
-        propose_attack(f, fw);
-        return;
-    case 9:
-        base_swap(f, fw);
-        return;
+    case 8: propose_attack(f, fw); return;
+    case 9: base_swap(f, fw); return;
     case 4:
     case 5:
-    case 13:
-        DiploMenuFlagA = tech_trade(f, fw, 0, DiploCounterProposal, p);
-        return;
-    case 6:
-        DiploMenuFlagA = energy_trade(f, fw);
-        return;
-    case 1:
-        make_gift(f, fw);
-        return;
+    case 13: DiploMenuFlagA = tech_trade(f, fw, 0, DiploCounterProposal, p); return;
+    case 6: DiploMenuFlagA = energy_trade(f, fw); return;
+    case 1: make_gift(f, fw); return;
     case 11: {
         // The loan repaid.
         const MFaction& m = MFactions[f];
@@ -955,8 +944,7 @@ void GAMEAPI make_a_proposal(int32_t f, int32_t fw, int32_t direct) {
         pop("REPAIDLOAN", fw);
         break;
     }
-    default:
-        break;
+    default: break;
     }
     if (DiploCurrentProposal != 12) return;
     // COUNCILMATTER: a vote asked of faction_id_with.
@@ -968,30 +956,15 @@ void GAMEAPI make_a_proposal(int32_t f, int32_t fw, int32_t direct) {
         if (i == 1 && !(GameRules & RULES_VICTORY_DIPLOMATIC)) continue;
         bool ok = true;
         switch (i) {
-        case 1:
-            ok = !(GameState & STATE_GAME_DONE) && !ProposalPassCount[1] && eligible(f);
-            break;
+        case 1: ok = !(GameState & STATE_GAME_DONE) && !ProposalPassCount[1] && eligible(f); break;
         case 2:
-        case 5:
-            ok = !ProposalPassCount[i];
-            break;
-        case 3:
-            ok = ProposalPassCount[3] <= ProposalPassCount[4];
-            break;
-        case 4:
-            ok = ProposalPassCount[4] != ProposalPassCount[3];
-            break;
-        case 6:
-            ok = ProposalPassCount[5] != 0;
-            break;
-        case 8:
-            ok = ProposalPassCount[8] <= ProposalPassCount[9];
-            break;
-        case 9:
-            ok = ProposalPassCount[9] < ProposalPassCount[8];
-            break;
-        default:
-            break;
+        case 5: ok = !ProposalPassCount[i]; break;
+        case 3: ok = ProposalPassCount[3] <= ProposalPassCount[4]; break;
+        case 4: ok = ProposalPassCount[4] != ProposalPassCount[3]; break;
+        case 6: ok = ProposalPassCount[5] != 0; break;
+        case 8: ok = ProposalPassCount[8] <= ProposalPassCount[9]; break;
+        case 9: ok = ProposalPassCount[9] < ProposalPassCount[8]; break;
+        default: break;
         }
         if (!ok) continue;
         StrBuffer[0] = 0;

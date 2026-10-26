@@ -11,31 +11,31 @@ enum BaseState {
     BSTATE_UNK_1 = 0x1,
     BSTATE_DRONE_RIOTS_ACTIVE = 0x2,
     BSTATE_GOLDEN_AGE_ACTIVE = 0x4,
-    BSTATE_COMBAT_LOSS_LAST_TURN = 0x8, // Reset on upkeep
+    BSTATE_COMBAT_LOSS_LAST_TURN = 0x8,  // Reset on upkeep
     BSTATE_UNK_10 = 0x10,
-    BSTATE_UNK_20 = 0x20, // enemy_strategy, former units
+    BSTATE_UNK_20 = 0x20,  // enemy_strategy, former units
     BSTATE_RESEARCH_DATA_STOLEN = 0x40,
-    BSTATE_SKIP_RENAME = 0x80, // prevents capture_base from adding flag BSTATE_RENAME_BASE
+    BSTATE_SKIP_RENAME = 0x80,  // prevents capture_base from adding flag BSTATE_RENAME_BASE
     BSTATE_UNK_100 = 0x100,
-    BSTATE_FACILITY_SCRAPPED = 0x200, // Only one facility can be scrapped/recycled per turn
-    BSTATE_ARTIFACT_LINKED = 0x400, // Alien Artifact linked to Network Node
-    BSTATE_ARTIFACT_ALREADY_LINKED = 0x800, // Only show already linked alert once
+    BSTATE_FACILITY_SCRAPPED = 0x200,  // Only one facility can be scrapped/recycled per turn
+    BSTATE_ARTIFACT_LINKED = 0x400,  // Alien Artifact linked to Network Node
+    BSTATE_ARTIFACT_ALREADY_LINKED = 0x800,  // Only show already linked alert once
     BSTATE_UNK_1000 = 0x1000,
     BSTATE_UNK_2000 = 0x2000,
     BSTATE_UNK_4000 = 0x4000,
     BSTATE_UNK_8000 = 0x8000,
-    BSTATE_RENAME_BASE = 0x10000, // set in capture_base, this base can be renamed in base_upkeep
+    BSTATE_RENAME_BASE = 0x10000,  // set in capture_base, this base can be renamed in base_upkeep
     BSTATE_GENETIC_PLAGUE_INTRO = 0x20000,
-    BSTATE_ASSISTANT_KILLER_HOME = 0x40000, // Veh home base (or closest) of Assistant worm killer
-    BSTATE_UNK_80000 = 0x80000, // enemy_strategy, former units
+    BSTATE_ASSISTANT_KILLER_HOME = 0x40000,  // Veh home base (or closest) of Assistant worm killer
+    BSTATE_UNK_80000 = 0x80000,  // enemy_strategy, former units
     BSTATE_UNK_100000 = 0x100000,
     BSTATE_UNK_200000 = 0x200000,
     BSTATE_ENERGY_RESERVES_DRAINED = 0x400000,
-    BSTATE_PRODUCTION_DONE = 0x800000, // cleared in base_upkeep > base_production
-    BSTATE_UNK_1000000 = 0x1000000, // base_production
+    BSTATE_PRODUCTION_DONE = 0x800000,  // cleared in base_upkeep > base_production
+    BSTATE_UNK_1000000 = 0x1000000,  // base_production
     BSTATE_UNK_2000000 = 0x2000000,
-    BSTATE_UNK_4000000 = 0x4000000, // enemy_strategy
-    BSTATE_UNK_8000000 = 0x8000000, // enemy_strategy
+    BSTATE_UNK_4000000 = 0x4000000,  // enemy_strategy
+    BSTATE_UNK_8000000 = 0x8000000,  // enemy_strategy
     BSTATE_NET_LOCKED = 0x10000000,
     BSTATE_PSI_GATE_USED = 0x20000000,
     BSTATE_HURRY_PRODUCTION = 0x40000000,
@@ -62,20 +62,20 @@ enum RetoolRuleType {
 
 enum BaseGovernor {
     GOV_MANAGE_PRODUCTION = 0x1,
-    GOV_MAY_FORCE_PSYCH = 0x2, // Thinker variable
-    GOV_UNK_4 = 0x4, // maybe unused
-    GOV_UNK_8 = 0x8, // maybe unused
-    GOV_UNK_10 = 0x10, // maybe unused
+    GOV_MAY_FORCE_PSYCH = 0x2,  // Thinker variable
+    GOV_UNK_4 = 0x4,  // maybe unused
+    GOV_UNK_8 = 0x8,  // maybe unused
+    GOV_UNK_10 = 0x10,  // maybe unused
     GOV_MAY_HURRY_PRODUCTION = 0x20,
     GOV_MANAGE_CITIZENS = 0x40,
     GOV_NEW_VEH_FULLY_AUTO = 0x80,
-    GOV_MAY_PROD_NATIVE = 0x100, // Thinker variable
+    GOV_MAY_PROD_NATIVE = 0x100,  // Thinker variable
     GOV_MAY_PROD_LAND_COMBAT = 0x200,
     GOV_MAY_PROD_NAVAL_COMBAT = 0x400,
     GOV_MAY_PROD_AIR_COMBAT = 0x800,
     GOV_MAY_PROD_LAND_DEFENSE = 0x1000,
     GOV_MAY_PROD_AIR_DEFENSE = 0x2000,
-    GOV_UNK_4000 = 0x4000, // maybe unused
+    GOV_UNK_4000 = 0x4000,  // maybe unused
     GOV_MAY_PROD_TERRAFORMERS = 0x8000,
     GOV_MAY_PROD_FACILITIES = 0x10000,
     GOV_MAY_PROD_COLONY_POD = 0x20000,
@@ -89,9 +89,9 @@ enum BaseGovernor {
     GOV_PRIORITY_DISCOVER = 0x2000000,
     GOV_PRIORITY_BUILD = 0x4000000,
     GOV_PRIORITY_CONQUER = 0x8000000,
-    GOV_UNK_10000000 = 0x10000000, // maybe unused
-    GOV_UNK_20000000 = 0x20000000, // maybe unused
-    GOV_UNK_40000000 = 0x40000000, // used on lowest difficulty
+    GOV_UNK_10000000 = 0x10000000,  // maybe unused
+    GOV_UNK_20000000 = 0x20000000,  // maybe unused
+    GOV_UNK_40000000 = 0x40000000,  // used on lowest difficulty
     GOV_ACTIVE = 0x80000000,
 };
 
@@ -119,27 +119,27 @@ const uint32_t BaseGovOptions[][2] = {
     {0x100000, GOV_MAY_HURRY_PRODUCTION},
 };
 
-const int32_t BaseSupportCosts[8][2]  = {
-    {2, 0}, // -4, Each unit costs 2 to support; no free minerals for new base.
-    {1, 0}, // -3, Each unit costs 1 to support; no free minerals for new base.
-    {1, 1}, // -2, Support 1 unit free per base; no free minerals for new base.
-    {1, 1}, // -1, Support 1 unit free per base
-    {1, 2}, //  0, Support 2 units free per base
-    {1, 3}, //  1, Support 3 units free per base
-    {1, 4}, //  2, Support 4 units free per base!
-    {1,-4}, //  3, Support 4 units OR up to base size for free!!
+const int32_t BaseSupportCosts[8][2] = {
+    {2, 0},  // -4, Each unit costs 2 to support; no free minerals for new base.
+    {1, 0},  // -3, Each unit costs 1 to support; no free minerals for new base.
+    {1, 1},  // -2, Support 1 unit free per base; no free minerals for new base.
+    {1, 1},  // -1, Support 1 unit free per base
+    {1, 2},  //  0, Support 2 units free per base
+    {1, 3},  //  1, Support 3 units free per base
+    {1, 4},  //  2, Support 4 units free per base!
+    {1, -4},  //  3, Support 4 units OR up to base size for free!!
 };
 
 enum BaseRadius {
     BR_NOT_AVAILABLE = 1,
     BR_NOT_VISIBLE = 2,
     BR_BASE_IN_TILE = 4,
-    BR_VEH_IN_TILE = 8, // convoy active or non-pact/non-treaty vehicle
+    BR_VEH_IN_TILE = 8,  // convoy active or non-pact/non-treaty vehicle
     BR_WORKER_ACTIVE = 16,
     BR_FOREIGN_TILE = 32,
 };
 
-enum SEType { // used only as boolean value
+enum SEType {  // used only as boolean value
     SE_Current = 0,
     SE_Pending = 1,
 };
@@ -156,8 +156,8 @@ struct BASE {
     uint8_t visibility;
     int8_t factions_pop_size_intel[8];
     char name[25];
-    int16_t unk_x; // base_terraform
-    int16_t unk_y; // base_terraform
+    int16_t unk_x;  // base_terraform
+    int16_t unk_y;  // base_terraform
     int32_t state_flags;
     int32_t event_flags;
     int32_t governor_flags;
@@ -211,8 +211,8 @@ struct BASE {
     int32_t superdrone_total;
     int32_t random_event_turns;
     int32_t nerve_staple_count;
-    int8_t defend_goal; // Thinker variable
-    int8_t defend_range; // Thinker variable
+    int8_t defend_goal;  // Thinker variable
+    int8_t defend_range;  // Thinker variable
     int8_t pad_6;
     int8_t pad_7;
     int32_t pad_8;
@@ -230,4 +230,3 @@ struct BASE {
 };
 
 #pragma pack(pop)
-

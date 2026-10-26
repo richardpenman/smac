@@ -45,9 +45,9 @@ constexpr int kSaveBytes = 1024;
 extern "C" {
 uint32_t has_abil_saved_stack[kSaveBytes / 4];
 int32_t has_abil_result;
-int32_t has_abil_loop;          // final loop counter, -1 if the bonus loop was not entered
-int32_t has_abil_tech_called;   // the bonus loop called has_tech
-uint32_t has_abil_tech_args[4]; // edi, esi, preq_tech, faction (pushed order reversed)
+int32_t has_abil_loop;  // final loop counter, -1 if the bonus loop was not entered
+int32_t has_abil_tech_called;  // the bonus loop called has_tech
+uint32_t has_abil_tech_args[4];  // edi, esi, preq_tech, faction (pushed order reversed)
 int32_t __cdecl has_abil_body(int32_t unit_id, uint32_t ability_flag);
 }
 
@@ -64,10 +64,10 @@ __attribute__((constructor)) static void has_abil_dbg_init() {
     if (const char* m = getenv("HA_EDI")) has_abil_dbg_edi = (uint32_t)strtoul(m, nullptr, 16);
 }
 #define HA_DBG(bit, label) "testl $" #bit ", _has_abil_dbg_mask\n jz " #label "\n"
-#define HA_DBG_ONLY(code) code
+#define HA_DBG_ONLY(code)  code
 #else
 #define HA_DBG(bit, label) ""
-#define HA_DBG_ONLY(code) ""
+#define HA_DBG_ONLY(code)  ""
 #endif
 __attribute__((naked)) int32_t GAMEAPI has_abil(int32_t unit_id, uint32_t ability_flag) {
     __asm__(
@@ -96,15 +96,15 @@ __attribute__((naked)) int32_t GAMEAPI has_abil(int32_t unit_id, uint32_t abilit
         "pop %esi\n pop %ebx\n mov %ebp, %esp\n pop %ebp\n ret\n");
 }
 #define HA_RECORD_LOOP(i) (has_abil_loop = (i))
-#define HA_RECORD_TECH(f, i, preq, faction)                                                         \
-    (has_abil_tech_called = 1, has_abil_tech_args[0] = (uint32_t)(f) * 0x59C,                      \
+#define HA_RECORD_TECH(f, i, preq, faction)                                                                           \
+    (has_abil_tech_called = 1, has_abil_tech_args[0] = (uint32_t)(f) * 0x59C,                                         \
      has_abil_tech_args[1] = (uint32_t)(uintptr_t)&game().mfactions[0].faction_bonus_val1[0] + (f) * 0x59C + (i) * 4, \
      has_abil_tech_args[2] = (uint32_t)(preq), has_abil_tech_args[3] = (uint32_t)(faction))
 extern "C" int32_t __cdecl has_abil_body(int32_t unit_id, uint32_t ability_flag) {
     has_abil_loop = -1;
     has_abil_tech_called = 0;
 #else
-#define HA_RECORD_LOOP(i) ((void)0)
+#define HA_RECORD_LOOP(i)                   ((void)0)
 #define HA_RECORD_TECH(f, i, preq, faction) ((void)0)
 // Whether unit_id has ability_flag (see veh.h).
 int32_t GAMEAPI has_abil(int32_t unit_id, uint32_t ability_flag) {
@@ -215,8 +215,7 @@ int32_t GAMEAPI do_unity_crash(int32_t x, int32_t y, int32_t faction_id) {
         NetMsg_pop(&NetMsg, "UNITYRADAR", -5000, 0, "foundradar_sm.pcx");
         FX_fade(&Sounds, 0x16);
         return 1;
-    default:
-        return 0;
+    default: return 0;
     }
 }
 
@@ -590,8 +589,8 @@ int32_t GAMEAPI SHADOWABLE(morale_veh)(int32_t veh_id, int32_t check_drone_riot,
 int32_t GAMEAPI offense_proto(int32_t unit_id, int32_t veh_id_def, int32_t is_bombard) {
     CWeapon& weapon = Weapon[Units[unit_id].weapon_id];
     if (weapon.mode == 11 && veh_id_def >= 0 && Units[game().vehs[veh_id_def].unit_id].plan == 11) return 16;
-    if ((is_bombard || (weapon.offense_value >= 0 &&
-                        (veh_id_def < 0 || !unit_psi_armor(game().vehs[veh_id_def].unit_id)))) &&
+    if ((is_bombard ||
+         (weapon.offense_value >= 0 && (veh_id_def < 0 || !unit_psi_armor(game().vehs[veh_id_def].unit_id)))) &&
         veh_unit_raw(veh_id_def) != 15 && unit_id != 15) {  // reads Vehs[-1] without a defender
         int32_t value = weapon.offense_value < 0 ? -weapon.offense_value : weapon.offense_value;
         if (Chassis[Units[unit_id].chassis_id].missile && weapon.offense_value < 99) value = value * 3 / 2;
@@ -624,8 +623,8 @@ int32_t GAMEAPI SHADOWABLE(speed_proto)(int32_t unit_id) {
     if (unit_id == 19) return 0;  // Fungal Tower
     if (triad == 2) value += u.reactor_id * 2;
     if (Weapon[u.weapon_id].mode == 7) value--;  // transport
-    if (has_abil(unit_id, 0x800000)) value--;    // slow
-    if (has_abil(unit_id, 0x400)) {               // antigrav struts
+    if (has_abil(unit_id, 0x800000)) value--;  // slow
+    if (has_abil(unit_id, 0x400)) {  // antigrav struts
         if (Chassis[u.chassis_id].triad == 2) value += u.reactor_id * 2;
         else value++;
     }
@@ -660,10 +659,8 @@ static void speed_note_stack_residue(int32_t veh_id) {
     } else if (!(unit_id < 64 && unit_psi_weapon(unit_id))) {
         morale_calls = veh.home_base_id >= 0;
     }
-    if (morale_calls)
-        SpeedStackResidue = 1;
-    else if (unit_id != 19)
-        SpeedStackResidue = unit_id * 0x34;
+    if (morale_calls) SpeedStackResidue = 1;
+    else if (unit_id != 19) SpeedStackResidue = unit_id * 0x34;
 }
 
 int32_t GAMEAPI SHADOWABLE(speed)(int32_t veh_id, int32_t skip_morale) {
@@ -729,8 +726,9 @@ int32_t GAMEAPI veh_cost(int32_t unit_id, int32_t base_id, int32_t* has_proto_co
         factor = 0;
     } else {
         int32_t triad = unit_triad(unit_id);
-        factor = triad == 1 ? Rules.extra_cost_prototype_sea
-                 : triad == 2 ? Rules.extra_cost_prototype_air : Rules.extra_cost_prototype_land;
+        factor = triad == 1   ? Rules.extra_cost_prototype_sea
+                 : triad == 2 ? Rules.extra_cost_prototype_air
+                              : Rules.extra_cost_prototype_land;
     }
     int32_t extra = (base_cost(unit_id) * factor + 50) / 100;
     if (base_id >= 0 && base_has_fac(base_id, 10)) extra = 0;  // Skunkworks
@@ -825,6 +823,6 @@ HYBRID_SHADOW_THUNK(int32_t, speed, (int32_t veh_id, int32_t skip_morale), 2, 0x
                     "push %ebp\n mov %esp, %ebp\n push %ebx\n push %esi")
 HYBRID_SHADOW_THUNK(int32_t, speed_proto, (int32_t unit_id), 1, 0x5C13B7,
                     "push %ebp\n mov %esp, %ebp\n push %ebx\n mov 8(%ebp), %ebx")
-HYBRID_SHADOW_THUNK(int32_t, morale_veh, (int32_t veh_id, int32_t check_drone_riot, int32_t faction_id_vs_native),
-                    3, 0x5C0E46, "push %ebp\n mov %esp, %ebp\n sub $8, %esp")
+HYBRID_SHADOW_THUNK(int32_t, morale_veh, (int32_t veh_id, int32_t check_drone_riot, int32_t faction_id_vs_native), 3,
+                    0x5C0E46, "push %ebp\n mov %esp, %ebp\n sub $8, %esp")
 #endif

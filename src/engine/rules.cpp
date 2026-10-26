@@ -401,10 +401,8 @@ void GAMEAPI read_faction(MFaction* faction, int32_t toggle) {
             for (int32_t i = 0; i < 11; i++) {
                 if (!crt_stricmp(value, SocialParam[i].set1)) {
                     if (n < 8) {
-                        if (is_bonus(key, BN_ROBUST))
-                            f->faction_bonus_id[n] = 10;
-                        else
-                            f->faction_bonus_id[n] = is_bonus(key, BN_SOCIAL) ? 3 : 4;
+                        if (is_bonus(key, BN_ROBUST)) f->faction_bonus_id[n] = 10;
+                        else f->faction_bonus_id[n] = is_bonus(key, BN_SOCIAL) ? 3 : 4;
                         f->faction_bonus_val1[n] = i;
                         f->faction_bonus_val2[n] = amount;
                         n++;
@@ -599,10 +597,8 @@ int32_t GAMEAPI read_units() {
     if (text_open(AlphaxFileName, "UNITS")) return 1;
     text_get();
     int32_t count = text_item_number();
-    if (count < 0)
-        count = 0;
-    else if (count > 64)
-        count = 64;
+    if (count < 0) count = 0;
+    else if (count > 64) count = 64;
     for (int32_t i = 0; i < count; i++) {
         UNIT& u = Units[i];
         text_get();
@@ -800,7 +796,7 @@ int32_t GAMEAPI read_rules(int32_t all_rules) {
         f.free_tech = tech_name(text_item());
         f.effect = text_item_string();
         f.free_tech = -2;  // the "free" tech column is read but never used
-        if (i >= 70) {    // secret projects: AI priorities
+        if (i >= 70) {  // secret projects: AI priorities
             f.AI_fight = text_item_number();
             f.AI_power = text_item_number();
             f.AI_tech = text_item_number();
@@ -962,11 +958,26 @@ int32_t GAMEAPI read_rules(int32_t all_rules) {
 #ifndef SMACX_HYBRID
 // Initial map-bit columns of Terraform (0x691878, .data): {bit, bit_incompatible}.
 static const uint32_t kTerraformBits[20][2] = {
-    {0x8000, 0x200000},       {0x80000, 0x200000},   {0x10, 0x81E00050},      {0x40, 0x81E00050},
-    {0x200000, 0x1E88070},    {0x4, 0x0},            {0x8, 0x0},              {0x800, 0x40000},
-    {0x40000, 0x800},         {0x80000000, 0x1C00050}, {0x0, 0x20},           {0x20, 0x288050},
-    {0x400000, 0x81E00050},   {0x800000, 0x81E00050}, {0x1000000, 0x81E08050}, {0x0, 0x0},
-    {0x0, 0x0},               {0x0, 0x0},            {0x0, 0x0},              {0x2000, 0x30000400},
+    {0x8000, 0x200000},
+    {0x80000, 0x200000},
+    {0x10, 0x81E00050},
+    {0x40, 0x81E00050},
+    {0x200000, 0x1E88070},
+    {0x4, 0x0},
+    {0x8, 0x0},
+    {0x800, 0x40000},
+    {0x40000, 0x800},
+    {0x80000000, 0x1C00050},
+    {0x0, 0x20},
+    {0x20, 0x288050},
+    {0x400000, 0x81E00050},
+    {0x800000, 0x81E00050},
+    {0x1000000, 0x81E08050},
+    {0x0, 0x0},
+    {0x0, 0x0},
+    {0x0, 0x0},
+    {0x0, 0x0},
+    {0x2000, 0x30000400},
 };
 
 void rules_static_init() {

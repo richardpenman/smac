@@ -938,8 +938,8 @@ int32_t GAMEAPI save_game(int32_t scenario) {
         ControlTurnA = 1;
         if (MultiplayerActive) {
             NetDaemon_hang_up(&NetState);
-            static const uint8_t kCleared[] = {0,  1,  2,  3,  12, 11, 15, 14, 19, 30, 28, 29, 39, 38,
-                                               8,  9,  10, 37, 36, 32, 31, 33, 4,  5,  42, 41, 6,  7};
+            static const uint8_t kCleared[] = {0, 1, 2,  3,  12, 11, 15, 14, 19, 30, 28, 29, 39, 38,
+                                               8, 9, 10, 37, 36, 32, 31, 33, 4,  5,  42, 41, 6,  7};
             for (uint8_t i : kCleared) NetSessionState[i] = 0;
             NetSessionState[40] = 0xFF;
             NetSessionState[18] = 0;

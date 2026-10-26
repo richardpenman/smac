@@ -175,7 +175,8 @@ void button_ctor(BaseButton* b) {
 
 // BaseButton_init (0x607210): the label, the id, the rectangle in the parent, the default text
 // colour (black, no shadow) and the font.
-void button_init(BaseButton* b, const char* text, int32_t id, int32_t x, int32_t y, int32_t w, int32_t h, int32_t parent) {
+void button_init(BaseButton* b, const char* text, int32_t id, int32_t x, int32_t y, int32_t w, int32_t h,
+                 int32_t parent) {
     b->name = text ? text : "";
     b->has_name = text != nullptr;
     b->id = id;
@@ -834,8 +835,8 @@ static void bw_step(uint8_t* self, bool next) {
         const char* name = Bases[i].name;
         int32_t c = crt_stricmp(name, Bases[bwf(kBwBase)].name);
         if (next ? c > 0 : c < 0) {
-            if (found < 0 || (next ? crt_stricmp(name, Bases[found_cmp].name) < 0
-                                   : crt_stricmp(name, Bases[found_cmp].name) > 0)) {
+            if (found < 0 ||
+                (next ? crt_stricmp(name, Bases[found_cmp].name) < 0 : crt_stricmp(name, Bases[found_cmp].name) > 0)) {
                 found = i;
                 found_cmp = i;
             }
@@ -912,57 +913,59 @@ int32_t basewin_console_key(uint8_t* console, int32_t ch, int32_t vk, int32_t ke
     bool prod_ok = !net_busy || (ControlUpkeepA && !(NetUpkeepDoneMask & (1 << (CurrentPlayerFaction & 31))));
     switch (vk) {
     case 0xD:
-    case 0x1B:
-        BaseWin_exit(self);
-        return 1;
-    case 0x21: case 0x25: case 0x64: case 0x69:  // PgUp, left, keypad 4 / 9
+    case 0x1B: BaseWin_exit(self); return 1;
+    case 0x21:
+    case 0x25:
+    case 0x64:
+    case 0x69:  // PgUp, left, keypad 4 / 9
         BaseWin_prev(self);
         return 1;
-    case 0x22: case 0x27: case 0x63: case 0x66:  // PgDn, right, keypad 3 / 6
+    case 0x22:
+    case 0x27:
+    case 0x63:
+    case 0x66:  // PgDn, right, keypad 3 / 6
         BaseWin_next(self);
         return 1;
-    default:
-        break;
+    default: break;
     }
     if (key >= '0' && key <= '9') {
         if (prod_ok) BaseWin_production(self, key - '0', 0);
         return 1;
     }
     switch (key) {
-    case ',': case '<':
-        BaseWin_prev(self);
-        return 1;
-    case '.': case '>': case 'n':
-        BaseWin_next(self);
-        return 1;
-    case 'c': case 'p':
+    case ',':
+    case '<': BaseWin_prev(self); return 1;
+    case '.':
+    case '>':
+    case 'n': BaseWin_next(self); return 1;
+    case 'c':
+    case 'p':
         if (prod_ok) BaseWin_production(self, 0, 0);
         return 1;
     case 'h':
         if (!net_busy) BaseWin_hurry(self);
         return 1;
-    case 'r':
-        BaseWin_rename(self);
-        return 1;
+    case 'r': BaseWin_rename(self); return 1;
     case 'e':
         if (GameState & STATE_SCENARIO_EDITOR) BaseWin_base_editor(self);
         return 1;
-    case '+': case '=':  // scenario editor: population
+    case '+':
+    case '=':  // scenario editor: population
         if (GameState & STATE_SCENARIO_EDITOR) {
             BaseWin_focus(self);
             if (cur_base().pop_size < 99) cur_base().pop_size++;
             BaseWin_recompute(self, 0);
         }
         break;
-    case '-': case '_':
+    case '-':
+    case '_':
         if (GameState & STATE_SCENARIO_EDITOR) {
             BaseWin_focus(self);
             if (cur_base().pop_size > 1) cur_base().pop_size--;
             BaseWin_recompute(self, 0);
         }
         break;
-    default:
-        break;
+    default: break;
     }
     // The rest of the console's keys with the base window's flag ([ebp-0x28]): end of turn and
     // time bonus; the character commands, editor keys and movement are skipped.
@@ -1071,7 +1074,8 @@ bool basewin_mouse(int32_t type, int32_t x, int32_t y, bool double_click, bool r
     auto opaque = [](Buffer* c, int32_t px, int32_t py) {
         return px >= 0 && py >= 0 && px < c->width && py < c->height && c->data[(size_t)py * c->stride + px] != 9;
     };
-    if (in_box(x, y, mp) && (opaque(&g_bw.mi_canvas, x - mp.left, y - mp.top) || button_at(1, x - mp.left, y - mp.top))) {
+    if (in_box(x, y, mp) &&
+        (opaque(&g_bw.mi_canvas, x - mp.left, y - mp.top) || button_at(1, x - mp.left, y - mp.top))) {
         parent = 1;
         lx = x - mp.left;
         ly = y - mp.top;
@@ -1106,8 +1110,7 @@ bool basewin_mouse(int32_t type, int32_t x, int32_t y, bool double_click, bool r
         // BaseWin_on_left_down / on_iface_left_down: the spot under the press (drag source).
         uint32_t base = parent ? 0x40130 + 0xA14 - 0x40130 + 0x40130 : 0;
         (void)base;
-        if (bwf(kBwDragState) > 0) {
-        }
+        if (bwf(kBwDragState) > 0) {}
         bwf(kBwDragState) = -1;
         bwf(kBwDragType) = -1;
         bwf(kBwDragIndex) = -1;

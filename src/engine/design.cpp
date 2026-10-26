@@ -93,9 +93,7 @@ int32_t GAMEAPI arm_val(int32_t armor_id, int32_t faction_id) {
     return arm_def(armor_id) * 2;
 }
 
-int32_t GAMEAPI armor_val(int32_t unit_id, int32_t faction_id) {
-    return arm_val(Units[unit_id].armor_id, faction_id);
-}
+int32_t GAMEAPI armor_val(int32_t unit_id, int32_t faction_id) { return arm_val(Units[unit_id].armor_id, faction_id); }
 
 // ---- stat strings ----
 
@@ -130,17 +128,12 @@ void GAMEAPI say_defense(char* buffer, int32_t unit_id) {
 void GAMEAPI say_stats_short(char* buffer, int32_t unit_id) {
     char num[80];
     const UNIT& unit = Units[unit_id];
-    if (weap_off(unit.weapon_id) < 0)
-        std::strcat(buffer, "?");
-    else if (weap_off(unit.weapon_id) < 99)
-        say_offense(buffer, unit_id);
-    else
-        std::strcat(buffer, "*");
+    if (weap_off(unit.weapon_id) < 0) std::strcat(buffer, "?");
+    else if (weap_off(unit.weapon_id) < 99) say_offense(buffer, unit_id);
+    else std::strcat(buffer, "*");
     std::strcat(buffer, "-");
-    if (arm_def(unit.armor_id) < 0)
-        std::strcat(buffer, "?");
-    else
-        say_defense(buffer, unit_id);
+    if (arm_def(unit.armor_id) < 0) std::strcat(buffer, "?");
+    else say_defense(buffer, unit_id);
     std::strcat(buffer, "-");
     crt_itoa(speed_proto(unit_id) / Rules.move_rate_roads, num, 10);
     std::strcat(buffer, num);
@@ -154,17 +147,12 @@ void GAMEAPI say_stats_short(char* buffer, int32_t unit_id) {
 void GAMEAPI say_stats_labeled(char* buffer, int32_t unit_id) {
     char num[80];
     const UNIT& unit = Units[unit_id];
-    if (weap_off(unit.weapon_id) < 0)
-        std::strcat(buffer, label_get(196));  // psi
-    else if (weap_off(unit.weapon_id) < 99)
-        say_offense(buffer, unit_id);
-    else
-        std::strcat(buffer, "*");
+    if (weap_off(unit.weapon_id) < 0) std::strcat(buffer, label_get(196));  // psi
+    else if (weap_off(unit.weapon_id) < 99) say_offense(buffer, unit_id);
+    else std::strcat(buffer, "*");
     std::strcat(buffer, "-");
-    if (arm_def(unit.armor_id) < 0)
-        std::strcat(buffer, label_get(196));
-    else
-        say_defense(buffer, unit_id);
+    if (arm_def(unit.armor_id) < 0) std::strcat(buffer, label_get(196));
+    else say_defense(buffer, unit_id);
     std::strcat(buffer, "-");
     crt_itoa(speed_proto(unit_id) / Rules.move_rate_roads, num, 10);
     std::strcat(buffer, num);
@@ -198,8 +186,7 @@ void GAMEAPI say_stats(char* buffer, int32_t unit_id, const char* separator) {
         const char* name;
         if (plan == 2 && (weap_off(unit.weapon_id) < 0 || arm_def(unit.armor_id) < weap_off(unit.weapon_id)))
             name = TextLabels[312];
-        else
-            name = PlansShortName[plan];
+        else name = PlansShortName[plan];
         std::strcat(buffer, S(name));
         std::strcat(buffer, ", ");
     }
@@ -233,10 +220,8 @@ void GAMEAPI say_stats(char* buffer, int32_t unit_id, const char* separator) {
     }
     if (separator_done) std::strcat(buffer, separator ? separator : "/");
     if (!full_name) {
-        if (arm_def(unit.armor_id) < 0)
-            std::strcat(buffer, label_get(196));
-        else
-            say_defense(buffer, unit_id);
+        if (arm_def(unit.armor_id) < 0) std::strcat(buffer, label_get(196));
+        else say_defense(buffer, unit_id);
         std::strcat(buffer, separator ? separator : "/");
         crt_itoa(speed_proto(unit_id) / Rules.move_rate_roads, num, 10);
         std::strcat(buffer, num);
@@ -340,10 +325,8 @@ void name_bump(char* name, int32_t* stop) {
     {
         size_t len = std::strlen(name);
         int8_t c = (int8_t)name[len - 1];
-        if (c < '2' || c >= '9')
-            *stop = 1;
-        else
-            name[len - 1] = (char)(c + 1);
+        if (c < '2' || c >= '9') *stop = 1;
+        else name[len - 1] = (char)(c + 1);
     }
     return;
 append:
@@ -377,7 +360,7 @@ void GAMEAPI name_proto(char* name, int32_t unit_id, int32_t faction_id, int32_t
         break;
     }
     std::strcpy(alt, name);
-    int32_t large = 0;    // use the "large" chassis names
+    int32_t large = 0;  // use the "large" chassis names
     int32_t not_sea = 0;
     if (mode < 3) {
         int32_t threshold;
@@ -441,10 +424,8 @@ void GAMEAPI name_proto(char* name, int32_t unit_id, int32_t faction_id, int32_t
         std::strcat(name, " ");
         std::strcat(alt, " ");
         std::strcat(name, S(ch.defsv1_name));
-        if (!special || !(unit_id & 1))
-            alt_part = (!large || not_sea) ? ch.defsv2_name : ch.defsv_name_lrg;
-        else
-            alt_part = (!large || !not_sea) ? ch.defsv1_name : ch.defsv_name_lrg;
+        if (!special || !(unit_id & 1)) alt_part = (!large || not_sea) ? ch.defsv2_name : ch.defsv_name_lrg;
+        else alt_part = (!large || !not_sea) ? ch.defsv1_name : ch.defsv_name_lrg;
         std::strcat(alt, S(alt_part));
     } else if (ch.triad != 2 || !(ability_flags & 0x20) || mode > 2 || off < 0) {
         if (ch.missile) {
@@ -508,15 +489,11 @@ void GAMEAPI name_proto(char* name, int32_t unit_id, int32_t faction_id, int32_t
             std::strcat(alt, label_get(615));
         } else {
             std::strcat(name, " ");
-            if (!reactor_rank)
-                std::strcat(name, S((!large || !not_sea) ? ch.offsv1_name : ch.offsv_name_lrg));
-            else
-                std::strcat(name, reactor_name(reactor_id));
+            if (!reactor_rank) std::strcat(name, S((!large || !not_sea) ? ch.offsv1_name : ch.offsv_name_lrg));
+            else std::strcat(name, reactor_name(reactor_id));
             std::strcat(alt, " ");
-            if (reactor_rank)
-                std::strcat(alt, reactor_name(reactor_id));
-            else
-                std::strcat(alt, S((!large || not_sea) ? ch.offsv2_name : ch.offsv_name_lrg));
+            if (reactor_rank) std::strcat(alt, reactor_name(reactor_id));
+            else std::strcat(alt, S((!large || not_sea) ? ch.offsv2_name : ch.offsv_name_lrg));
         }
     } else {
         // air unit with air superiority
@@ -528,38 +505,37 @@ void GAMEAPI name_proto(char* name, int32_t unit_id, int32_t faction_id, int32_t
         std::strcat(name, " ");
         std::strcat(alt, " ");
         std::strcat(name, S(ch.defsv1_name));
-        if (!special || !(unit_id & 1))
-            alt_part = (!large || not_sea) ? ch.defsv2_name : ch.defsv_name_lrg;
-        else
-            alt_part = (!large || !not_sea) ? ch.defsv1_name : ch.defsv_name_lrg;
+        if (!special || !(unit_id & 1)) alt_part = (!large || not_sea) ? ch.defsv2_name : ch.defsv_name_lrg;
+        else alt_part = (!large || !not_sea) ? ch.defsv1_name : ch.defsv_name_lrg;
         std::strcat(alt, S(alt_part));
     }
-dedupe : {
-    int32_t same = std::strcmp(name, alt) == 0;
-    int32_t stop = 0;
-    for (int32_t i = 0; i < 512; i++) {
-        if (i == unit_id) continue;
-        if (i / 64 != 0 && i / 64 != faction_id) continue;
-        const UNIT& other = Units[i];
-        if (other.chassis_id == (uint32_t)chassis_id && other.weapon_id == (uint32_t)weapon_id &&
-            other.armor_id == (uint32_t)armor_id && other.reactor_id == (uint32_t)reactor_id &&
-            other.ability_flags == ability_flags)
-            continue;
-        if (!stop && !std::strcmp(name, Units[i].name)) {
-            if (!same) parity = 1;
-            name_bump(name, &stop);
-            i = -1;
+dedupe:
+    {
+        int32_t same = std::strcmp(name, alt) == 0;
+        int32_t stop = 0;
+        for (int32_t i = 0; i < 512; i++) {
+            if (i == unit_id) continue;
+            if (i / 64 != 0 && i / 64 != faction_id) continue;
+            const UNIT& other = Units[i];
+            if (other.chassis_id == (uint32_t)chassis_id && other.weapon_id == (uint32_t)weapon_id &&
+                other.armor_id == (uint32_t)armor_id && other.reactor_id == (uint32_t)reactor_id &&
+                other.ability_flags == ability_flags)
+                continue;
+            if (!stop && !std::strcmp(name, Units[i].name)) {
+                if (!same) parity = 1;
+                name_bump(name, &stop);
+                i = -1;
+            }
+            // BUG(original): after a rename above, this compares with Units[-1] (memory before the table)
+            COMPAT_ORIGINAL(out_of_range_reads);
+            if (!same && !std::strcmp(alt, unit_name_raw(i))) {
+                parity = 0;
+                name_bump(alt, &stop);
+                i = -1;
+            }
         }
-        // BUG(original): after a rename above, this compares with Units[-1] (memory before the table)
-        COMPAT_ORIGINAL(out_of_range_reads);
-        if (!same && !std::strcmp(alt, unit_name_raw(i))) {
-            parity = 0;
-            name_bump(alt, &stop);
-            i = -1;
-        }
+        if (parity) std::strcpy(name, alt);
     }
-    if (parity) std::strcpy(name, alt);
-}
 }
 
 // ---- component selection ----
@@ -779,9 +755,9 @@ void GAMEAPI prune_protos(int32_t faction_id, int32_t unit_id, int32_t net_synch
                 if (weap_off(v.weapon_id) < 1 ? v.weapon_id != u.weapon_id
                                               : weap_off(v.weapon_id) > weap_off(u.weapon_id))
                     continue;
-                if (arm_def(v.armor_id) < 1 ? v.armor_id != u.armor_id
-                                            : prune_arm(v.armor_id, faction_id) * 2 >
-                                                  prune_arm(u.armor_id, faction_id) * 2)
+                if (arm_def(v.armor_id) < 1
+                        ? v.armor_id != u.armor_id
+                        : prune_arm(v.armor_id, faction_id) * 2 > prune_arm(u.armor_id, faction_id) * 2)
                     continue;
                 bool same_roles = v.plan == 3 || ((weap_off(v.weapon_id) > 1) == (weap_off(u.weapon_id) > 1) &&
                                                   (arm_def(v.armor_id) > 1) == (arm_def(u.armor_id) > 1));
@@ -796,10 +772,9 @@ void GAMEAPI prune_protos(int32_t faction_id, int32_t unit_id, int32_t net_synch
                 uint32_t va = v.ability_flags, ua = u.ability_flags;
                 const Faction& fac = game().factions[faction_id];
                 bool abil_ok =
-                    va == ua ||
-                    (((ua ^ va) & 0xFFFBD5FC) == 0 &&
-                     (v.reactor_id < u.reactor_id || (ua & va) == va ||
-                      (u_id >= 64 && fac.units_active[v_id] == 0 && fac.units_queue[v_id] == 0)));
+                    va == ua || (((ua ^ va) & 0xFFFBD5FC) == 0 &&
+                                 (v.reactor_id < u.reactor_id || (ua & va) == va ||
+                                  (u_id >= 64 && fac.units_active[v_id] == 0 && fac.units_queue[v_id] == 0)));
                 if (!(abil_ok && v.plan == u.plan)) continue;
                 if (!(v_flag8 == 0 || (v.group_id == u.group_id && (ua & va) == va))) continue;
                 if (!(u.cost <= v.cost || v.reactor_id < u.reactor_id || (v_id >= 64 && !(v.unit_flags & 8)))) continue;
@@ -857,10 +832,8 @@ void GAMEAPI prune_protos(int32_t faction_id, int32_t unit_id, int32_t net_synch
                                 if (!declined) check = true;
                             } else {
                                 choice = X_pop("ASKPRODUPGRADE", 0);
-                                if (choice < 2)
-                                    check = true;
-                                else
-                                    declined = true;
+                                if (choice < 2) check = true;
+                                else declined = true;
                             }
                             if (check && ((v.unit_flags & 0x200) || choice == 1)) {
                                 v.obsolete_factions &= ~mask;
@@ -884,8 +857,7 @@ void GAMEAPI prune_protos(int32_t faction_id, int32_t unit_id, int32_t net_synch
                         parse_says(1, StrBuffer, -1, -1);
                         if (game().mfactions[faction_id].rule_flags & 0x80)
                             popp(ScriptFileName, "PRODUPGRADE", 0, "alunit_sm.pcx", 0);
-                        else
-                            popp(ScriptFileName, "PRODUPGRADE", 0, "unit_sm.pcx", 0);
+                        else popp(ScriptFileName, "PRODUPGRADE", 0, "unit_sm.pcx", 0);
                     }
                 }
             }
@@ -919,9 +891,9 @@ void GAMEAPI prune_protos(int32_t faction_id, int32_t unit_id, int32_t net_synch
                            (weap_off(v.weapon_id) < 1 ? v.weapon_id == u.weapon_id
                                                       : weap_off(v.weapon_id) <= weap_off(u.weapon_id)) &&
                            v.carry_capacity <= u.carry_capacity &&
-                           (arm_def(v.armor_id) < 1 ? v.armor_id == u.armor_id
-                                                    : prune_arm(v.armor_id, faction_id) * 2 <=
-                                                          prune_arm(u.armor_id, faction_id) * 2) &&
+                           (arm_def(v.armor_id) < 1
+                                ? v.armor_id == u.armor_id
+                                : prune_arm(v.armor_id, faction_id) * 2 <= prune_arm(u.armor_id, faction_id) * 2) &&
                            Chassis[v.chassis_id].speed <= Chassis[u.chassis_id].speed &&
                            bit_count(v.ability_flags & u.ability_flags) >= bit_count(v.ability_flags) &&
                            ((v.ability_flags ^ u.ability_flags) & 0x408418) == 0) {
@@ -946,9 +918,9 @@ void GAMEAPI prune_protos(int32_t faction_id, int32_t unit_id, int32_t net_synch
                        Chassis[v.chassis_id].range == Chassis[u.chassis_id].range &&
                        (weap_off(v.weapon_id) < 1 ? v.weapon_id == u.weapon_id
                                                   : weap_off(v.weapon_id) <= weap_off(u.weapon_id)) &&
-                       (arm_def(v.armor_id) < 1 ? v.armor_id == u.armor_id
-                                                : prune_arm(v.armor_id, faction_id) * 2 <=
-                                                      prune_arm(u.armor_id, faction_id) * 2) &&
+                       (arm_def(v.armor_id) < 1
+                            ? v.armor_id == u.armor_id
+                            : prune_arm(v.armor_id, faction_id) * 2 <= prune_arm(u.armor_id, faction_id) * 2) &&
                        Chassis[v.chassis_id].speed <= Chassis[u.chassis_id].speed) {
                 if (!((v.unit_flags & kUnitPrototyped) &&
                       bit_count(u.ability_flags & v.ability_flags) < bit_count(v.ability_flags)) &&
@@ -983,8 +955,8 @@ int32_t GAMEAPI propose_proto(int32_t faction_id, int32_t chassis_id, int32_t we
         UNIT& u = Units[u_id];
         int32_t score;
         int32_t slot = u_id;
-        if (u_id >= 64 && (u.unit_flags & kUnitActive) && (u.obsolete_factions & mask) &&
-            !fac.units_active[u_id] && !fac.units_queue[u_id]) {
+        if (u_id >= 64 && (u.unit_flags & kUnitActive) && (u.obsolete_factions & mask) && !fac.units_active[u_id] &&
+            !fac.units_queue[u_id]) {
             // obsolete and unused: replaceable
             score = plan != (uint8_t)u.group_id ? 0x1000 : 0x2000;
         } else if (!(u.unit_flags & kUnitActive)) {
@@ -1156,7 +1128,7 @@ void GAMEAPI consider_designs(int32_t faction_id) {
     const int32_t rpow = 2 << (reactor & 31);
     // weapon / armor upgrades for existing designs
     int32_t new_weapon = -1;  // local_18
-    int32_t new_armor = -1;   // local_8
+    int32_t new_armor = -1;  // local_8
     for (int32_t w = 0; w < 26; w++) {
         int32_t off = weap_off(w);
         if (!has_tech(Weapon[w].preq_tech, f) || off <= 0 || off >= 99 || w == 23) continue;
@@ -1207,10 +1179,8 @@ void GAMEAPI consider_designs(int32_t faction_id) {
                     weapon = unit.weapon_id;
                     int32_t off = weap_off(weapon);
                     int32_t lim = (int32_t)(scratch * rpow * 4) / off;
-                    if (lim < 2 || off < 2)
-                        off = 2;
-                    else if (lim <= off)
-                        off = lim;
+                    if (lim < 2 || off < 2) off = 2;
+                    else if (lim <= off) off = lim;
                     if (off < arm_def(new_armor)) continue;
                 } else {
                     armor = unit.armor_id;
@@ -1218,10 +1188,8 @@ void GAMEAPI consider_designs(int32_t faction_id) {
                         scratch = 2 - (reactor != 1);
                         int32_t off = weap_off(new_weapon);
                         int32_t lim = (int32_t)(scratch * rpow * 4) / off;
-                        if (lim < 2 || off < 2)
-                            lim = 2;
-                        else if (off < lim)
-                            lim = off;
+                        if (lim < 2 || off < 2) lim = 2;
+                        else if (off < lim) lim = off;
                         if (arm_def(new_armor) <= lim) armor = new_armor;
                     }
                 }
@@ -1245,14 +1213,11 @@ void GAMEAPI consider_designs(int32_t faction_id) {
                         fac.AI_power + fac.AI_growth + margin)
                         upgrade_armor = true;
                 }
-                if (upgrade_armor)
-                    armor = new_armor;
-                else if (armor != new_armor && weapon != new_weapon)
-                    continue;
+                if (upgrade_armor) armor = new_armor;
+                else if (armor != new_armor && weapon != new_weapon) continue;
                 break;
             }
-            default:
-                continue;
+            default: continue;
             }
             propose_proto(f, chassis, weapon, armor, unit.ability_flags, reactor, (uint8_t)unit.group_id, nullptr);
         }
@@ -1297,7 +1262,8 @@ void GAMEAPI consider_designs(int32_t faction_id) {
                 break;
             weapon = next;
         }
-        if (arm_def(armor) > 1 || DesignSuggestMode) propose_proto(f, chassis, weapon, armor, abil, reactor, 2, nullptr);
+        if (arm_def(armor) > 1 || DesignSuggestMode)
+            propose_proto(f, chassis, weapon, armor, abil, reactor, 2, nullptr);
         if (has_tech(abil_preq(18), f) && !(abil & 0x40000) && !human) {
             bool trance = !(fac.clean_minerals_modifier < 4 || fac.SE_morale_pending > 0);
             if (trance || threats) {
@@ -1326,15 +1292,11 @@ void GAMEAPI consider_designs(int32_t faction_id) {
         int32_t weapon = weapon_budget(f, human ? 99 : budget, 0);
         int32_t lim_off = weap_off(weapon);
         int32_t lim = (int32_t)(scratch * rpow * 4) / lim_off;
-        if (lim < 2 || lim_off < 2)
-            lim_off = 2;
-        else if (lim <= lim_off)
-            lim_off = lim;
+        if (lim < 2 || lim_off < 2) lim_off = 2;
+        else if (lim <= lim_off) lim_off = lim;
         if (lim_off <= budget / 2) lim_off = budget / 2;
-        if (lim_off < 1)
-            lim_off = 1;
-        else if (lim_off > 99)
-            lim_off = 99;
+        if (lim_off < 1) lim_off = 1;
+        else if (lim_off > 99) lim_off = 99;
         int32_t armor = armor_budget(f, lim_off);
         scratch = armor;
         int32_t off_cost = weap_off(weapon);
@@ -1347,10 +1309,8 @@ void GAMEAPI consider_designs(int32_t faction_id) {
             add_abil(&abil, 0x100000, f);
         bool deep_radar = true;
         if (!(war_score == 0 || war_score <= 1 - fac.AI_fight || fac.AI_fight < 0)) {
-            if (human)
-                deep_radar = false;
-            else
-                add_abil(&abil, 0x100000, f);
+            if (human) deep_radar = false;
+            else add_abil(&abil, 0x100000, f);
         }
         if (deep_radar && !human &&
             ((fac.best_armor_value * 3 / 2 <= fac.enemy_best_psi_land_defense &&
@@ -1399,7 +1359,8 @@ void GAMEAPI consider_designs(int32_t faction_id) {
                     int32_t cost_alt = proto_cost(alt, weapon, armor, abil, reactor);
                     bool take;
                     if (cost_alt > reactor + 5)
-                        take = proto_cost(ch, weapon, armor, abil, reactor) >= proto_cost(alt, weapon, armor, abil, reactor);
+                        take = proto_cost(ch, weapon, armor, abil, reactor) >=
+                               proto_cost(alt, weapon, armor, abil, reactor);
                     else
                         take = (int32_t)(proto_cost(ch, weapon, armor, abil, reactor) + 1 + (f & 1)) >=
                                proto_cost(alt, weapon, armor, abil, reactor);
@@ -1457,10 +1418,8 @@ void GAMEAPI consider_designs(int32_t faction_id) {
         if (war_score != 0 && 3 - fac.AI_fight < war_score && fac.AI_fight >= 0 && !human) add_abil(&abil, 0x100000, f);
         bool radar = true;
         if (ProposalPassCount[9] < ProposalPassCount[8] && fac.AI_power + fac.AI_fight > 0) {
-            if (!human)
-                add_abil(&abil, 0x100000, f);
-            else
-                radar = false;
+            if (!human) add_abil(&abil, 0x100000, f);
+            else radar = false;
         }
         if (radar && !human && (threats & 2)) add_abil(&abil, 0x800, f);
         if (mf.rule_morale < 0 || (fac.AI_fight > 0 && fac.SE_industry_pending >= 0) ||
@@ -1491,10 +1450,8 @@ void GAMEAPI consider_designs(int32_t faction_id) {
                 if (abil == 0) add_abil(&abil, 4, f);
             }
             if (has_tech(abil_preq(10), f)) {
-                if (!two_abils(f))
-                    abil = 0x400;
-                else
-                    abil |= 0x400;
+                if (!two_abils(f)) abil = 0x400;
+                else abil |= 0x400;
             }
         } else {
             abil |= 0x800;
@@ -1520,8 +1477,7 @@ void GAMEAPI consider_designs(int32_t faction_id) {
         }
         if (has_tech(abil_preq(8), f) && !(abil & 0x100) && bit_count(abil) < 2 && (abil == 0 || two_abils(f)))
             abil |= 0x100;
-        if (has_tech(abil_preq(1), f) && !(abil & 2) && bit_count(abil) < 2 && (abil == 0 || two_abils(f)))
-            abil |= 2;
+        if (has_tech(abil_preq(1), f) && !(abil & 2) && bit_count(abil) < 2 && (abil == 0 || two_abils(f))) abil |= 2;
         int32_t weapon = weapon_budget(f, 1, 0);
         int32_t armor = armor_budget(f, 1);
         for (int32_t round = 0; round < 100; round++) {

@@ -109,7 +109,8 @@ void THISCALL BaseWin_farm_click(uint8_t* self, int32_t x, int32_t y, int32_t) {
             b->worked_tiles |= bit;
             int32_t i = bwf(kBwDragIndex);
             for (int32_t j = i + 1; i < cur_base().specialist_total; i++, j++) {
-                int32_t t = j < 0x10 ? (cur_base().specialist_types[j >> 3] >> ((j & 7) << 2)) & 0xF : best_specialist();
+                int32_t t =
+                    j < 0x10 ? (cur_base().specialist_types[j >> 3] >> ((j & 7) << 2)) & 0xF : best_specialist();
                 if (j < 0x11) set_specialist_type(i, t);
             }
             if (cur_base().specialist_total) cur_base().specialist_total--;
@@ -172,10 +173,12 @@ void THISCALL BaseWin_farm_click(uint8_t* self, int32_t x, int32_t y, int32_t) {
             int32_t s = resource_yield(0, faction_id, CurrentBaseID, tx, ty) * (w_food + 3) * 4 / nut;
             int32_t mins = cur_base().mineral_intake_2 - BaseForcesMaintCost;
             mins = mins < 1 ? 1 : (mins > 99 ? 99 : mins);
-            s += resource_yield(1, faction_id, CurrentBaseID, tx, ty) * (w_fight + w_power + 4) * cur_base().pop_size / mins;
+            s += resource_yield(1, faction_id, CurrentBaseID, tx, ty) * (w_fight + w_power + 4) * cur_base().pop_size /
+                 mins;
             int32_t en = cur_base().energy_intake_2;
             en = en < 1 ? 1 : (en > 99 ? 99 : en);
-            s += resource_yield(2, faction_id, CurrentBaseID, tx, ty) * cur_base().pop_size * (w_energy + w_min_tech + 2) / en;
+            s += resource_yield(2, faction_id, CurrentBaseID, tx, ty) * cur_base().pop_size *
+                 (w_energy + w_min_tech + 2) / en;
             if (s < best) {
                 best = s;
                 best_i = i;
@@ -256,8 +259,7 @@ void THISCALL BaseWin_pop_click(uint8_t* self, int32_t index, int32_t, int32_t, 
             int32_t t = -1;
             if (bwf(kBwDragType) == 0) t = BaseWin_farm_get(self, bwf(kBwDownX), bwf(kBwDownY));
             else
-                for (t = 0x14; t > 0 && !(cur_base().worked_tiles & (1u << t)); t--) {
-                }
+                for (t = 0x14; t > 0 && !(cur_base().worked_tiles & (1u << t)); t--) {}
             if (t > 0) cur_base().worked_tiles &= ~(1u << t);
             index = cur_base().specialist_total++;
         }
@@ -561,7 +563,7 @@ void THISCALL BaseWin_gov_activate(uint8_t*) {
 }
 
 // GOVOPTIONS: the governor's check boxes <-> governor_flags bits.
-static const uint32_t kGovBits[19] = {0x80000000, 0x200000, 0x80,    0x40,    1,      0x400000, 0x200,
+static const uint32_t kGovBits[19] = {0x80000000, 0x200000, 0x80,    0x40,    1,       0x400000, 0x200,
                                       0x400,      0x800,    0x1000,  0x2000,  0x80000, 0x800000, 0x100000,
                                       0x8000,     0x20000,  0x10000, 0x40000, 0x20};
 
@@ -618,8 +620,14 @@ void THISCALL BaseWin_update_gov_buttons(uint8_t* self) {
     bool human = (FactionStatus[0] & (1 << faction_id)) != 0;
     Faction& f = Factions[faction_id];
     bw_button_set(bw_button(8), (int32_t)(g >> 31));
-    struct { int32_t button; uint32_t bit; int32_t ai; } kGov[4] = {
-        {4, 0x1000000, f.AI_growth}, {5, 0x2000000, f.AI_tech}, {6, 0x4000000, f.AI_wealth}, {7, 0x8000000, f.AI_power}};
+    struct {
+        int32_t button;
+        uint32_t bit;
+        int32_t ai;
+    } kGov[4] = {{4, 0x1000000, f.AI_growth},
+                 {5, 0x2000000, f.AI_tech},
+                 {6, 0x4000000, f.AI_wealth},
+                 {7, 0x8000000, f.AI_power}};
     for (auto& k : kGov) {
         bool on = human ? ((g & k.bit) && (g & 0x80000000)) : k.ai != 0;
         bw_button_set(bw_button(k.button), on ? 1 : 0);
@@ -818,10 +826,18 @@ void THISCALL BaseWin_on_button_clicked(uint8_t* self, int32_t id) {
     case 1: BaseWin_rename(self); return;
     case 2: BaseWin_prev(self); return;
     case 3: BaseWin_next(self); return;
-    case 4: if (own) BaseWin_gov_on(self, 0x1000000); return;
-    case 5: if (own) BaseWin_gov_on(self, 0x2000000); return;
-    case 6: if (own) BaseWin_gov_on(self, 0x4000000); return;
-    case 7: if (own) BaseWin_gov_on(self, 0x8000000); return;
+    case 4:
+        if (own) BaseWin_gov_on(self, 0x1000000);
+        return;
+    case 5:
+        if (own) BaseWin_gov_on(self, 0x2000000);
+        return;
+    case 6:
+        if (own) BaseWin_gov_on(self, 0x4000000);
+        return;
+    case 7:
+        if (own) BaseWin_gov_on(self, 0x8000000);
+        return;
     case 8:
         if (!own) return;
         if (!(cur_base().governor_flags & 0x80000000)) {
@@ -852,7 +868,9 @@ void THISCALL BaseWin_on_button_clicked(uint8_t* self, int32_t id) {
         return;
     case 0xC: BaseWin_production(self, 0, 0); return;
     case 0xD: BaseWin_hurry(self); return;
-    case 0x10: if (own) BaseWin_nerve_staple(self); return;
+    case 0x10:
+        if (own) BaseWin_nerve_staple(self);
+        return;
     case 0x12:
     case 0x13:
         if (own) BaseWin_governor(self, 0);
@@ -868,9 +886,7 @@ void THISCALL BaseWin_on_button_clicked(uint8_t* self, int32_t id) {
         if (own) BaseWin_base_editor(self);
         return;
     case -2:
-    case 0:
-        BaseWin_exit(self);
-        return;
+    case 0: BaseWin_exit(self); return;
     default: return;
     }
 }

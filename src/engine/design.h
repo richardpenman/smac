@@ -48,16 +48,17 @@ ADDR(0x57DF00) void GAMEAPI clear_bunglist(int32_t faction_id);
 // 0x57DF30: records unit_id's design in the faction's list (ring buffer, Faction.bunglist_next).
 ADDR(0x57DF30) void GAMEAPI bung_add(int32_t faction_id, int32_t unit_id);
 // Whether a human faction's list contains the design.
-ADDR(0x57DFC0) int32_t GAMEAPI is_bunged(int32_t faction_id, int32_t chassis_id, int32_t weapon_id, int32_t armor_id,
-                                         uint32_t ability_flags, int32_t reactor_id);
+ADDR(0x57DFC0)
+int32_t GAMEAPI is_bunged(int32_t faction_id, int32_t chassis_id, int32_t weapon_id, int32_t armor_id,
+                          uint32_t ability_flags, int32_t reactor_id);
 
 // ---- naming and component selection ----
 // Automatic name of a design (written to name, at most ~256 characters). unit_id is the slot the
 // design is meant for (its plan and reactor rank among the faction's designs choose the variant);
 // other designs of the faction with the same name get a numeric suffix.
-ADDR(0x57E040) void GAMEAPI name_proto(char* name, int32_t unit_id, int32_t faction_id, int32_t chassis_id,
-                                       int32_t weapon_id, int32_t armor_id, uint32_t ability_flags,
-                                       int32_t reactor_id);
+ADDR(0x57E040)
+void GAMEAPI name_proto(char* name, int32_t unit_id, int32_t faction_id, int32_t chassis_id, int32_t weapon_id,
+                        int32_t armor_id, uint32_t ability_flags, int32_t reactor_id);
 // Best reactor (1-4) the faction knows.
 ADDR(0x57EFA0) int32_t GAMEAPI best_reactor(int32_t faction_id);
 // Best known chassis of a triad (-1: any) for a speed requirement (> 0: at least that speed, 2 points
@@ -79,9 +80,9 @@ ADDR(0x57F4B0) void GAMEAPI prune_protos(int32_t faction_id, int32_t unit_id, in
 // Creates (or finds) a prototype for the design. plan: AI plan to assign (-1: keep; -2: mark as
 // prototyped); name: nullptr for an automatic name. Returns the unit id, -1 if rejected, 2 for the
 // basic design (1-1-1 infantry).
-ADDR(0x580860) int32_t GAMEAPI propose_proto(int32_t faction_id, int32_t chassis_id, int32_t weapon_id,
-                                             int32_t armor_id, uint32_t ability_flags, int32_t reactor_id,
-                                             int32_t plan, const char* name);
+ADDR(0x580860)
+int32_t GAMEAPI propose_proto(int32_t faction_id, int32_t chassis_id, int32_t weapon_id, int32_t armor_id,
+                              uint32_t ability_flags, int32_t reactor_id, int32_t plan, const char* name);
 // Index of the lowest set bit of an ability flag.
 ADDR(0x581170) int32_t GAMEAPI abil_index(uint32_t ability_flag);
 // Adds an ability to an empty ability set when the faction knows it and does not get it for free.

@@ -20,13 +20,14 @@ ADDR(0x59A2D0) void THISCALL Path_shutdown(Path* self);
 // fungus, 8 at least one move per step, 0x10 fungus costs extra, 0x40 avoid zones of control,
 // 0x80 AI: avoid foreign territory, 0x200 territory mode (unit_id: a second faction whose land
 // is open; 0x400 closes unowned land, 0x800 opens land of non-hostile factions).
-ADDR(0x59A530) int32_t THISCALL Path_find(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t unit_id,
-                                          int32_t faction_id, int32_t flags, int32_t prev_dir);
+ADDR(0x59A530)
+int32_t THISCALL Path_find(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t unit_id,
+                           int32_t faction_id, int32_t flags, int32_t prev_dir);
 // Not an original function: Path_find with the value of its uninitialised start-ZOC local given
 // explicitly (BUG(original), compat residue.path_start_zoc; see docs/RECONSTRUCTION.md "Known
 // uninitialised reads").
-int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t unit_id,
-                       int32_t faction_id, int32_t flags, int32_t prev_dir, int32_t start_zoc);
+int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t unit_id, int32_t faction_id,
+                       int32_t flags, int32_t prev_dir, int32_t start_zoc);
 // Next step direction of a vehicle towards its first waypoint (Path_find, else the greedy best
 // neighbour); -1 if none (the order is then cancelled). faction_id: the faction whose rules apply.
 ADDR(0x59BC10) int32_t THISCALL Path_move(Path* self, int32_t veh_id, int32_t faction_id);

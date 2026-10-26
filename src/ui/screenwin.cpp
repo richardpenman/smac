@@ -213,7 +213,8 @@ void sw_run(ScreenWin* s) {
         if (right && b && !b->bubble.empty()) {
             // BaseButton_on_right_click -> BaseButton_timer_callback(0): its help bubble over it.
             int32_t ox = parent ? mp.left : s->x, oy = parent ? mp.top : s->y;
-            ui_bubble_set_rect(b->bubble.c_str(), UiRect{b->r.left + ox, b->r.top + oy, b->r.right + ox, b->r.bottom + oy});
+            ui_bubble_set_rect(b->bubble.c_str(),
+                               UiRect{b->r.left + ox, b->r.top + oy, b->r.right + ox, b->r.bottom + oy});
             continue;
         }
         if (right) {  // a right click (on release): the spot's menu

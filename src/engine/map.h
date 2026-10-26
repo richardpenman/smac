@@ -26,14 +26,14 @@ inline constexpr int32_t TableRange[9] = {1, 9, 25, 49, 81, 121, 169, 225, 289};
 // ---- globals ------------------------------------------------------------------------------------
 
 GLOBAL(int32_t[11], AltNaturalDefault, 0x68FAF4);  // altitude-detail thresholds used by world_build
-GLOBAL(int32_t[11], AltNaturalLinear, 0x68FB20);   // linearized thresholds (world_linearize_contours)
-GLOBAL(int32_t[11], AltNatural, 0x68FB4C);         // current thresholds: detail - sea level -> altitude
-GLOBAL(int32_t, GoodyCoefX, 0x68FB78);             // goody_at pod pattern coefficients
+GLOBAL(int32_t[11], AltNaturalLinear, 0x68FB20);  // linearized thresholds (world_linearize_contours)
+GLOBAL(int32_t[11], AltNatural, 0x68FB4C);  // current thresholds: detail - sea level -> altitude
+GLOBAL(int32_t, GoodyCoefX, 0x68FB78);  // goody_at pod pattern coefficients
 GLOBAL(int32_t, GoodyCoefY, 0x68FB7C);
-GLOBAL(int32_t, MapResizeOldX, 0x945AD4);          // map_resize scratch
+GLOBAL(int32_t, MapResizeOldX, 0x945AD4);  // map_resize scratch
 GLOBAL(int32_t, MapResizeOldY, 0x945AD8);
 GLOBAL_NATIVE(MAP*, MapResizeOldTiles, 0x945AD0);
-GLOBAL(int32_t, MapScaleExtra, 0x945AEC);          // map_scale_set / map_scale
+GLOBAL(int32_t, MapScaleExtra, 0x945AEC);  // map_scale_set / map_scale
 GLOBAL(int32_t, MountPlanetX, 0x9A6804);
 GLOBAL(int32_t, MountPlanetY, 0x9A6808);
 // Landmark-overlay tables used by the map renderer (reset by fixup_landmarks / delete_landmark).
@@ -116,8 +116,8 @@ ADDR(0x592030) int32_t GAMEAPI bonus_at(int32_t x, int32_t y);
 // Supply pod: 0 none, 1 supply pod, 2 unity pod pattern.
 ADDR(0x592140) int32_t GAMEAPI goody_at(int32_t x, int32_t y);
 // Appends a location description (base name and/or coordinates) to buffer.
-ADDR(0x592250) void GAMEAPI say_loc(char* buffer, int32_t x, int32_t y, int32_t near_base, int32_t coords,
-                                    int32_t with_near);
+ADDR(0x592250)
+void GAMEAPI say_loc(char* buffer, int32_t x, int32_t y, int32_t near_base, int32_t coords, int32_t with_near);
 // Clears the AI site value of every tile within radius 2.
 ADDR(0x592400) void GAMEAPI site_radius(int32_t x, int32_t y);
 // 0x592480: plants fungus on a tile (clearing improvements) and clears the nearby site values.

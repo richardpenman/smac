@@ -37,8 +37,8 @@ constexpr int32_t kCouncil = 1;  // MultiWin_on_button_clicked: 0 chat, 1 counci
 
 struct MultiWinState : ScreenWin {
     Font *f_text = nullptr, *f_bold = nullptr;
-    std::vector<int32_t> rows;     // the factions listed
-    int32_t menu_faction = -1;     // the faction of the open right-click menu
+    std::vector<int32_t> rows;  // the factions listed
+    int32_t menu_faction = -1;  // the faction of the open right-click menu
     std::vector<std::pair<int32_t, std::string>> menu;  // PullDown items (id, text)
     UiRect menu_rect{};
     std::string last_action;

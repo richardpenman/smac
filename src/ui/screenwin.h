@@ -25,12 +25,12 @@
 struct ScreenWin {
     const char* name = "";
     bool open = false;
-    int32_t x = 0, y = 0;              // window position on the screen
-    Buffer canvas;                     // the window's canvas (+0x444 of the GraphicWin)
-    bool iface = false;                // uses the main interface (SubInterface)
-    Buffer mi;                         // the main interface's canvas while the window is open
+    int32_t x = 0, y = 0;  // window position on the screen
+    Buffer canvas;  // the window's canvas (+0x444 of the GraphicWin)
+    bool iface = false;  // uses the main interface (SubInterface)
+    Buffer mi;  // the main interface's canvas while the window is open
     std::vector<BaseButton*> buttons;  // parent 0: the window, 1: the main interface
-    Spots spots[2];                    // clickable spots of the window / the main interface
+    Spots spots[2];  // clickable spots of the window / the main interface
     BaseButton* pressed = nullptr;
     // What the last redraw wrote (test aid: SCREENSTATE): one entry per text drawn by sw_text.
     std::vector<std::string> texts;

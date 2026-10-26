@@ -57,7 +57,8 @@ int32_t to_vk(SDL_Keycode k) {
     switch (k) {
     case SDLK_BACKSPACE: return VKEY_BACK;
     case SDLK_TAB: return VKEY_TAB;
-    case SDLK_RETURN: case SDLK_KP_ENTER: return VKEY_RETURN;
+    case SDLK_RETURN:
+    case SDLK_KP_ENTER: return VKEY_RETURN;
     case SDLK_ESCAPE: return VKEY_ESCAPE;
     case SDLK_SPACE: return VKEY_SPACE;
     case SDLK_PAGEUP: return VKEY_PRIOR;
@@ -75,11 +76,15 @@ int32_t to_vk(SDL_Keycode k) {
     case SDLK_KP_PLUS: return VKEY_ADD;
     case SDLK_KP_MINUS: return VKEY_SUBTRACT;
     case SDLK_KP_DIVIDE: return VKEY_DIVIDE;
-    case SDLK_PLUS: case SDLK_EQUALS: return VKEY_OEM_PLUS;
+    case SDLK_PLUS:
+    case SDLK_EQUALS: return VKEY_OEM_PLUS;
     case SDLK_MINUS: return VKEY_OEM_MINUS;
-    case SDLK_LSHIFT: case SDLK_RSHIFT: return VKEY_SHIFT;
-    case SDLK_LCTRL: case SDLK_RCTRL: return VKEY_CONTROL;
-    case SDLK_LALT: case SDLK_RALT: return VKEY_MENU;
+    case SDLK_LSHIFT:
+    case SDLK_RSHIFT: return VKEY_SHIFT;
+    case SDLK_LCTRL:
+    case SDLK_RCTRL: return VKEY_CONTROL;
+    case SDLK_LALT:
+    case SDLK_RALT: return VKEY_MENU;
     default: return 0;
     }
 }
@@ -165,15 +170,17 @@ bool read_font_units(const std::string& path, FontUnits* u) {
     std::fclose(f);
     auto u16 = [&](size_t o) { return o + 2 <= d.size() ? (int32_t)(d[o] << 8 | d[o + 1]) : 0; };
     auto s16 = [&](size_t o) { return (int32_t)(int16_t)u16(o); };
-    auto u32 = [&](size_t o) { return o + 4 <= d.size() ? (uint32_t)(d[o] << 24 | d[o + 1] << 16 | d[o + 2] << 8 | d[o + 3]) : 0u; };
+    auto u32 = [&](size_t o) {
+        return o + 4 <= d.size() ? (uint32_t)(d[o] << 24 | d[o + 1] << 16 | d[o + 2] << 8 | d[o + 3]) : 0u;
+    };
     int32_t tables = u16(4);
     size_t head = 0, hhea = 0, os2 = 0;
     for (int32_t i = 0; i < tables; i++) {
         size_t rec = 12 + (size_t)i * 16;
         uint32_t tag = u32(rec), off = u32(rec + 8);
-        if (tag == 0x68656164) head = off;       // 'head'
+        if (tag == 0x68656164) head = off;  // 'head'
         else if (tag == 0x68686561) hhea = off;  // 'hhea'
-        else if (tag == 0x4F532F32) os2 = off;   // 'OS/2'
+        else if (tag == 0x4F532F32) os2 = off;  // 'OS/2'
     }
     if (!head || !hhea || !os2) return false;
     u->upem = u16(head + 18);
@@ -214,17 +221,24 @@ std::string find_font_file(const char* face, bool bold, bool italic) {
         names.push_back(bold ? "LiberationSansNarrow-Bold.ttf" : "LiberationSansNarrow-Regular.ttf");
     }
     names.push_back(bold ? (italic ? "arialbi.ttf" : "arialbd.ttf") : (italic ? "ariali.ttf" : "arial.ttf"));
-    names.push_back(bold ? (italic ? "Arial Bold Italic.ttf" : "Arial Bold.ttf") : (italic ? "Arial Italic.ttf" : "Arial.ttf"));
+    names.push_back(bold ? (italic ? "Arial Bold Italic.ttf" : "Arial Bold.ttf")
+                         : (italic ? "Arial Italic.ttf" : "Arial.ttf"));
     names.push_back(bold ? (italic ? "LiberationSans-BoldItalic.ttf" : "LiberationSans-Bold.ttf")
                          : (italic ? "LiberationSans-Italic.ttf" : "LiberationSans-Regular.ttf"));
     names.push_back(bold ? "DejaVuSans-Bold.ttf" : "DejaVuSans.ttf");
     names.push_back(bold ? "arialnb.ttf" : "arialn.ttf");
     const char* dirs[] = {
         nullptr,  // game directory
-        "/usr/share/fonts/truetype/msttcorefonts", "/usr/share/fonts/truetype/liberation",
-        "/usr/share/fonts/truetype/liberation2", "/usr/share/fonts/liberation", "/usr/share/fonts/TTF",
-        "/usr/share/fonts/truetype/dejavu", "/usr/share/fonts/dejavu", "/Library/Fonts",
-        "/System/Library/Fonts/Supplemental", "C:/Windows/Fonts",
+        "/usr/share/fonts/truetype/msttcorefonts",
+        "/usr/share/fonts/truetype/liberation",
+        "/usr/share/fonts/truetype/liberation2",
+        "/usr/share/fonts/liberation",
+        "/usr/share/fonts/TTF",
+        "/usr/share/fonts/truetype/dejavu",
+        "/usr/share/fonts/dejavu",
+        "/Library/Fonts",
+        "/System/Library/Fonts/Supplemental",
+        "C:/Windows/Fonts",
     };
     for (const auto& n : names) {
         for (const char* d : dirs) {
@@ -251,8 +265,8 @@ bool video_init(const char* title, int32_t width, int32_t height, bool hidden) {
     g_width = width;
     g_height = height;
     if (hidden) return true;  // offscreen: frames are only saved
-    g_window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height,
-                                SDL_WINDOW_RESIZABLE);
+    g_window =
+        SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_RESIZABLE);
     if (!g_window) {
         std::fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError());
         return false;
@@ -333,8 +347,8 @@ void set_layer_palettes(const uint8_t* layers, int32_t pitch, const Rgb* const* 
 bool save_bmp(const char* path, const uint8_t* pixels, int32_t pitch, int32_t width, int32_t height,
               const Rgb* palette) {
     convert(pixels, pitch, width, height, palette);
-    SDL_Surface* s = SDL_CreateRGBSurfaceWithFormatFrom(g_rgb.data(), width, height, 32, width * 4,
-                                                        SDL_PIXELFORMAT_ARGB8888);
+    SDL_Surface* s =
+        SDL_CreateRGBSurfaceWithFormatFrom(g_rgb.data(), width, height, 32, width * 4, SDL_PIXELFORMAT_ARGB8888);
     if (!s) return false;
     SDL_Surface* rgb24 = SDL_ConvertSurfaceFormat(s, SDL_PIXELFORMAT_RGB24, 0);
     bool ok = rgb24 && SDL_SaveBMP(rgb24, path) == 0;
@@ -458,8 +472,7 @@ int32_t font_text_width(int32_t handle, const char* text, int32_t len) {
     return w;
 }
 
-bool font_render(int32_t handle, const char* text, int32_t len, std::vector<uint8_t>* mask, int32_t* w,
-                 int32_t* h) {
+bool font_render(int32_t handle, const char* text, int32_t len, std::vector<uint8_t>* mask, int32_t* w, int32_t* h) {
     auto it = g_fonts.find(handle);
     *w = *h = 0;
     if (it == g_fonts.end() || !text || len <= 0) return false;

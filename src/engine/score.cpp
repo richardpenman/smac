@@ -142,10 +142,8 @@ int32_t GAMEAPI most_objectives(int32_t* winner_id, int32_t* tied_count) {
         int32_t value = num_objectives(i, GameRules & RULES_VICTORY_COOPERATIVE);
         if (value < best) continue;
         if (tied_count) {
-            if (value > best)
-                *tied_count = 0;
-            else if (!has_pact(best_id, i) || !(GameRules & RULES_VICTORY_COOPERATIVE))
-                ++*tied_count;
+            if (value > best) *tied_count = 0;
+            else if (!has_pact(best_id, i) || !(GameRules & RULES_VICTORY_COOPERATIVE)) ++*tied_count;
         }
         best = value;
         best_id = i;
@@ -280,7 +278,8 @@ void GAMEAPI rankings(int32_t full) {
         uint32_t ext = game().factions[i].player_flags_ext;
         int32_t span = (vendettas - game().factions[i].AI_fight + 2) * 256;
         int32_t roll = (span == 1 || span - 1 < 0) ? 0 : game_rand() % span;
-        int32_t chance = (rep + (climax ? 4 : 0) + ((ext >> 3) & 4) + ((revenge & DIPLO_WANT_REVENGE) ? 4 : 0)) * difficulty;
+        int32_t chance =
+            (rep + (climax ? 4 : 0) + ((ext >> 3) & 4) + ((revenge & DIPLO_WANT_REVENGE) ? 4 : 0)) * difficulty;
         if (roll < chance) set_treaty(i, leader, DIPLO_SHALL_BETRAY, 1);
     }
 }
@@ -439,7 +438,6 @@ void GAMEAPI compute_score(int32_t faction_id, int32_t* score, int32_t* table, i
     f.unk_107 = *score;
     if ((GameRules & RULES_IRONMAN) && !(GameState & STATE_SCENARIO_CHEATED_FLAG)) f.unk_107 = *score * 2;
 }
-
 
 void GAMEAPI replay_base(int32_t event, int32_t x, int32_t y, int32_t faction_id) {
     log_say_values("Replay Base", x, y, faction_id);

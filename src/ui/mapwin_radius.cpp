@@ -46,7 +46,8 @@ bool in_view_range(uint8_t* win, int32_t x, int32_t y) {
 }
 // IntersectRect: false (and an empty result) when the rectangles do not overlap.
 bool intersect(UiRect* out, const UiRect& a, const UiRect& b) {
-    UiRect r{std::max(a.left, b.left), std::max(a.top, b.top), std::min(a.right, b.right), std::min(a.bottom, b.bottom)};
+    UiRect r{std::max(a.left, b.left), std::max(a.top, b.top), std::min(a.right, b.right),
+             std::min(a.bottom, b.bottom)};
     if (r.right <= r.left || r.bottom <= r.top) {
         *out = UiRect{0, 0, 0, 0};
         return false;
@@ -57,7 +58,8 @@ bool intersect(UiRect* out, const UiRect& a, const UiRect& b) {
 int32_t line_height(const Font* f) { return f->field_0 < 0 ? f->height : f->field_0 + f->ascent_above; }
 // The rows of tiles a partial redraw walks: from (y - half) to (y + half + 1), the row dy
 // `half - |dy|` tiles wide on either side above the centre and `half - (dy & 1)` below (+ extra).
-template <typename F> void for_radius_tiles(int32_t x, int32_t y, int32_t half, int32_t extra, F&& fn) {
+template <typename F>
+void for_radius_tiles(int32_t x, int32_t y, int32_t half, int32_t extra, F&& fn) {
     for (int32_t dy = -half; dy <= half + 1; dy++) {
         int32_t w = dy > 0 ? (dy & 1) : -dy;
         int32_t hw = half - w + extra;
@@ -167,7 +169,8 @@ void THISCALL MapWin_gen_radius(uint8_t* win, int32_t x, int32_t y, int32_t radi
             if (!on_map(tx, ty) || !in_view_range(win, tx, ty)) return;
             int32_t px, py;
             pfncTileToPoint(win, tx, ty, &px, &py);
-            MapWin_gen_terrain_poly(canvas, win, zoom, faction_id, -1, mw(win, kMwOptions), tx, ty, px, py);  // mapwin_unk1
+            MapWin_gen_terrain_poly(canvas, win, zoom, faction_id, -1, mw(win, kMwOptions), tx, ty, px,
+                                    py);  // mapwin_unk1
         });
     }
     MapWin_draw_vehicles_2(win, x, y, radius, faction_id);

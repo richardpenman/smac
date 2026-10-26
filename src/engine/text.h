@@ -12,24 +12,24 @@
 struct Text {
     char filename[80];
     char filepath[256];  // full path of the open file
-    char* position;      // parse position in buffer
+    char* position;  // parse position in buffer
     CrtFile* file;
-    char* buffer;        // current line (0x200 bytes)
-    char* item;          // current item (0x200 bytes)
+    char* buffer;  // current line (0x200 bytes)
+    char* item;  // current item (0x200 bytes)
 };
 SMAC_POINTER_STRUCT(Text);
 SMAC_LAYOUT(Text, 0x160);
 
 struct TextIndex {
     char filename[256];
-    int32_t count;       // number of section headers
-    Heap heap;           // entries: {int32_t file offset; char name[]} (name without '#')
+    int32_t count;  // number of section headers
+    Heap heap;  // entries: {int32_t file offset; char name[]} (name without '#')
 };
 SMAC_POINTER_STRUCT(TextIndex);
 SMAC_LAYOUT(TextIndex, 0x118);
 
 GLOBAL_NATIVE(Text, TextBuffer, 0x9B7BA0);
-GLOBAL_NATIVE(char*, TextBufferGetPtr, 0x9B7D00);   // scratch line buffer (= TextBuffer.buffer)
+GLOBAL_NATIVE(char*, TextBufferGetPtr, 0x9B7D00);  // scratch line buffer (= TextBuffer.buffer)
 GLOBAL_NATIVE(char*, TextBufferItemPtr, 0x9B7D04);  // last item (= TextBuffer.item)
 GLOBAL_NATIVE(TextIndex[4], TextIndexes, 0x9B7D08);
 

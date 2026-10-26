@@ -43,9 +43,7 @@ int32_t map_dist(int32_t dx, int32_t dy) {  // the x distance wraps on round map
     return ax + ay;
 }
 
-bool is_air(int32_t veh_id) {
-    return Chassis[Units[Vehs[veh_id].unit_id].chassis_id].triad == 2;
-}
+bool is_air(int32_t veh_id) { return Chassis[Units[Vehs[veh_id].unit_id].chassis_id].triad == 2; }
 
 }  // namespace
 
@@ -77,9 +75,7 @@ void THISCALL MapWin_right_menu(uint8_t* win, int32_t x, int32_t y, int32_t px, 
             ui_invalidate();
             break;
         case 0x321:
-        case 0x322:
-            pfncMoveMap(MapWins[0], x, y, 1);
-            break;
+        case 0x322: pfncMoveMap(MapWins[0], x, y, 1); break;
         case 0x323:
             if (zoom < 0) mw(win, kMwZoom) = zoom + 2, ui_invalidate_map();
             break;
@@ -178,7 +174,8 @@ void THISCALL MapWin_right_menu(uint8_t* win, int32_t x, int32_t y, int32_t px, 
     // Multiplayer: not the player's turn / input pending (bVar2) or the turn ended (uVar8).
     bool locked = false;
     if (MultiplayerActive) {
-        locked = ControlTurnC || NetLocked || NetInputPending || ((1u << CurrentPlayerFaction) & (uint32_t)NetTurnDoneMask);
+        locked =
+            ControlTurnC || NetLocked || NetInputPending || ((1u << CurrentPlayerFaction) & (uint32_t)NetTurnDoneMask);
         base_id = base_at(x, y);
         veh_id = veh_at(x, y);
         active = MapWinVehA;
@@ -217,12 +214,8 @@ void THISCALL MapWin_right_menu(uint8_t* win, int32_t x, int32_t y, int32_t px, 
             }
         }
         break;
-    case 4:
-        pfncMoveMap(&MainConsole, Vehs[active].x, Vehs[active].y, 1);
-        break;
-    case 5:
-        BaseWin_zoom(&BaseWin, base_id, 0);
-        break;
+    case 4: pfncMoveMap(&MainConsole, Vehs[active].x, Vehs[active].y, 1); break;
+    case 5: BaseWin_zoom(&BaseWin, base_id, 0); break;
     case 6:
         if (veh_id >= 0 && stack_check(veh_id, 10, CurrentPlayerFaction, -1, -1))
             Console_activate(&MainConsole, x, y, 0);
@@ -249,9 +242,7 @@ void THISCALL MapWin_right_menu(uint8_t* win, int32_t x, int32_t y, int32_t px, 
     case 9:
         if (!locked) Console_name_landmark(&MainConsole, x, y);
         break;
-    case 10:
-        help_any();
-        break;
+    case 10: help_any(); break;
     case 0xB:
         if (!locked) Console_erase_landmark(&MainConsole, x, y);
         break;

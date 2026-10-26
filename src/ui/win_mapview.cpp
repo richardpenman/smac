@@ -35,7 +35,8 @@ void GAMEAPI draw_tile_fixup_pair(int32_t x1, int32_t y1, int32_t x2, int32_t y2
         for_each_mapwin([&](int32_t, uint8_t* w) { MapWin_draw_radius(w, x1, y1, 0, mode); });
         return;
     }
-    for_each_mapwin([&](int32_t, uint8_t* w) { MapWin_draw_radius(w, x1, y1, (has_radar != 0) + 1, CurrentPlayerFaction); });
+    for_each_mapwin(
+        [&](int32_t, uint8_t* w) { MapWin_draw_radius(w, x1, y1, (has_radar != 0) + 1, CurrentPlayerFaction); });
     if (x2 != -1) {
         int32_t viewer = CurrentPlayerFaction;
         for_each_mapwin([&](int32_t, uint8_t* w) { MapWin_draw_radius(w, x2, y2, (has_radar != 0) + 1, viewer); });

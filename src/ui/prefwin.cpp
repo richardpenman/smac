@@ -57,23 +57,24 @@ struct Bit {
     bool inverted;
 };
 const Bit kBits[] = {
-    {0x7, 'P', 0x20, 0}, {0x8, 'P', 0x4000, 0}, {0x9, 'M', 0x100000, 0}, {0xa, 'P', 0x1000, 0}, {0xb, 'P', 0x2, 0},
-    {0xc, 'P', 0x1, 0}, {0xd, 'P', 0x4, 1}, {0xe, 'P', 0x8000, 1}, {0xf, 'P', 0x20000000, 1}, {0x10, 'M', 0x40000, 0},
-    {0x11, 'M', 0x8000, 0}, {0x12, 'M', 0x10, 0}, {0x13, 'P', 0x8, 0}, {0x1c, 'M', 0x40, 0}, {0x14, 'M', 0x80, 0},
-    {0x15, 'P', 0x80000, 0}, {0x17, 'M', 0x4, 0}, {0x18, 'M', 0x200000, 0}, {0x19, 'M', 0x400, 0},
-    {0x1a, 'M', 0x100, 0}, {0x1d, 'P', 0x10000, 0}, {0x1e, 'P', 0x1000000, 0}, {0x1f, 'P', 0x20000, 0},
-    {0x20, 'P', 0x2000000, 0}, {0x2a, 'M', 0x400000, 1}, {0x21, 'M', 0x8, 0}, {0x22, 'M', 0x20, 0},
-    {0x23, 'P', 0x100000, 0}, {0x24, 'P', 0x200000, 0}, {0x25, 'P', 0x400000, 0}, {0x26, 'P', 0x800000, 0},
-    {0x27, 'P', 0x40000000, 0}, {0x28, 'P', 0x80000000, 0}, {0x29, 'M', 0x800, 0}, {0x3d, 'P', 0x800, 0},
-    {0x3e, 'P', 0x400, 0}, {0x3f, 'M', 0x4000, 0}, {0x40, 'M', 0x20000, 0}, {0x41, 'P', 0x10000000, 0},
-    {0x42, 'P', 0x40000, 1}, {0x47, 'M', 0x1000000, 1}, {0x43, 'P', 0x80, 0}, {0x44, 'P', 0x8000000, 0},
-    {0x45, 'M', 0x80000, 0}, {0x16, 'M', 0x200, 0}, {0x2b, 'W', 0x1, 0}, {0x2c, 'W', 0x2, 0}, {0x2d, 'W', 0x400, 0},
-    {0x2e, 'W', 0x4, 0}, {0x2f, 'W', 0x2000, 0}, {0x30, 'W', 0x8, 0}, {0x31, 'W', 0x10, 0}, {0x32, 'W', 0x20, 0},
-    {0x33, 'W', 0x40, 0}, {0x34, 'W', 0x80, 0}, {0x35, 'W', 0x100, 0}, {0x36, 'W', 0x200, 0}, {0x37, 'W', 0x800, 0},
-    {0x38, 'W', 0x1000, 0}, {0x39, 'W', 0x4000, 0}, {0x3a, 'W', 0x8000, 0}, {0x3b, 'W', 0x10000, 0},
-    {0x3c, 'W', 0x20000, 0}, {0x48, 'M', 0x1, 0}, {0x49, 'P', 0x100, 0}, {0x4a, 'P', 0x200, 0},
-    {0x4b, 'M', 0x2000, 0}, {0x4c, 'M', 0x1000, 0}, {0x4d, 'M', 0x10000, 0}, {0x4e, 'M', 0x800000, 0},
-    {0x4f, 'M', 0x2000000, 1}};
+    {0x7, 'P', 0x20, 0},        {0x8, 'P', 0x4000, 0},     {0x9, 'M', 0x100000, 0},    {0xa, 'P', 0x1000, 0},
+    {0xb, 'P', 0x2, 0},         {0xc, 'P', 0x1, 0},        {0xd, 'P', 0x4, 1},         {0xe, 'P', 0x8000, 1},
+    {0xf, 'P', 0x20000000, 1},  {0x10, 'M', 0x40000, 0},   {0x11, 'M', 0x8000, 0},     {0x12, 'M', 0x10, 0},
+    {0x13, 'P', 0x8, 0},        {0x1c, 'M', 0x40, 0},      {0x14, 'M', 0x80, 0},       {0x15, 'P', 0x80000, 0},
+    {0x17, 'M', 0x4, 0},        {0x18, 'M', 0x200000, 0},  {0x19, 'M', 0x400, 0},      {0x1a, 'M', 0x100, 0},
+    {0x1d, 'P', 0x10000, 0},    {0x1e, 'P', 0x1000000, 0}, {0x1f, 'P', 0x20000, 0},    {0x20, 'P', 0x2000000, 0},
+    {0x2a, 'M', 0x400000, 1},   {0x21, 'M', 0x8, 0},       {0x22, 'M', 0x20, 0},       {0x23, 'P', 0x100000, 0},
+    {0x24, 'P', 0x200000, 0},   {0x25, 'P', 0x400000, 0},  {0x26, 'P', 0x800000, 0},   {0x27, 'P', 0x40000000, 0},
+    {0x28, 'P', 0x80000000, 0}, {0x29, 'M', 0x800, 0},     {0x3d, 'P', 0x800, 0},      {0x3e, 'P', 0x400, 0},
+    {0x3f, 'M', 0x4000, 0},     {0x40, 'M', 0x20000, 0},   {0x41, 'P', 0x10000000, 0}, {0x42, 'P', 0x40000, 1},
+    {0x47, 'M', 0x1000000, 1},  {0x43, 'P', 0x80, 0},      {0x44, 'P', 0x8000000, 0},  {0x45, 'M', 0x80000, 0},
+    {0x16, 'M', 0x200, 0},      {0x2b, 'W', 0x1, 0},       {0x2c, 'W', 0x2, 0},        {0x2d, 'W', 0x400, 0},
+    {0x2e, 'W', 0x4, 0},        {0x2f, 'W', 0x2000, 0},    {0x30, 'W', 0x8, 0},        {0x31, 'W', 0x10, 0},
+    {0x32, 'W', 0x20, 0},       {0x33, 'W', 0x40, 0},      {0x34, 'W', 0x80, 0},       {0x35, 'W', 0x100, 0},
+    {0x36, 'W', 0x200, 0},      {0x37, 'W', 0x800, 0},     {0x38, 'W', 0x1000, 0},     {0x39, 'W', 0x4000, 0},
+    {0x3a, 'W', 0x8000, 0},     {0x3b, 'W', 0x10000, 0},   {0x3c, 'W', 0x20000, 0},    {0x48, 'M', 0x1, 0},
+    {0x49, 'P', 0x100, 0},      {0x4a, 'P', 0x200, 0},     {0x4b, 'M', 0x2000, 0},     {0x4c, 'M', 0x1000, 0},
+    {0x4d, 'M', 0x10000, 0},    {0x4e, 'M', 0x800000, 0},  {0x4f, 'M', 0x2000000, 1}};
 
 // PrefWin_init: the pages' script sections and the ids of their items in order.
 struct Page {
@@ -84,7 +85,8 @@ struct Page {
 const Page kPages[6] = {
     {"BASICPREFS", 750, {0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe}},
     {"ADVANCEDPREFS", 751, {0xf, 0x10, 0x11, 0x12, 0x13, 0x1c, 0x14, 0x15, 0x17, 0x18, 0x19, 0x1a}},
-    {"BASEWARNINGS", 752,
+    {"BASEWARNINGS",
+     752,
      {0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c}},
     {"AUTOMATIONPREFS", 753, {0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x2a, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29}},
     {"AUDIOVISUALPREFS", 754, {0x40, 0x41, 0x42, 0x47, 0x43, 0x44, 0x45, 0x16}},
@@ -139,7 +141,8 @@ struct GammaWin : ScreenWin {
         UiRect all{0, 0, canvas.width, canvas.height};
         Buffer_set_clip(&canvas, &all);
         Buffer_fill_3(&canvas, &all, 0xF8);
-        for (int32_t i = 10; i < 0xF6; i++) Buffer_line_2(&canvas, ramp.left + i - 10, ramp.top, ramp.left + i - 10, ramp.bottom, i);
+        for (int32_t i = 10; i < 0xF6; i++)
+            Buffer_line_2(&canvas, ramp.left + i - 10, ramp.top, ramp.left + i - 10, ramp.bottom, i);
         char buf[64];
         std::snprintf(buf, sizeof(buf), "%f", pos * 0.01);
         sw_font(&canvas, &font, 0);
@@ -165,7 +168,8 @@ struct GammaWin : ScreenWin {
         spot_add(&spots[0], 3, 0, bar.left + h, bar.top, tx - bar.left - h, h);
         spot_add(&spots[0], 4, 0, tx + h, bar.top, bar.right - h - tx - h, h);
         spot_add(&spots[0], 5, 0, okr.left, okr.top, okr.right - okr.left, okr.bottom - okr.top);
-        spot_add(&spots[0], 6, 0, cancelr.left, cancelr.top, cancelr.right - cancelr.left, cancelr.bottom - cancelr.top);
+        spot_add(&spots[0], 6, 0, cancelr.left, cancelr.top, cancelr.right - cancelr.left,
+                 cancelr.bottom - cancelr.top);
     }
     void step(int32_t d) {
         pos = std::max(1, std::min(400, pos + d));
@@ -178,7 +182,10 @@ struct GammaWin : ScreenWin {
         case 2: step(1); break;
         case 3: step(-10); break;
         case 4: step(10); break;
-        case 5: ok = true; sw_close(this); break;
+        case 5:
+            ok = true;
+            sw_close(this);
+            break;
         case 6: sw_close(this); break;
         default: break;
         }
@@ -220,10 +227,10 @@ void gamma_dialog() {
 }
 
 struct PrefWin : ScreenWin {
-    int32_t page = 0;            // +0xA14
-    uint32_t words[3] = {};      // P, M, W
-    bool state[0x60] = {};       // the check boxes by id
-    bool apply = false;          // +0xA5C
+    int32_t page = 0;  // +0xA14
+    uint32_t words[3] = {};  // P, M, W
+    bool state[0x60] = {};  // the check boxes by id
+    bool apply = false;  // +0xA5C
     std::vector<std::string> items[6];
     std::vector<std::string> notes[6];  // text lines of a page (MAPPREFS)
     Font font, small;
@@ -232,7 +239,7 @@ struct PrefWin : ScreenWin {
     // The audio page: master / sfx / voice / music switches (+0x15820, +0x1636C, +0x16EB8, +0x17A04)
     // and the four sliders' positions.
     int32_t vol_on[4] = {1, 1, 1, 1};  // by button 0x55, 0x56, 0x57, 0x58
-    int32_t volume[4] = {};            // by slider 0x50..0x53
+    int32_t volume[4] = {};  // by slider 0x50..0x53
     BaseButton* vol_button[4] = {};
     UiRect slider[4] = {};
     int32_t dragging = -1;
@@ -401,9 +408,7 @@ struct PrefWin : ScreenWin {
         int32_t span = std::max(1, r.right - r.left - 10);
         return (x - r.left - 5) * 0x7F / span;
     }
-    void show_page(int32_t p) {
-        page = (p + 6) % 6;
-    }
+    void show_page(int32_t p) { page = (p + 6) % 6; }
     void close(bool ok) {
         // PrefWin_destroy.
         if (ok) {
@@ -524,7 +529,7 @@ void THISCALL Console_retire_game(uint8_t*) {
 
 // ---- Console_editor_rules (0x4DC230): the scenario's rules (RULES' check boxes) ----
 void THISCALL Console_editor_rules(uint8_t*) {
-    static const uint32_t kRuleBits[16] = {0x800, 2, 8, 4, 0x1000, 1, 0x10, 0x20,
+    static const uint32_t kRuleBits[16] = {0x800,  2,     8,    4,     0x1000, 1,      0x10, 0x20,
                                            0x4000, 0x200, 0x40, 0x100, 0x2000, 0x8000, 0x80, 0x400};
     auto_undo();
     for (;;) {

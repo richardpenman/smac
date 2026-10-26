@@ -11,8 +11,8 @@
 constexpr int32_t kScrollNormal = 0x14, kScrollSmall = 0xC;
 
 struct ScrollBar {
-    UiRect r{};           // the bar in its canvas
-    bool small = false;   // scroll_small's sprites
+    UiRect r{};  // the bar in its canvas
+    bool small = false;  // scroll_small's sprites
     int32_t min = 0, max = 0, pos = 0;  // Scroll_set_range / Scroll_set_pos
 };
 

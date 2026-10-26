@@ -39,22 +39,22 @@ extern int (*g_harness_top_menu)();
 extern int (*g_harness_enemy_veh)(int);
 extern void (*g_harness_enemy_veh_pump)();
 /* Reconstructed first/single wants_to_attack calls (engine/diplomacy.h): oracle_wta_poison_thunk. */
-extern int(__cdecl *g_harness_wants_to_attack_fresh)(int, int, int);
+extern int(__cdecl* g_harness_wants_to_attack_fresh)(int, int, int);
 extern "C" void oracle_wta_poison_thunk();
 static void hook_enemy_veh_pump_void();
 /* Reconstructed CouncilWin_session -> the window's modal loop (engine/council.h). */
-extern int (*g_harness_council_modal)(unsigned char *);
+extern int (*g_harness_council_modal)(unsigned char*);
 #endif
 
 /* ---- original functions ---- */
 #define ORIG(type, name, addr) static type const name = (type)(addr)
-typedef int(__cdecl *f_none)(void);
-typedef int(__cdecl *f_int)(int);
-typedef int(__cdecl *f_ptr)(const char *);
-typedef int(__cdecl *f_ptr_int)(const char *, int);
-typedef int(__cdecl *f_ptr2)(void *, int);
-typedef void *(__cdecl *f_getptd)(void);
-typedef void(__thiscall *f_this)(void *);
+typedef int(__cdecl* f_none)(void);
+typedef int(__cdecl* f_int)(int);
+typedef int(__cdecl* f_ptr)(const char*);
+typedef int(__cdecl* f_ptr_int)(const char*, int);
+typedef int(__cdecl* f_ptr2)(void*, int);
+typedef void*(__cdecl* f_getptd)(void);
+typedef void(__thiscall* f_this)(void*);
 
 ORIG(f_int, o_game_srand, 0x538FB0);
 ORIG(f_int, o_game_reseed, 0x6257E0);
@@ -73,43 +73,43 @@ ORIG(f_int, o_faction_upkeep, 0x527290);
 ORIG(f_int, o_enemy_turn, 0x579510);
 ORIG(f_none, o_Console_human_turn, 0x514050);
 
-#define G(type, addr) (*(type *)(addr))
-#define GameRandomState G(uint32_t, 0x9BB568)
+#define G(type, addr)        (*(type*)(addr))
+#define GameRandomState      G(uint32_t, 0x9BB568)
 #define CurrentPlayerFaction G(int32_t, 0x939284)
-#define MFactions ((uint8_t *)0x946A50)
-#define MFACTION_SIZE 0x59C
-#define MapRandomSeed G(int32_t, 0x949878)
-#define MapSizePlanet G(int32_t, 0x94A2A0)
-#define MapOceanCoverage G(int32_t, 0x94A2A4)
-#define MapLandCoverage G(int32_t, 0x94A2A8)
-#define MapErosiveForces G(int32_t, 0x94A2AC)
-#define MapPlanetaryOrbit G(int32_t, 0x94A2B0)
-#define MapCloudCover G(int32_t, 0x94A2B4)
-#define MapNativeLifeForms G(int32_t, 0x94A2B8)
-#define MapGenerate G(int32_t, 0x945820) /* world_build requested by size_of_planet */
-#define Paths ((void *)0x945B00)
-#define ExpansionEnabled G(int32_t, 0x9A6488)
-#define GameRules G(uint32_t, 0x9A649C)
-#define GameState G(uint32_t, 0x9A64C0)
-#define DiffLevel G(int32_t, 0x9A64C4)
-#define VehCount G(int32_t, 0x9A64C8)
-#define CurrentTurn G(int32_t, 0x9A64D4)
-#define GameTimeControl G(int32_t, 0x9A64E0)
-#define FactionStatus ((uint8_t *)0x9A64E8)
-#define MapAreaX G(int32_t, 0x949870)
-#define MapAreaY G(int32_t, 0x949874)
-#define GamePreferences G(uint32_t, 0x9A6490)
-#define GameMorePreferences G(uint32_t, 0x9A6494)
-#define AlphaIniPrefsFlags G(uint32_t, 0x94B464)
+#define MFactions            ((uint8_t*)0x946A50)
+#define MFACTION_SIZE        0x59C
+#define MapRandomSeed        G(int32_t, 0x949878)
+#define MapSizePlanet        G(int32_t, 0x94A2A0)
+#define MapOceanCoverage     G(int32_t, 0x94A2A4)
+#define MapLandCoverage      G(int32_t, 0x94A2A8)
+#define MapErosiveForces     G(int32_t, 0x94A2AC)
+#define MapPlanetaryOrbit    G(int32_t, 0x94A2B0)
+#define MapCloudCover        G(int32_t, 0x94A2B4)
+#define MapNativeLifeForms   G(int32_t, 0x94A2B8)
+#define MapGenerate          G(int32_t, 0x945820) /* world_build requested by size_of_planet */
+#define Paths                ((void*)0x945B00)
+#define ExpansionEnabled     G(int32_t, 0x9A6488)
+#define GameRules            G(uint32_t, 0x9A649C)
+#define GameState            G(uint32_t, 0x9A64C0)
+#define DiffLevel            G(int32_t, 0x9A64C4)
+#define VehCount             G(int32_t, 0x9A64C8)
+#define CurrentTurn          G(int32_t, 0x9A64D4)
+#define GameTimeControl      G(int32_t, 0x9A64E0)
+#define FactionStatus        ((uint8_t*)0x9A64E8)
+#define MapAreaX             G(int32_t, 0x949870)
+#define MapAreaY             G(int32_t, 0x949874)
+#define GamePreferences      G(uint32_t, 0x9A6490)
+#define GameMorePreferences  G(uint32_t, 0x9A6494)
+#define AlphaIniPrefsFlags   G(uint32_t, 0x94B464)
 
 /* ---- logging ---- */
 static char g_outdir[MAX_PATH] = "oracle_out";
-static FILE *g_log;
+static FILE* g_log;
 static int g_turn_limit = -1;
 static int g_viewer = 0;
 static int g_trace = 0;
 
-static void logf_(const char *fmt, ...) {
+static void logf_(const char* fmt, ...) {
     if (!g_log) {
         char p[MAX_PATH];
         CreateDirectoryA(g_outdir, NULL);
@@ -124,12 +124,12 @@ static void logf_(const char *fmt, ...) {
     fflush(g_log);
 }
 
-static uint32_t crt_state() { return ((uint32_t *)o_crt_getptd())[5]; }
-static void crt_set_state(uint32_t v) { ((uint32_t *)o_crt_getptd())[5] = v; }
+static uint32_t crt_state() { return ((uint32_t*)o_crt_getptd())[5]; }
+static void crt_set_state(uint32_t v) { ((uint32_t*)o_crt_getptd())[5] = v; }
 
 #ifdef ORACLE_WITH_ENGINE
 /* Interface for fcompare.cpp (see fcompare.h). */
-void oracle_logf(const char *fmt, ...) {
+void oracle_logf(const char* fmt, ...) {
     char buf[1024];
     va_list ap;
     va_start(ap, fmt);
@@ -137,27 +137,27 @@ void oracle_logf(const char *fmt, ...) {
     va_end(ap);
     logf_("%s", buf);
 }
-const char *oracle_outdir() { return g_outdir; }
+const char* oracle_outdir() { return g_outdir; }
 uint32_t oracle_crt_state() { return crt_state(); }
 void oracle_crt_set_state(uint32_t v) { crt_set_state(v); }
 #define FCOMPARE_HOOK(where, arg) fcompare_hook(where, arg)
-#define FCOMPARE_FINISH() fcompare_finish()
+#define FCOMPARE_FINISH()         fcompare_finish()
 #else
 #define FCOMPARE_HOOK(where, arg) ((void)0)
-#define FCOMPARE_FINISH() ((void)0)
+#define FCOMPARE_FINISH()         ((void)0)
 #endif
 
 /* ---- code patching ---- */
-static void patch_bytes(uint32_t site, const uint8_t *bytes, size_t n) {
+static void patch_bytes(uint32_t site, const uint8_t* bytes, size_t n) {
     DWORD old;
-    uint8_t *p = (uint8_t *)site;
+    uint8_t* p = (uint8_t*)site;
     VirtualProtect(p, n, PAGE_EXECUTE_READWRITE, &old);
     memcpy(p, bytes, n);
     VirtualProtect(p, n, old, &old);
     FlushInstructionCache(GetCurrentProcess(), p, n);
 }
 
-static void write_rel(uint32_t site, uint8_t opcode, void *target, size_t total) {
+static void write_rel(uint32_t site, uint8_t opcode, void* target, size_t total) {
     uint8_t b[8] = {opcode};
     int32_t rel = (int32_t)((uint32_t)target - (site + 5));
     memcpy(b + 1, &rel, 4);
@@ -165,8 +165,8 @@ static void write_rel(uint32_t site, uint8_t opcode, void *target, size_t total)
     patch_bytes(site, b, total);
 }
 
-static void write_call(uint32_t site, void *target) {
-    if (*(uint8_t *)site != 0xE8) {
+static void write_call(uint32_t site, void* target) {
+    if (*(uint8_t*)site != 0xE8) {
         logf_("patch error: no call at %08X\n", site);
         ExitProcess(3);
     }
@@ -192,8 +192,9 @@ static int __cdecl ui_game_random(int lo, int hi) {
 /* ---- observer preferences ----
  * Disable everything that would block an unattended run or depend on wall-clock time. */
 static void apply_observer_prefs() {
-    const uint32_t clear = 0x1 | 0x2 | 0x20 | 0x80 | 0x10000000; /* pause end turn, autosave, tutorial, map anim, SP movies */
-    const uint32_t set = 0x40000 | 0x8;                            /* interludes disabled, fast battle resolution */
+    const uint32_t clear =
+        0x1 | 0x2 | 0x20 | 0x80 | 0x10000000; /* pause end turn, autosave, tutorial, map anim, SP movies */
+    const uint32_t set = 0x40000 | 0x8; /* interludes disabled, fast battle resolution */
     GamePreferences = (GamePreferences & ~clear) | set;
     AlphaIniPrefsFlags = (AlphaIniPrefsFlags & ~clear) | set;
     GameMorePreferences &= ~(0x10u | 0x4000u | 0x8000u | 0x20000u); /* pause after battles, voice, confirm odds */
@@ -228,14 +229,14 @@ static void logic_clock_reset() { g_logic_clock = 0; }
  * and get a clock that jumps 1 s per read (so busy-wait loops end immediately); UI code gets the
  * real time. */
 #include "fast_clock_sites.h"
-typedef DWORD(WINAPI *f_timeGetTime)(void);
+typedef DWORD(WINAPI* f_timeGetTime)(void);
 static f_timeGetTime g_real_timeGetTime;
 static uint32_t g_fast_clock = 0;
 static DWORD WINAPI hook_timeGetTime() {
     uint32_t ret = (uint32_t)(uintptr_t)__builtin_return_address(0);
     for (uint32_t site : kLogicClockSites)
         if (ret == site + 6) return logic_clock();
-    for (auto &r : fast_clock_funcs)
+    for (auto& r : fast_clock_funcs)
         if (ret >= r[0] && ret < r[1]) return g_fast_clock += 1000;
     return g_real_timeGetTime();
 }
@@ -244,40 +245,38 @@ static DWORD WINAPI hook_timeGetTime() {
 /* ---- reconstructed function patches (hybrid.dll) ---- */
 #ifdef ORACLE_WITH_ENGINE
 struct PatchState {
-    const HybridPatch *p;
+    const HybridPatch* p;
     uint8_t saved[5];
     bool active;
 };
 static std::vector<PatchState> g_patches;
 
 static void patches_init() {
-    for (const HybridPatch *p = kHybridPatches; p->func; p++) {
+    for (const HybridPatch* p = kHybridPatches; p->func; p++) {
         PatchState s = {p, {}, false};
-        memcpy(s.saved, (void *)p->addr, 5);
+        memcpy(s.saved, (void*)p->addr, 5);
         g_patches.push_back(s);
     }
 }
 
-static void patch_set(PatchState &s, bool on) {
+static void patch_set(PatchState& s, bool on) {
     if (s.active == on) return;
-    if (on)
-        write_rel(s.p->addr, 0xE9, s.p->func, 5);
-    else
-        patch_bytes(s.p->addr, s.saved, 5);
+    if (on) write_rel(s.p->addr, 0xE9, s.p->func, 5);
+    else patch_bytes(s.p->addr, s.saved, 5);
     s.active = on;
 }
 
 /* patch all | none | +name | -name ... */
-static void cmd_patch(char *args) {
-    for (char *tok = strtok(args, " \t"); tok; tok = strtok(NULL, " \t")) {
+static void cmd_patch(char* args) {
+    for (char* tok = strtok(args, " \t"); tok; tok = strtok(NULL, " \t")) {
         if (!strcmp(tok, "all") || !strcmp(tok, "none")) {
-            for (auto &s : g_patches) patch_set(s, tok[0] == 'a');
+            for (auto& s : g_patches) patch_set(s, tok[0] == 'a');
             continue;
         }
         bool on = tok[0] != '-';
-        const char *name = (tok[0] == '+' || tok[0] == '-') ? tok + 1 : tok;
+        const char* name = (tok[0] == '+' || tok[0] == '-') ? tok + 1 : tok;
         bool found = false;
-        for (auto &s : g_patches)
+        for (auto& s : g_patches)
             if (!strcmp(s.p->name, name)) {
                 patch_set(s, on);
                 found = true;
@@ -285,12 +284,12 @@ static void cmd_patch(char *args) {
         if (!found) logf_("patch: unknown function %s\n", name);
     }
     int n = 0;
-    for (auto &s : g_patches) n += s.active;
+    for (auto& s : g_patches) n += s.active;
     logf_("patch: %d of %d reconstructed functions active\n", n, (int)g_patches.size());
 }
 
-int oracle_patch_set(const char *name, int on) {
-    for (auto &s : g_patches)
+int oracle_patch_set(const char* name, int on) {
+    for (auto& s : g_patches)
         if (!strcmp(s.p->name, name)) {
             int prev = s.active;
             patch_set(s, on != 0);
@@ -300,28 +299,28 @@ int oracle_patch_set(const char *name, int on) {
 }
 #endif
 
-static void trace_orders(const char *what, int arg);
+static void trace_orders(const char* what, int arg);
 static void poison_stack();
 static volatile LONG g_progress = 0; /* steps of the game loop, for the hang watchdog */
 
 /* ---- snapshots ---- */
 /* Binary state dump: records {u32 addr, u32 size, bytes} for each region of state_regions.h. */
-static void write_state(const char *path) {
-    FILE *f = fopen(path, "wb");
+static void write_state(const char* path) {
+    FILE* f = fopen(path, "wb");
     if (!f) return;
-    auto put = [&](uint32_t addr, const void *data, uint32_t size) {
+    auto put = [&](uint32_t addr, const void* data, uint32_t size) {
         fwrite(&addr, 4, 1, f);
         fwrite(&size, 4, 1, f);
         if (size) fwrite(data, 1, size, f);
     };
-#define REGION(name, addr, size) put(addr, (const void *)(uintptr_t)(addr), size);
-#define REGION_VAR(name, addr, count_addr, elem)                                              \
-    {                                                                                         \
-        uint32_t n = (uint32_t)G(int32_t, count_addr) * (elem);                               \
-        const void *src = (addr) == 0x10000000 ? (const void *)G(uintptr_t, 0x94A30C)         \
-                          : (addr) == 0x20000000 ? (const void *)G(uintptr_t, 0x94A310)       \
-                                                 : (const void *)(uintptr_t)(addr);           \
-        put(addr, src, src ? n : 0);                                                          \
+#define REGION(name, addr, size) put(addr, (const void*)(uintptr_t)(addr), size);
+#define REGION_VAR(name, addr, count_addr, elem)                                       \
+    {                                                                                  \
+        uint32_t n = (uint32_t)G(int32_t, count_addr) * (elem);                        \
+        const void* src = (addr) == 0x10000000   ? (const void*)G(uintptr_t, 0x94A30C) \
+                          : (addr) == 0x20000000 ? (const void*)G(uintptr_t, 0x94A310) \
+                                                 : (const void*)(uintptr_t)(addr);     \
+        put(addr, src, src ? n : 0);                                                   \
     }
 #define MASK(addr, size)
 #include "state_regions.h"
@@ -331,13 +330,13 @@ static void write_state(const char *path) {
     fclose(f);
 }
 
-static int snapshot(const char *name) {
+static int snapshot(const char* name) {
     char path[MAX_PATH];
     snprintf(path, sizeof(path), "%s\\%s.state", g_outdir, name);
     write_state(path);
     uint32_t crt = crt_state(), game = GameRandomState;
     snprintf(path, sizeof(path), "%s\\%s.rng", g_outdir, name);
-    FILE *f = fopen(path, "w");
+    FILE* f = fopen(path, "w");
     if (f) {
         fprintf(f, "crt %u\ngame %u\nclock %u\nturn %d\n", crt, game, logic_clock_state(), CurrentTurn);
         fclose(f);
@@ -355,20 +354,20 @@ static int snapshot(const char *name) {
  * BasePop_exec_3 (0x602600, thiscall, 2 stack args) has a built-in no-display path when its first
  * argument is nonzero: it prepares the popup and returns 0 without a modal window. Unattended
  * runs force that path. The original entry is reached through a trampoline. */
-static uint8_t *g_pop_trampoline;
-typedef int(__thiscall *f_pop)(void *, int, int);
-static int __thiscall hook_basepop_exec(void *self, int no_display, int arg2) {
+static uint8_t* g_pop_trampoline;
+typedef int(__thiscall* f_pop)(void*, int, int);
+static int __thiscall hook_basepop_exec(void* self, int no_display, int arg2) {
     (void)no_display;
     return ((f_pop)g_pop_trampoline)(self, 1, arg2);
 }
 static void install_popup_hook() {
     const uint32_t entry = 0x602600, len = 8; /* mov eax,fs:[0]; push -1 */
-    g_pop_trampoline = (uint8_t *)VirtualAlloc(NULL, 32, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-    memcpy(g_pop_trampoline, (void *)entry, len);
+    g_pop_trampoline = (uint8_t*)VirtualAlloc(NULL, 32, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    memcpy(g_pop_trampoline, (void*)entry, len);
     g_pop_trampoline[len] = 0xE9;
     int32_t rel = (int32_t)((entry + len) - ((uint32_t)(uintptr_t)g_pop_trampoline + len + 5));
     memcpy(g_pop_trampoline + len + 1, &rel, 4);
-    write_rel(entry, 0xE9, (void *)hook_basepop_exec, 5);
+    write_rel(entry, 0xE9, (void*)hook_basepop_exec, 5);
 }
 
 /* ---- Planetary Council session ----
@@ -383,17 +382,17 @@ static void install_popup_hook() {
  * loop by exactly these two steps: the viewer casts the vote the game already holds for its
  * faction (for faction 0 the tally ignores it: only factions 1-7 are counted; for an AI viewer it
  * is that faction's own AI vote), then presses Enter. See harness/README.md. */
-typedef int(__thiscall *f_cw_vote)(void *, int, int);
-typedef int(__thiscall *f_cw_key)(void *, int, int);
-typedef int(__thiscall *f_cw_modal)(void *, int, int, int);
+typedef int(__thiscall* f_cw_vote)(void*, int, int);
+typedef int(__thiscall* f_cw_key)(void*, int, int);
+typedef int(__thiscall* f_cw_modal)(void*, int, int, int);
 static f_cw_vote const o_councilwin_vote = (f_cw_vote)0x424720;
 static f_cw_key const o_councilwin_key = (f_cw_key)0x425BA0;
 #define MultiplayerActive G(int32_t, 0x93F660)
-static int __thiscall hook_council_modal(void *self, int a, int b, int c) {
-    int32_t *w = (int32_t *)self;
+static int __thiscall hook_council_modal(void* self, int a, int b, int c) {
+    int32_t* w = (int32_t*)self;
     int viewer = CurrentPlayerFaction;
     if (MultiplayerActive || (FactionStatus[0] & (1 << viewer)))
-        return ((f_cw_modal)(*(uint32_t **)self)[0xE4 / 4])(self, a, b, c);
+        return ((f_cw_modal)(*(uint32_t**)self)[0xE4 / 4])(self, a, b, c);
     int vote = w[0x295 + viewer];
     logf_("council turn=%d proposal=%d candidate=%d viewer=%d vote=%d votes=%d,%d,%d,%d,%d,%d,%d\n", CurrentTurn,
           w[0x287], w[0x288], viewer, vote, w[0x296], w[0x297], w[0x298], w[0x299], w[0x29A], w[0x29B], w[0x29C]);
@@ -406,18 +405,16 @@ static int __thiscall hook_council_modal(void *self, int a, int b, int c) {
 #ifdef ORACLE_WITH_ENGINE
 /* The same for the reconstructed FUN_00427230 (CouncilWin_session), whose modal loop call is
  * ui_councilwin_modal (hybrid: this hook). */
-static int council_modal_engine(unsigned char *win) {
-    return hook_council_modal(win, 0, 0x5398E0, 0x7AE820);
-}
+static int council_modal_engine(unsigned char* win) { return hook_council_modal(win, 0, 0x5398E0, 0x7AE820); }
 #endif
 static void install_council_hook() {
     const uint32_t site = 0x4282F2; /* FUN_00427230: call [eax+0xE4] (Win_set_modal) */
     const uint8_t expect[6] = {0xFF, 0x90, 0xE4, 0x00, 0x00, 0x00};
-    if (memcmp((void *)site, expect, 6)) {
+    if (memcmp((void*)site, expect, 6)) {
         logf_("patch error: no council modal call at %08X\n", site);
         ExitProcess(3);
     }
-    write_rel(site, 0xE8, (void *)hook_council_modal, 6);
+    write_rel(site, 0xE8, (void*)hook_council_modal, 6);
 }
 
 /* ---- fresh map blocks ----
@@ -428,29 +425,29 @@ static void install_council_hook() {
  * what native mem_get returns. Hooked at the entry of mapwin_terrain_fixup (0x471240), which
  * only map_init calls, right after both allocations succeed and before anything writes the
  * blocks; hybrid builds reach it too (the reconstructed map_init calls the original). */
-#define MapTilesPtr G(uint8_t *, 0x94A30C)
-#define MapAbstractPtr G(uint8_t *, 0x94A310)
-#define MapAreaTiles G(int32_t, 0x949884)
+#define MapTilesPtr      G(uint8_t*, 0x94A30C)
+#define MapAbstractPtr   G(uint8_t*, 0x94A310)
+#define MapAreaTiles     G(int32_t, 0x949884)
 #define MapAbstractCount G(int32_t, 0x94A29C)
-static uint8_t *g_terrain_fixup_tramp;
+static uint8_t* g_terrain_fixup_tramp;
 static void __cdecl hook_mapwin_terrain_fixup() {
     if (MapTilesPtr && MapAreaTiles > 0) memset(MapTilesPtr, 0, (size_t)MapAreaTiles * 0x2C);
     if (MapAbstractPtr && MapAbstractCount > 0) memset(MapAbstractPtr, 0, (size_t)MapAbstractCount);
-    ((void(__cdecl *)())(void *)g_terrain_fixup_tramp)();
+    ((void(__cdecl*)())(void*)g_terrain_fixup_tramp)();
 }
 static void install_map_alloc_hook() {
     const uint32_t site = 0x471240;
     const uint8_t expect[6] = {0x56, 0xBE, 0x3C, 0x3C, 0x7D, 0x00}; /* push esi; mov esi, 0x7D3C3C */
-    if (memcmp((void *)site, expect, 6)) {
+    if (memcmp((void*)site, expect, 6)) {
         logf_("patch error: unexpected mapwin_terrain_fixup prologue at %08X\n", site);
         ExitProcess(3);
     }
-    g_terrain_fixup_tramp = (uint8_t *)VirtualAlloc(NULL, 16, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    g_terrain_fixup_tramp = (uint8_t*)VirtualAlloc(NULL, 16, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
     memcpy(g_terrain_fixup_tramp, expect, 6);
     g_terrain_fixup_tramp[6] = 0xE9;
     int32_t rel = (int32_t)((site + 6) - ((uint32_t)(uintptr_t)g_terrain_fixup_tramp + 11));
     memcpy(g_terrain_fixup_tramp + 7, &rel, 4);
-    write_rel(site, 0xE9, (void *)hook_mapwin_terrain_fixup, 6);
+    write_rel(site, 0xE9, (void*)hook_mapwin_terrain_fixup, 6);
 }
 
 /* ---- end of game ----
@@ -461,9 +458,7 @@ static void install_map_alloc_hook() {
  * and returns to the main menu. These are UI screens with modal loops (report_score even crashes
  * with viewer 0: ReportIf_on_status indexes its per-faction buttons with faction 0). The oracle
  * skips the first four and, at show_replay, writes the final snapshot `game_end` and exits. */
-static void __cdecl end_screen_skip() {
-    logf_("end of game: end screen skipped (turn=%d)\n", CurrentTurn);
-}
+static void __cdecl end_screen_skip() { logf_("end of game: end screen skipped (turn=%d)\n", CurrentTurn); }
 static void slotlog_flush();
 static void __cdecl hook_show_replay() {
     snapshot("game_end");
@@ -474,16 +469,16 @@ static void __cdecl hook_show_replay() {
     ExitProcess(0);
 }
 static void install_end_of_game_hooks() {
-    write_rel(0x428DF0, 0xE9, (void *)end_screen_skip, 5);  /* show_credits */
-    write_rel(0x4ACB80, 0xE9, (void *)end_screen_skip, 5);  /* report_score */
-    write_rel(0x496670, 0xE9, (void *)end_screen_skip, 5);  /* quayle */
-    write_rel(0x44AE50, 0xE9, (void *)end_screen_skip, 5);  /* hall_of_fame */
-    write_rel(0x5ADBF0, 0xE9, (void *)hook_show_replay, 5); /* show_replay */
+    write_rel(0x428DF0, 0xE9, (void*)end_screen_skip, 5); /* show_credits */
+    write_rel(0x4ACB80, 0xE9, (void*)end_screen_skip, 5); /* report_score */
+    write_rel(0x496670, 0xE9, (void*)end_screen_skip, 5); /* quayle */
+    write_rel(0x44AE50, 0xE9, (void*)end_screen_skip, 5); /* hall_of_fame */
+    write_rel(0x5ADBF0, 0xE9, (void*)hook_show_replay, 5); /* show_replay */
 }
 
 /* ---- turn loop hooks ---- */
 /* trace 1: log RNG state at each faction step; trace 2: also dump state (STEP_TTT_F_x.state) */
-static void trace_point(const char *what, int f) {
+static void trace_point(const char* what, int f) {
     if (!g_trace || g_trace >= 4) return;
     logf_("%s %d turn=%d crt=%u game=%u\n", what, f, CurrentTurn, crt_state(), GameRandomState);
     if (g_trace >= 2) {
@@ -491,8 +486,9 @@ static void trace_point(const char *what, int f) {
         snprintf(path, sizeof(path), "%s\\step_%03d_%d_%s.state", g_outdir, CurrentTurn, f, what);
         write_state(path);
         snprintf(path, sizeof(path), "%s\\step_%03d_%d_%s.rng", g_outdir, CurrentTurn, f, what);
-        if (FILE *r = fopen(path, "w")) {
-            fprintf(r, "crt %u\ngame %u\nclock %u\nturn %d\n", crt_state(), GameRandomState, logic_clock_state(), CurrentTurn);
+        if (FILE* r = fopen(path, "w")) {
+            fprintf(r, "crt %u\ngame %u\nclock %u\nturn %d\n", crt_state(), GameRandomState, logic_clock_state(),
+                    CurrentTurn);
             fclose(r);
         }
     }
@@ -528,18 +524,18 @@ __attribute__((noinline)) static void poison_stack() {
 static uint8_t g_prev_orders[2048];
 static uint32_t state_hash() {
     uint32_t h = 2166136261u;
-    auto mix = [&](const void *p, uint32_t n) {
-        const uint8_t *b = (const uint8_t *)p;
+    auto mix = [&](const void* p, uint32_t n) {
+        const uint8_t* b = (const uint8_t*)p;
         for (uint32_t i = 0; i < n; i++) h = (h ^ b[i]) * 16777619u;
     };
-#define REGION(name, addr, size) mix((const void *)(uintptr_t)(addr), size);
-#define REGION_VAR(name, addr, count_addr, elem)                                                \
-    {                                                                                           \
-        uint32_t n = (uint32_t)G(int32_t, count_addr) * (elem);                                 \
-        const void *src = (addr) == 0x10000000 ? (const void *)G(uintptr_t, 0x94A30C)           \
-                          : (addr) == 0x20000000 ? (const void *)G(uintptr_t, 0x94A310)         \
-                                                 : (const void *)(uintptr_t)(addr);             \
-        if (src) mix(src, n);                                                                   \
+#define REGION(name, addr, size) mix((const void*)(uintptr_t)(addr), size);
+#define REGION_VAR(name, addr, count_addr, elem)                                       \
+    {                                                                                  \
+        uint32_t n = (uint32_t)G(int32_t, count_addr) * (elem);                        \
+        const void* src = (addr) == 0x10000000   ? (const void*)G(uintptr_t, 0x94A30C) \
+                          : (addr) == 0x20000000 ? (const void*)G(uintptr_t, 0x94A310) \
+                                                 : (const void*)(uintptr_t)(addr);     \
+        if (src) mix(src, n);                                                          \
     }
 #define MASK(addr, size)
 #include "state_regions.h"
@@ -548,11 +544,11 @@ static uint32_t state_hash() {
 #undef MASK
     return h;
 }
-static void trace_orders(const char *what, int arg) {
+static void trace_orders(const char* what, int arg) {
     if (g_trace < 4) return;
     int n = VehCount;
     for (int i = 0; i < n && i < 2048; i++) {
-        uint8_t o = *(uint8_t *)(0x952839 + 0x34 * i);
+        uint8_t o = *(uint8_t*)(0x952839 + 0x34 * i);
         if (o != g_prev_orders[i]) logf_("  veh %d order %d->%d\n", i, g_prev_orders[i], o);
         g_prev_orders[i] = o;
     }
@@ -578,15 +574,15 @@ static DWORD WINAPI watch_thread(LPVOID) {
     CloseHandle(th);
     return 0;
 }
-static LONG CALLBACK watch_handler(EXCEPTION_POINTERS *e) {
+static LONG CALLBACK watch_handler(EXCEPTION_POINTERS* e) {
     if (e->ExceptionRecord->ExceptionCode != EXCEPTION_SINGLE_STEP) return EXCEPTION_CONTINUE_SEARCH;
-    CONTEXT *c = e->ContextRecord;
-    logf_("WATCH write [%08X]=%02X eip=%08X turn=%d stack:", g_watch_addr, *(uint8_t *)g_watch_addr, (uint32_t)c->Eip,
+    CONTEXT* c = e->ContextRecord;
+    logf_("WATCH write [%08X]=%02X eip=%08X turn=%d stack:", g_watch_addr, *(uint8_t*)g_watch_addr, (uint32_t)c->Eip,
           CurrentTurn);
-    uint32_t *bp = (uint32_t *)c->Ebp;
+    uint32_t* bp = (uint32_t*)c->Ebp;
     for (int i = 0; i < 12 && bp && (uint32_t)bp > 0x10000 && !IsBadReadPtr(bp, 8); i++) {
         logf_(" %08X", bp[1]);
-        bp = (uint32_t *)bp[0];
+        bp = (uint32_t*)bp[0];
     }
     logf_("\n");
     c->Dr6 = 0;
@@ -605,12 +601,11 @@ static void watch_arm() {
  * gets a runtime thunk: push idx; call log_call; add esp,4; jmp trampoline(prologue copy). */
 struct CallHook {
     uint32_t addr, prologue;
-    const char *name;
+    const char* name;
 };
 static const CallHook kCallHooks[] = {
-    {0x5B6260, 6, "spot_all"},  {0x5B6060, 6, "wake_stack"}, {0x5B5EA0, 5, "want_to_wake"},
-    {0x5C1D70, 5, "veh_wake"},  {0x5B5AD0, 7, "spot_loc"},   {0x55A150, 9, "veh_scoot"},
-    {0x5B58E0, 7, "spot_stack"},
+    {0x5B6260, 6, "spot_all"}, {0x5B6060, 6, "wake_stack"}, {0x5B5EA0, 5, "want_to_wake"}, {0x5C1D70, 5, "veh_wake"},
+    {0x5B5AD0, 7, "spot_loc"}, {0x55A150, 9, "veh_scoot"},  {0x5B58E0, 7, "spot_stack"},
 };
 static int g_logcalls_from_turn = -1;
 static void __cdecl log_call(int idx, uint32_t ret, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
@@ -618,19 +613,30 @@ static void __cdecl log_call(int idx, uint32_t ret, uint32_t a0, uint32_t a1, ui
         logf_("CALL T%d %s(%d,%d,%d,%d) from %08X\n", CurrentTurn, kCallHooks[idx].name, a0, a1, a2, a3, ret);
 }
 static void install_call_hooks() {
-    uint8_t *mem = (uint8_t *)VirtualAlloc(NULL, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    uint8_t* mem = (uint8_t*)VirtualAlloc(NULL, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
     for (size_t i = 0; i < sizeof(kCallHooks) / sizeof(kCallHooks[0]); i++) {
-        const CallHook &h = kCallHooks[i];
+        const CallHook& h = kCallHooks[i];
         uint8_t *tramp = mem + i * 64, *thunk = tramp + 24;
-        memcpy(tramp, (void *)h.addr, h.prologue);
+        memcpy(tramp, (void*)h.addr, h.prologue);
         tramp[h.prologue] = 0xE9;
         int32_t rel = (int32_t)((h.addr + h.prologue) - ((uint32_t)(uintptr_t)tramp + h.prologue + 5));
         memcpy(tramp + h.prologue + 1, &rel, 4);
-        uint8_t *t = thunk;
-        *t++ = 0x68; uint32_t idx = (uint32_t)i; memcpy(t, &idx, 4); t += 4;
-        *t++ = 0xE8; rel = (int32_t)((uint32_t)(uintptr_t)log_call - ((uint32_t)(uintptr_t)t + 4)); memcpy(t, &rel, 4); t += 4;
-        *t++ = 0x83; *t++ = 0xC4; *t++ = 0x04;
-        *t++ = 0xE9; rel = (int32_t)((uint32_t)(uintptr_t)tramp - ((uint32_t)(uintptr_t)t + 4)); memcpy(t, &rel, 4); t += 4;
+        uint8_t* t = thunk;
+        *t++ = 0x68;
+        uint32_t idx = (uint32_t)i;
+        memcpy(t, &idx, 4);
+        t += 4;
+        *t++ = 0xE8;
+        rel = (int32_t)((uint32_t)(uintptr_t)log_call - ((uint32_t)(uintptr_t)t + 4));
+        memcpy(t, &rel, 4);
+        t += 4;
+        *t++ = 0x83;
+        *t++ = 0xC4;
+        *t++ = 0x04;
+        *t++ = 0xE9;
+        rel = (int32_t)((uint32_t)(uintptr_t)tramp - ((uint32_t)(uintptr_t)t + 4));
+        memcpy(t, &rel, 4);
+        t += 4;
         write_rel(h.addr, 0xE9, thunk, 5);
     }
 }
@@ -641,7 +647,7 @@ static void install_call_hooks() {
  * jmp trampoline (prologue copy). */
 struct SoundHook {
     uint32_t addr, prologue;
-    const char *name;
+    const char* name;
     int nargs; /* stack arguments logged; -1: popup_wave_callback (the block's wave id), -2: a string,
                   -3: Wave_play_2 (the wave's address and file name) */
 };
@@ -654,13 +660,13 @@ static const SoundHook kSoundHooks[] = {
 static int g_logsound_from_turn = 0x7FFFFFFF;
 static void __cdecl log_sound(int idx, uint32_t ecx, uint32_t ret, uint32_t a0, uint32_t a1, uint32_t a2) {
     if (CurrentTurn < g_logsound_from_turn) return;
-    const SoundHook &h = kSoundHooks[idx];
+    const SoundHook& h = kSoundHooks[idx];
     if (h.nargs == -1) {
-        logf_("SOUND T%d %s %d from %08X\n", CurrentTurn, h.name, a0 ? *(int *)(a0 + 0x104) : -1, ret);
+        logf_("SOUND T%d %s %d from %08X\n", CurrentTurn, h.name, a0 ? *(int*)(a0 + 0x104) : -1, ret);
     } else if (h.nargs == -2) {
-        logf_("SOUND T%d %s %s from %08X\n", CurrentTurn, h.name, a0 ? (const char *)a0 : "", ret);
+        logf_("SOUND T%d %s %s from %08X\n", CurrentTurn, h.name, a0 ? (const char*)a0 : "", ret);
     } else if (h.nargs == -3) {
-        const char *file = *(const char **)(ecx + 0x4C);
+        const char* file = *(const char**)(ecx + 0x4C);
         logf_("SOUND T%d %s %08X %s from %08X\n", CurrentTurn, h.name, ecx, file ? file : "-", ret);
     } else if (h.nargs == 3) {
         logf_("SOUND T%d %s %d %d %d from %08X\n", CurrentTurn, h.name, a0, a1, a2, ret);
@@ -669,21 +675,32 @@ static void __cdecl log_sound(int idx, uint32_t ecx, uint32_t ret, uint32_t a0, 
     }
 }
 static void install_sound_hooks() {
-    uint8_t *mem = (uint8_t *)VirtualAlloc(NULL, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    uint8_t* mem = (uint8_t*)VirtualAlloc(NULL, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
     for (size_t i = 0; i < sizeof(kSoundHooks) / sizeof(kSoundHooks[0]); i++) {
-        const SoundHook &h = kSoundHooks[i];
+        const SoundHook& h = kSoundHooks[i];
         uint8_t *tramp = mem + i * 64, *thunk = tramp + 24;
-        memcpy(tramp, (void *)h.addr, h.prologue);
+        memcpy(tramp, (void*)h.addr, h.prologue);
         tramp[h.prologue] = 0xE9;
         int32_t rel = (int32_t)((h.addr + h.prologue) - ((uint32_t)(uintptr_t)tramp + h.prologue + 5));
         memcpy(tramp + h.prologue + 1, &rel, 4);
-        uint8_t *t = thunk;
+        uint8_t* t = thunk;
         *t++ = 0x51;
-        *t++ = 0x68; uint32_t idx = (uint32_t)i; memcpy(t, &idx, 4); t += 4;
-        *t++ = 0xE8; rel = (int32_t)((uint32_t)(uintptr_t)log_sound - ((uint32_t)(uintptr_t)t + 4)); memcpy(t, &rel, 4); t += 4;
-        *t++ = 0x83; *t++ = 0xC4; *t++ = 0x04;
+        *t++ = 0x68;
+        uint32_t idx = (uint32_t)i;
+        memcpy(t, &idx, 4);
+        t += 4;
+        *t++ = 0xE8;
+        rel = (int32_t)((uint32_t)(uintptr_t)log_sound - ((uint32_t)(uintptr_t)t + 4));
+        memcpy(t, &rel, 4);
+        t += 4;
+        *t++ = 0x83;
+        *t++ = 0xC4;
+        *t++ = 0x04;
         *t++ = 0x59;
-        *t++ = 0xE9; rel = (int32_t)((uint32_t)(uintptr_t)tramp - ((uint32_t)(uintptr_t)t + 4)); memcpy(t, &rel, 4); t += 4;
+        *t++ = 0xE9;
+        rel = (int32_t)((uint32_t)(uintptr_t)tramp - ((uint32_t)(uintptr_t)t + 4));
+        memcpy(t, &rel, 4);
+        t += 4;
         write_rel(h.addr, 0xE9, thunk, 5);
     }
 }
@@ -698,14 +715,14 @@ static void install_sound_hooks() {
  * stack contents below ESP, so a traced run can diverge from the untraced one afterwards. */
 ORIG(f_int, o_enemy_veh_st, 0x579240);
 static int g_st_turn = -1, g_st_veh = -1, g_st_max = 1, g_st_done = 0;
-static FILE *g_st_file;
+static FILE* g_st_file;
 static volatile int g_st_active;
 static uint32_t g_st_entry_esp, g_st_ret_addr, g_st_ret_esp, g_st_steps, g_st_ext;
 static PVOID g_st_handler;
 static const uint32_t kImageCodeLo = 0x401000, kImageCodeHi = 0x669000;
-static LONG CALLBACK steptrace_handler(EXCEPTION_POINTERS *e) {
+static LONG CALLBACK steptrace_handler(EXCEPTION_POINTERS* e) {
     if (e->ExceptionRecord->ExceptionCode != EXCEPTION_SINGLE_STEP) return EXCEPTION_CONTINUE_SEARCH;
-    CONTEXT *c = e->ContextRecord;
+    CONTEXT* c = e->ContextRecord;
     if (!g_st_active) {
         if (!(c->Dr6 & 1) || g_watch_addr) return EXCEPTION_CONTINUE_SEARCH;
         c->Dr7 &= ~3u; /* stale return breakpoint */
@@ -729,8 +746,16 @@ static LONG CALLBACK steptrace_handler(EXCEPTION_POINTERS *e) {
     if (!g_st_entry_esp) g_st_entry_esp = (uint32_t)c->Esp;
     c->Dr6 = 0;
     if (eip >= kImageCodeLo && eip < kImageCodeHi) {
-        uint32_t rec[10] = {eip, (uint32_t)c->EFlags, (uint32_t)c->Eax, (uint32_t)c->Ecx, (uint32_t)c->Edx,
-                            (uint32_t)c->Ebx, (uint32_t)c->Esp, (uint32_t)c->Ebp, (uint32_t)c->Esi, (uint32_t)c->Edi};
+        uint32_t rec[10] = {eip,
+                            (uint32_t)c->EFlags,
+                            (uint32_t)c->Eax,
+                            (uint32_t)c->Ecx,
+                            (uint32_t)c->Edx,
+                            (uint32_t)c->Ebx,
+                            (uint32_t)c->Esp,
+                            (uint32_t)c->Ebp,
+                            (uint32_t)c->Esi,
+                            (uint32_t)c->Edi};
         fwrite(rec, 4, 10, g_st_file);
         g_st_steps++;
         c->EFlags |= 0x100;
@@ -742,11 +767,19 @@ static LONG CALLBACK steptrace_handler(EXCEPTION_POINTERS *e) {
         return EXCEPTION_CONTINUE_EXECUTION;
     }
     /* external call: [esp] is the return address into terranx.exe */
-    uint32_t rec[10] = {eip, 0xFFFFFFFFu, (uint32_t)c->Eax, (uint32_t)c->Ecx, (uint32_t)c->Edx, (uint32_t)c->Ebx,
-                        (uint32_t)c->Esp, (uint32_t)c->Ebp, (uint32_t)c->Esi, (uint32_t)c->Edi};
+    uint32_t rec[10] = {eip,
+                        0xFFFFFFFFu,
+                        (uint32_t)c->Eax,
+                        (uint32_t)c->Ecx,
+                        (uint32_t)c->Edx,
+                        (uint32_t)c->Ebx,
+                        (uint32_t)c->Esp,
+                        (uint32_t)c->Ebp,
+                        (uint32_t)c->Esi,
+                        (uint32_t)c->Edi};
     fwrite(rec, 4, 10, g_st_file);
     g_st_ext++;
-    g_st_ret_addr = *(uint32_t *)c->Esp;
+    g_st_ret_addr = *(uint32_t*)c->Esp;
     g_st_ret_esp = (uint32_t)c->Esp + 4;
     c->Dr0 = g_st_ret_addr;
     c->Dr7 = (c->Dr7 & ~0x000F0003u) | 1u; /* L0, execute, 1 byte */
@@ -795,7 +828,7 @@ static struct {
     int noff;
 } g_sl;
 static uint32_t g_sl_saved_esp;
-static const uint32_t *g_sl_regs;
+static const uint32_t* g_sl_regs;
 static uint8_t g_sl_stack[65536] __attribute__((aligned(16)));
 struct SlotRec {
     int32_t turn;
@@ -805,13 +838,13 @@ static std::vector<SlotRec> g_sl_recs;
 static void __cdecl slotlog_cb(uint32_t esp) {
     SlotRec r;
     r.turn = CurrentTurn;
-    const uint32_t *sp = (const uint32_t *)esp;
+    const uint32_t* sp = (const uint32_t*)esp;
     r.ret = sp[0];
     for (int i = 0; i < 8; i++) r.args[i] = sp[1 + i];
-    for (int i = 0; i < g_sl.noff; i++) r.vals[i] = *(const uint32_t *)(esp + g_sl.off[i]);
+    for (int i = 0; i < g_sl.noff; i++) r.vals[i] = *(const uint32_t*)(esp + g_sl.off[i]);
     /* The thunk's pushfd/pushad frame: EFLAGS, EDI, ESI, EBP, ESP, EBX, ... (the registers at
      * entry; EBP is the caller's frame pointer). */
-    const uint32_t *pa = g_sl_regs;
+    const uint32_t* pa = g_sl_regs;
     r.regs[0] = pa[5];
     r.regs[1] = pa[2];
     r.regs[2] = pa[1];
@@ -823,8 +856,8 @@ static void slotlog_flush() {
     if (g_sl_recs.empty()) return;
     char path[MAX_PATH];
     snprintf(path, sizeof(path), "%s\\slotlog.txt", g_outdir);
-    if (FILE *f = fopen(path, "a")) {
-        for (auto &r : g_sl_recs) {
+    if (FILE* f = fopen(path, "a")) {
+        for (auto& r : g_sl_recs) {
             fprintf(f, "T%d ret=%08X args=", r.turn, r.ret);
             for (int i = 0; i < 8; i++) fprintf(f, "%s%X", i ? "," : "", r.args[i]);
             fprintf(f, " vals=");
@@ -837,21 +870,40 @@ static void slotlog_flush() {
 }
 static void install_slotlog(int prologue) {
     g_sl_recs.reserve(1 << 20);
-    uint8_t *mem = (uint8_t *)VirtualAlloc(NULL, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-    uint8_t *t = mem;
-    auto u32 = [&](uint32_t v) { memcpy(t, &v, 4); t += 4; };
+    uint8_t* mem = (uint8_t*)VirtualAlloc(NULL, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    uint8_t* t = mem;
+    auto u32 = [&](uint32_t v) {
+        memcpy(t, &v, 4);
+        t += 4;
+    };
     uint32_t top = (uint32_t)(uintptr_t)(g_sl_stack + sizeof(g_sl_stack) - 16);
-    *t++ = 0x89; *t++ = 0x25; u32((uint32_t)(uintptr_t)&g_sl_saved_esp); /* mov [saved], esp */
-    *t++ = 0xBC; u32(top);                                                /* mov esp, top */
-    *t++ = 0x60; *t++ = 0x9C;                                             /* pushad; pushfd */
-    *t++ = 0x89; *t++ = 0x25; u32((uint32_t)(uintptr_t)&g_sl_regs);      /* mov [g_sl_regs], esp */
-    *t++ = 0xFF; *t++ = 0x35; u32((uint32_t)(uintptr_t)&g_sl_saved_esp);  /* push [saved] */
-    *t++ = 0xE8; u32((uint32_t)(uintptr_t)slotlog_cb - ((uint32_t)(uintptr_t)t + 4));
-    *t++ = 0x83; *t++ = 0xC4; *t++ = 0x04;                                /* add esp, 4 */
-    *t++ = 0x9D; *t++ = 0x61;                                             /* popfd; popad */
-    *t++ = 0x8B; *t++ = 0x25; u32((uint32_t)(uintptr_t)&g_sl_saved_esp);  /* mov esp, [saved] */
-    memcpy(t, (void *)g_sl.func, prologue); t += prologue;
-    *t++ = 0xE9; u32((g_sl.func + prologue) - ((uint32_t)(uintptr_t)t + 4));
+    *t++ = 0x89;
+    *t++ = 0x25;
+    u32((uint32_t)(uintptr_t)&g_sl_saved_esp); /* mov [saved], esp */
+    *t++ = 0xBC;
+    u32(top); /* mov esp, top */
+    *t++ = 0x60;
+    *t++ = 0x9C; /* pushad; pushfd */
+    *t++ = 0x89;
+    *t++ = 0x25;
+    u32((uint32_t)(uintptr_t)&g_sl_regs); /* mov [g_sl_regs], esp */
+    *t++ = 0xFF;
+    *t++ = 0x35;
+    u32((uint32_t)(uintptr_t)&g_sl_saved_esp); /* push [saved] */
+    *t++ = 0xE8;
+    u32((uint32_t)(uintptr_t)slotlog_cb - ((uint32_t)(uintptr_t)t + 4));
+    *t++ = 0x83;
+    *t++ = 0xC4;
+    *t++ = 0x04; /* add esp, 4 */
+    *t++ = 0x9D;
+    *t++ = 0x61; /* popfd; popad */
+    *t++ = 0x8B;
+    *t++ = 0x25;
+    u32((uint32_t)(uintptr_t)&g_sl_saved_esp); /* mov esp, [saved] */
+    memcpy(t, (void*)g_sl.func, prologue);
+    t += prologue;
+    *t++ = 0xE9;
+    u32((g_sl.func + prologue) - ((uint32_t)(uintptr_t)t + 4));
     write_rel(g_sl.func, 0xE9, mem, prologue);
 }
 
@@ -881,20 +933,20 @@ static void hook_enemy_veh_pump_void() { hook_enemy_veh_pump(); }
  * internals) that a headless build cannot reproduce. Only these dwords are written, so no other
  * dead stack changes. */
 static const uint32_t kWantsToAttackFirstSites[] = {
-    0x52B0E1, 0x52B21A,           /* wants_prop (pairs) */
-    0x53BED6,                     /* diplomacy_check */
-    0x54648E, 0x54685A,           /* propose_attack (pairs) */
-    0x549DF1,                     /* threaten (pair) */
-    0x54C352,                     /* call_off_vendetta */
+    0x52B0E1, 0x52B21A, /* wants_prop (pairs) */
+    0x53BED6, /* diplomacy_check */
+    0x54648E, 0x54685A, /* propose_attack (pairs) */
+    0x549DF1, /* threaten (pair) */
+    0x54C352, /* call_off_vendetta */
     0x552566, 0x5527E8, 0x553325, /* communicate (two singles, one pair) */
-    0x55EB3F,                     /* encounter (pair) */
-    0x562D0A,                     /* enemy_strategy (pair) */
-    0x5BCC70,                     /* tech_val (pair) */
+    0x55EB3F, /* encounter (pair) */
+    0x562D0A, /* enemy_strategy (pair) */
+    0x5BCC70, /* tech_val (pair) */
 };
 extern "C" uint32_t oracle_wta_fill[8];
 uint32_t oracle_wta_fill[8];
 extern "C" void __cdecl oracle_wta_prepare() {
-    uint8_t *b = (uint8_t *)oracle_wta_fill;
+    uint8_t* b = (uint8_t*)oracle_wta_fill;
     for (size_t i = 0; i < sizeof(oracle_wta_fill); i++) {
         if (g_poison_rand) {
             g_poison_rand = g_poison_rand * 1103515245u + 12345u;
@@ -906,11 +958,12 @@ extern "C" void __cdecl oracle_wta_prepare() {
 }
 /* Called instead of wants_to_attack at the sites above; ESP at entry equals the original entry ESP. */
 extern "C" __attribute__((naked, used)) void oracle_wta_poison_thunk() {
-    __asm__("call _oracle_wta_prepare\n"
-            "xor %ecx, %ecx\n"
-            "1:\n mov _oracle_wta_fill(,%ecx,4), %eax\n mov %eax, -0x138(%esp,%ecx,4)\n"
-            "inc %ecx\n cmp $8, %ecx\n jb 1b\n"
-            "mov $0x55BC80, %eax\n jmp *%eax\n");
+    __asm__(
+        "call _oracle_wta_prepare\n"
+        "xor %ecx, %ecx\n"
+        "1:\n mov _oracle_wta_fill(,%ecx,4), %eax\n mov %eax, -0x138(%esp,%ecx,4)\n"
+        "inc %ecx\n cmp $8, %ecx\n jb 1b\n"
+        "mov $0x55BC80, %eax\n jmp *%eax\n");
 }
 
 /* trace 3 <turn>: dump state before every enemy_veh call on that turn */
@@ -923,8 +976,9 @@ static int __cdecl hook_enemy_veh(int veh) {
         snprintf(path, sizeof(path), "%s\\step_%03d_9_c%05d_veh%d.state", g_outdir, CurrentTurn, g_trace_seq, veh);
         write_state(path);
         snprintf(path, sizeof(path), "%s\\step_%03d_9_c%05d_veh%d.rng", g_outdir, CurrentTurn, g_trace_seq++, veh);
-        if (FILE *r = fopen(path, "w")) {
-            fprintf(r, "crt %u\ngame %u\nclock %u\nturn %d\n", crt_state(), GameRandomState, logic_clock_state(), CurrentTurn);
+        if (FILE* r = fopen(path, "w")) {
+            fprintf(r, "crt %u\ngame %u\nclock %u\nturn %d\n", crt_state(), GameRandomState, logic_clock_state(),
+                    CurrentTurn);
             fclose(r);
         }
     }
@@ -975,28 +1029,28 @@ static int __cdecl hook_observer_pause() { return 0; }
 struct MapDump {
     std::string file;
     int viewer, zoom, cx, cy; /* kMapDumpKeep: unchanged */
-    int fx, fy;               /* scrollfrom=X,Y: full redraw there first, then a scrolled move */
-    unsigned options;         /* options=HEX: OR'd into the window's options for the dump */
-    int rx, ry, rr;           /* radius=X,Y,R: then MapWin_draw_radius(X, Y, R, 0) (partial redraw) */
+    int fx, fy; /* scrollfrom=X,Y: full redraw there first, then a scrolled move */
+    unsigned options; /* options=HEX: OR'd into the window's options for the dump */
+    int rx, ry, rr; /* radius=X,Y,R: then MapWin_draw_radius(X, Y, R, 0) (partial redraw) */
 };
 static const int kMapDumpKeep = -99999;
 static std::vector<MapDump> g_mapdumps;
-typedef void(__thiscall *f_this_int)(void *, int);
+typedef void(__thiscall* f_this_int)(void*, int);
 ORIG(f_this_int, o_pfncRedrawMap, 0x46A550);
 ORIG(f_int, o_load_faction_art, 0x453710);
 ORIG(f_none, o_load_flags, 0x453F70);
-#define MainConsoleObj ((uint8_t *)0x9156B0)
-#define GamePaletteObj ((const uint8_t *)0x94C590)
+#define MainConsoleObj ((uint8_t*)0x9156B0)
+#define GamePaletteObj ((const uint8_t*)0x94C590)
 
 /* `fontmetrics <file> <pixels> <style>`: the original's Font (Font_init "Arial") metrics and the
  * text extent (Font_width) of every character 32..255, as text: calibrates the native font
  * rasteriser against GDI. */
-typedef int(__thiscall *f_font_init)(void *, const char *, int, int);
-typedef int(__thiscall *f_font_width)(void *, const char *);
+typedef int(__thiscall* f_font_init)(void*, const char*, int, int);
+typedef int(__thiscall* f_font_width)(void*, const char*);
 ORIG(f_this, o_Font_ctor, 0x618EA0);
 ORIG(f_font_init, o_Font_init, 0x618F40);
 ORIG(f_font_width, o_Font_width, 0x619280);
-static void cmd_fontmetrics(char *args) {
+static void cmd_fontmetrics(char* args) {
     char name[MAX_PATH] = "";
     int pixels = 0, style = 0;
     sscanf(args, "%259s %d %d", name, &pixels, &style);
@@ -1005,7 +1059,7 @@ static void cmd_fontmetrics(char *args) {
     int r = o_Font_init(font, "Arial", pixels, style);
     char path[MAX_PATH];
     snprintf(path, sizeof(path), "%s\\%s", g_outdir, name);
-    FILE *f = fopen(path, "w");
+    FILE* f = fopen(path, "w");
     if (!f) return;
     fprintf(f, "init %d height %d ascent_above %d internal %d ascent %d descent %d\n", r, font[3], font[4], font[5],
             font[6], font[7]);
@@ -1017,10 +1071,10 @@ static void cmd_fontmetrics(char *args) {
     logf_("fontmetrics %s %d %d -> %d\n", name, pixels, style, r);
 }
 
-static void cmd_mapdump(char *args) {
-    MapDump d = {"", kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, 0,
-                 kMapDumpKeep, 0, 0};
-    char *tok = strtok(args, " \t");
+static void cmd_mapdump(char* args) {
+    MapDump d = {
+        "", kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, 0, kMapDumpKeep, 0, 0};
+    char* tok = strtok(args, " \t");
     if (tok) d.file = tok;
     while ((tok = strtok(NULL, " \t"))) {
         if (!strncmp(tok, "viewer=", 7)) d.viewer = atoi(tok + 7);
@@ -1035,56 +1089,61 @@ static void cmd_mapdump(char *args) {
 }
 
 static void run_map_dumps() {
-    uint8_t *win = MainConsoleObj;
-    int vbase = *(int *)(*(uintptr_t *)win + 4);
-    for (const MapDump &d : g_mapdumps) {
+    uint8_t* win = MainConsoleObj;
+    int vbase = *(int*)(*(uintptr_t*)win + 4);
+    for (const MapDump& d : g_mapdumps) {
         int old_viewer = CurrentPlayerFaction;
         uint32_t crt = crt_state(), game = GameRandomState;
         if (d.viewer != kMapDumpKeep) CurrentPlayerFaction = d.viewer;
-        if (d.zoom != kMapDumpKeep) *(int32_t *)(win + 0x1DD98) = d.zoom;
+        if (d.zoom != kMapDumpKeep) *(int32_t*)(win + 0x1DD98) = d.zoom;
         if (d.cx != kMapDumpKeep) {
-            *(int32_t *)(win + 0x1DD9C) = d.cx;
-            *(int32_t *)(win + 0x1DDA0) = d.cy;
+            *(int32_t*)(win + 0x1DD9C) = d.cx;
+            *(int32_t*)(win + 0x1DDA0) = d.cy;
         }
-        *(int32_t *)(win + 0x21A44) = 0; /* full redraw, not the scroll shortcut */
+        *(int32_t*)(win + 0x21A44) = 0; /* full redraw, not the scroll shortcut */
         if (d.fx != kMapDumpKeep) {
             /* the scrolled redraw (MapWin_focus): full redraw at the start, then pfncMoveMap with
              * the scroll flag set */
-            typedef void(__thiscall * f_move)(void *, int, int, int);
-            int tx = *(int32_t *)(win + 0x1DD9C), ty = *(int32_t *)(win + 0x1DDA0);
-            *(int32_t *)(win + 0x1DD9C) = d.fx;
-            *(int32_t *)(win + 0x1DDA0) = d.fy;
+            typedef void(__thiscall * f_move)(void*, int, int, int);
+            int tx = *(int32_t*)(win + 0x1DD9C), ty = *(int32_t*)(win + 0x1DDA0);
+            *(int32_t*)(win + 0x1DD9C) = d.fx;
+            *(int32_t*)(win + 0x1DDA0) = d.fy;
             o_pfncRedrawMap(win, 0);
-            *(int32_t *)(win + 0x21A44) = 1;
+            *(int32_t*)(win + 0x21A44) = 1;
             ((f_move)0x46B1F0)(win, tx, ty, 0);
-            *(int32_t *)(win + 0x21A44) = 0;
+            *(int32_t*)(win + 0x21A44) = 0;
         } else {
-            unsigned old_options = *(uint32_t *)(win + 0x1DD70);
-            *(uint32_t *)(win + 0x1DD70) |= d.options;
+            unsigned old_options = *(uint32_t*)(win + 0x1DD70);
+            *(uint32_t*)(win + 0x1DD70) |= d.options;
             o_pfncRedrawMap(win, 0);
             if (d.rx != kMapDumpKeep) {
                 /* the canvas cleared to 0 first: the dump shows what the partial redraw paints */
-                const uint8_t *cb = win + vbase + 0x444;
-                uint8_t *cbits = *(uint8_t *const *)(cb + 0x54);
-                int cw = *(const int32_t *)(cb + 0x80), ch = -*(const int32_t *)(cb + 0x84);
-                int cs = *(const int32_t *)(cb + 0x4A8);
+                const uint8_t* cb = win + vbase + 0x444;
+                uint8_t* cbits = *(uint8_t* const*)(cb + 0x54);
+                int cw = *(const int32_t*)(cb + 0x80), ch = -*(const int32_t*)(cb + 0x84);
+                int cs = *(const int32_t*)(cb + 0x4A8);
                 for (int y = 0; cbits && y < ch; y++) memset(cbits + (size_t)y * cs, 0, cw);
-                typedef void(__thiscall * f_radius)(void *, int, int, int, int);
+                typedef void(__thiscall * f_radius)(void*, int, int, int, int);
                 ((f_radius)0x46A2A0)(win, d.rx, d.ry, d.rr, 0);
             }
-            *(uint32_t *)(win + 0x1DD70) = old_options;
+            *(uint32_t*)(win + 0x1DD70) = old_options;
         }
         crt_set_state(crt);
         GameRandomState = game;
-        const uint8_t *buf = win + vbase + 0x444;
-        const uint8_t *bits = *(uint8_t *const *)(buf + 0x54);
-        int32_t hdr[8] = {*(const int32_t *)(buf + 0x80), -*(const int32_t *)(buf + 0x84), CurrentPlayerFaction,
-                          *(int32_t *)(win + 0x1DD98), *(int32_t *)(win + 0x1DD9C), *(int32_t *)(win + 0x1DDA0),
-                          CurrentTurn, (int32_t)G(uint32_t, 0x94A30C)};
-        int stride = *(const int32_t *)(buf + 0x4A8);
+        const uint8_t* buf = win + vbase + 0x444;
+        const uint8_t* bits = *(uint8_t* const*)(buf + 0x54);
+        int32_t hdr[8] = {*(const int32_t*)(buf + 0x80),
+                          -*(const int32_t*)(buf + 0x84),
+                          CurrentPlayerFaction,
+                          *(int32_t*)(win + 0x1DD98),
+                          *(int32_t*)(win + 0x1DD9C),
+                          *(int32_t*)(win + 0x1DDA0),
+                          CurrentTurn,
+                          (int32_t)G(uint32_t, 0x94A30C)};
+        int stride = *(const int32_t*)(buf + 0x4A8);
         char path[MAX_PATH];
         snprintf(path, sizeof(path), "%s\\%s", g_outdir, d.file.c_str());
-        FILE *df = bits && hdr[0] > 0 && hdr[1] > 0 ? fopen(path, "wb") : NULL;
+        FILE* df = bits && hdr[0] > 0 && hdr[1] > 0 ? fopen(path, "wb") : NULL;
         if (df) {
             fwrite("SMXMAP1", 1, 8, df);
             fwrite(hdr, 4, 8, df);
@@ -1094,11 +1153,11 @@ static void run_map_dumps() {
         }
         /* <file>.pt: pfncPtToTile (0x463040) for every 4th pixel: int32 result, x, y. */
         {
-            typedef int(__thiscall * f_pt)(void *, int, int, int *, int *);
+            typedef int(__thiscall * f_pt)(void*, int, int, int*, int*);
             f_pt pt = (f_pt)0x463040;
             char ptpath[MAX_PATH];
             snprintf(ptpath, sizeof(ptpath), "%s.pt", path);
-            if (FILE *pf = fopen(ptpath, "wb")) {
+            if (FILE* pf = fopen(ptpath, "wb")) {
                 for (int py = 0; py < hdr[1]; py += 4)
                     for (int px = 0; px < hdr[0]; px += 4) {
                         int32_t r[3] = {0, -1, -1};
@@ -1108,10 +1167,10 @@ static void run_map_dumps() {
                 fclose(pf);
             }
             /* <file>.co: pfncMapGetCornerYOffset (0x46FE70) of every tile, corners 0..4. */
-            typedef int(__thiscall * f_co)(void *, int, int, int);
+            typedef int(__thiscall * f_co)(void*, int, int, int);
             f_co co = (f_co)0x46FE70;
             snprintf(ptpath, sizeof(ptpath), "%s.co", path);
-            if (FILE *cf = fopen(ptpath, "wb")) {
+            if (FILE* cf = fopen(ptpath, "wb")) {
                 for (int ty = 0; ty < MapAreaY; ty++)
                     for (int tx = ty & 1; tx < MapAreaX; tx += 2)
                         for (int c = 0; c < 5; c++) {
@@ -1121,9 +1180,9 @@ static void run_map_dumps() {
                 fclose(cf);
             }
         }
-        logf_("mapdump %s -> %d: %dx%d viewer=%d zoom=%d center=%d,%d origin=%d,%d q=%d\n", d.file.c_str(),
-              df != NULL, hdr[0], hdr[1], hdr[2], hdr[3], hdr[4], hdr[5], *(int32_t *)(win + 0x1DDA4),
-              *(int32_t *)(win + 0x1DDA8), *(int32_t *)(win + 0x1DDC8));
+        logf_("mapdump %s -> %d: %dx%d viewer=%d zoom=%d center=%d,%d origin=%d,%d q=%d\n", d.file.c_str(), df != NULL,
+              hdr[0], hdr[1], hdr[2], hdr[3], hdr[4], hdr[5], *(int32_t*)(win + 0x1DDA4), *(int32_t*)(win + 0x1DDA8),
+              *(int32_t*)(win + 0x1DDC8));
         CurrentPlayerFaction = old_viewer;
     }
     g_mapdumps.clear();
@@ -1143,9 +1202,9 @@ struct BaseDump {
     int base, viewer;
 };
 static std::vector<BaseDump> g_basedumps;
-static void cmd_basedump(char *args) {
+static void cmd_basedump(char* args) {
     BaseDump d = {"", 0, kMapDumpKeep};
-    char *tok = strtok(args, " \t");
+    char* tok = strtok(args, " \t");
     if (tok) d.file = tok;
     while ((tok = strtok(NULL, " \t"))) {
         if (!strncmp(tok, "base=", 5)) d.base = atoi(tok + 5);
@@ -1154,16 +1213,16 @@ static void cmd_basedump(char *args) {
     if (d.file.empty()) logf_("basedump: no file\n");
     else g_basedumps.push_back(d);
 }
-static void write_canvas(FILE *f, const uint8_t *buf) {
-    const uint8_t *bits = *(uint8_t *const *)(buf + 0x54);
-    int32_t wh[2] = {*(const int32_t *)(buf + 0x80), -*(const int32_t *)(buf + 0x84)};
-    int stride = *(const int32_t *)(buf + 0x4A8);
+static void write_canvas(FILE* f, const uint8_t* buf) {
+    const uint8_t* bits = *(uint8_t* const*)(buf + 0x54);
+    int32_t wh[2] = {*(const int32_t*)(buf + 0x80), -*(const int32_t*)(buf + 0x84)};
+    int stride = *(const int32_t*)(buf + 0x4A8);
     if (!bits || wh[0] <= 0 || wh[1] <= 0) wh[0] = wh[1] = 0;
     fwrite(wh, 4, 2, f);
     for (int y = 0; y < wh[1]; y++) fwrite(bits + (size_t)y * stride, 1, wh[0], f);
 }
 /* The screen as the game shows it (GDI capture of the desktop), as a 24-bit BMP. */
-static void screen_bmp(const char *path) {
+static void screen_bmp(const char* path) {
     int w = GetSystemMetrics(SM_CXSCREEN), h = GetSystemMetrics(SM_CYSCREEN);
     HDC sdc = GetDC(NULL), mdc = CreateCompatibleDC(sdc);
     BITMAPINFO bi = {};
@@ -1172,13 +1231,13 @@ static void screen_bmp(const char *path) {
     bi.bmiHeader.biHeight = h;
     bi.bmiHeader.biPlanes = 1;
     bi.bmiHeader.biBitCount = 24;
-    void *bits = NULL;
+    void* bits = NULL;
     HBITMAP bmp = CreateDIBSection(sdc, &bi, DIB_RGB_COLORS, &bits, NULL, 0);
     HGDIOBJ old = SelectObject(mdc, bmp);
     BitBlt(mdc, 0, 0, w, h, sdc, 0, 0, SRCCOPY);
     GdiFlush();
     int stride = (w * 3 + 3) & ~3;
-    if (FILE *f = fopen(path, "wb")) {
+    if (FILE* f = fopen(path, "wb")) {
         BITMAPFILEHEADER fh = {};
         fh.bfType = 0x4D42;
         fh.bfOffBits = sizeof(fh) + sizeof(bi.bmiHeader);
@@ -1195,9 +1254,9 @@ static void screen_bmp(const char *path) {
 }
 
 static void run_base_dumps() {
-    typedef void(__thiscall * f_zoom)(void *, int, int);
-    uint8_t *bw = (uint8_t *)0x6A7628, *mi = (uint8_t *)0x7AE820;
-    for (const BaseDump &d : g_basedumps) {
+    typedef void(__thiscall * f_zoom)(void*, int, int);
+    uint8_t *bw = (uint8_t*)0x6A7628, *mi = (uint8_t*)0x7AE820;
+    for (const BaseDump& d : g_basedumps) {
         int old_viewer = CurrentPlayerFaction;
         uint32_t crt = crt_state(), game = GameRandomState;
         /* default viewer: the base's owner (Bases 0x97D040, 0x134 bytes, faction_id at +4) */
@@ -1205,7 +1264,7 @@ static void run_base_dumps() {
         ((f_zoom)0x41A920)(bw, d.base, 0);
         char path[MAX_PATH];
         snprintf(path, sizeof(path), "%s\\%s", g_outdir, d.file.c_str());
-        FILE *f = fopen(path, "wb");
+        FILE* f = fopen(path, "wb");
         if (f) {
             fwrite("SMXBASE1", 1, 8, f);
             for (int i = 0; i < 256; i++) fwrite(GamePaletteObj + i * 4, 1, 3, f);
@@ -1217,8 +1276,8 @@ static void run_base_dumps() {
         snprintf(path, sizeof(path), "%s\\%s.bmp", g_outdir, d.file.c_str());
         screen_bmp(path);
         snprintf(path, sizeof(path), "%s\\%s.obj", g_outdir, d.file.c_str());
-        if (FILE *of = fopen(path, "wb")) {
-            fwrite((const void *)0x682000, 1, 0x9CA000 - 0x682000, of);
+        if (FILE* of = fopen(path, "wb")) {
+            fwrite((const void*)0x682000, 1, 0x9CA000 - 0x682000, of);
             fclose(of);
         }
         ((f_this)0x41A4C0)(bw); /* BaseWin_exit */
@@ -1268,12 +1327,12 @@ static int g_hang_secs = 60;
 static DWORD g_main_thread_id;
 static bool is_return_address(uint32_t v) {
     if (v < 0x401005 || v >= kImageCodeHi) return false;
-    const uint8_t *p = (const uint8_t *)(uintptr_t)v;
-    if (p[-5] == 0xE8) return true;                                   /* call rel32 */
-    if (p[-2] == 0xFF && (p[-1] & 0x38) == 0x10) return true;         /* call r32 / [r32] */
-    if (p[-3] == 0xFF && (p[-2] & 0x38) == 0x10) return true;         /* call [r32+d8] */
-    if (p[-6] == 0xFF && (p[-5] & 0x38) == 0x10) return true;         /* call [r32+d32] / [abs] */
-    if (p[-7] == 0xFF && (p[-6] & 0x38) == 0x10) return true;         /* call [sib+d32] */
+    const uint8_t* p = (const uint8_t*)(uintptr_t)v;
+    if (p[-5] == 0xE8) return true; /* call rel32 */
+    if (p[-2] == 0xFF && (p[-1] & 0x38) == 0x10) return true; /* call r32 / [r32] */
+    if (p[-3] == 0xFF && (p[-2] & 0x38) == 0x10) return true; /* call [r32+d8] */
+    if (p[-6] == 0xFF && (p[-5] & 0x38) == 0x10) return true; /* call [r32+d32] / [abs] */
+    if (p[-7] == 0xFF && (p[-6] & 0x38) == 0x10) return true; /* call [sib+d32] */
     return false;
 }
 static void hang_dump() {
@@ -1285,16 +1344,16 @@ static void hang_dump() {
     ctx.ContextFlags = CONTEXT_FULL;
     GetThreadContext(th, &ctx);
     logf_("HANG turn=%d eip=%08X esp=%08X modal_depth=%d modal_top=%08X vtbl=%08X stack:", CurrentTurn,
-          (uint32_t)ctx.Eip, (uint32_t)ctx.Esp, G(int32_t, 0x9B7AE4),
-          G(uint32_t, 0x9B7AE0), G(uint32_t, 0x9B7AE0) ? *(uint32_t *)(uintptr_t)G(uint32_t, 0x9B7AE0) : 0);
+          (uint32_t)ctx.Eip, (uint32_t)ctx.Esp, G(int32_t, 0x9B7AE4), G(uint32_t, 0x9B7AE0),
+          G(uint32_t, 0x9B7AE0) ? *(uint32_t*)(uintptr_t)G(uint32_t, 0x9B7AE0) : 0);
     uint32_t sp = (uint32_t)ctx.Esp;
     MEMORY_BASIC_INFORMATION mbi;
     uint32_t end = sp + 0x40000;
-    if (VirtualQuery((void *)(uintptr_t)sp, &mbi, sizeof(mbi)))
+    if (VirtualQuery((void*)(uintptr_t)sp, &mbi, sizeof(mbi)))
         end = (uint32_t)(uintptr_t)mbi.BaseAddress + (uint32_t)mbi.RegionSize;
     int n = 0;
     for (uint32_t a = sp & ~3u; a + 4 <= end && n < 48; a += 4) {
-        uint32_t v = *(uint32_t *)(uintptr_t)a;
+        uint32_t v = *(uint32_t*)(uintptr_t)a;
         if (is_return_address(v)) {
             logf_(" %08X", v);
             n++;
@@ -1328,10 +1387,10 @@ static void hang_watchdog_start() {
 }
 
 /* ---- newgame ---- */
-static const char *kDefaultFactions[7] = {"gaians", "hive", "univ", "morgan", "spartans", "believe", "peace"};
+static const char* kDefaultFactions[7] = {"gaians", "hive", "univ", "morgan", "spartans", "believe", "peace"};
 static const int kWorldSize[5][2] = {{24, 48}, {32, 64}, {40, 80}, {44, 90}, {64, 128}};
 
-static int cmd_newgame(char *args) {
+static int cmd_newgame(char* args) {
     int size = 2, ocean = 1, erosion = 1, orbit = 1, clouds = 1, natives = 1, diff = 3;
     int width = 0, height = 0;
     uint32_t rules = 0;
@@ -1339,8 +1398,8 @@ static int cmd_newgame(char *args) {
     int random_leaders = 0; /* bit 0: random personalities (GameState 0x800000), bit 1: random agendas (0x1000000) */
     char factions[7][24];
     for (int i = 0; i < 7; i++) snprintf(factions[i], 24, "%s", kDefaultFactions[i]);
-    for (char *tok = strtok(args, " \t"); tok; tok = strtok(NULL, " \t")) {
-        char *eq = strchr(tok, '=');
+    for (char* tok = strtok(args, " \t"); tok; tok = strtok(NULL, " \t")) {
+        char* eq = strchr(tok, '=');
         if (!eq) continue;
         *eq = 0;
         const char *k = tok, *v = eq + 1;
@@ -1393,9 +1452,9 @@ static int cmd_newgame(char *args) {
     if (random_leaders & 1) GameState |= 0x800000u;
     if (random_leaders & 2) GameState |= 0x1000000u;
     for (int i = 1; i < 8; i++) {
-        uint8_t *m = MFactions + i * MFACTION_SIZE;
+        uint8_t* m = MFactions + i * MFACTION_SIZE;
         memset(m + 4, 0, 24);
-        snprintf((char *)m + 4, 24, "%s", factions[i - 1]);
+        snprintf((char*)m + 4, 24, "%s", factions[i - 1]);
         o_read_faction(m, 0);
     }
     FactionStatus[0] = 0; /* no human players */
@@ -1411,8 +1470,7 @@ static int cmd_newgame(char *args) {
     FactionStatus[0] = 0;
     CurrentPlayerFaction = g_viewer; /* observer views as native life by default: no popups */
     apply_observer_prefs();
-    logf_("newgame done mapseed=%d turn=%d crt=%u game=%u\n", MapRandomSeed, CurrentTurn, crt_state(),
-          GameRandomState);
+    logf_("newgame done mapseed=%d turn=%d crt=%u game=%u\n", MapRandomSeed, CurrentTurn, crt_state(), GameRandomState);
     return 0;
 }
 
@@ -1421,7 +1479,7 @@ static int cmd_newgame(char *args) {
  * snapshot of that turn (before turn_upkeep). `call` calls the original address: in hybrid.dll a
  * patched function runs as the reconstruction. */
 struct ScriptCall {
-    const char *name;
+    const char* name;
     uint32_t addr;
     bool has_result; /* false: void, EAX is not logged */
 };
@@ -1430,23 +1488,23 @@ static const ScriptCall kScriptCalls[] = {
 #include "script_calls.h"
 #undef SCRIPT_CALL
 };
-typedef int(__cdecl *f_call8)(int, int, int, int, int, int, int, int);
-#define MapHalfX G(int32_t, 0x68FAF0)
+typedef int(__cdecl* f_call8)(int, int, int, int, int, int, int, int);
+#define MapHalfX    G(int32_t, 0x68FAF0)
 #define MapTilesPtr G(uintptr_t, 0x94A30C)
 static const int kMapTileSize = 44;
 
-static void poke_bytes(uint8_t *p, int size, long long v) {
+static void poke_bytes(uint8_t* p, int size, long long v) {
     for (int i = 0; i < size; i++) p[i] = (uint8_t)((unsigned long long)v >> (8 * i));
 }
 
-static bool setup_command(const char *cmd, char *args) {
+static bool setup_command(const char* cmd, char* args) {
     if (!strcmp(cmd, "poke")) {
         unsigned addr = 0;
         int size = 0;
         long long v = 0;
         if (sscanf(args, "%x %d %lli", &addr, &size, &v) == 3 && size >= 1 && size <= 4 && addr >= 0x682000 &&
             addr + size <= 0x9CA000) {
-            poke_bytes((uint8_t *)(uintptr_t)addr, size, v);
+            poke_bytes((uint8_t*)(uintptr_t)addr, size, v);
             logf_("poke %08X %d %lld\n", addr, size, v);
         } else {
             logf_("poke: bad arguments %s\n", args);
@@ -1456,7 +1514,7 @@ static bool setup_command(const char *cmd, char *args) {
         long long v = 0;
         if (sscanf(args, "%d %d %i %d %lli", &x, &y, &off, &size, &v) == 5 && size >= 1 && size <= 4 && off >= 0 &&
             off + size <= kMapTileSize && x >= 0 && x < MapAreaX && y >= 0 && y < MapAreaY) {
-            poke_bytes((uint8_t *)MapTilesPtr + (MapHalfX * y + (x >> 1)) * kMapTileSize + off, size, v);
+            poke_bytes((uint8_t*)MapTilesPtr + (MapHalfX * y + (x >> 1)) * kMapTileSize + off, size, v);
             logf_("poketile %d %d %d %d %lld\n", x, y, off, size, v);
         } else {
             logf_("poketile: bad arguments %s\n", args);
@@ -1464,9 +1522,9 @@ static bool setup_command(const char *cmd, char *args) {
     } else if (!strcmp(cmd, "call")) {
         char name[64] = "";
         int a[8] = {};
-        int n = sscanf(args, "%63s %i %i %i %i %i %i %i %i", name, &a[0], &a[1], &a[2], &a[3], &a[4], &a[5], &a[6],
-                       &a[7]);
-        for (const ScriptCall &c : kScriptCalls) {
+        int n =
+            sscanf(args, "%63s %i %i %i %i %i %i %i %i", name, &a[0], &a[1], &a[2], &a[3], &a[4], &a[5], &a[6], &a[7]);
+        for (const ScriptCall& c : kScriptCalls) {
             if (strcmp(c.name, name)) continue;
             int r = ((f_call8)c.addr)(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
             if (c.has_result) logf_("call %s (%d args) -> %d\n", name, n - 1, r);
@@ -1488,13 +1546,13 @@ struct AtCommand {
 static std::vector<AtCommand> g_at;
 
 static void run_at_commands() {
-    for (AtCommand &c : g_at) {
+    for (AtCommand& c : g_at) {
         if (c.turn != CurrentTurn || c.done) continue;
         c.done = true;
         std::vector<char> buf(c.line.begin(), c.line.end());
         buf.push_back(0);
-        char *cmd = buf.data();
-        char *args = cmd + strcspn(cmd, " \t");
+        char* cmd = buf.data();
+        char* args = cmd + strcspn(cmd, " \t");
         if (*args) *args++ = 0;
         args += strspn(args, " \t");
         logf_("at %d> %s %s\n", c.turn, cmd, args);
@@ -1504,7 +1562,7 @@ static void run_at_commands() {
 
 /* ---- script ---- */
 static int __cdecl oracle_top_menu() {
-    FILE *f = fopen("oracle.cmd", "r");
+    FILE* f = fopen("oracle.cmd", "r");
     if (!f) {
         logf_("no oracle.cmd\n");
         ExitProcess(2);
@@ -1512,9 +1570,9 @@ static int __cdecl oracle_top_menu() {
     char line[16384];
     while (fgets(line, sizeof(line), f)) {
         line[strcspn(line, "\r\n")] = 0;
-        char *cmd = line + strspn(line, " \t");
+        char* cmd = line + strspn(line, " \t");
         if (!*cmd || *cmd == '#') continue;
-        char *args = cmd + strcspn(cmd, " \t");
+        char* args = cmd + strcspn(cmd, " \t");
         if (*args) *args++ = 0;
         args += strspn(args, " \t");
         logf_("> %s %s\n", cmd, args);
@@ -1555,7 +1613,7 @@ static int __cdecl oracle_top_menu() {
         } else if (!strcmp(cmd, "dumprules")) {
             char path[MAX_PATH];
             snprintf(path, sizeof(path), "%s\\%s", g_outdir, args);
-            FILE *df = fopen(path, "w");
+            FILE* df = fopen(path, "w");
             if (df) {
                 rules_dump(df);
                 fclose(df);
@@ -1572,10 +1630,8 @@ static int __cdecl oracle_top_menu() {
             g_viewer = atoi(args);
             CurrentPlayerFaction = g_viewer;
         } else if (!strcmp(cmd, "poison")) {
-            if (!strncmp(args, "rand", 4))
-                g_poison_rand = (uint32_t)strtoul(args + 4, NULL, 0) | 1;
-            else
-                g_poison = (int)strtol(args, NULL, 0);
+            if (!strncmp(args, "rand", 4)) g_poison_rand = (uint32_t)strtoul(args + 4, NULL, 0) | 1;
+            else g_poison = (int)strtol(args, NULL, 0);
         } else if (!strcmp(cmd, "logcalls")) {
             g_logcalls_from_turn = atoi(args);
             install_call_hooks();
@@ -1587,10 +1643,11 @@ static int __cdecl oracle_top_menu() {
         } else if (!strcmp(cmd, "poisonpump")) {
             /* now always installed at startup; kept for old scripts */
         } else if (!strcmp(cmd, "slotlog")) {
-            char *tok = strtok(args, " \t");
+            char* tok = strtok(args, " \t");
             g_sl.func = strtoul(tok, NULL, 16);
             int prologue = atoi(strtok(NULL, " \t"));
-            while ((tok = strtok(NULL, " \t")) && g_sl.noff < 8) g_sl.off[g_sl.noff++] = (uint32_t)strtol(tok, NULL, 16);
+            while ((tok = strtok(NULL, " \t")) && g_sl.noff < 8)
+                g_sl.off[g_sl.noff++] = (uint32_t)strtol(tok, NULL, 16);
             install_slotlog(prologue);
         } else if (!strcmp(cmd, "steptrace")) {
             sscanf(args, "%d %d %d", &g_st_turn, &g_st_veh, &g_st_max);
@@ -1607,9 +1664,9 @@ static int __cdecl oracle_top_menu() {
             sscanf(args, "%x %x %259s", &addr, &size, name);
             char path[MAX_PATH];
             snprintf(path, sizeof(path), "%s\\%s", g_outdir, name);
-            FILE *df = fopen(path, "wb");
+            FILE* df = fopen(path, "wb");
             if (df) {
-                fwrite((const void *)(uintptr_t)addr, 1, size, df);
+                fwrite((const void*)(uintptr_t)addr, 1, size, df);
                 fclose(df);
             }
             logf_("dumpmem %08X %X %s -> %d\n", addr, size, name, df != NULL);
@@ -1630,7 +1687,7 @@ static int __cdecl oracle_top_menu() {
         } else if (!strcmp(cmd, "quit")) {
             break;
         } else if (!strcmp(cmd, "at")) {
-            char *rest = args + strcspn(args, " \t");
+            char* rest = args + strcspn(args, " \t");
             g_at.push_back({atoi(args), std::string(rest + strspn(rest, " \t")), false});
         } else if (setup_command(cmd, args)) {
         } else {
@@ -1643,17 +1700,17 @@ static int __cdecl oracle_top_menu() {
     return 1;
 }
 
-static LONG WINAPI crash_filter(EXCEPTION_POINTERS *e) {
+static LONG WINAPI crash_filter(EXCEPTION_POINTERS* e) {
     logf_("CRASH code=%08lX addr=%p turn=%d stack:", e->ExceptionRecord->ExceptionCode,
           e->ExceptionRecord->ExceptionAddress, CurrentTurn);
     {
         uint32_t sp = (uint32_t)e->ContextRecord->Esp, end = sp + 0x40000;
         MEMORY_BASIC_INFORMATION mbi;
-        if (VirtualQuery((void *)(uintptr_t)sp, &mbi, sizeof(mbi)))
+        if (VirtualQuery((void*)(uintptr_t)sp, &mbi, sizeof(mbi)))
             end = (uint32_t)(uintptr_t)mbi.BaseAddress + (uint32_t)mbi.RegionSize;
         int n = 0;
         for (uint32_t a = sp & ~3u; a + 4 <= end && n < 32; a += 4) {
-            uint32_t v = *(uint32_t *)(uintptr_t)a;
+            uint32_t v = *(uint32_t*)(uintptr_t)a;
             if (is_return_address(v)) logf_(" %08X", v), n++;
         }
         logf_("\n");
@@ -1664,19 +1721,19 @@ static LONG WINAPI crash_filter(EXCEPTION_POINTERS *e) {
 
 BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
     if (reason == DLL_PROCESS_ATTACH) {
-        write_call(0x52AC4A, (void *)oracle_top_menu);  /* control_game -> top_menu */
-        write_call(0x52768A, (void *)hook_turn_upkeep); /* control_turn -> turn_upkeep */
-        write_call(0x528214, (void *)hook_faction_upkeep);
-        write_call(0x528289, (void *)hook_enemy_turn);
-        write_call(0x579703, (void *)hook_enemy_veh); /* enemy_turn -> enemy_veh */
+        write_call(0x52AC4A, (void*)oracle_top_menu); /* control_game -> top_menu */
+        write_call(0x52768A, (void*)hook_turn_upkeep); /* control_turn -> turn_upkeep */
+        write_call(0x528214, (void*)hook_faction_upkeep);
+        write_call(0x528289, (void*)hook_enemy_turn);
+        write_call(0x579703, (void*)hook_enemy_veh); /* enemy_turn -> enemy_veh */
         /* Poison again after enemy_veh's message pump (do_all_non_input), so the uninitialised
          * local read by enemy_move ([ebp-0x48], 0x574DD7) never sees UI leftovers. */
-        write_call(0x57928D, (void *)hook_enemy_veh_pump);
+        write_call(0x57928D, (void*)hook_enemy_veh_pump);
         /* Poison wants_to_attack's uninitialised slot array before each evaluation. */
-        for (uint32_t site : kWantsToAttackFirstSites) write_call(site, (void *)oracle_wta_poison_thunk);
-        write_call(0x52826E, (void *)hook_human_turn);
-        write_call(0x5282C9, (void *)hook_observer_pause);
-        for (uint32_t site : ui_sites_game_random) write_call(site, (void *)ui_game_random);
+        for (uint32_t site : kWantsToAttackFirstSites) write_call(site, (void*)oracle_wta_poison_thunk);
+        write_call(0x52826E, (void*)hook_human_turn);
+        write_call(0x5282C9, (void*)hook_observer_pause);
+        for (uint32_t site : ui_sites_game_random) write_call(site, (void*)ui_game_random);
         install_popup_hook();
         install_council_hook();
         install_map_alloc_hook();
@@ -1688,10 +1745,10 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
             const uint8_t ret = 0xC3;
             patch_bytes(0x50F3D0, &ret, 1); /* start_timers */
         }
-        g_real_timeGetTime = *(f_timeGetTime *)IAT_timeGetTime;
+        g_real_timeGetTime = *(f_timeGetTime*)IAT_timeGetTime;
         {
-            void *hook = (void *)hook_timeGetTime;
-            patch_bytes(IAT_timeGetTime, (const uint8_t *)&hook, 4);
+            void* hook = (void*)hook_timeGetTime;
+            patch_bytes(IAT_timeGetTime, (const uint8_t*)&hook, 4);
         }
 #ifdef ORACLE_WITH_ENGINE
         g_harness_turn_upkeep = hook_turn_upkeep;
@@ -1702,18 +1759,18 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         g_harness_top_menu = oracle_top_menu;
         g_harness_enemy_veh = hook_enemy_veh;
         g_harness_enemy_veh_pump = hook_enemy_veh_pump_void;
-        g_harness_wants_to_attack_fresh = (int(__cdecl *)(int, int, int))(void *)oracle_wta_poison_thunk;
+        g_harness_wants_to_attack_fresh = (int(__cdecl*)(int, int, int))(void*)oracle_wta_poison_thunk;
         g_harness_council_modal = council_modal_engine;
         engine_set_deterministic(true);
         patches_init();
         /* oracle.patch: patch spec applied before the game boots, so reconstructed boot code
          * (rules parsing, preferences) runs too. */
-        if (FILE *pf = fopen("oracle.patch", "r")) {
+        if (FILE* pf = fopen("oracle.patch", "r")) {
             char spec[4096] = "";
             size_t n = fread(spec, 1, sizeof(spec) - 1, pf);
             spec[n] = 0;
             fclose(pf);
-            for (char *c = spec; *c; c++)
+            for (char* c = spec; *c; c++)
                 if (*c == '\r' || *c == '\n') *c = ' ';
             logf_("early patch: %s\n", spec);
             cmd_patch(spec);

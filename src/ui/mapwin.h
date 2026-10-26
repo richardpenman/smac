@@ -16,44 +16,44 @@
 #include "ui/gfx.h"
 
 // ---- MapWin fields (byte offsets of the original object) ----
-constexpr uint32_t kMwTileCache = 0x4;        // per-tile terrain cache pointer (native: MapWinNative)
-constexpr uint32_t kMwElevScale = 0x1DD6C;    // corner height step: 25 (8 with "flat terrain")
-constexpr uint32_t kMwOptions = 0x1DD70;      // display option bits (MapWinOptions for the main view)
+constexpr uint32_t kMwTileCache = 0x4;  // per-tile terrain cache pointer (native: MapWinNative)
+constexpr uint32_t kMwElevScale = 0x1DD6C;  // corner height step: 25 (8 with "flat terrain")
+constexpr uint32_t kMwOptions = 0x1DD70;  // display option bits (MapWinOptions for the main view)
 constexpr uint32_t kMwActive = 0x1DD74;
-constexpr uint32_t kMwIndex = 0x1DD78;        // index in MapWins (0: main view, 1: world map)
-constexpr uint32_t kMwTracking = 0x1DD80;     // mouse-over tracking active
-constexpr uint32_t kMwZoom = 0x1DD98;         // zoom step (0: normal; < 0: smaller)
+constexpr uint32_t kMwIndex = 0x1DD78;  // index in MapWins (0: main view, 1: world map)
+constexpr uint32_t kMwTracking = 0x1DD80;  // mouse-over tracking active
+constexpr uint32_t kMwZoom = 0x1DD98;  // zoom step (0: normal; < 0: smaller)
 constexpr uint32_t kMwCenterX = 0x1DD9C;
 constexpr uint32_t kMwCenterY = 0x1DDA0;
-constexpr uint32_t kMwOriginX = 0x1DDA4;      // tile at the top-left of the view
+constexpr uint32_t kMwOriginX = 0x1DDA4;  // tile at the top-left of the view
 constexpr uint32_t kMwOriginY = 0x1DDA8;
-constexpr uint32_t kMwPixelX = 0x1DDAC;       // pixel offset of the view (map narrower than the window)
+constexpr uint32_t kMwPixelX = 0x1DDAC;  // pixel offset of the view (map narrower than the window)
 constexpr uint32_t kMwPixelY = 0x1DDB0;
-constexpr uint32_t kMwTileW = 0x1DDB4;        // 8q
-constexpr uint32_t kMwTileH = 0x1DDB8;        // 4q
-constexpr uint32_t kMwHalfW = 0x1DDBC;        // 4q
-constexpr uint32_t kMwHalfH = 0x1DDC0;        // 2q
-constexpr uint32_t kMwQuarterW = 0x1DDC4;     // 2q
-constexpr uint32_t kMwQ = 0x1DDC8;            // q: zoom unit
-constexpr uint32_t kMwColsOdd = 0x1DDCC;      // tiles per odd row
+constexpr uint32_t kMwTileW = 0x1DDB4;  // 8q
+constexpr uint32_t kMwTileH = 0x1DDB8;  // 4q
+constexpr uint32_t kMwHalfW = 0x1DDBC;  // 4q
+constexpr uint32_t kMwHalfH = 0x1DDC0;  // 2q
+constexpr uint32_t kMwQuarterW = 0x1DDC4;  // 2q
+constexpr uint32_t kMwQ = 0x1DDC8;  // q: zoom unit
+constexpr uint32_t kMwColsOdd = 0x1DDCC;  // tiles per odd row
 constexpr uint32_t kMwRowsAbove = 0x1DDD0;
-constexpr uint32_t kMwColsEven = 0x1DDD4;     // tiles per even row
+constexpr uint32_t kMwColsEven = 0x1DDD4;  // tiles per even row
 constexpr uint32_t kMwRowsBelow = 0x1DDD8;
-constexpr uint32_t kMwUnitLift = 0x1DDDC;     // unit/base height above the terrain (option 2)
+constexpr uint32_t kMwUnitLift = 0x1DDDC;  // unit/base height above the terrain (option 2)
 constexpr uint32_t kMwUnitLift2 = 0x1DDE0;
 constexpr uint32_t kMwLastZoom = 0x1EEC0;
 constexpr uint32_t kMwLastElev = 0x1EEC4;
-constexpr uint32_t kMwFont0 = 0x1EEC8;        // Font objects (map labels)
+constexpr uint32_t kMwFont0 = 0x1EEC8;  // Font objects (map labels)
 constexpr uint32_t kMwFont1 = 0x1EEF4;
 constexpr uint32_t kMwFont2 = 0x1EF20;
-constexpr uint32_t kMwScrolling = 0x21A44;    // incremental scroll redraw in progress
+constexpr uint32_t kMwScrolling = 0x21A44;  // incremental scroll redraw in progress
 // Byte offset of the GraphicWin virtual base: MapWin 0x21A6C, Console (the main view) 0x23D94.
 constexpr uint32_t kMapWinVBase = 0x21A6C;
 constexpr uint32_t kConsoleVBase = 0x23D94;
 // GraphicWin fields (offsets from the virtual base).
-constexpr uint32_t kGwClientRect = 0x474;     // RECT: the drawable client area
+constexpr uint32_t kGwClientRect = 0x474;  // RECT: the drawable client area
 constexpr uint32_t kGwWidth = 0x4C4;
-constexpr uint32_t kGwHeight = 0x4C8;         // negative (top-down DIB)
+constexpr uint32_t kGwHeight = 0x4C8;  // negative (top-down DIB)
 
 // Fixed zoom factor (piZoomNum / piZoomDenom; used when ZoomNum > 0, else the window's zoom step).
 GLOBAL(int32_t, ZoomNum, 0x691E6C);
@@ -62,24 +62,24 @@ GLOBAL(int32_t, ZoomDenom, 0x691E70);
 inline int32_t& mw(uint8_t* win, uint32_t off) { return *reinterpret_cast<int32_t*>(win + off); }
 
 // ---- original globals of the map drawing ----
-GLOBAL(UiRect, VisibleTiles, 0x7D3C28);          // prVisibleTiles: main view tile range
-GLOBAL(int32_t[4][2], TileCorners, 0x7D3C08);    // W, N, E, S corner points of the last tile drawn
+GLOBAL(UiRect, VisibleTiles, 0x7D3C28);  // prVisibleTiles: main view tile range
+GLOBAL(int32_t[4][2], TileCorners, 0x7D3C08);  // W, N, E, S corner points of the last tile drawn
 GLOBAL(int32_t[4][2], CursorTileCorners, 0x7D3BE8);  // TileCorners of the cursor tile
 GLOBAL(int32_t, TerrainDefaultLight, 0x686354);  // light of tiles not currently seen
 // Sub-polygon tables of the tile (4 triangles: centre + two diamond corners).
-GLOBAL(int32_t[12], TilePolyX, 0x685F20);        // in 2q units
-GLOBAL(int32_t[12], TilePolyY, 0x685F50);        // in q units
-GLOBAL(int32_t[12], TilePolyCorner, 0x685F80);   // corner index of each vertex (0 centre, 1..4 W N E S)
-GLOBAL(int32_t[12][2], TilePolyUV, 0x686090);    // texture coordinates of each vertex
+GLOBAL(int32_t[12], TilePolyX, 0x685F20);  // in 2q units
+GLOBAL(int32_t[12], TilePolyY, 0x685F50);  // in q units
+GLOBAL(int32_t[12], TilePolyCorner, 0x685F80);  // corner index of each vertex (0 centre, 1..4 W N E S)
+GLOBAL(int32_t[12][2], TilePolyUV, 0x686090);  // texture coordinates of each vertex
 // The 4 tiles around each tile corner (corner c: entries (c-1)*4 .. +3), and 4-vertex quads.
 GLOBAL(int32_t[16], CornerTileX, 0x685EA0);
 GLOBAL(int32_t[16], CornerTileY, 0x685EE0);
 GLOBAL(uint8_t[256][2], RainTransition, 0x685484);  // [neighbour mask]: texture variant, rotation
 GLOBAL(int32_t[16][2], OceanQuadUV, 0x685CA8);
 GLOBAL(int32_t[16][2], CoastQuadUV, 0x6860F0);
-GLOBAL(int32_t[80], OceanDepthLight, 0x6861F0);     // ocean depth (detail) -> light
-GLOBAL(int32_t[4][4][2], WaterQuadPoints, 0x7D3AF0); // the 4 water quads of the last tile drawn
-GLOBAL(int32_t[4][4], WaterQuadLight, 0x7F6644);     // their depth lights
+GLOBAL(int32_t[80], OceanDepthLight, 0x6861F0);  // ocean depth (detail) -> light
+GLOBAL(int32_t[4][4][2], WaterQuadPoints, 0x7D3AF0);  // the 4 water quads of the last tile drawn
+GLOBAL(int32_t[4][4], WaterQuadLight, 0x7F6644);  // their depth lights
 // The point whose surroundings GamePreferences 0x200 outlines (DAT_00685478 / _0068547C).
 GLOBAL(int32_t, OutlineCenterX, 0x685478);
 GLOBAL(int32_t, OutlineCenterY, 0x68547C);
@@ -98,10 +98,10 @@ uint8_t* ui_mapwin_cache_entry(uint8_t* win, int32_t x, int32_t y);
 
 // Native parts of a map window.
 struct MapWinNative {
-    uint8_t* win = nullptr;            // object in the memory image
-    uint32_t vbase = kMapWinVBase;     // virtual base offset of its GraphicWin
-    Buffer* canvas = nullptr;          // GraphicWin canvas (+vbase+0x444)
-    std::vector<uint8_t> tile_cache;   // +4: 12 bytes per tile, see pfncMapGetCornerYOffset
+    uint8_t* win = nullptr;  // object in the memory image
+    uint32_t vbase = kMapWinVBase;  // virtual base offset of its GraphicWin
+    Buffer* canvas = nullptr;  // GraphicWin canvas (+vbase+0x444)
+    std::vector<uint8_t> tile_cache;  // +4: 12 bytes per tile, see pfncMapGetCornerYOffset
 };
 // Registers the native parts of a window; the GraphicWin size fields are set from the canvas.
 MapWinNative* ui_mapwin_attach(uint8_t* win, uint32_t vbase, Buffer* canvas);
@@ -147,19 +147,19 @@ ADDR_NATIVE(0x470790) int32_t THISCALL MapWin_get_point_light(uint8_t* win, int3
 // Depth value of an ocean tile corner (contour based; 0x39..0x43 at coasts).
 ADDR_NATIVE(0x462190) int32_t GAMEAPI alt_get_ocean_detail(int32_t x, int32_t y, int32_t quadrant, int32_t vertex);
 // Draws the terrain of tile (x, y) whose top-left is at (px, py).
-ADDR_NATIVE(0x4632D0) int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom,
-                                                             int32_t faction_id, int32_t a5, int32_t options,
-                                                             int32_t x, int32_t y, int32_t px, int32_t py);
-ADDR_NATIVE(0x466CA0) void THISCALL MapWin_draw_vehicles(uint8_t* win, int32_t x, int32_t y, int32_t px, int32_t py,
-                                                        int32_t faction_id);
-ADDR_NATIVE(0x467190) void THISCALL MapWin_draw_bases(uint8_t* win, int32_t x, int32_t y, int32_t px, int32_t py,
-                                                     int32_t faction_id);
+ADDR_NATIVE(0x4632D0)
+int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom, int32_t faction_id, int32_t a5,
+                                        int32_t options, int32_t x, int32_t y, int32_t px, int32_t py);
+ADDR_NATIVE(0x466CA0)
+void THISCALL MapWin_draw_vehicles(uint8_t* win, int32_t x, int32_t y, int32_t px, int32_t py, int32_t faction_id);
+ADDR_NATIVE(0x467190)
+void THISCALL MapWin_draw_bases(uint8_t* win, int32_t x, int32_t y, int32_t px, int32_t py, int32_t faction_id);
 ADDR_NATIVE(0x467DE0) void THISCALL MapWin_draw_base_names(uint8_t* win);
 // Draws the whole view: terrain, units and bases, base names (terrain_only: skip the terrain fill).
 ADDR_NATIVE(0x469CA0) void THISCALL pfncDrawMap(uint8_t* win, int32_t faction_id, int32_t terrain_only);
 // Base sprite with its population box and name plate at (px, py).
-ADDR_NATIVE(0x55AF20) void GAMEAPI base_draw(Buffer* dest, int32_t base_id, int32_t px, int32_t py, int32_t zoom,
-                                            int32_t flags);
+ADDR_NATIVE(0x55AF20)
+void GAMEAPI base_draw(Buffer* dest, int32_t base_id, int32_t px, int32_t py, int32_t zoom, int32_t flags);
 // veh_draw and the unit art are in ui/vehdraw.h.
 // The map label font cache (FUN_005592D0): Arial of the zoom unit * num / den pixels (10 -> 11),
 // three fonts kept, least recently used replaced.
@@ -172,19 +172,22 @@ void THISCALL pfncRedrawMap(uint8_t* win, int32_t flag);  // 0x46A550
 // ---- partial redraws and overlays (mapwin_radius.cpp) ----
 // The screen rectangle of the tiles within `radius` of (x, y) (radius 0: the tile widened by a
 // quarter on each side), clipped to the client area; 0 when empty.
-ADDR_NATIVE(0x468CD0) int32_t THISCALL MapWin_compute_clip(uint8_t* win, int32_t x, int32_t y, int32_t radius,
-                                                           UiRect* out);
+ADDR_NATIVE(0x468CD0)
+int32_t THISCALL MapWin_compute_clip(uint8_t* win, int32_t x, int32_t y, int32_t radius, UiRect* out);
 // Redraws the tiles around (x, y) inside MapWin_compute_clip's rectangle: the terrain (unless
 // no_terrain), the units and bases, the base names, the overlays and legend when shown.
-ADDR_NATIVE(0x469190) void THISCALL MapWin_gen_radius(uint8_t* win, int32_t x, int32_t y, int32_t radius,
-                                                      int32_t faction_id, int32_t no_terrain);
-ADDR_NATIVE(0x468F90) void THISCALL MapWin_draw_vehicles_2(uint8_t* win, int32_t x, int32_t y, int32_t radius,
-                                                           int32_t faction_id);
+ADDR_NATIVE(0x469190)
+void THISCALL
+    MapWin_gen_radius(uint8_t* win, int32_t x, int32_t y, int32_t radius, int32_t faction_id, int32_t no_terrain);
+ADDR_NATIVE(0x468F90)
+void THISCALL MapWin_draw_vehicles_2(uint8_t* win, int32_t x, int32_t y, int32_t radius, int32_t faction_id);
 // MapWin_gen_radius for the viewer (mode < 0: without the terrain); mode != 0 shows the change.
-ADDR_NATIVE(0x46A2A0) void THISCALL MapWin_draw_radius(uint8_t* win, int32_t x, int32_t y, int32_t radius, int32_t mode);
+ADDR_NATIVE(0x46A2A0)
+void THISCALL MapWin_draw_radius(uint8_t* win, int32_t x, int32_t y, int32_t radius, int32_t mode);
 // MapWin_draw_radius (radius 0) when (x, y) is in the window's tile range.
 ADDR_NATIVE(0x46A4A0) void THISCALL MapWin_draw_tile(uint8_t* win, int32_t x, int32_t y, int32_t mode);
-ADDR_NATIVE(0x468C20) void THISCALL MapWin_gen_tile(uint8_t* win, int32_t x, int32_t y, int32_t faction_id, int32_t units);
+ADDR_NATIVE(0x468C20)
+void THISCALL MapWin_gen_tile(uint8_t* win, int32_t x, int32_t y, int32_t faction_id, int32_t units);
 // Options 0x2000: the AI goals at (x, y) (the faction's initial when omniscient, the goal's letter
 // and priority).
 ADDR_NATIVE(0x4688E0) void THISCALL MapWin_gen_overlays(uint8_t* win, int32_t x, int32_t y);
@@ -203,15 +206,16 @@ GLOBAL(int32_t, DestLineCost, 0x7D3B70);  // path cost summed by MapWin_dest_lin
 // from (x1, y1) to (x2, y2): drawn tile by tile (another region / unknown tiles: straight), its
 // cost in DestLineCost. solid: on the screen overlay (the go-to drag), else dashed (on, off) on
 // the view.
-ADDR_NATIVE(0x467430) void THISCALL MapWin_dest_line(uint8_t* win, int32_t x1, int32_t y1, int32_t x2, int32_t y2,
-                                                     int32_t unit_id, int32_t faction_id, int32_t mode,
-                                                     int32_t patrol, int32_t on, int32_t off, int32_t solid);
-ADDR_NATIVE(0x4672C0) void THISCALL MapWin_direct_dest_line(uint8_t* win, int32_t x1, int32_t y1, int32_t x2,
-                                                            int32_t y2, int32_t triad, int32_t on, int32_t off,
-                                                            int32_t solid);
+ADDR_NATIVE(0x467430)
+void THISCALL
+    MapWin_dest_line(uint8_t* win, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t unit_id, int32_t faction_id,
+                     int32_t mode, int32_t patrol, int32_t on, int32_t off, int32_t solid);
+ADDR_NATIVE(0x4672C0)
+void THISCALL MapWin_direct_dest_line(uint8_t* win, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t triad,
+                                      int32_t on, int32_t off, int32_t solid);
 // MapWin_draw_base_dest: the destination lines of the map display options (0x40000 rally points,
 // 0x400000 patrols, 0x800000 go-to orders); redraw: update the view when one was drawn.
 ADDR_NATIVE(0x467970) void THISCALL MapWin_draw_base_dest(uint8_t* win, int32_t redraw);
 // Buffer_line (0x5E09D0): a dashed line (runs of `on` pixels of c1, `off` of c2; -1 transparent).
-void buffer_dashed_line(Buffer* b, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t c1, int32_t c2,
-                        int32_t on, int32_t off, int32_t phase);
+void buffer_dashed_line(Buffer* b, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t c1, int32_t c2, int32_t on,
+                        int32_t off, int32_t phase);

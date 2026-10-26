@@ -139,14 +139,14 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
         if (f.region_total_bases[i]) regions_with_bases++;
 
     // Production of the other bases and vehicles, per unit and per plan/triad.
-    static int32_t queued_region[512];   // [ebp-0xF6C] own bases in the region building the unit
-    static int32_t queued_all[512];      // [ebp-0x1F6C] own other bases building the unit
-    static int32_t units_region[512];    // [ebp-0x176C] own vehicles in the region
-    int32_t veh_region[kPlanTriads];     // [ebp-0x4BC]
-    int32_t veh_all[kPlanTriads];        // [ebp-0x2EC]
-    int32_t prod_region[kPlanTriads];    // [ebp-0x594]
-    int32_t prod_all[kPlanTriads];       // [ebp-0x3C4]
-    int32_t veh_home[kPlanTriads];       // [ebp-0x76C]
+    static int32_t queued_region[512];  // [ebp-0xF6C] own bases in the region building the unit
+    static int32_t queued_all[512];  // [ebp-0x1F6C] own other bases building the unit
+    static int32_t units_region[512];  // [ebp-0x176C] own vehicles in the region
+    int32_t veh_region[kPlanTriads];  // [ebp-0x4BC]
+    int32_t veh_all[kPlanTriads];  // [ebp-0x2EC]
+    int32_t prod_region[kPlanTriads];  // [ebp-0x594]
+    int32_t prod_all[kPlanTriads];  // [ebp-0x3C4]
+    int32_t veh_home[kPlanTriads];  // [ebp-0x76C]
     int32_t prod_triad_region[3] = {0, 0, 0};  // [ebp-0x1DC]
     std::memset(queued_region, 0, sizeof(queued_region));
     std::memset(queued_all, 0, sizeof(queued_all));
@@ -226,9 +226,9 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
     const int32_t mineral_output = cur_base().mineral_intake_2 + mineral_surplus * 2;  // [ebp-0xE0]
     int32_t building_project;  // [ebp-0xB0]
     if (score_out)
-        building_project = cur_base().production_id_last <= -70 && cur_base().minerals_accumulated > Rules.retool_exemption;
-    else
-        building_project = cur_base().queue_items[0] <= -70;
+        building_project =
+            cur_base().production_id_last <= -70 && cur_base().minerals_accumulated > Rules.retool_exemption;
+    else building_project = cur_base().queue_items[0] <= -70;
     int32_t projects_by_group[8] = {0};  // [ebp-0x3E4] (counted, unused)
     uint32_t project_builders[64] = {0};  // [ebp-0x694] factions building each project
     int32_t projects_here = 0;  // [ebp-0x148]
@@ -242,11 +242,11 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
         psych_need = 1;
 
     int32_t naval_yard_dist = 24, aerospace_dist = 24;
-    int32_t unk1_flag = 0;          // [ebp-0x6C]: a base of the region has state flag 1 (2: this base)
+    int32_t unk1_flag = 0;  // [ebp-0x6C]: a base of the region has state flag 1 (2: this base)
     int32_t flag_100000_count = 0;  // [ebp-0xD0]
-    int32_t undergarrisoned = 0;    // [ebp-0x160]
-    int32_t home_defenders = 0;     // [ebp-0xC4] (base loop)
-    int32_t max_pop = 0;            // [ebp-0xD8]
+    int32_t undergarrisoned = 0;  // [ebp-0x160]
+    int32_t home_defenders = 0;  // [ebp-0xC4] (base loop)
+    int32_t max_pop = 0;  // [ebp-0xD8]
     for (int32_t i = 0; i < game().base_count; i++) {
         BASE& base = game().bases[i];
         int32_t owner = (uint8_t)base.faction_id;
@@ -316,8 +316,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
         if (base.state_flags & 1) unk1_flag = 1;
         if (base.queue_items[0] <= -70) projects_region++;
         if (base_fac(i, FAC_COMMAND_CENTER) || base.queue_items[0] == -FAC_COMMAND_CENTER) cmdcenter_count++;
-        if (base_fac(i, FAC_BIOENHANCEMENT_CENTER) || base.queue_items[0] == -FAC_BIOENHANCEMENT_CENTER)
-            bioenh_count++;
+        if (base_fac(i, FAC_BIOENHANCEMENT_CENTER) || base.queue_items[0] == -FAC_BIOENHANCEMENT_CENTER) bioenh_count++;
         if (base_fac(i, FAC_NAVAL_YARD) || base.queue_items[0] == -FAC_NAVAL_YARD) navalyard_count++;
         if (base_fac(i, FAC_AEROSPACE_COMPLEX) || base.queue_items[0] == -FAC_AEROSPACE_COMPLEX) aerospace_count++;
         if (base_fac(i, FAC_SKUNKWORKS) || base.queue_items[0] == -FAC_SKUNKWORKS) skunk_count++;
@@ -373,9 +372,9 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
         }
     }
     if (cur_base().state_flags & 1) unk1_flag = 2;
-    int32_t own_vehs = 0;      // [ebp-0x68]
-    int32_t probes_home = 0;   // [ebp-0xE4]: plan 3 units with ability 0x40000 supported here
-    int32_t free_units = 0;    // [ebp-0xE8]: own units of plans 0-3 in the region outside bases
+    int32_t own_vehs = 0;  // [ebp-0x68]
+    int32_t probes_home = 0;  // [ebp-0xE4]: plan 3 units with ability 0x40000 supported here
+    int32_t free_units = 0;  // [ebp-0xE8]: own units of plans 0-3 in the region outside bases
     for (int32_t v = 0; v < game().veh_count; v++) {
         VEH& veh = game().vehs[v];
         if (veh.faction_id != faction_id) continue;
@@ -391,8 +390,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
         veh_all[idx] += (Units[u].reactor_id >= best_reac) + 1;
         if (veh.home_base_id == CurrentBaseID) {
             veh_home[idx]++;
-            if (Units[u].plan == 3 && has_abil(u, 0x40000) && map_tile(veh.x, veh.y)->region == region)
-                probes_home++;
+            if (Units[u].plan == 3 && has_abil(u, 0x40000) && map_tile(veh.x, veh.y)->region == region) probes_home++;
         }
         MAP* sq = map_tile(veh.x, veh.y);
         if (sq->region == region) {
@@ -432,8 +430,8 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
     }
     // Defenders of this base and the resulting need for defense (0-3).
     int32_t stack = stack_fix(veh_at(cur_base().x, cur_base().y));  // [ebp-0x4C]
-    const int32_t garrison = garrison_check(CurrentBaseID);                 // [ebp-0xF0]
-    const int32_t defensive = defensive_check(CurrentBaseID);               // [ebp-0xC8]
+    const int32_t garrison = garrison_check(CurrentBaseID);  // [ebp-0xF0]
+    const int32_t defensive = defensive_check(CurrentBaseID);  // [ebp-0xC8]
     const int32_t sc11 = stack_check(stack, 11, 0x10000000, 0x10000000, faction_id);  // [ebp-0x5C]
     int32_t defense;  // [ebp-0x88]
     {
@@ -576,8 +574,8 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             if (triad == 0 && has_abil(u, 0x8000)) plan = 16;
             int32_t flag78 = 0;  // [ebp-0x78]: only an alternative choice
             int32_t category = (uint8_t)unit.plan < 8;  // [ebp-0x90]
-            int32_t w = (unit.cost + 2) << 8;           // [ebp-0x34]
-            int32_t base_rank = 0;                      // edi before [ebp-0x18]
+            int32_t w = (unit.cost + 2) << 8;  // [ebp-0x34]
+            int32_t base_rank = 0;  // edi before [ebp-0x18]
             bool skip = false;
             switch (triad) {
             case 2: {
@@ -896,7 +894,8 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                 if (veh_all[pt(triad, 7)] >= lim) w *= 2;
                 if (plan == 7) {
                     if (prod_all[pt(triad, 6)] + veh_all[pt(triad, 6)] + veh_all[pt(triad, 7)] +
-                                prod_all[pt(triad, 7)] < 2 &&
+                                prod_all[pt(triad, 7)] <
+                            2 &&
                         CurrentTurn < 100)
                         w /= 2;
                     if (!veh_all[pt(triad, 7)] && !prod_all[pt(triad, 7)] &&
@@ -992,7 +991,8 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                         skip = true;
                         break;
                     }
-                    if (plan_region == 8 && (veh_region[pt(0, 3)] || prod_region[pt(0, 3)] || !f.region_territory_pods[region]) &&
+                    if (plan_region == 8 &&
+                        (veh_region[pt(0, 3)] || prod_region[pt(0, 3)] || !f.region_territory_pods[region]) &&
                         (veh_region[pt(0, 9)] || prod_region[pt(0, 9)] || !has_tech(Units[1].preq_tech, faction_id)) &&
                         !(rf & 0x20))
                         w /= 2;
@@ -1025,7 +1025,8 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                         int32_t idx = pt(triad, plan);
                         if (need < 3 && !prod_region[idx] && !veh_region[idx] && !(cb.state_flags & 0x1000000)) w /= 2;
                     }
-                    if (cb.nutrient_surplus >= Rules.nutrient_intake_req_citizen && (plan_region == 7 || is_sea)) w /= 2;
+                    if (cb.nutrient_surplus >= Rules.nutrient_intake_req_citizen && (plan_region == 7 || is_sea))
+                        w /= 2;
                     if (!is_sea && plan_region != 7 &&
                         (is_human || !(f.player_flags_ext & PFLAG_EXT_STRAT_LOTS_SEA_BASES)))
                         w *= 2;
@@ -1156,8 +1157,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             }
             case 11: {  // probe
                 int32_t idx = pt(triad, plan);
-                if (veh_region[idx] >= f.region_total_bases[region] ||
-                    (is_human && prod_all[idx] + veh_all[idx] > 1)) {
+                if (veh_region[idx] >= f.region_total_bases[region] || (is_human && prod_all[idx] + veh_all[idx] > 1)) {
                     skip = true;
                     break;
                 }
@@ -1210,8 +1210,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                 }
                 Faction& t = game().factions[target];
                 int32_t credit_ratio = is_human ? 0 : f.energy_credits / range(t.energy_credits, 100, 999999);
-                int32_t mil_ratio =
-                    is_human ? 0 : t.mil_strength_1 / range(f.mil_strength_1, f.base_count + 1, 999999);
+                int32_t mil_ratio = is_human ? 0 : t.mil_strength_1 / range(f.mil_strength_1, f.base_count + 1, 999999);
                 int32_t tdiff = (GameRules & RULES_INTENSE_RIVALRY) ? 5 : t.diff_level;
                 int32_t k = is_human ? 4 : 2;
                 int32_t bits = bit_count(has_treaty(faction_id, target, 7));
@@ -1255,8 +1254,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                 if (f.player_flags_ext & PFLAG_EXT_STRAT_LOTS_MISSILES) w /= 2;
                 break;
             }
-            default:
-                break;
+            default: break;
             }
             if (skip) continue;
             // Prototypes: compared with the faction's best active designs.
@@ -1298,7 +1296,8 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                 if (!has_skunk) {
                     if (!(plan == 5 && !f.planet_busters)) {
                         if (!better)
-                            prio += range((plan_region > 2) - ((gov_conquer || gov_discover) ? 1 : 0) + ai_growth, 0, 2);
+                            prio +=
+                                range((plan_region > 2) - ((gov_conquer || gov_discover) ? 1 : 0) + ai_growth, 0, 2);
                         if (plan_region == 8 || (plan_region == 7 && !(cur_base().state_flags & 0x1000000))) {
                             if (plan == 8) {
                                 w /= 2;
@@ -1346,15 +1345,12 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                             if (p == rbp) w /= 2;
                             if (p == 1) w = w * 3 / 4;
                             break;
-                        case 8:
-                            w = w * 3 / 4;
-                            break;
+                        case 8: w = w * 3 / 4; break;
                         case 7:
                             if (p == 7) w /= 2;
                             if (p == 6) w = w * 3 / 4;
                             break;
-                        default:
-                            break;
+                        default: break;
                         }
                     }
                 } else if (!has_skunk) {
@@ -1374,7 +1370,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             bool psych_cap = true;
             if (need) {
                 bool to_support = false;  // jump to the defense adjustments (0x4FCD78)
-                bool alert = false;       // need 3: mark as alternative (0x4FCD31)
+                bool alert = false;  // need 3: mark as alternative (0x4FCD31)
                 if (plan == 2) {
                     to_support = true;
                 } else if (plan == 3) {
@@ -1469,8 +1465,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                 if (!stack_check(stack, 15, -1, -1, -1)) {
                     if (at_goal(faction_id, 16, cur_base().x, cur_base().y) || (cur_base().state_flags & 0x200000))
                         w /= 3;
-                    else if (cur_base().event_flags & 0x100)
-                        w = w * 2 / 3;
+                    else if (cur_base().event_flags & 0x100) w = w * 2 / 3;
                     if (plan_region <= 2) w = w * 2 / 3;
                 }
                 if ((enemy_region >= 0 || enemy_elsewhere >= 0) && (!stack_check(stack, 15, -1, -1, -1) || !need))
@@ -1615,13 +1610,13 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
     for (int32_t fac = 1; fac < 70; fac++) {
         if (!facility_avail(fac, faction_id, CurrentBaseID, 0)) continue;
         BASE& cb = cur_base();
-        int32_t threat_flag = 0;   // [ebp-0x14]
-        int32_t defensive_fac = 0; // [ebp-0x90]
+        int32_t threat_flag = 0;  // [ebp-0x14]
+        int32_t defensive_fac = 0;  // [ebp-0x90]
         int32_t spec = cb.specialist_total - cb.specialist_adjust;  // [ebp-0x6C]
-        int32_t bonus = gov_build; // ebx
-        int32_t value = 999;       // esi (lower is better)
-        uint32_t req = 0x10000;    // [ebp-0x24]: governor permissions needed
-        int32_t w = 0x100;         // [ebp-0x34]
+        int32_t bonus = gov_build;  // ebx
+        int32_t value = 999;  // esi (lower is better)
+        uint32_t req = 0x10000;  // [ebp-0x24]: governor permissions needed
+        int32_t w = 0x100;  // [ebp-0x34]
         switch (fac) {
         case FAC_HEADQUARTERS:
             if (plan_region == 2 || f.SE_effic_pending <= -4) break;
@@ -1766,8 +1761,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             }
             if (gov_discover || (gov_conquer && mor < 0 && plan_region != 2 && !(f.region_flags[region] & 0x4000)))
                 bonus = 1;
-            else
-                bonus = 0;
+            else bonus = 0;
             break;
         }
         case FAC_SKUNKWORKS: {
@@ -1821,10 +1815,8 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                 break;
             }
             int32_t sc = stack_check(stack, 2, 12, faction_id, -1);
-            if (fac == FAC_RESEARCH_HOSPITAL)
-                value = range((5 - ai_tech - sc) * 2 - cb.energy_intake_2 / 4, 1, 10);
-            else
-                value = range((6 - ai_tech - sc) * 2 - cb.energy_intake_2 / 5, 1, 10);
+            if (fac == FAC_RESEARCH_HOSPITAL) value = range((5 - ai_tech - sc) * 2 - cb.energy_intake_2 / 4, 1, 10);
+            else value = range((6 - ai_tech - sc) * 2 - cb.energy_intake_2 / 5, 1, 10);
             bonus = gov_discover;
             break;
         }
@@ -1833,9 +1825,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             bonus = (gov_conquer && plan_region > 2) ? (1 | gov_build) : gov_build;
             break;
         case FAC_NANOREPLICATOR:
-        case FAC_QUANTUM_CONVERTER:
-            value = range(10 - cb.mineral_intake / 2, 1, 10);
-            break;
+        case FAC_QUANTUM_CONVERTER: value = range(10 - cb.mineral_intake / 2, 1, 10); break;
         case FAC_GENEJACK_FACTORY:
             if (is_human) break;
             value = range((cb.drone_total - cb.talent_total - has_fac_built(FAC_BROOD_PIT)) * 2 + 16 -
@@ -1858,9 +1848,9 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             int32_t r = range(Rules.nutrient_intake_req_citizen, 1, 10);
             if ((cb.nutrient_surplus + 1) / r + cb.pop_size >= limit) {
                 int32_t r2 = range(Rules.nutrient_intake_req_citizen, 1, 10);
-                value = range(limit - (Rules.nutrient_intake_req_citizen / 2 + cb.nutrient_surplus) / r2 -
-                                  cb.pop_size + 4,
-                              1, 10);
+                value =
+                    range(limit - (Rules.nutrient_intake_req_citizen / 2 + cb.nutrient_surplus) / r2 - cb.pop_size + 4,
+                          1, 10);
                 if (plan_region > 2) value /= 2;
             }
             if (has_project(FAC_CLONING_VATS - 70, faction_id)) value /= 2;
@@ -1888,10 +1878,10 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                 }
             }
             if (!project) break;
-            if (alt_detail_at(cb.x, cb.y) - MapSeaLevel < WorldBuilder.sea_level_rises + ClimateFutureChange + AltNatural[3])
+            if (alt_detail_at(cb.x, cb.y) - MapSeaLevel <
+                WorldBuilder.sea_level_rises + ClimateFutureChange + AltNatural[3])
                 value = range(8 - cur_base().pop_size / 3, is_human ? 4 : 2, 8);
-            else
-                value = range(20 - cur_base().pop_size / 2, is_human ? 6 : 4, 12);
+            else value = range(20 - cur_base().pop_size / 2, is_human ? 6 : 4, 12);
             break;
         }
         case FAC_COMMAND_CENTER:
@@ -1911,8 +1901,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                 (f.region_flags[region] & 0x4000) ||
                 (CurrentTurn >= 100 && f.region_total_bases[region] <= 8 && plan_region != 7))
                 bonus = 0;
-            else
-                bonus = gov_conquer;
+            else bonus = gov_conquer;
             break;
         }
         case FAC_NAVAL_YARD: {
@@ -1960,9 +1949,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
         case FAC_PSI_GATE:
             value = range((climactic_battle() ? 2 : 4) - ascent_human - at_climax(faction_id), 0, 4);
             break;
-        case FAC_COVERT_OPS_CENTER:
-            value = (2 - ((f.player_flags_ext >> 3) & 1)) * 5;
-            break;
+        case FAC_COVERT_OPS_CENTER: value = (2 - ((f.player_flags_ext >> 3) & 1)) * 5; break;
         case FAC_SUBSPACE_GENERATOR: {
             if (!(m.rule_flags & 0x80)) break;
             if (generators(faction_id, nullptr) >= Rules.subspace_gen_req) break;
@@ -2010,8 +1997,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             bonus = (gov_conquer && plan_region == 7) ? 1 : 0;
             break;
         }
-        default:
-            break;
+        default: break;
         }
         // Common scoring.
         int32_t lose = base_lose_minerals(CurrentBaseID, -fac);
@@ -2034,7 +2020,8 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             sv = v;
         }
         if (enemy_elsewhere >= 0 && !defensive_fac) {
-            if (ai_fight > 0 || (human(enemy_elsewhere) && (ai_fight >= 0 || has_treaty(faction_id, enemy_elsewhere, 0x20))))
+            if (ai_fight > 0 ||
+                (human(enemy_elsewhere) && (ai_fight >= 0 || has_treaty(faction_id, enemy_elsewhere, 0x20))))
                 sv = v * 2;
         }
         for (int32_t k = 0; k < 2; k++) {
@@ -2242,8 +2229,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                 continue;
         }
         int32_t item = fac;  // [ebp-0xD8]
-        if (!has_fac_built(FAC_RECREATION_COMMONS) &&
-            (!is_human || (cur_base().governor_flags & 0x10000))) {
+        if (!has_fac_built(FAC_RECREATION_COMMONS) && (!is_human || (cur_base().governor_flags & 0x10000))) {
             if (!has_tech(Facility[FAC_RECREATION_COMMONS].preq_tech, faction_id)) continue;
             item = FAC_RECREATION_COMMONS;
         }

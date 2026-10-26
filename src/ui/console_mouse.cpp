@@ -41,24 +41,24 @@
 
 namespace {
 
-GLOBAL(int32_t, MapMouseEnabled, 0x90D938);   // set by WorldWin_init: the map windows take clicks
-GLOBAL(int32_t, MapMouseModal, 0x915620);     // go_timer does nothing while set
-GLOBAL(int32_t, MouseMoveBusy, 0x7F67C4);     // MapWin_on_mouse_move re-entry guard
-GLOBAL(int32_t, WorldBuildBrush, 0x945AE0);   // scenario editor brush (0, 2, 0x12: climate changes)
+GLOBAL(int32_t, MapMouseEnabled, 0x90D938);  // set by WorldWin_init: the map windows take clicks
+GLOBAL(int32_t, MapMouseModal, 0x915620);  // go_timer does nothing while set
+GLOBAL(int32_t, MouseMoveBusy, 0x7F67C4);  // MapWin_on_mouse_move re-entry guard
+GLOBAL(int32_t, WorldBuildBrush, 0x945AE0);  // scenario editor brush (0, 2, 0x12: climate changes)
 
 // MapWin fields used by the mouse code (byte offsets of the MapWin object).
 constexpr uint32_t kMwRightCount = 0x1DD7C;
-constexpr uint32_t kMwGroupDrag = 0x1DD84;    // the drag moves the stack (Console_group)
+constexpr uint32_t kMwGroupDrag = 0x1DD84;  // the drag moves the stack (Console_group)
 constexpr uint32_t kMwIgnoreClick = 0x1DD88;  // the next click is ignored (set by go_reset)
-constexpr uint32_t kMwEditPaint = 0x1DD8C;    // scenario editor painting (1 left, 2 right)
-constexpr uint32_t kMwDragX = 0x1DE0C;        // tile under the drag (-1: none)
+constexpr uint32_t kMwEditPaint = 0x1DD8C;  // scenario editor painting (1 left, 2 right)
+constexpr uint32_t kMwDragX = 0x1DE0C;  // tile under the drag (-1: none)
 constexpr uint32_t kMwDragY = 0x1DE10;
-constexpr uint32_t kMwDragBase = 0x1DE24;     // base whose rally point is dragged
-constexpr uint32_t kMwCursor = 0x1EF4C;       // cursor sprite address (0: arrow)
-constexpr uint32_t kMwCursorId = 0x1EF50;     // standard cursor id (0x7F00: IDC_ARROW)
-constexpr uint32_t kCursorGoTo = 0x93AA70 + 1 * 0x2C;   // 0x93AA9C
-constexpr uint32_t kCursorNo = 0x93AA70 + 3 * 0x2C;     // 0x93AB4C
-constexpr uint32_t kCursorBase = 0x93AA70 + 9 * 0x2C;   // 0x93ABFC
+constexpr uint32_t kMwDragBase = 0x1DE24;  // base whose rally point is dragged
+constexpr uint32_t kMwCursor = 0x1EF4C;  // cursor sprite address (0: arrow)
+constexpr uint32_t kMwCursorId = 0x1EF50;  // standard cursor id (0x7F00: IDC_ARROW)
+constexpr uint32_t kCursorGoTo = 0x93AA70 + 1 * 0x2C;  // 0x93AA9C
+constexpr uint32_t kCursorNo = 0x93AA70 + 3 * 0x2C;  // 0x93AB4C
+constexpr uint32_t kCursorBase = 0x93AA70 + 9 * 0x2C;  // 0x93ABFC
 
 // ---- cursors (load_cursors 0x454FC0: CURSOR.PCX, 12 cursors of 32 x 32 at x = 1 + 33 i; the
 // hot spot is marked by colour 5 in the row above and the column left of each cell) ----
@@ -416,7 +416,8 @@ void THISCALL MapWin_on_mouse_move(uint8_t* win, int32_t px, int32_t py) {
     uint8_t* mv = main_view();
     int32_t width = mw(mv, ui_mapwin_native(mv)->vbase + kGwWidth);
     int32_t tw = Buffer_text_width(d, text);
-    Buffer_write_l_3(d, text, px - tw * px / (width ? width : 1), py + mw(&MainConsole, kMwTileH), (int32_t)std::strlen(text));
+    Buffer_write_l_3(d, text, px - tw * px / (width ? width : 1), py + mw(&MainConsole, kMwTileH),
+                     (int32_t)std::strlen(text));
     ui_desktop_show(true);
     std::fprintf(stderr, "goto drag: %s\n", text);
     ui_set_drag_target(x, y);
@@ -434,10 +435,10 @@ void THISCALL MapWin_click(uint8_t* win, int32_t px, int32_t py, int32_t right) 
     mw(&MainConsole, kConRedraw) = 0;  // MapWinField23C00
     BaseWinMultiplayerRefresh = 0;
     uint32_t cursor = (uint32_t)mw(win, kMwCursor);
-    bool goto_cursor = cursor == kCursorGoTo;    // [ebp-0x28]
-    bool base_cursor = cursor == kCursorBase;    // [ebp-0x1c]
-    int32_t drag_base = mw(win, kMwDragBase);    // [ebp-0x2c]
-    int32_t group = mw(win, kMwGroupDrag);       // [ebp-0x30]
+    bool goto_cursor = cursor == kCursorGoTo;  // [ebp-0x28]
+    bool base_cursor = cursor == kCursorBase;  // [ebp-0x1c]
+    int32_t drag_base = mw(win, kMwDragBase);  // [ebp-0x2c]
+    int32_t group = mw(win, kMwGroupDrag);  // [ebp-0x30]
     go_reset();
     ui_set_drag_target(-1, -1);
     int32_t ctrl = key_held(VKEY_CONTROL);

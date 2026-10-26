@@ -68,17 +68,17 @@ struct Item {
 };
 
 struct DatalinkState : ScreenWin {
-    int32_t cat = 0;          // +0x29DC
-    int32_t index = 0;        // +0x29E0
-    int32_t history[20]{};    // +0x29E4
-    int32_t hist_n = 0;       // +0x2A34
-    int32_t restoring = 0;    // +0x2A38
+    int32_t cat = 0;  // +0x29DC
+    int32_t index = 0;  // +0x29E0
+    int32_t history[20]{};  // +0x29E4
+    int32_t hist_n = 0;  // +0x2A34
+    int32_t restoring = 0;  // +0x2A38
     std::vector<Item> items;  // the ListBox (+0xF628)
     int32_t sel = 0, top = 0;
     std::string title;
-    HelpText text1, text2;    // the entry's texts (the stats beside the picture, the description)
-    HelpText blurb;           // the quote in the main interface's centre pane (+0x130B4)
-    int32_t picture = 0;      // 0 none, 1 facility / project, 2 technology, 3 unit
+    HelpText text1, text2;  // the entry's texts (the stats beside the picture, the description)
+    HelpText blurb;  // the quote in the main interface's centre pane (+0x130B4)
+    int32_t picture = 0;  // 0 none, 1 facility / project, 2 technology, 3 unit
     int32_t picture_id = 0;
     UiRect r_cat{0x1E, 7, 0xE6, 0x1B}, r_list{0x1E, 0x1D, 0xE6, 0x1CD}, r_title{0xEF, 7, 0x302, 0x22},
         r_text1{0xEF, 0x24, 0x302, 0xF9}, r_text2{0xEF, 0xFB, 0x302, 0x1CD}, r_pic{0xF8, 0x2C, 0x177, 0xAB};
@@ -86,19 +86,18 @@ struct DatalinkState : ScreenWin {
     void redraw() override;
     void on_button(int32_t id) override;
     void on_key(int32_t key) override;
-    void on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool right,
-                  bool dbl) override;
+    void on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool right, bool dbl) override;
     void log_state() override;
     void on_move(int32_t x, int32_t y) override {
         if (cat == 14) labs_mouse(this, &canvas, x, y);
     }
 
     void set_cat(int32_t c, int32_t force);  // 0x42A2C0
-    void fill(int32_t c);                   // the set_cat_* functions
-    void select_id(int32_t id);             // ListBox_set_selected_id
-    void entry();                           // Datalink_draw_entry's choice and history
-    void build_entry(int32_t c, int32_t i); // the draw_* functions' texts
-    void link(int32_t id);                  // Datalink_on_link_clicked
+    void fill(int32_t c);  // the set_cat_* functions
+    void select_id(int32_t id);  // ListBox_set_selected_id
+    void entry();  // Datalink_draw_entry's choice and history
+    void build_entry(int32_t c, int32_t i);  // the draw_* functions' texts
+    void link(int32_t id);  // Datalink_on_link_clicked
     int32_t visible() const { return (r_list.bottom - r_list.top - 6) / 16; }
 };
 
@@ -309,7 +308,9 @@ void DatalinkState::build_entry(int32_t c, int32_t i) {
         parse_says(0, title.c_str(), -1, -1);
         parse_says(1, TriadName[Chassis[i].triad], -1, -1);
         parse_num(0, Chassis[i].speed);
-        parse_says(2, Chassis[i].preq_tech >= 0 && Chassis[i].preq_tech < 89 ? Tech[Chassis[i].preq_tech].name : label_get(25), -1, -1);
+        parse_says(
+            2, Chassis[i].preq_tech >= 0 && Chassis[i].preq_tech < 89 ? Tech[Chassis[i].preq_tech].name : label_get(25),
+            -1, -1);
         parse_num(3, Chassis[i].preq_tech + 140000);
         load_template(&text1, "HELPCHASSIS");
         load_section(&text2, "HELPX", "CHASSISDESC" + std::to_string(i));
@@ -327,8 +328,11 @@ void DatalinkState::build_entry(int32_t c, int32_t i) {
         const CWeapon& w = Weapon[i];
         title = w.name;
         parse_says(0, w.name, -1, -1);
-        parse_says(1, w.offense_value < 0 ? label_get(196) : w.mode < 3 ? OffenseMode[w.mode].name : label_get(128),
-                  -1, -1);
+        parse_says(1,
+                   w.offense_value < 0 ? label_get(196)
+                   : w.mode < 3        ? OffenseMode[w.mode].name
+                                       : label_get(128),
+                   -1, -1);
         parse_num(0, w.offense_value);
         parse_num(1, w.cost);
         preq(2, 2, w.preq_tech);
@@ -584,12 +588,18 @@ void DatalinkState::on_key(int32_t key) {
     if (!n) return;
     int32_t old = sel;
     switch (vk) {
-    case 0x26: case 0x68: sel = std::max(0, sel - 1); break;
-    case 0x28: case 0x62: sel = std::min(n - 1, sel + 1); break;
-    case 0x21: case 0x69: sel = std::max(0, sel - visible()); break;
-    case 0x22: case 0x63: sel = std::min(n - 1, sel + visible()); break;
-    case 0x24: case 0x67: sel = 0; break;
-    case 0x23: case 0x61: sel = n - 1; break;
+    case 0x26:
+    case 0x68: sel = std::max(0, sel - 1); break;
+    case 0x28:
+    case 0x62: sel = std::min(n - 1, sel + 1); break;
+    case 0x21:
+    case 0x69: sel = std::max(0, sel - visible()); break;
+    case 0x22:
+    case 0x63: sel = std::min(n - 1, sel + visible()); break;
+    case 0x24:
+    case 0x67: sel = 0; break;
+    case 0x23:
+    case 0x61: sel = n - 1; break;
     default:
         // A letter: the next item starting with it.
         if (!(key & 0x60000) && vk >= 'A' && vk <= 'Z')
@@ -667,8 +677,10 @@ void THISCALL Datalink_exec(uint8_t*, int32_t cat, int32_t id) {
         sw_button(&w, label_get(712 + k), 0x100 + k, pane.left + 4, bottom - 0x16, pane.right - 4 - (pane.left + 4),
                   0x16, 1, bf);
     }
-    sw_button(&w, sw_upper(label_get(664)).c_str(), 0x10, 0x98, extra + 0x14E, 0x18E - 0x98, 0x14, 0, find_font(0xE, 1));
-    sw_button(&w, sw_upper(label_get(39)).c_str(), 0x11, 0x192, extra + 0x14E, 0x18E - 0x98, 0x14, 0, find_font(0xE, 1));
+    sw_button(&w, sw_upper(label_get(664)).c_str(), 0x10, 0x98, extra + 0x14E, 0x18E - 0x98, 0x14, 0,
+              find_font(0xE, 1));
+    sw_button(&w, sw_upper(label_get(39)).c_str(), 0x11, 0x192, extra + 0x14E, 0x18E - 0x98, 0x14, 0,
+              find_font(0xE, 1));
     w.set_cat(cat, 1);
     w.index = id;
     w.select_id(w.cat * 10000 + id);

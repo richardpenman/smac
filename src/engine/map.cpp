@@ -132,18 +132,14 @@ static void base_submerged_popup(int32_t base_id, bool saved) {
     if ((uint8_t)base.faction_id == (uint32_t)viewer) {
         Console_focus(&MainConsole, base.x, base.y, viewer);
         parse_says(0, base.name, -1, -1);
-        if (saved)
-            X_pop_2("BASESUBMERGED", "subbase_sm.pcx", 0);
-        else
-            popp("SCRIPT", "BASESUBMERGED1", 0, "subbase_sm.pcx", 0);
+        if (saved) X_pop_2("BASESUBMERGED", "subbase_sm.pcx", 0);
+        else popp("SCRIPT", "BASESUBMERGED1", 0, "subbase_sm.pcx", 0);
     } else if ((uint8_t)base.faction_id == (uint32_t)viewer || ((uint8_t)(1 << (viewer & 31)) & base.visibility)) {
         Console_focus(&MainConsole, base.x, base.y, viewer);
         parse_says(0, base.name, -1, -1);
         parse_says(1, game().mfactions[(uint8_t)base.faction_id].adj_name_faction, -1, -1);
-        if (saved)
-            X_pop_2("BASESUBMERGED2", "subbase_sm.pcx", 0);
-        else
-            popp("SCRIPT", "BASESUBMERGED3", 0, "subbase_sm.pcx", 0);
+        if (saved) X_pop_2("BASESUBMERGED2", "subbase_sm.pcx", 0);
+        else popp("SCRIPT", "BASESUBMERGED3", 0, "subbase_sm.pcx", 0);
     }
 }
 
@@ -242,10 +238,8 @@ int32_t GAMEAPI pfncGetElevation(int32_t x, int32_t y) {
     MAP* sq = map_tile(x, y);
     int32_t detail = sq->contour;
     int32_t elev = (detail - AltNaturalLinear[3] - MapSeaLevel) * 50;
-    if (detail > AltNaturalLinear[sq->climate >> 5])
-        elev += (MapSeaLevel * 301 + y * 217 + x * 113) % 50;
-    else
-        elev += 10;
+    if (detail > AltNaturalLinear[sq->climate >> 5]) elev += (MapSeaLevel * 301 + y * 217 + x * 113) % 50;
+    else elev += 10;
     if (elev < -3000) return -3000;
     if (elev > 3500) return 3500;
     return elev;
@@ -311,18 +305,14 @@ void GAMEAPI bit_put(int32_t x, int32_t y, uint32_t items) { map_tile(x, y)->ite
 
 void GAMEAPI bit_set(int32_t x, int32_t y, uint32_t items, int32_t add) {
     MAP* sq = map_tile(x, y);
-    if (add)
-        sq->items |= items;
-    else
-        sq->items &= ~items;
+    if (add) sq->items |= items;
+    else sq->items &= ~items;
 }
 
 void GAMEAPI bit2_set(int32_t x, int32_t y, uint32_t landmarks, int32_t add) {
     MAP* sq = map_tile(x, y);
-    if (add)
-        sq->landmarks |= landmarks;
-    else
-        sq->landmarks &= ~landmarks;
+    if (add) sq->landmarks |= landmarks;
+    else sq->landmarks &= ~landmarks;
 }
 
 void GAMEAPI code_set(int32_t x, int32_t y, int32_t code) {
@@ -372,10 +362,8 @@ int32_t GAMEAPI minerals_at(int32_t x, int32_t y) {
     case 2:
         if (k == 0) return 0;
         return k == 1 ? 1 : 2;
-    case 3:
-        return k > 1 ? 2 : 1;
-    default:
-        return ~k & 1;
+    case 3: return k > 1 ? 2 : 1;
+    default: return ~k & 1;
     }
 }
 

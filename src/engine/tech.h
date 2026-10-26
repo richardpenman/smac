@@ -22,8 +22,8 @@ ADDR(0x5B9FE0) int32_t GAMEAPI tech_category(int32_t tech_id);
 ADDR(0x5BA030) int32_t GAMEAPI redundant(int32_t facility_id, int32_t faction_id);
 // Whether faction_id can build facility_id (at base_id, -1: anywhere; queue_count first queue
 // entries count as built).
-ADDR(0x5BA0E0) int32_t GAMEAPI facility_avail(int32_t facility_id, int32_t faction_id, int32_t base_id,
-                                              int32_t queue_count);
+ADDR(0x5BA0E0)
+int32_t GAMEAPI facility_avail(int32_t facility_id, int32_t faction_id, int32_t base_id, int32_t queue_count);
 // Whether faction_id can build unit_id at base_id (prototype/obsolescence/triad checks).
 ADDR(0x5BA910) int32_t GAMEAPI veh_avail(int32_t unit_id, int32_t faction_id, int32_t base_id);
 // Whether faction_id may do terraforming action terraform_id (on sea tiles: is_sea).

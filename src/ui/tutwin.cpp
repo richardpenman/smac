@@ -58,19 +58,18 @@
 #include "ui/vehdraw.h"
 #include "ui/win.h"
 
-GLOBAL(int32_t, TutHintsDone, 0x9A64BC);     // _DAT_009A64BC: hints closed with their button
-GLOBAL(int32_t, TutTourContinues, 0x8CC244); // DAT_008CC244: the window is part of a tour
+GLOBAL(int32_t, TutHintsDone, 0x9A64BC);  // _DAT_009A64BC: hints closed with their button
+GLOBAL(int32_t, TutTourContinues, 0x8CC244);  // DAT_008CC244: the window is part of a tour
 
 namespace {
 
 int32_t& tf(uint32_t off) { return *reinterpret_cast<int32_t*>(&TutWin + off); }
 // TutWin fields (+0x537C..): the terrain tile shown, the target point, the pointer lines, the
 // state.
-constexpr uint32_t kTileX = 0x537C, kTileY = 0x5380, kPtX = 0x5384, kPtY = 0x5388, kLineX = 0x538C,
-                   kLineY = 0x5390, kPt2X = 0x5394, kPt2Y = 0x5398, kLine2X = 0x539C, kLine2Y = 0x53A0,
-                   kShown = 0x53A4, kDone = 0x53A8, kVeh = 0x53AC, kResult = 0x53B4, kKind = 0x53B8,
-                   kTour = 0x53BC, kKeyPending = 0x53C4, kKeyCh = 0x53C8, kKeyVk = 0x53CC, kBits = 0x53D0,
-                   kParent = 0x53D4;
+constexpr uint32_t kTileX = 0x537C, kTileY = 0x5380, kPtX = 0x5384, kPtY = 0x5388, kLineX = 0x538C, kLineY = 0x5390,
+                   kPt2X = 0x5394, kPt2Y = 0x5398, kLine2X = 0x539C, kLine2Y = 0x53A0, kShown = 0x53A4, kDone = 0x53A8,
+                   kVeh = 0x53AC, kResult = 0x53B4, kKind = 0x53B8, kTour = 0x53BC, kKeyPending = 0x53C4,
+                   kKeyCh = 0x53C8, kKeyVk = 0x53CC, kBits = 0x53D0, kParent = 0x53D4;
 
 int32_t& mwi(uint8_t* win, uint32_t off) { return *reinterpret_cast<int32_t*>(win + off); }
 
@@ -365,9 +364,9 @@ void tutwin_tour7_steps() {
     static const struct {
         const char* label;
         int32_t which;
-    } kSteps[] = {{"DESTOURCHAS", 0},    {"DESTOURWEAP", 1},     {"DESTOURARM", 2},     {"DESTOURREACTOR", 3},
-                  {"DESTOURABILITY", 4}, {"DESTOURCOST", 10},    {"DESTOURSTATS", 11},  {"DESTOURBAR", 20},
-                  {"DESTOURARROWS", 21}, {"DESTOURPRESETS", 22}, {"DESTOURDONE", 34},   {"DESTOURAPPLY", 31},
+    } kSteps[] = {{"DESTOURCHAS", 0},    {"DESTOURWEAP", 1},     {"DESTOURARM", 2},      {"DESTOURREACTOR", 3},
+                  {"DESTOURABILITY", 4}, {"DESTOURCOST", 10},    {"DESTOURSTATS", 11},   {"DESTOURBAR", 20},
+                  {"DESTOURARROWS", 21}, {"DESTOURPRESETS", 22}, {"DESTOURDONE", 34},    {"DESTOURAPPLY", 31},
                   {"DESTOURRENAME", 35}, {"DESTOUROBS", 36},     {"DESTOURUPGRADE", 37}, {"DESTOURRETIRE", 30},
                   {"DESTOURCANCEL", 38}};
     for (const auto& st : kSteps)
@@ -416,17 +415,15 @@ void tour1(uint8_t* self) {
         const char* label;
         uint32_t rect;
         PtKind kind;
-    } kA[] = {{"TOUR1GOVERNOR", 0x40DAC, kBase},     {"TOUR1EXPLORE", 0x40D6C, kBase},
-              {"TOUR1DISCOVER", 0x40D7C, kBase},     {"TOUR1BUILD", 0x40D8C, kBase},
-              {"TOUR1CONQUER", 0x40D9C, kBase},      {"TOUR1GOVERNOR2", 0x40DAC, kBase},
-              {"TOUR1ADVANCED", 0x40E4C, kBase},     {"TOUR1CAPTION", 0x40CAC, kIface},
-              {"TOUR1ECO", 0x40D1C, kBase},          {"TOUR1POP", 0x40C5C, kIface},
-              {"TOUR1POP2", 0x40C5C, kIface},          {"TOUR1STAPLE", 0x40E2C, kIface},
-              {"TOUR1PRODUCTION", 0x40C6C, kIface},  {"TOUR1QUEUE", 0x40C8C, kIface},
-              {"TOUR1CHANGE", 0x40DEC, kIface},      {"TOUR1HURRY", 0x40DFC, kIface},
-              {"TOUR1GARRISON", 0x40C2C, kIface},    {"TOUR1SUPPORTED", 0x40B6C, kIface},
-              {"TOUR1FACILITIES", 0x40BAC, kBase},   {"TOUR1COMMERCE", 0x40BDC, kBase},
-              {"TOUR1NUTRIENTS", 0x40BFC, kBase},    {"TOUR1AREA", 0x40B8C, kBase}};
+    } kA[] = {
+        {"TOUR1GOVERNOR", 0x40DAC, kBase},    {"TOUR1EXPLORE", 0x40D6C, kBase},   {"TOUR1DISCOVER", 0x40D7C, kBase},
+        {"TOUR1BUILD", 0x40D8C, kBase},       {"TOUR1CONQUER", 0x40D9C, kBase},   {"TOUR1GOVERNOR2", 0x40DAC, kBase},
+        {"TOUR1ADVANCED", 0x40E4C, kBase},    {"TOUR1CAPTION", 0x40CAC, kIface},  {"TOUR1ECO", 0x40D1C, kBase},
+        {"TOUR1POP", 0x40C5C, kIface},        {"TOUR1POP2", 0x40C5C, kIface},     {"TOUR1STAPLE", 0x40E2C, kIface},
+        {"TOUR1PRODUCTION", 0x40C6C, kIface}, {"TOUR1QUEUE", 0x40C8C, kIface},    {"TOUR1CHANGE", 0x40DEC, kIface},
+        {"TOUR1HURRY", 0x40DFC, kIface},      {"TOUR1GARRISON", 0x40C2C, kIface}, {"TOUR1SUPPORTED", 0x40B6C, kIface},
+        {"TOUR1FACILITIES", 0x40BAC, kBase},  {"TOUR1COMMERCE", 0x40BDC, kBase},  {"TOUR1NUTRIENTS", 0x40BFC, kBase},
+        {"TOUR1AREA", 0x40B8C, kBase}};
     for (const auto& st : kA)
         if (!base_step(self, st.label, st.rect, st.kind)) return;
     BaseWin_draw_expenses(&BaseWin, 2);
@@ -561,11 +558,11 @@ void THISCALL TutWin_tour(uint8_t* self) {
     // hold; the "rock" (temperature) table keeps the index where the score belongs and the
     // slopes use the ring's index instead of the neighbour's, as the original).
     int32_t ocean_x = -1, ocean_y = -1, ocean_score = -1, fungus_x = -1, fungus_y = -1;
-    int32_t flat_s = -1, flat_x = -1, flat_y = -1;         // [ebp-0x88], -0x80, -0x48
-    int32_t roll_s = -1, roll_x = -1, roll_y = -1;         // [ebp-0x98], -0x40, -0x78
-    int32_t rocky_s = -1, rocky_x = -1, rocky_y = -1;      // [ebp-0x5c], -0x68, -0x70
-    int32_t alt3_s = -1, alt3_x = -1, alt3_y = -1;         // [ebp-0x9c], -0xa4, -0x60
-    int32_t high = 3, high_x = -1, high_y = -1;            // [ebp-0x64], -0x54, -0x58
+    int32_t flat_s = -1, flat_x = -1, flat_y = -1;  // [ebp-0x88], -0x80, -0x48
+    int32_t roll_s = -1, roll_x = -1, roll_y = -1;  // [ebp-0x98], -0x40, -0x78
+    int32_t rocky_s = -1, rocky_x = -1, rocky_y = -1;  // [ebp-0x5c], -0x68, -0x70
+    int32_t alt3_s = -1, alt3_x = -1, alt3_y = -1;  // [ebp-0x9c], -0xa4, -0x60
+    int32_t high = 3, high_x = -1, high_y = -1;  // [ebp-0x64], -0x54, -0x58
     int32_t rain_s[3] = {-1, -1, -1}, rain_x[3] = {-1, -1, -1}, rain_y[3] = {-1, -1, -1}, rain_id[3] = {-1, -1, -1};
     int32_t temp_s[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
     int32_t rain_max = -1, rain_max_x = -1, rain_max_y = -1, rain_min = 3, rain_min_x = -1;
@@ -581,10 +578,11 @@ void THISCALL TutWin_tour(uint8_t* self) {
             if (ty < 0 || ty >= MapAreaY || tx < 0 || tx >= MapAreaX) continue;
             MAP* sq = map_tile(tx, ty);
             uint8_t alt = sq->climate & 0xE0;
-            if (!(alt < 0x61 || mwi(win, kMwOriginY) + 2 <= (int32_t)((ty - (uint32_t)(sq->climate >> 5)) + 3))) continue;
+            if (!(alt < 0x61 || mwi(win, kMwOriginY) + 2 <= (int32_t)((ty - (uint32_t)(sq->climate >> 5)) + 3)))
+                continue;
             if (!in_view(win, tx, ty, 2)) continue;
-            if (!((Factions[CurrentPlayerFaction].player_flags & 0x200) || (sq->visibility & (1 << (CurrentPlayerFaction & 31))) ||
-                  (GameState & STATE_OMNISCIENT_VIEW)))
+            if (!((Factions[CurrentPlayerFaction].player_flags & 0x200) ||
+                  (sq->visibility & (1 << (CurrentPlayerFaction & 31))) || (GameState & STATE_OMNISCIENT_VIEW)))
                 continue;
             if (alt < 0x60) {
                 int32_t score = ((sq->items & 0x20) && alt >= 0x40) ? 1 : 2;
@@ -596,7 +594,8 @@ void THISCALL TutWin_tour(uint8_t* self) {
                 continue;
             }
             if ((sq->items & 0x20) && alt >= 0x40) {
-                if (fungus_y < 0 || fungus_y >= MapAreaY || fungus_x < 0 || fungus_x >= MapAreaX || (sq->val3 & 0xC0) < 0x80) {
+                if (fungus_y < 0 || fungus_y >= MapAreaY || fungus_x < 0 || fungus_x >= MapAreaX ||
+                    (sq->val3 & 0xC0) < 0x80) {
                     fungus_y = ty;
                     fungus_x = tx;
                 }
@@ -712,7 +711,9 @@ void THISCALL TutWin_tour(uint8_t* self) {
             if (!tut_map(self, "TOURRAIN", rain_max_x, rain_max_y, -1, nullptr, 2, -1, -1)) return end();
             for (int32_t r = 2; r >= 0; r--) {
                 if (rain_id[r] < 0) continue;
-                std::string l = std::string("TOURRAIN") + (r == 0 ? (rain_max ? "DRY" : "DRY2") : r == 1 ? "MOD" : "WET");
+                std::string l = std::string("TOURRAIN") + (r == 0   ? (rain_max ? "DRY" : "DRY2")
+                                                           : r == 1 ? "MOD"
+                                                                    : "WET");
                 if (!tut_map(self, l.c_str(), rain_x[r], rain_y[r], -1, nullptr, 2, -1, -1)) return end();
             }
         }
@@ -943,10 +944,12 @@ void THISCALL Console_give_hints(uint8_t* self) {
                 bool ok = true;
                 if (on_map(bx, by)) {
                     uint8_t c = tile(bx, by)->climate;
-                    if (!((c & 0xE0) < 0x61 || mwi(win, kMwOriginY) + 2 <= (int32_t)((by - (uint32_t)(c >> 5)) + 3))) ok = false;
+                    if (!((c & 0xE0) < 0x61 || mwi(win, kMwOriginY) + 2 <= (int32_t)((by - (uint32_t)(c >> 5)) + 3)))
+                        ok = false;
                 }
                 if (!ok) continue;
-                if (!(mwi(win, kMwOriginY) + 2 <= by && by < mwi(win, kMwRowsBelow) + mwi(win, kMwRowsAbove) - 2 + mwi(win, kMwOriginY)))
+                if (!(mwi(win, kMwOriginY) + 2 <= by &&
+                      by < mwi(win, kMwRowsBelow) + mwi(win, kMwRowsAbove) - 2 + mwi(win, kMwOriginY)))
                     continue;
                 int32_t t = bx, ox = mwi(win, kMwOriginX);
                 if (!(MapToggleFlat & 1)) {
@@ -1077,7 +1080,8 @@ void THISCALL Console_give_hints(uint8_t* self) {
                 other = true;
             }
             if (other) {
-                if ((at_goal(F, 0x79, x, y) || good_sensor(CurrentPlayerFaction, x, y)) && !(TutHintsDone & 0x2000000)) {
+                if ((at_goal(F, 0x79, x, y) || good_sensor(CurrentPlayerFaction, x, y)) &&
+                    !(TutHintsDone & 0x2000000)) {
                     label = "TERRASENSOR", bits = 0x2000000;
                 } else {
                     uint32_t items = tile(x, y)->items;

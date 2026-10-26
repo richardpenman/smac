@@ -25,27 +25,27 @@
 #include "ui/gfx.h"
 
 // ---- BaseWin fields (byte offsets of the original object) ----
-constexpr uint32_t kBwClient = 0x474;        // GraphicWin client rect
-constexpr uint32_t kBwPane = 0x40AFC;        // lower pane: 0 resources, 1 psych, 2 support (buttons 10, 11, 9)
-constexpr uint32_t kBwBase = 0x40B0C;        // base shown
+constexpr uint32_t kBwClient = 0x474;  // GraphicWin client rect
+constexpr uint32_t kBwPane = 0x40AFC;  // lower pane: 0 resources, 1 psych, 2 support (buttons 10, 11, 9)
+constexpr uint32_t kBwBase = 0x40B0C;  // base shown
 constexpr uint32_t kBwB10 = 0x40B10;
 constexpr uint32_t kBwB14 = 0x40B14;
 constexpr uint32_t kBwB18 = 0x40B18;
-constexpr uint32_t kBwOpen = 0x40B28;        // set while the window is open (BaseWin_zoom's wait loop)
-constexpr uint32_t kBwQueueSel = 0x40B2C;    // queue slot picked for the build menu (0: production)
+constexpr uint32_t kBwOpen = 0x40B28;  // set while the window is open (BaseWin_zoom's wait loop)
+constexpr uint32_t kBwQueueSel = 0x40B2C;  // queue slot picked for the build menu (0: production)
 constexpr uint32_t kBwProdAtOpen = 0x40B34;  // production when the window was opened (retooling)
-constexpr uint32_t kBwHurried = 0x40B38;     // minerals after the last hurry
-constexpr uint32_t kBwDownX = 0x40B44;       // left button press position
+constexpr uint32_t kBwHurried = 0x40B38;  // minerals after the last hurry
+constexpr uint32_t kBwDownX = 0x40B44;  // left button press position
 constexpr uint32_t kBwDownY = 0x40B48;
-constexpr uint32_t kBwDragType = 0x40B4C;    // spot type under the press (-1 none)
-constexpr uint32_t kBwDragIndex = 0x40B50;   // spot index under the press
-constexpr uint32_t kBwDragState = 0x40B54;   // 0 pressed on a spot, > 0 dragging, -1 none
+constexpr uint32_t kBwDragType = 0x40B4C;  // spot type under the press (-1 none)
+constexpr uint32_t kBwDragIndex = 0x40B50;  // spot index under the press
+constexpr uint32_t kBwDragState = 0x40B54;  // 0 pressed on a spot, > 0 dragging, -1 none
 // Rectangles (left, top, right, bottom) set by BaseWin_init; window coordinates unless noted (MI:
 // main interface coordinates).
-constexpr uint32_t kBwRectProdMI = 0x40B5C;      // production name
-constexpr uint32_t kBwRectProd2MI = 0x40B6C;     // production picture
+constexpr uint32_t kBwRectProdMI = 0x40B5C;  // production name
+constexpr uint32_t kBwRectProd2MI = 0x40B6C;  // production picture
 constexpr uint32_t kBwRectProdPaneMI = 0x40B7C;  // production pane (MainInfc pane at 0xDB0 + 4)
-constexpr uint32_t kBwRectMap = 0x40B8C;         // resource map
+constexpr uint32_t kBwRectMap = 0x40B8C;  // resource map
 constexpr uint32_t kBwRectFacTitle = 0x40B9C;
 constexpr uint32_t kBwRectFacList = 0x40BAC;
 constexpr uint32_t kBwRectFacPane = 0x40BBC;
@@ -56,16 +56,16 @@ constexpr uint32_t kBwRectNutrients = 0x40BFC;
 constexpr uint32_t kBwRectNutTitle = 0x40C0C;
 constexpr uint32_t kBwRectNutPane = 0x40C1C;
 constexpr uint32_t kBwRectGarrisonMI = 0x40C2C;  // units in the base (the bottom pane)
-constexpr uint32_t kBwRectAlloc = 0x40C3C;       // energy allocation (the lower pane)
-constexpr uint32_t kBwRectExpenses = 0x40C4C;    // resource rows
-constexpr uint32_t kBwRectPopMI = 0x40C5C;       // citizens row
-constexpr uint32_t kBwRectQueueMI = 0x40C6C;     // queue pane
+constexpr uint32_t kBwRectAlloc = 0x40C3C;  // energy allocation (the lower pane)
+constexpr uint32_t kBwRectExpenses = 0x40C4C;  // resource rows
+constexpr uint32_t kBwRectPopMI = 0x40C5C;  // citizens row
+constexpr uint32_t kBwRectQueueMI = 0x40C6C;  // queue pane
 constexpr uint32_t kBwRectQueueListMI = 0x40C7C;
 constexpr uint32_t kBwRectQueueList2MI = 0x40C8C;
 constexpr uint32_t kBwRectQueueBoxMI = 0x40C9C;
-constexpr uint32_t kBwRectNameMI = 0x40CAC;      // base name box
-constexpr uint32_t kBwRectExp1 = 0x40CBC;        // resource row rectangles (draw_expenses)
-constexpr uint32_t kBwRectMisc = 0x40D1C;        // M.Y., energy, eco-damage
+constexpr uint32_t kBwRectNameMI = 0x40CAC;  // base name box
+constexpr uint32_t kBwRectExp1 = 0x40CBC;  // resource row rectangles (draw_expenses)
+constexpr uint32_t kBwRectMisc = 0x40D1C;  // M.Y., energy, eco-damage
 constexpr uint32_t kBwRectOk = 0x40D2C;
 constexpr uint32_t kBwRectRename = 0x40D3C;
 constexpr uint32_t kBwRectPrevMI = 0x40D4C;
@@ -75,30 +75,30 @@ constexpr uint32_t kBwRectHurryMI = 0x40DFC;
 constexpr uint32_t kBwRectStapleMI = 0x40E2C;
 constexpr uint32_t kBwRectQueueBtnMI = 0x40E6C;
 constexpr uint32_t kBwRectEditor = 0x40E7C;
-constexpr uint32_t kBwFont = 0x40E8C;           // Font (Arial 14 bold): the buttons' font
-constexpr uint32_t kBwSpotsIface = 0x40EB4;     // Spot list of the main interface panes
-constexpr uint32_t kBwSpotsWin = 0x40EC0;       // Spot list of the window
-constexpr uint32_t kBwMask = 0x40ECC;           // Buffer 100 x 50: the tile diamond (BaseWin_farm_get)
-constexpr uint32_t kBwButtons = 0xD7C0;         // BaseButton[22], 0xB4C bytes each
+constexpr uint32_t kBwFont = 0x40E8C;  // Font (Arial 14 bold): the buttons' font
+constexpr uint32_t kBwSpotsIface = 0x40EB4;  // Spot list of the main interface panes
+constexpr uint32_t kBwSpotsWin = 0x40EC0;  // Spot list of the window
+constexpr uint32_t kBwMask = 0x40ECC;  // Buffer 100 x 50: the tile diamond (BaseWin_farm_get)
+constexpr uint32_t kBwButtons = 0xD7C0;  // BaseButton[22], 0xB4C bytes each
 constexpr uint32_t kBwButtonSize = 0xB4C;
-constexpr uint32_t kBwButtonStaple2 = 0xBE80;   // a second button 0x10 (ter1wreck.pcx art)
+constexpr uint32_t kBwButtonStaple2 = 0xBE80;  // a second button 0x10 (ter1wreck.pcx art)
 
 inline int32_t& bwf(uint32_t off) { return *reinterpret_cast<int32_t*>(&BaseWin + off); }
 inline UiRect& bw_rect(uint32_t off) { return *reinterpret_cast<UiRect*>(&BaseWin + off); }
 
 // ---- the main interface (MainInfc 0x7AE820) fields the base window uses ----
-constexpr uint32_t kMiPos = 0xA1C;          // window rectangle (screen)
-constexpr uint32_t kMiPaneQueue = 0xD80;    // pane rectangles (MainInfc coordinates)
+constexpr uint32_t kMiPos = 0xA1C;  // window rectangle (screen)
+constexpr uint32_t kMiPaneQueue = 0xD80;  // pane rectangles (MainInfc coordinates)
 constexpr uint32_t kMiPaneRight = 0xD90;
 constexpr uint32_t kMiPaneCenter = 0xDA0;
 constexpr uint32_t kMiPaneBottom = 0xDB0;
 constexpr uint32_t kMiPaneCenter2 = 0xDC0;
 constexpr uint32_t kMiPaneBottom2 = 0xDD0;
-constexpr uint32_t kMiHeight = 0xD7C;       // console height (0xD5)
+constexpr uint32_t kMiHeight = 0xD7C;  // console height (0xD5)
 inline int32_t& mif(uint32_t off) { return *reinterpret_cast<int32_t*>(&MainInterfaceWin + off); }
 inline UiRect& mi_rect(uint32_t off) { return *reinterpret_cast<UiRect*>(&MainInterfaceWin + off); }
-GLOBAL(int32_t, MiConsoleHeight, 0x7AF59C);     // DAT_007AF59C (MainInfc + 0xD7C)
-GLOBAL(int32_t, MiSlideState, 0x7D3930);        // DAT_007D3930: the console slid down (restore_back)
+GLOBAL(int32_t, MiConsoleHeight, 0x7AF59C);  // DAT_007AF59C (MainInfc + 0xD7C)
+GLOBAL(int32_t, MiSlideState, 0x7D3930);  // DAT_007D3930: the console slid down (restore_back)
 
 // Text colour pairs of text.pcx (textcolor_init 0x4BA220): {colour, shadow (-1 none)} pairs
 // from 0x8C6B5C to 0x8C6E68 (the triples at 0x8C6C24..0x8C6C6C).
@@ -124,17 +124,17 @@ ADDR_NATIVE(0x409100) int32_t THISCALL BaseWin_farm_get(uint8_t* self, int32_t x
 // Clicks on the resource map: work / free a tile (or move a worker dragged from another tile).
 ADDR_NATIVE(0x40A1D0) void THISCALL BaseWin_farm_click(uint8_t* self, int32_t x, int32_t y, int32_t right);
 // Clicks on a citizen: the specialist menu (CITIZEN).
-ADDR_NATIVE(0x40A880) void THISCALL BaseWin_pop_click(uint8_t* self, int32_t index, int32_t x, int32_t y,
-                                                     int32_t right);
+ADDR_NATIVE(0x40A880)
+void THISCALL BaseWin_pop_click(uint8_t* self, int32_t index, int32_t x, int32_t y, int32_t right);
 // Facilities list: the facility's menu (scrap: SELLFAC).
-ADDR_NATIVE(0x40C070) void THISCALL BaseWin_facilities_click(uint8_t* self, int32_t index, int32_t x, int32_t y,
-                                                            int32_t right);
+ADDR_NATIVE(0x40C070)
+void THISCALL BaseWin_facilities_click(uint8_t* self, int32_t index, int32_t x, int32_t y, int32_t right);
 // Queue pane clicks.
-ADDR_NATIVE(0x409200) void THISCALL BaseWin_queue_click(uint8_t* self, int32_t index, int32_t x, int32_t y,
-                                                       int32_t right);
+ADDR_NATIVE(0x409200)
+void THISCALL BaseWin_queue_click(uint8_t* self, int32_t index, int32_t x, int32_t y, int32_t right);
 // Supported / present units: the unit's menu.
-ADDR_NATIVE(0x40B140) void THISCALL BaseWin_garrison_click(uint8_t* self, int32_t index, int32_t x, int32_t y,
-                                                          int32_t right);
+ADDR_NATIVE(0x40B140)
+void THISCALL BaseWin_garrison_click(uint8_t* self, int32_t index, int32_t x, int32_t y, int32_t right);
 // The build menu (queue slot `slot`, 0: the production; `a2`: no network lock).
 ADDR_NATIVE(0x417040) void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t a2);
 // Puts item into the queue slot picked (kBwQueueSel); insert: before it.
@@ -150,8 +150,7 @@ ADDR_NATIVE(0x415F70) void THISCALL BaseWin_gov_on(uint8_t* self, uint32_t flag)
 ADDR_NATIVE(0x415F00) void THISCALL BaseWin_gov_activate(uint8_t* self);
 ADDR_NATIVE(0x41B4F0) void THISCALL BaseWin_nerve_staple(uint8_t* self);
 ADDR_NATIVE(0x4165D0) void THISCALL BaseWin_click(uint8_t* self, int32_t x, int32_t y, int32_t right, int32_t a4);
-ADDR_NATIVE(0x4160F0) void THISCALL BaseWin_iface_click(uint8_t* self, int32_t x, int32_t y, int32_t right,
-                                                       int32_t a4);
+ADDR_NATIVE(0x4160F0) void THISCALL BaseWin_iface_click(uint8_t* self, int32_t x, int32_t y, int32_t right, int32_t a4);
 ADDR_NATIVE(0x41D500) void THISCALL BaseWin_on_button_clicked(uint8_t* self, int32_t id);
 ADDR_NATIVE(0x41E560) void THISCALL BaseWin_update_gov_buttons(uint8_t* self);
 // Drawing (the panes; flag 1: present now, 0: with the next update).

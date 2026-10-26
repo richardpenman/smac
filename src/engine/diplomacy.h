@@ -3,8 +3,9 @@
 #include "engine/globals.h"
 
 // First contact / encounter between two factions at (x, y).
-ADDR(0x55E370) void GAMEAPI encounter(int32_t faction_id, int32_t faction_id_with, int32_t x, int32_t y,
-                                      int32_t is_monolith, int32_t is_native);
+ADDR(0x55E370)
+void GAMEAPI encounter(int32_t faction_id, int32_t faction_id_with, int32_t x, int32_t y, int32_t is_monolith,
+                       int32_t is_native);
 // Whether faction_id is the "great satan" (overwhelming leader); is_aggressive selects the rule.
 ADDR(0x539C00) int32_t GAMEAPI great_satan(int32_t faction_id, int32_t is_aggressive);
 // Whether faction_id (seen from faction_id_vs) is close to a diplomatic/council victory.
@@ -64,8 +65,9 @@ ADDR(0x53A780) int32_t GAMEAPI contiguous(int32_t faction_id, int32_t faction_id
 // or, if already warned, count 1 more (+2 more with a treaty); bit 1: also with agenda bit 0x200.
 // Marks the units (state 0x400), sets faction_id's player flag 0x10000 when any are found.
 // base_id_out: the claiming base of the last one; count_out: warned units already flagged.
-ADDR(0x55EB80) int32_t GAMEAPI territory(int32_t faction_id, int32_t faction_id_with, int32_t flags,
-                                         int32_t* base_id_out, int32_t* count_out);
+ADDR(0x55EB80)
+int32_t GAMEAPI
+    territory(int32_t faction_id, int32_t faction_id_with, int32_t flags, int32_t* base_id_out, int32_t* count_out);
 // AI factions with a treaty trade technology.
 ADDR(0x55D430) void GAMEAPI enemies_trade_tech(int32_t faction_id, int32_t faction_id_with);
 
@@ -89,8 +91,9 @@ ADDR(0x543A20) void GAMEAPI trade_maps(int32_t faction_id, int32_t faction_id_wi
 // Value of base_id to faction_id when faction_id_with offers or demands it (-1: none or not
 // reachable): energy, size, nearby bases, facilities, projects, garrison; is_threat halves it
 // where both have bases, is_gift multiplies by 4.
-ADDR(0x54CB50) int32_t GAMEAPI value_of_base(int32_t base_id, int32_t faction_id, int32_t faction_id_with,
-                                             int32_t is_threat, int32_t is_gift);
+ADDR(0x54CB50)
+int32_t GAMEAPI
+    value_of_base(int32_t base_id, int32_t faction_id, int32_t faction_id_with, int32_t is_threat, int32_t is_gift);
 // Hands base_id over to faction_id: nearby units of the old owner move to its nearest base or
 // change sides, production is reset, the base's supported units of the old owner are killed.
 ADDR(0x54CF40) void GAMEAPI give_a_base(int32_t base_id, int32_t faction_id);
@@ -137,11 +140,11 @@ ADDR(0x539160) int32_t GAMEAPI auto_contact();
 // with wait, waits until it is acknowledged). Treaty and technology variants: engine/probe.h.
 ADDR(0x539310) void GAMEAPI net_agenda_on(int32_t faction_id, int32_t faction_id_with, uint32_t agenda, int32_t wait);
 ADDR(0x539380) void GAMEAPI net_agenda_off(int32_t faction_id, int32_t faction_id_with, uint32_t agenda, int32_t wait);
-ADDR(0x5393F0) void GAMEAPI net_set_agenda(int32_t faction_id, int32_t faction_id_with, uint32_t agenda, int32_t add,
-                                           int32_t wait);
+ADDR(0x5393F0)
+void GAMEAPI net_set_agenda(int32_t faction_id, int32_t faction_id_with, uint32_t agenda, int32_t add, int32_t wait);
 // Adds energy to faction_id (amount) and faction_id_with (amount_with); faction 0 is skipped.
-ADDR(0x539460) void GAMEAPI net_energy(int32_t faction_id, int32_t amount, int32_t faction_id_with,
-                                       int32_t amount_with, int32_t wait);
+ADDR(0x539460)
+void GAMEAPI net_energy(int32_t faction_id, int32_t amount, int32_t faction_id_with, int32_t amount_with, int32_t wait);
 // Sets the loan faction_id owes faction_id_with (balance, payment per turn).
 ADDR(0x539510) void GAMEAPI net_loan(int32_t faction_id, int32_t faction_id_with, int32_t balance, int32_t payment);
 ADDR(0x539580) void GAMEAPI net_maps(int32_t faction_id, int32_t faction_id_with, int32_t wait);
@@ -200,7 +203,7 @@ ADDR(0x53D160) void GAMEAPI pledge_truce(int32_t faction_id, int32_t faction_id_
 // Closes the diplomacy dialog state (DiploWinState, caption flags, map focus).
 ADDR(0x53E470) void GAMEAPI diplomacy_ends(int32_t faction_id, int32_t faction_id_with);
 GLOBAL(int32_t, DiploTalkActive, 0x93FAB8);  // cleared by diplomacy_ends
-GLOBAL(int32_t, DiploFocusX, 0x68D43C);      // map location shown during the dialog (-1 none)
+GLOBAL(int32_t, DiploFocusX, 0x68D43C);  // map location shown during the dialog (-1 none)
 GLOBAL(int32_t, DiploFocusY, 0x68D440);
 // faction_id (human) demands that faction_id_with withdraws its units from its territory
 // (commlink checks first; sunspots: only a message about the answer).
@@ -227,14 +230,14 @@ ADDR(0x54AFA0) int32_t GAMEAPI attack_from(int32_t base_id, int32_t faction_id);
 // DiploBestUnitID; mode 13: a commlink to DiploProposalFaction): the BUY... popup with the price
 // (eager: 1.5 times; offer 1: no purchase; offer 5 or mode 5: offered even when unaffordable).
 // Returns 1 if an offer was made.
-ADDR(0x5401A0) int32_t GAMEAPI buy_tech(int32_t faction_id, int32_t faction_id_with, int32_t offer, int32_t eager,
-                                        int32_t mode);
+ADDR(0x5401A0)
+int32_t GAMEAPI buy_tech(int32_t faction_id, int32_t faction_id_with, int32_t offer, int32_t eager, int32_t mode);
 // faction_id (human) and faction_id_with exchange technologies (or maps, 9999): the AI's refusals
 // (hate, fear, its lead, projects), gifts of surrendered or strong pact partners, else the
 // TRADETECH offer; offer 2/4: the human proposes the trade; mode 5: prototypes, 13: a commlink
 // frequency for a technology; counter: repeat while trades succeed. Returns 1 if a trade was made.
-ADDR(0x541100) int32_t GAMEAPI tech_trade(int32_t faction_id, int32_t faction_id_with, int32_t counter, int32_t offer,
-                                          int32_t mode);
+ADDR(0x541100)
+int32_t GAMEAPI tech_trade(int32_t faction_id, int32_t faction_id_with, int32_t counter, int32_t offer, int32_t mode);
 // faction_id (human) asks faction_id_with for energy (by DiploCounterProposal): a gift from a rich
 // pact partner, technology sold for energy, or a loan. Returns 1 if energy changed hands.
 ADDR(0x540630) int32_t GAMEAPI energy_trade(int32_t faction_id, int32_t faction_id_with);
@@ -263,8 +266,8 @@ ADDR(0x547C10) void GAMEAPI make_gift(int32_t faction_id, int32_t faction_id_wit
 // election of candidate; candidate -1/-2/-3: YEA/NAY/ABSTAIN): its price in energy or
 // technology (BUYVOTEMENU); the promise is kept in faction_id_with's unk_29/unk_30 and cast at
 // once when the council is in session.
-ADDR(0x53EB50) void GAMEAPI buy_council_vote(int32_t faction_id, int32_t faction_id_with, int32_t proposal,
-                                             int32_t candidate);
+ADDR(0x53EB50)
+void GAMEAPI buy_council_vote(int32_t faction_id, int32_t faction_id_with, int32_t proposal, int32_t candidate);
 // The human (faction_id) asks faction_id_with to declare war on DiploProposalFaction: refused,
 // done at once by a pact partner, or for technology / energy; the target may learn who incited
 // it. Returns 0 when a counter proposal (DiploCounterProposal 3) was not taken up, else 1.
@@ -278,9 +281,9 @@ ADDR(0x54BEC0) void GAMEAPI call_off_vendetta(int32_t faction_id, int32_t factio
 // EnergyBaseMaint, EnergyFacilityCount); with recompute, base_compute of each base first.
 // diplomacy_check reads FactionCurrentNetIncome.
 ADDR(0x445130) void GAMEAPI energy_compute(int32_t faction_id, int32_t recompute);
-GLOBAL(int32_t[512], EnergyBaseMaint, 0x7492E0);    // per base: facility maintenance
-GLOBAL(int32_t, FactionCurrentLabs, 0x749AE0);      // labs total (then research points per turn)
-GLOBAL(int32_t[70], EnergyFacilityCount, 0x749AEC); // facilities 0-64 built in the faction's bases
+GLOBAL(int32_t[512], EnergyBaseMaint, 0x7492E0);  // per base: facility maintenance
+GLOBAL(int32_t, FactionCurrentLabs, 0x749AE0);  // labs total (then research points per turn)
+GLOBAL(int32_t[70], EnergyFacilityCount, 0x749AEC);  // facilities 0-64 built in the faction's bases
 // game module text helpers (0x58F700-0x58FAF0): "$<M1:text>" gender/number markup of
 // faction_id's noun around text appended to buffer; leader file phrases (#<filename> of
 // faction_id: line 9 + n; get_noun_phrase sets the gender defaults from its 2nd/3rd items);

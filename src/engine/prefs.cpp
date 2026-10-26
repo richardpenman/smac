@@ -75,10 +75,8 @@ uint32_t GAMEAPI default_rules() { return 0x1A0E; }
 
 int32_t GAMEAPI prefs_get_int(const char* key, int32_t def, int32_t use_default) {
     str_number(def);
-    if (!use_default)
-        ini_get(key, StrBuffer);
-    else
-        crt_strcpy(TextBufferGetPtr, StrBuffer);
+    if (!use_default) ini_get(key, StrBuffer);
+    else crt_strcpy(TextBufferGetPtr, StrBuffer);
     TextBuffer.position = TextBuffer.buffer;
     return crt_atoi(TextBuffer.buffer);
 }
@@ -93,10 +91,8 @@ void GAMEAPI prefs_fac_load() {
         crt_strcat(StrBuffer, " ");
         crt_itoa(i, num, 10);
         crt_strcat(StrBuffer, num);
-        if (prefs_format_current())
-            ini_get(StrBuffer, name);
-        else
-            crt_strcpy(TextBufferGetPtr, name);
+        if (prefs_format_current()) ini_get(StrBuffer, name);
+        else crt_strcpy(TextBufferGetPtr, name);
         TextBuffer.position = TextBuffer.buffer;
         crt_strcpy(name, TextBufferGetPtr);
         crt_strcpy(game().mfactions[i].search_key, TextBufferGetPtr);
@@ -114,10 +110,8 @@ static int32_t load_number(const char* key, int32_t def) {
 
 // Reads a bit-set key (default in StrBuffer) unless defaults are requested or the format is old.
 static void load_bits(const char* key, int32_t use_defaults) {
-    if (!use_defaults && prefs_format_current())
-        ini_get(key, StrBuffer);
-    else
-        crt_strcpy(TextBufferGetPtr, StrBuffer);
+    if (!use_defaults && prefs_format_current()) ini_get(key, StrBuffer);
+    else crt_strcpy(TextBufferGetPtr, StrBuffer);
     TextBuffer.position = TextBuffer.buffer;
 }
 
@@ -146,10 +140,8 @@ void GAMEAPI prefs_load(int32_t use_defaults) {
     load_bits("More Preferences", use_defaults);
     AlphaIniPrefs.more_preferences = text_item_binary();
 
-    if (!use_defaults && prefs_format_current())
-        ini_get("Semaphore", "00000000");
-    else
-        crt_strcpy(TextBufferGetPtr, "00000000");
+    if (!use_defaults && prefs_format_current()) ini_get("Semaphore", "00000000");
+    else crt_strcpy(TextBufferGetPtr, "00000000");
     TextBuffer.position = TextBuffer.buffer;
     AlphaIniPrefs.semaphore = text_item_binary();
 

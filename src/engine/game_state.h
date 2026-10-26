@@ -11,13 +11,13 @@
 #include "engine/globals.h"
 
 struct MapView {
-    int32_t& x;           // MapAreaX: tiles per row times 2 (x steps by 2 along a row)
-    int32_t& y;           // MapAreaY: rows
-    int32_t& half_x;      // MapHalfX: x / 2
+    int32_t& x;  // MapAreaX: tiles per row times 2 (x steps by 2 along a row)
+    int32_t& y;  // MapAreaY: rows
+    int32_t& half_x;  // MapHalfX: x / 2
     int32_t& tile_count;  // MapAreaTiles: half_x * y
-    int32_t& sq_root;     // MapAreaSqRoot: quick_root(tile_count)
-    int32_t& flat;        // MapToggleFlat: bit 0 set when the map does not wrap
-    MAP*& tiles;          // MapTiles: tile_count tiles, row by row
+    int32_t& sq_root;  // MapAreaSqRoot: quick_root(tile_count)
+    int32_t& flat;  // MapToggleFlat: bit 0 set when the map does not wrap
+    MAP*& tiles;  // MapTiles: tile_count tiles, row by row
 };
 
 struct GameStateView {
@@ -33,8 +33,14 @@ struct GameStateView {
 };
 
 // Defined after every global it refers to in each translation unit, so it is initialised after them.
-inline GameStateView g_game_state{
-    {MapAreaX, MapAreaY, MapHalfX, MapAreaTiles, MapAreaSqRoot, MapToggleFlat, MapTiles},
-    Factions, MFactions, Bases, BaseCount, Vehs, VehCount, Rules, CurrentTurn};
+inline GameStateView g_game_state{{MapAreaX, MapAreaY, MapHalfX, MapAreaTiles, MapAreaSqRoot, MapToggleFlat, MapTiles},
+                                  Factions,
+                                  MFactions,
+                                  Bases,
+                                  BaseCount,
+                                  Vehs,
+                                  VehCount,
+                                  Rules,
+                                  CurrentTurn};
 
 inline GameStateView& game() { return g_game_state; }

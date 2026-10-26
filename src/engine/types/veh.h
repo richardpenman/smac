@@ -121,7 +121,7 @@ enum VehWeapon {
 };
 
 enum VehWeaponMode {
-    WMODE_COMBAT = 0, // Thinker variable
+    WMODE_COMBAT = 0,  // Thinker variable
     WMODE_PROJECTILE = 0,
     WMODE_ENERGY = 1,
     WMODE_MISSILE = 2,
@@ -235,7 +235,7 @@ enum VehAblRules {
 
 // Only items that formers may be allowed to build
 enum FormerItem {
-    FORMER_NONE = -1, // Thinker variable
+    FORMER_NONE = -1,  // Thinker variable
     FORMER_FARM = 0,
     FORMER_SOIL_ENR = 1,
     FORMER_MINE = 2,
@@ -259,36 +259,36 @@ enum FormerItem {
 };
 
 enum VehOrder {
-    ORDER_NONE = 0,              //  -
-    ORDER_SENTRY_BOARD = 1,      // (L)
-    ORDER_HOLD = 2,              // (H); Hold (set 1st waypoint (-1, 0)), Hold 10 (-1, 10), On Alert
-    ORDER_CONVOY = 3,            // (O)
-    ORDER_FARM = 4,              // (f)
-    ORDER_SOIL_ENRICHER = 5,     // (f)
-    ORDER_MINE = 6,              // (M)
-    ORDER_SOLAR_COLLECTOR = 7,   // (S)
-    ORDER_PLANT_FOREST = 8,      // (F)
-    ORDER_ROAD = 9,              // (R)
-    ORDER_MAGTUBE = 10,          // (R)
-    ORDER_BUNKER = 11,           // (K)
-    ORDER_AIRBASE = 12,          // (.)
-    ORDER_SENSOR_ARRAY = 13,     // (O)
-    ORDER_REMOVE_FUNGUS = 14,    // (F)
-    ORDER_PLANT_FUNGUS = 15,     // (F)
-    ORDER_CONDENSER = 16,        // (N)
-    ORDER_ECHELON_MIRROR = 17,   // (E)
-    ORDER_THERMAL_BOREHOLE = 18, // (B)
-    ORDER_DRILL_AQUIFER = 19,    // (Q)
-    ORDER_TERRAFORM_UP = 20,     // (])
-    ORDER_TERRAFORM_DOWN = 21,   // ([)
+    ORDER_NONE = 0,  //  -
+    ORDER_SENTRY_BOARD = 1,  // (L)
+    ORDER_HOLD = 2,  // (H); Hold (set 1st waypoint (-1, 0)), Hold 10 (-1, 10), On Alert
+    ORDER_CONVOY = 3,  // (O)
+    ORDER_FARM = 4,  // (f)
+    ORDER_SOIL_ENRICHER = 5,  // (f)
+    ORDER_MINE = 6,  // (M)
+    ORDER_SOLAR_COLLECTOR = 7,  // (S)
+    ORDER_PLANT_FOREST = 8,  // (F)
+    ORDER_ROAD = 9,  // (R)
+    ORDER_MAGTUBE = 10,  // (R)
+    ORDER_BUNKER = 11,  // (K)
+    ORDER_AIRBASE = 12,  // (.)
+    ORDER_SENSOR_ARRAY = 13,  // (O)
+    ORDER_REMOVE_FUNGUS = 14,  // (F)
+    ORDER_PLANT_FUNGUS = 15,  // (F)
+    ORDER_CONDENSER = 16,  // (N)
+    ORDER_ECHELON_MIRROR = 17,  // (E)
+    ORDER_THERMAL_BOREHOLE = 18,  // (B)
+    ORDER_DRILL_AQUIFER = 19,  // (Q)
+    ORDER_TERRAFORM_UP = 20,  // (])
+    ORDER_TERRAFORM_DOWN = 21,  // ([)
     ORDER_TERRAFORM_LEVEL = 22,  // (_)
-    ORDER_PLACE_MONOLITH = 23,   // (?)
-    ORDER_MOVE_TO = 24,          // (G); Move unit to here, Go to Base, Group go to, Patrol
-    ORDER_MOVE = 25,             // (>); Only used in a few places, seems to be buggy mechanic
-    ORDER_EXPLORE = 26,          // (/); not set via shortcut, AI related?
-    ORDER_ROAD_TO = 27,          // (r)
-    ORDER_MAGTUBE_TO = 28,       // (t)
-    ORDER_AI_GO_TO = 88,         //  - ; ORDER_GO_TO (0x18) | 0x40 > 0x58 ? only used by AI funcs
+    ORDER_PLACE_MONOLITH = 23,  // (?)
+    ORDER_MOVE_TO = 24,  // (G); Move unit to here, Go to Base, Group go to, Patrol
+    ORDER_MOVE = 25,  // (>); Only used in a few places, seems to be buggy mechanic
+    ORDER_EXPLORE = 26,  // (/); not set via shortcut, AI related?
+    ORDER_ROAD_TO = 27,  // (r)
+    ORDER_MAGTUBE_TO = 28,  // (t)
+    ORDER_AI_GO_TO = 88,  //  - ; ORDER_GO_TO (0x18) | 0x40 > 0x58 ? only used by AI funcs
     VehOrderResetFlag = 0x40,
     VehOrderFormerFirst = ORDER_FARM,
     VehOrderFormerLast = ORDER_PLACE_MONOLITH,
@@ -300,12 +300,12 @@ enum VehOrderAutoType {
     ORDERA_TERRA_AUTO_MAGTUBE = 2,
     ORDERA_TERRA_AUTOIMPROVE_BASE = 3,
     ORDERA_TERRA_FARM_SOLAR_ROAD = 4,
-    ORDERA_TERRA_FARM_MINE_ROAD = 5, // displayed incorrectly as 'Mine+Solar+Road' (labels.txt:L411)
+    ORDERA_TERRA_FARM_MINE_ROAD = 5,  // displayed incorrectly as 'Mine+Solar+Road' (labels.txt:L411)
     ORDERA_TERRA_AUTO_FUNGUS_REM = 6,
     ORDERA_TERRA_AUTO_SENSOR = 7,
     // 8 unused?
     // 9 unused?
-    ORDERA_BOMBING_RUN = 10, // air units only
+    ORDERA_BOMBING_RUN = 10,  // air units only
     ORDERA_ON_ALERT = 11,
     ORDERA_AUTOMATE_AIR_DEFENSE = 12,
 };
@@ -324,62 +324,62 @@ enum ProbeAction {
 };
 
 enum UnitFlags {
-    UNIT_ACTIVE = 0x1, // if this bit is zero, prototype has been retired
+    UNIT_ACTIVE = 0x1,  // if this bit is zero, prototype has been retired
     UNIT_CUSTOM_NAME_SET = 0x2,
     UNIT_PROTOTYPED = 0x4,
     UNIT_UNK_10 = 0x10,
     UNIT_UNK_80 = 0x80,
-    UNIT_UNK_100 = 0x100, // checked in upgrade_any_prototypes
+    UNIT_UNK_100 = 0x100,  // checked in upgrade_any_prototypes
 };
 
 enum VehFlags {
-    VFLAG_UNK_1 = 0x1, // used in repair_phase
-    VFLAG_UNK_2 = 0x2, // used in repair_phase, if not set, VFLAG_UNK_1 gets cleared instead
+    VFLAG_UNK_1 = 0x1,  // used in repair_phase
+    VFLAG_UNK_2 = 0x2,  // used in repair_phase, if not set, VFLAG_UNK_1 gets cleared instead
     VFLAG_PROBE_PACT_OPERATIONS = 0x4,
-    VFLAG_ADD_ONE_MORALE = 0x8, // used by morale_alien
-    VFLAG_ADD_TWO_MORALE = 0x10, // used by morale_alien
+    VFLAG_ADD_ONE_MORALE = 0x8,  // used by morale_alien
+    VFLAG_ADD_TWO_MORALE = 0x10,  // used by morale_alien
     VFLAG_IS_OBJECTIVE = 0x20,
     VFLAG_LURKER = 0x40,
     VFLAG_START_RAND_LOCATION = 0x80,
     VFLAG_START_RAND_MONOLITH = 0x100,
     VFLAG_START_RAND_FUNGUS = 0x200,
     VFLAG_INVISIBLE = 0x400,
-    VFLAG_UNK_800 = 0x800, // used
-    VFLAG_UNK_1000 = 0x1000, // used
-    VFLAG_UNK_2000 = 0x2000, // used
-    VFLAG_UNK_4000 = 0x4000, // maybe unused
-    VFLAG_FULL_MOVE_SKIPPED = 0x8000, // Thinker variable
+    VFLAG_UNK_800 = 0x800,  // used
+    VFLAG_UNK_1000 = 0x1000,  // used
+    VFLAG_UNK_2000 = 0x2000,  // used
+    VFLAG_UNK_4000 = 0x4000,  // maybe unused
+    VFLAG_FULL_MOVE_SKIPPED = 0x8000,  // Thinker variable
 };
 
 enum VehState {
     VSTATE_IN_TRANSPORT = 0x1,
-    VSTATE_UNK_2 = 0x2, // cleared in repair_phase
-    VSTATE_HAS_MOVED = 0x4, // set after first movement attempt (even if failed) on each turn
-    VSTATE_UNK_8 = 0x8, // used in repair_phase
+    VSTATE_UNK_2 = 0x2,  // cleared in repair_phase
+    VSTATE_HAS_MOVED = 0x4,  // set after first movement attempt (even if failed) on each turn
+    VSTATE_UNK_8 = 0x8,  // used in repair_phase
     VSTATE_REQUIRES_SUPPORT = 0x10,
     VSTATE_MADE_AIRDROP = 0x20,
-    VSTATE_UNK_40 = 0x40, // action_destroy
+    VSTATE_UNK_40 = 0x40,  // action_destroy
     VSTATE_DESIGNATE_DEFENDER = 0x80,
     VSTATE_MONOLITH_UPGRADED = 0x100,
-    VSTATE_ON_ALERT = 0x200, // related to ORDERA_ON_ALERT, cleared in veh_wake
+    VSTATE_ON_ALERT = 0x200,  // related to ORDERA_ON_ALERT, cleared in veh_wake
     VSTATE_UNK_400 = 0x400,
-    VSTATE_UNK_800 = 0x800, // used in repair_phase (remove when VFLAG_UNK_1 or VFLAG_UNK_2 is cleared)
+    VSTATE_UNK_800 = 0x800,  // used in repair_phase (remove when VFLAG_UNK_1 or VFLAG_UNK_2 is cleared)
     VSTATE_UNK_1000 = 0x1000,
-    VSTATE_UNK_2000 = 0x2000, // set in base_production, cleared in repair_phase
-    VSTATE_EXPLORE = 0x4000, // cleared in veh_wake
+    VSTATE_UNK_2000 = 0x2000,  // set in base_production, cleared in repair_phase
+    VSTATE_EXPLORE = 0x4000,  // cleared in veh_wake
     VSTATE_UNK_8000 = 0x8000,
     VSTATE_UNK_10000 = 0x10000,
-    VSTATE_UNK_20000 = 0x20000, // veh_init
-    VSTATE_UNK_40000 = 0x40000, // veh_init
-    VSTATE_USED_NERVE_GAS = 0x80000, // set/reset on attacking Veh after each attack
+    VSTATE_UNK_20000 = 0x20000,  // veh_init
+    VSTATE_UNK_40000 = 0x40000,  // veh_init
+    VSTATE_USED_NERVE_GAS = 0x80000,  // set/reset on attacking Veh after each attack
     VSTATE_UNK_100000 = 0x100000,
     VSTATE_PACIFISM_DRONE = 0x200000,
     VSTATE_PACIFISM_FREE_SKIP = 0x400000,
-    VSTATE_ASSISTANT_WORM = 0x800000, // Int: Brood Trainer; Human player's 1st spawned Mind Worm
-    VSTATE_UNK_1000000 = 0x1000000, // cleared in veh_wake
-    VSTATE_UNK_2000000 = 0x2000000, // cleared in veh_wake
-    VSTATE_WORKING = 0x4000000, // cleared in repair_phase, terraform action or convoy resources
-    VSTATE_UNK_8000000 = 0x8000000, // cleared in veh_wake
+    VSTATE_ASSISTANT_WORM = 0x800000,  // Int: Brood Trainer; Human player's 1st spawned Mind Worm
+    VSTATE_UNK_1000000 = 0x1000000,  // cleared in veh_wake
+    VSTATE_UNK_2000000 = 0x2000000,  // cleared in veh_wake
+    VSTATE_WORKING = 0x4000000,  // cleared in repair_phase, terraform action or convoy resources
+    VSTATE_UNK_8000000 = 0x8000000,  // cleared in veh_wake
     VSTATE_UNK_10000000 = 0x10000000,
     VSTATE_UNK_20000000 = 0x20000000,
     VSTATE_UNK_40000000 = 0x40000000,
@@ -396,14 +396,13 @@ struct UNIT {
     uint8_t carry_capacity;
     uint8_t cost;
     int8_t plan;
-    int8_t group_id; // some kind of internal prototype category
-    uint8_t obsolete_factions;// faction bitfield of those who marked this prototype obsolete
-    uint8_t combat_factions; // faction bitfield for those that have seen this unit in combat (atk/def)
+    int8_t group_id;  // some kind of internal prototype category
+    uint8_t obsolete_factions;  // faction bitfield of those who marked this prototype obsolete
+    uint8_t combat_factions;  // faction bitfield for those that have seen this unit in combat (atk/def)
     int8_t icon_offset;
-    int8_t pad_1; // unused
+    int8_t pad_1;  // unused
     uint16_t unit_flags;
     int16_t preq_tech;
-
 };
 
 struct VEH {
@@ -412,28 +411,28 @@ struct VEH {
     uint32_t state;
     uint16_t flags;
     int16_t unit_id;
-    int16_t pad_0; // unused
+    int16_t pad_0;  // unused
     uint8_t faction_id;
     uint8_t year_end_lurking;
     uint8_t damage_taken;
     uint8_t order;
     uint8_t waypoint_count;
     uint8_t patrol_current_point;
-    int16_t waypoint_x[4]; // first doubles as transport veh_id if unit is sentry/board
+    int16_t waypoint_x[4];  // first doubles as transport veh_id if unit is sentry/board
     int16_t waypoint_y[4];
     uint8_t morale;
     uint8_t movement_turns;
     uint8_t order_auto_type;
-    uint8_t visibility; // faction bitfield of who can currently see Veh excluding owner
-    uint8_t moves_spent; // stored as road moves spent unless magtube_movement_rate > 0
+    uint8_t visibility;  // faction bitfield of who can currently see Veh excluding owner
+    uint8_t moves_spent;  // stored as road moves spent unless magtube_movement_rate > 0
     int8_t rotate_angle;
     uint8_t iter_count;
     uint8_t status_icon;
     // 000 00 000 : framed faction : secondary options : primary action id (0-7)
     // secondary options: THOUGHTMENU, ADVVIRUS, DECIPHER, SUBVERTMENU
     // 000 0 0000 : framed faction : n/a : probe action id (8) ; Freeing Captured Leaders only
-    uint8_t probe_action; // see above and ProbeAction, last action taken by probe team
-    uint8_t probe_sabotage_id; // for targeted sabotage: production: 0, abort: 99, or facility id
+    uint8_t probe_action;  // see above and ProbeAction, last action taken by probe team
+    uint8_t probe_sabotage_id;  // for targeted sabotage: production: 0, abort: 99, or facility id
     int16_t home_base_id;
     int16_t next_veh_id_stack;
     int16_t prev_veh_id_stack;
@@ -445,5 +444,3 @@ struct VEH {
 };
 
 #pragma pack(pop)
-
-

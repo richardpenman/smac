@@ -70,7 +70,7 @@ def main():
                                            header=os.path.relpath(path, d).replace(os.sep, "/"))
                 elif f.endswith(".cpp") and not f.startswith(("native_stubs", "hybrid_bindings")):
                     clean = re.sub(r"//[^\n]*|/\*.*?\*/", "", text, flags=re.S)
-                    for m in re.finditer(r"^[A-Za-z_][\w:<>\s\*&]*?\b(\w+)\s*\([^;{]*\)\s*(?:const\s*)?\{",
+                    for m in re.finditer(r"^(?:__attribute__\(\(\w+\)\)\s*)?[A-Za-z_][\w:<>\s\*&]*?\b(\w+)\s*\([^;{]*\)\s*(?:const\s*)?\{",
                                          clean, re.M):
                         defined.add(m.group(1))
                     # hybrid shadow thunks: SHADOWABLE(name)(...) { ... } defines name

@@ -110,7 +110,8 @@ bool movie_play(const char* path) {
         while (platform::poll_event(&ev)) {
             if ((ev.type == platform::EV_KEY_DOWN &&
                  (ev.key == VKEY_RETURN || ev.key == VKEY_ESCAPE || ev.key == VKEY_SPACE)) ||
-                ev.type == platform::EV_LBUTTON_DOWN || ev.type == platform::EV_RBUTTON_DOWN || ev.type == platform::EV_QUIT)
+                ev.type == platform::EV_LBUTTON_DOWN || ev.type == platform::EV_RBUTTON_DOWN ||
+                ev.type == platform::EV_QUIT)
                 skip = true;
         }
         if (skip) break;

@@ -2,7 +2,7 @@
 #pragma once
 #include "engine/globals.h"
 
-GLOBAL(int32_t, ProtoSortCount, 0x945B40);      // proto_sort: number of listed prototypes
+GLOBAL(int32_t, ProtoSortCount, 0x945B40);  // proto_sort: number of listed prototypes
 GLOBAL(int32_t[128], ProtoSortList, 0x945B44);  // proto_sort: unit ids in display order
 
 // Moves a vehicle to (x, y) (top of the stack there).
@@ -11,14 +11,16 @@ ADDR(0x5A59B0) void GAMEAPI veh_put(int32_t veh_id, int32_t x, int32_t y);
 ADDR(0x5A59E0) int32_t GAMEAPI veh_health(int32_t veh_id);
 
 // Mineral cost (rows) of a design: chassis, weapon, armor, ability flags, reactor.
-ADDR(0x5A5A60) int32_t GAMEAPI proto_cost(int32_t chassis_id, int32_t weapon_id, int32_t armor_id,
-                                          uint32_t ability_flags, int32_t reactor_id);
+ADDR(0x5A5A60)
+int32_t GAMEAPI
+    proto_cost(int32_t chassis_id, int32_t weapon_id, int32_t armor_id, uint32_t ability_flags, int32_t reactor_id);
 // Cost of a design without abilities.
 ADDR(0x5A5D00) int32_t GAMEAPI base_cost(int32_t unit_id);
 // Fills Units[unit_id] with a design and derives cost, carrying capacity, plan, group and flags.
 // Faction designs (unit_id >= 64) are marked "prototyped" when an equal or better design exists.
-ADDR(0x5A5D40) void GAMEAPI make_proto(int32_t unit_id, int32_t chassis_id, int32_t weapon_id, int32_t armor_id,
-                                       uint32_t ability_flags, int32_t reactor_id);
+ADDR(0x5A5D40)
+void GAMEAPI make_proto(int32_t unit_id, int32_t chassis_id, int32_t weapon_id, int32_t armor_id,
+                        uint32_t ability_flags, int32_t reactor_id);
 // Sorts the basic and faction prototypes for the design workshop (ProtoSortList).
 ADDR(0x5A6270) void GAMEAPI proto_sort(int32_t faction_id);
 // Same for the prototype list of the design window (obsolete designs last).

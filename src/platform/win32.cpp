@@ -8,8 +8,8 @@
 #include <windows.h>
 
 namespace win32 {
-uint32_t GetPrivateProfileStringA(const char* section, const char* key, const char* def, char* buf,
-                                  uint32_t size, const char* file) {
+uint32_t GetPrivateProfileStringA(const char* section, const char* key, const char* def, char* buf, uint32_t size,
+                                  const char* file) {
     return ::GetPrivateProfileStringA(section, key, def, buf, size, file);
 }
 int32_t WritePrivateProfileStringA(const char* section, const char* key, const char* value, const char* file) {
@@ -200,8 +200,8 @@ const char* resolve_path(const char* path, char* out, uint32_t out_size) {
 
 namespace win32 {
 
-uint32_t GetPrivateProfileStringA(const char* section, const char* key, const char* def, char* buf,
-                                  uint32_t size, const char* file) {
+uint32_t GetPrivateProfileStringA(const char* section, const char* key, const char* def, char* buf, uint32_t size,
+                                  const char* file) {
     if (!buf || !size) return 0;
     std::vector<std::string> lines;
     std::string value;
@@ -268,10 +268,8 @@ int32_t WritePrivateProfileStringA(const char* section, const char* key, const c
             if (!trim(lines[i]).empty()) last = i;
         }
         if (at != end) {
-            if (value)
-                lines[at] = std::string(key) + "=" + value;
-            else
-                lines.erase(lines.begin() + at);
+            if (value) lines[at] = std::string(key) + "=" + value;
+            else lines.erase(lines.begin() + at);
         } else if (value) {
             lines.insert(lines.begin() + last + 1, std::string(key) + "=" + value);
         }

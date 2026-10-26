@@ -13,7 +13,8 @@ GLOBAL(int32_t, VehDrawDefendID, 0x689F2C);
 GLOBAL(int32_t, CouncilNetA, 0x68BF38);
 GLOBAL(int32_t, CouncilNetB, 0x68BF3C);
 GLOBAL(int32_t, CouncilNetC, 0x68BF40);
-GLOBAL(int32_t, NewDesignUnitID, 0x68F0F0);  // first new unit design a tech gave the viewer (tech_achieved, propose_proto); -1 none
+GLOBAL(int32_t, NewDesignUnitID,
+       0x68F0F0);  // first new unit design a tech gave the viewer (tech_achieved, propose_proto); -1 none
 GLOBAL(int32_t, GameHalted, 0x68F21C);
 GLOBAL(int32_t, MapHalfX, 0x68FAF0);
 GLOBAL_NATIVE(CTerraform[20], Terraform, 0x691878);  // [20]
@@ -26,14 +27,16 @@ GLOBAL(int32_t[8], CouncilProposal, 0x703DEC);  // [8]
 GLOBAL(int32_t[8], CouncilVoteState, 0x703E0C);  // [8]
 GLOBAL(int32_t, DesignWinMode, 0x73396C);  // DesignWin state; tech_achieved sets 1 before offering the new designs
 GLOBAL(int32_t[8][8][36], DiploStateC, 0x7388D8);  // [8][8][36]
-GLOBAL(int32_t, NetCommlinkActive, 0x7492CC);  // a commlink/diplomacy contact is in progress (commlink_attempt, net daemon)
+GLOBAL(int32_t, NetCommlinkActive,
+       0x7492CC);  // a commlink/diplomacy contact is in progress (commlink_attempt, net daemon)
 GLOBAL(int32_t, FactionCurrentTotalMaint, 0x7492DC);
 GLOBAL(int32_t, FactionCurrentBreakthroughTurns, 0x749AE4);
 GLOBAL(int32_t, FactionCurrentGrossIncome, 0x749AE8);
 GLOBAL(int32_t, FactionCurrentTotalLoan, 0x749C04);
 GLOBAL(int32_t, FactionCurrentNetIncome, 0x749C0C);
 GLOBAL(int32_t, AmbienceFlags, 0x74DA9C);  // ambience sound flags; bit 0: the viewer is at war (vendetta music)
-GLOBAL(int32_t, HelpChassisShown, 0x7591A4);  // last chassis shown by the datalinks (not written natively, see help.cpp)
+GLOBAL(int32_t, HelpChassisShown,
+       0x7591A4);  // last chassis shown by the datalinks (not written natively, see help.cpp)
 GLOBAL(int32_t, HelpWeaponShown, 0x7591A8);  // last weapon shown by the datalinks (not written natively, see help.cpp)
 GLOBAL(int32_t[30], InfcList, 0x7AE778);  // [30]
 GLOBAL(int32_t, InfcUsed, 0x7D392C);  // InfcPtrs[InfcList[InfcUsed]]
@@ -60,8 +63,10 @@ GLOBAL(int32_t, BaseFindDist, 0x90EA04);
 GLOBAL(int32_t, BaseForcesMaintCount, 0x90EA08);
 GLOBAL(int32_t[8], BaseCommerceImport, 0x90EA0C);  // [8] for each faction trading with this base
 GLOBAL(int32_t, BaseUpkeepState, 0x90EA34);
-GLOBAL(int32_t, UpgradeAllConfirmed, 0x90EA3C);  // upgrade_prototype: the player chose "upgrade all", no further prompts
-GLOBAL(int32_t, BaseProductionNoVeh, 0x90EA40);  // base_production skips creating the finished unit (no writer found in the original)
+GLOBAL(int32_t, UpgradeAllConfirmed,
+       0x90EA3C);  // upgrade_prototype: the player chose "upgrade all", no further prompts
+GLOBAL(int32_t, BaseProductionNoVeh,
+       0x90EA40);  // base_production skips creating the finished unit (no writer found in the original)
 GLOBAL(char[2][4][80], VehBattleDisplay, 0x90F554);  // [2][4][80]
 GLOBAL(int32_t[2], VehBasicBattleMorale, 0x912420);  // [2] ; [0] offense, [1] defense
 GLOBAL(int32_t[2][4], VehBattleModifier, 0x9155F0);  // [2][4]
@@ -75,7 +80,8 @@ GLOBAL(GameChecksum, RemoteChecksum, 0x93A510);
 GLOBAL(int32_t, ControlUpkeepA, 0x93A934);
 GLOBAL(int32_t, ControlTurnC, 0x93A938);
 GLOBAL(int32_t, NetUpkeepCount, 0x93A93C);
-GLOBAL(int32_t, ControlTurnStarted, 0x93A940);  // set at the first human/control turn; the map draws units and bases after it
+GLOBAL(int32_t, ControlTurnStarted,
+       0x93A940);  // set at the first human/control turn; the map draws units and bases after it
 GLOBAL(int32_t, ControlTurnB, 0x93A948);
 GLOBAL(int32_t, MultiDebugActive, 0x93A94C);
 GLOBAL(int32_t, NetNextPlayerTurn, 0x93A950);  // next_player_turn / player deleted: ends the net turn wait loops
@@ -89,7 +95,8 @@ GLOBAL(int32_t[8], FactionCombatLoss, 0x93A98C);  // [8]
 GLOBAL(int32_t, PbemGameID, 0x93A9AC);  // PBEM tamper check: clock + MapRandomSeed at config_game (saved)
 GLOBAL(int32_t, PbemGameDate, 0x93A9B0);  // PBEM tamper check: date of config_game (saved)
 GLOBAL(int32_t, PbemSaveCount, 0x93A9B4);  // PBEM tamper check: saves so far (save_daemon; saved)
-GLOBAL(int32_t, PbemTamperFaction, 0x93A9B8);  // [8] PBEM: faction that reloaded the turn, per faction (check_tamper; saved)
+GLOBAL(int32_t, PbemTamperFaction,
+       0x93A9B8);  // [8] PBEM: faction that reloaded the turn, per faction (check_tamper; saved)
 GLOBAL(int32_t, PbemTamperReloads, 0x93A9D8);  // [8] PBEM: how often it reloaded, per faction (check_tamper; saved)
 GLOBAL(int32_t, VehAttackFlags, 0x93E904);
 GLOBAL(int32_t, ChatRecipientMask, 0x93E960);  // factions the chat goes to (MultiWin toggles); 0xFF everyone

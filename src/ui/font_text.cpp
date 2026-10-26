@@ -103,9 +103,7 @@ int32_t markup_slot(BufferText& bt, const char* p, int32_t current, bool* double
             return 3;
         }
         return -1;
-    case '=':
-        bt.link_state = 2;
-        return -1;
+    case '=': bt.link_state = 2; return -1;
     case '[':
         if (p[1] != '[') return 2;
         *doubled = true;
@@ -122,9 +120,7 @@ int32_t markup_slot(BufferText& bt, const char* p, int32_t current, bool* double
         if (p[1] != '}') return 0;
         *doubled = true;
         return -1;
-    default:
-        (void)current;
-        return -1;
+    default: (void)current; return -1;
     }
 }
 
@@ -379,9 +375,8 @@ int32_t THISCALL Buffer_write_right_l_6(Buffer* self, const char* text, const Ui
     len = clamp_len(text, len);
     if (len <= 0) return 0;
     int32_t tw = Buffer_text_width_2(self, text, len);
-    return Buffer_write_multi_font_raw_l(self, text, rect->right - tw,
-                                         (rect->bottom - self->fonts[0]->ascent_above - rect->top) / 2 + rect->top,
-                                         len);
+    return Buffer_write_multi_font_raw_l(
+        self, text, rect->right - tw, (rect->bottom - self->fonts[0]->ascent_above - rect->top) / 2 + rect->top, len);
 }
 
 int32_t THISCALL Buffer_wrap_2(Buffer* self, const char* text, const UiRect* rect) {
@@ -547,7 +542,8 @@ int32_t THISCALL Buffer_wrap_flying_2(Buffer* self, const char* text) {
         std::memcpy(FlyLine + have, s, n);
         FlyLine[have + n] = 0;
         int32_t len = slen(FlyLine);
-        if (self->fonts[0] && self->fonts[0]->handle && len) Buffer_write_multi_font_raw_l(self, FlyLine, FlyX, FlyY, len);
+        if (self->fonts[0] && self->fonts[0]->handle && len)
+            Buffer_write_multi_font_raw_l(self, FlyLine, FlyX, FlyY, len);
         FlyLine[0] = 0;
         FlyUsed = 0;
         bt.lines++;
@@ -567,7 +563,8 @@ int32_t THISCALL Buffer_wrap_flying_flush(Buffer* self) {
     BufferText& bt = buffer_text(self);
     if (FlyLine[0]) {
         int32_t len = slen(FlyLine);
-        if (self->fonts[0] && self->fonts[0]->handle && len) Buffer_write_multi_font_raw_l(self, FlyLine, FlyX, FlyY, len);
+        if (self->fonts[0] && self->fonts[0]->handle && len)
+            Buffer_write_multi_font_raw_l(self, FlyLine, FlyX, FlyY, len);
         FlyY += line_height(self);
         bt.lines++;
     }

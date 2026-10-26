@@ -435,8 +435,8 @@ int32_t scene_add(VoxelScene* self, CaviarHandle* h, int32_t frame, const float*
         const CaviarModel::Frames& fr = m->frames[(size_t)i];
         VoxelObject& o = self->objects[self->count];
         static const float zero[9] = {};
-        const bool has = fr.flags.size() > (size_t)f && fr.pos.size() >= (size_t)f * 3 + 3 &&
-                         fr.mat.size() >= (size_t)f * 9 + 9;
+        const bool has =
+            fr.flags.size() > (size_t)f && fr.pos.size() >= (size_t)f * 3 + 3 && fr.mat.size() >= (size_t)f * 9 + 9;
         *const_cast<uint8_t*>(o.flag) = has ? fr.flags[(size_t)f] : 0x80;
         const float* p = has ? &fr.pos[(size_t)f * 3] : zero;
         if (offset) vec3_add(p, offset, o.pos);

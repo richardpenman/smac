@@ -263,7 +263,9 @@ void THISCALL BaseWin_draw_nutrients(uint8_t* self, int32_t flag) {
         }
     } else {
         per = 0;
-        if (need > 0) do per++; while (per * per < need);
+        if (need > 0) do
+                per++;
+            while (per * per < need);
         per += 2;
     }
     int32_t nrows = need / per;
@@ -583,10 +585,10 @@ const char* num(int32_t v) {
 }
 
 struct ExpRow {
-    uint32_t label;          // TextLabels offset
-    uint32_t color;          // label / number colour pair
-    int32_t intake, cost;    // first and second columns
-    int32_t used;            // cells of the first kind (consumption, or energy inefficiency)
+    uint32_t label;  // TextLabels offset
+    uint32_t color;  // label / number colour pair
+    int32_t intake, cost;  // first and second columns
+    int32_t used;  // cells of the first kind (consumption, or energy inefficiency)
     uint32_t used_sprite, surplus_sprite;  // BaseWin sprite offsets
     int32_t surplus;
     uint32_t surplus_color;
@@ -766,7 +768,6 @@ void THISCALL BaseWin_draw_expenses(uint8_t* self, int32_t flag) {
     ui_invalidate();
 }
 
-
 // ==== BaseWin_draw_energy_alloc (0x411980): economy / labs / psych ================================
 
 void THISCALL BaseWin_draw_energy_alloc(uint8_t* self, int32_t flag) {
@@ -817,11 +818,10 @@ void THISCALL BaseWin_draw_energy_alloc(uint8_t* self, int32_t flag) {
         uint32_t color, label, rect;
         int32_t pct, energy, bonus, total;
         bool stockpile;
-    } rows[3] = {
-        {0x8C6D5C, 0x5B8, 0x40D0C, econ, econ_e, b.economy_total - econ_e, b.economy_total,
-         b.queue_items[0] == -0x45 && b.mineral_surplus > 0},
-        {0x8C6D64, 0xF0, 0x40CFC, labs, labs_e, b.labs_total - labs_e, b.labs_total, false},
-        {0x8C6D6C, 0x4F8, 0x40CEC, psych, psych_e, b.psych_total - psych_e, b.psych_total, false}};
+    } rows[3] = {{0x8C6D5C, 0x5B8, 0x40D0C, econ, econ_e, b.economy_total - econ_e, b.economy_total,
+                  b.queue_items[0] == -0x45 && b.mineral_surplus > 0},
+                 {0x8C6D64, 0xF0, 0x40CFC, labs, labs_e, b.labs_total - labs_e, b.labs_total, false},
+                 {0x8C6D6C, 0x4F8, 0x40CEC, psych, psych_e, b.psych_total - psych_e, b.psych_total, false}};
     for (const Row& rw : rows) {
         row.top += 0x15;
         row.bottom += 0x15;
@@ -919,9 +919,19 @@ Sprite* facility_picture(int32_t fac) {
 int32_t facility_mandate(int32_t fac) {
     if (fac > 0x45) return 1;
     switch (fac) {
-    case 3: case 0x1F: case 0x20: return 0;
-    case 4: case 0x1B: case 0x1C: case 0x1D: case 0x1E: case 0x44: return 3;
-    case 8: case 0xF: case 0x10: case 0x11: return 1;
+    case 3:
+    case 0x1F:
+    case 0x20: return 0;
+    case 4:
+    case 0x1B:
+    case 0x1C:
+    case 0x1D:
+    case 0x1E:
+    case 0x44: return 3;
+    case 8:
+    case 0xF:
+    case 0x10:
+    case 0x11: return 1;
     default: return 2;
     }
 }
@@ -1088,7 +1098,9 @@ void THISCALL BaseWin_draw_production(uint8_t* self, int32_t flag) {
             while ((mx / per) * 2 > h) per *= 2;
         } else {
             per = 0;
-            if (mx > 0) do per++; while (per * per < mx);
+            if (mx > 0) do
+                    per++;
+                while (per * per < mx);
             per += 2;
         }
         int32_t rows = mx / per;
@@ -1211,8 +1223,12 @@ void THISCALL BaseWin_draw_queue(uint8_t* self, int32_t flag) {
         int32_t lh = line_h(&f1);
         UiRect row{t.left, y, t.right, y + lh};
         spot_add(&g_bw.spots_iface, slot + 2, 8, row.left, row.top, row.right - row.left, row.bottom - row.top);
-        if (bwf(kBwQueueSel) == slot) Buffer_tile(c, box_def(29)->center, row.left, row.top, row.left, row.top, row.right - row.left, row.bottom - row.top);
-        else if (bwf(0x40B30) == slot) Buffer_tile(c, box_def(27)->center, row.left, row.top, row.left, row.top, row.right - row.left, row.bottom - row.top);
+        if (bwf(kBwQueueSel) == slot)
+            Buffer_tile(c, box_def(29)->center, row.left, row.top, row.left, row.top, row.right - row.left,
+                        row.bottom - row.top);
+        else if (bwf(0x40B30) == slot)
+            Buffer_tile(c, box_def(27)->center, row.left, row.top, row.left, row.top, row.right - row.left,
+                        row.bottom - row.top);
         StrBuffer[0] = 0;
         cat_num(slot);
         cat(". ");
@@ -1325,7 +1341,8 @@ void load_resource_icons() {
     for (int32_t row = 0, y = 0x130; row < 4; row++, y += 0x29)
         for (int32_t col = 0, x = 0xAE; col < 8; col++, x += 0x29, a += 0x2C) extract(a, x, y, 0x28, 0x28);
     // The support icons (load_icons): 0x75B450 [4 x 4, 22 pixels: by resource], 0x75AF10 [2].
-    for (int32_t i = 0; i < 16; i++) extract(0x75B450 + (uint32_t)i * 0x2C, 1 + (i % 4) * 0x17, 0xD + (i / 4) * 0x17, 0x16, 0x16);
+    for (int32_t i = 0; i < 16; i++)
+        extract(0x75B450 + (uint32_t)i * 0x2C, 1 + (i % 4) * 0x17, 0xD + (i / 4) * 0x17, 0x16, 0x16);
     extract(0x75AF10, 1, 0xDC, 0x16, 0x16);
     extract(0x75AF3C, 1, 0xF3, 0x16, 0x16);
     // The citizens (load_cursors 0x454FC0): NEWICONS.PCX faces 0x78CAD0 [4 moods x 2 looks] and
@@ -1541,9 +1558,11 @@ void THISCALL pfncDrawCityMap(uint8_t* self, int32_t flag) {
         Buffer_set_font(c, find_font(0xC, 1), nullptr, nullptr, nullptr);
         StrBuffer[0] = 0;
         uint32_t ev = (uint32_t)cur_base().event_flags;
-        struct { uint32_t bit, label, what, color; } kEvents[6] = {
-            {0x200, 0xBE0, 0xBD8, 0x8C6CC4}, {0x400, 0xBE4, 0xBDC, 0x8C6CC4}, {0x800, 0xBE8, 0xBD8, 0x8C6CD4},
-            {0x1000, 0xBEC, 0xBDC, 0x8C6CD4}, {0x2000, 0xBF0, 0xBD8, 0x8C6CB4}, {0x4000, 0xBF4, 0xBDC, 0x8C6CB4}};
+        struct {
+            uint32_t bit, label, what, color;
+        } kEvents[6] = {{0x200, 0xBE0, 0xBD8, 0x8C6CC4},  {0x400, 0xBE4, 0xBDC, 0x8C6CC4},
+                        {0x800, 0xBE8, 0xBD8, 0x8C6CD4},  {0x1000, 0xBEC, 0xBDC, 0x8C6CD4},
+                        {0x2000, 0xBF0, 0xBD8, 0x8C6CB4}, {0x4000, 0xBF4, 0xBDC, 0x8C6CB4}};
         bool any = false;
         for (auto& e : kEvents) {
             if (!(ev & e.bit)) continue;
@@ -1627,7 +1646,8 @@ void THISCALL BaseWin_draw_psych(uint8_t* self, int32_t) {
     for (int32_t k = 0; k < 5; k++, y += row_h, row++) {
         if (row != 0) {
             while (row < 5 && BasePsychTalents[row] == BasePsychTalents[row - 1] &&
-                   BasePsychNDrones[row] == BasePsychNDrones[row - 1] && BasePsychSDrones[row] == BasePsychSDrones[row - 1])
+                   BasePsychNDrones[row] == BasePsychNDrones[row - 1] &&
+                   BasePsychSDrones[row] == BasePsychSDrones[row - 1])
                 row++;
         }
         if (row > 4) continue;
@@ -1698,7 +1718,8 @@ void THISCALL BaseWin_draw_support(uint8_t* self, int32_t) {
     mw(map, kMwCenterX) = Bases[CurrentBaseID].x;
     mw(map, kMwCenterY) = Bases[CurrentBaseID].y;
     pfncRedrawMap(map, 1);  // vtable +0xF8
-    Buffer_copy_4(&canvas, c, 0, 0, (m.right - m.left) / 2 - w / 2 + m.left, (m.bottom - m.top) / 2 - h / 2 + m.top, w, h);
+    Buffer_copy_4(&canvas, c, 0, 0, (m.right - m.left) / 2 - w / 2 + m.left, (m.bottom - m.top) / 2 - h / 2 + m.top, w,
+                  h);
     Buffer_set_clip(c, &saved);
     ui_invalidate();
 }
@@ -1746,7 +1767,8 @@ void THISCALL BaseWin_draw_pop(uint8_t* self, int32_t flag) {
             index = -1;
         } else {
             index = spec - cb.pop_size + i;
-            int32_t type = index < 0x10 ? (cb.specialist_types[index >> 3] >> ((index & 7) << 2)) & 0xF : best_specialist();
+            int32_t type =
+                index < 0x10 ? (cb.specialist_types[index >> 3] >> ((index & 7) << 2)) & 0xF : best_specialist();
             sp = ArtSprite((al ? 0x798CD0 : 0x7765C0) + (uint32_t)type * 0x2C);
         }
         sprite_copy1(sp, c, sp->key, x, y, 1, 1);
@@ -1803,8 +1825,7 @@ void support_icons(Buffer* c, int32_t veh, int32_t x, int32_t y, int32_t cw, int
     if (convoy_unit) {
         if (!in_base)
             for (int32_t k = 0; k < convoy; k++) put(0x75B4A8 + (uint32_t)v.order_auto_type * 0xB0);
-        else
-            put(0x75B47C + (uint32_t)v.order_auto_type * 0xB0);
+        else put(0x75B47C + (uint32_t)v.order_auto_type * 0xB0);
     }
 }
 }  // namespace

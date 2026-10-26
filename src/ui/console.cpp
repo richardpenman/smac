@@ -217,8 +217,7 @@ int32_t THISCALL Console_ready_search(uint8_t* self, int32_t veh_id) {
             if (!veh_ready(i)) continue;
             uint32_t state = Vehs[i].state;
             // The first multiplayer pass looks at units with orders or automation only.
-            if (pass < 0 && !(state & 0x200) && (state & 0x1000200) != 0x1000200 && !(state & 0x4000) &&
-                !Vehs[i].order)
+            if (pass < 0 && !(state & 0x200) && (state & 0x1000200) != 0x1000200 && !(state & 0x4000) && !Vehs[i].order)
                 continue;
             if (Vehs[i].state & 2) continue;  // waiting (w)
             int32_t dx = std::abs(cx - Vehs[i].x);
@@ -394,8 +393,8 @@ void THISCALL Console_update_data(uint8_t*, int32_t a1) {
 
 int32_t THISCALL Console_veh_turn(uint8_t* self) {
     mw(self, kConWaiting) = 1;
-    int32_t waited = 0;      // [ebp-0x8]
-    bool looped = false;     // [ebp-0x10]
+    int32_t waited = 0;  // [ebp-0x8]
+    bool looped = false;  // [ebp-0x10]
     int32_t auto_moves = 0;  // [ebp-0x4]: moves of an automated unit / order steps this turn
     if ((GamePreferences & PREF_BSC_TUTORIAL_MSGS) && !Vehs[mw(self, kConVeh)].order) Console_give_hints(self);
     int32_t& veh = mw(self, kConVeh);
@@ -501,7 +500,7 @@ int32_t THISCALL Console_veh_turn(uint8_t* self) {
 }
 
 int32_t THISCALL Console_human_turn(uint8_t* self) {
-    int32_t waited = 0;      // [ebp-0x8] in part: units were waited for (ENDOFTURN vs ENDOFTURN1)
+    int32_t waited = 0;  // [ebp-0x8] in part: units were waited for (ENDOFTURN vs ENDOFTURN1)
     int32_t veh_count = -1;  // [ebp-0x8]: VehCount when the selection was last checked
     ConsoleTurnFlag = 0;
     WorldWin_set_world_map(&WorldWin);
@@ -908,8 +907,7 @@ void THISCALL Console_new_base(uint8_t* self, int32_t veh_id) {
                     bool land = (map_tile(x, y)->climate & 0xE0) > 0x5F;
                     if (MFactions[faction_id].rule_flags & 0x80)
                         popp(ScriptFileName, "BASEFOUNDED", 0, land ? "al_col_sm.pcx" : "seabas_sm.pcx", 0);
-                    else
-                        popp(ScriptFileName, "BASEFOUNDED", 0, land ? "colfoun_sm.pcx" : "seabas_sm.pcx", 0);
+                    else popp(ScriptFileName, "BASEFOUNDED", 0, land ? "colfoun_sm.pcx" : "seabas_sm.pcx", 0);
                     BaseWin_zoom(&BaseWin, new_id, 1);
                     Console_update_data(self, 1);
                     return;
@@ -1317,14 +1315,14 @@ void THISCALL Console_veh_key(uint8_t* self, int32_t ch, int32_t key, int32_t vk
     default: break;
     }
     switch (vk) {
-    case 0x30046: Console_automate(self, veh, 6); break;      // ctrl+shift+F
-    case 0x20052: Console_road_to(self, veh, ORDER_ROAD_TO); break;     // ctrl+R
-    case 0x20044: Console_designate(self, veh); break;        // ctrl+D
+    case 0x30046: Console_automate(self, veh, 6); break;  // ctrl+shift+F
+    case 0x20052: Console_road_to(self, veh, ORDER_ROAD_TO); break;  // ctrl+R
+    case 0x20044: Console_designate(self, veh); break;  // ctrl+D
     case 0x20046: Console_terraform(self, veh, FORMER_PLANT_FUNGUS); break;  // ctrl+F
-    case 0x20048: Console_go_home(self, veh); break;          // ctrl+H
+    case 0x20048: Console_go_home(self, veh); break;  // ctrl+H
     case 0x20054: Console_road_to(self, veh, ORDER_MAGTUBE_TO); break;  // ctrl+T
-    case 0x20055: Console_upgrade(self, veh); break;          // ctrl+U
-    case 0x30041: {                                           // ctrl+shift+A
+    case 0x20055: Console_upgrade(self, veh); break;  // ctrl+U
+    case 0x30041: {  // ctrl+shift+A
         const UNIT& u = Units[Vehs[veh].unit_id];
         if (Chassis[u.chassis_id].triad == 2 && Weapon[u.weapon_id].offense_value) Console_automate(self, veh, 0xC);
         else Console_automate(self, veh, 3);
@@ -1493,23 +1491,24 @@ void THISCALL Console_turn_hints(uint8_t* self) {
 // ---- the key dispatcher -----------------------------------------------------------------------------
 
 namespace {
-GLOBAL(uint8_t[6], DebugKeyLetters, 0x939FE0);   // ctrl+shift+P/I/R/A/T/E: letters typed (debug)
-GLOBAL(int32_t, AutoPlayTimerOn, 0x939E8C);      // ctrl+shift+Z: computer plays for the human
-GLOBAL(uint8_t, AlphaMenu, 0x9380DC);            // the pull-down menu bar
-GLOBAL(int32_t, NetMsgShownA, 0x80A6BC);         // message boxes on screen
+GLOBAL(uint8_t[6], DebugKeyLetters, 0x939FE0);  // ctrl+shift+P/I/R/A/T/E: letters typed (debug)
+GLOBAL(int32_t, AutoPlayTimerOn, 0x939E8C);  // ctrl+shift+Z: computer plays for the human
+GLOBAL(uint8_t, AlphaMenu, 0x9380DC);  // the pull-down menu bar
+GLOBAL(int32_t, NetMsgShownA, 0x80A6BC);  // message boxes on screen
 GLOBAL(int32_t, NetMsgShownB, 0x805304);
 GLOBAL(int32_t, InterfaceMessageShown, 0x7CD2E8);
 GLOBAL(int32_t, InterfaceButtonState, 0x7CD11C);
-GLOBAL(int32_t, DebugKeyCount, 0x68A5C8);        // '~' presses (debug mode)
+GLOBAL(int32_t, DebugKeyCount, 0x68A5C8);  // '~' presses (debug mode)
 GLOBAL(int32_t, NetPendingInput, 0x93E8C8);
-GLOBAL(int32_t, ScenarioVictoryA, 0x94B4C0);     // scenario victory conditions (9000: none)
+GLOBAL(int32_t, ScenarioVictoryA, 0x94B4C0);  // scenario victory conditions (9000: none)
 GLOBAL(int32_t, ScenarioVictoryB, 0x94B4C4);
 
 bool in_map(int32_t x, int32_t y) { return y >= 0 && y < MapAreaY && x >= 0 && x < MapAreaX; }
 
 // The quit question (Esc, ctrl+Q): REALLYQUIT, or REALLYWIMPOUT with other humans in the game.
 bool confirm_quit() {
-    const char* label = (MultiplayerActive || PbemActive) && bit_count(FactionStatus[0]) >= 2 ? "REALLYWIMPOUT" : "REALLYQUIT";
+    const char* label =
+        (MultiplayerActive || PbemActive) && bit_count(FactionStatus[0]) >= 2 ? "REALLYWIMPOUT" : "REALLYQUIT";
     if (!X_pop(label, 0)) return false;
     if (PbemActive) {
         FactionStatus[0] &= (uint8_t)~(1 << (CurrentPlayerFaction & 31));
@@ -1579,7 +1578,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         return 1;
     }
     int32_t key = std::tolower(ch);  // [ebp-0x24]
-    int32_t net_busy;                // [ebp-0x2c]: multiplayer, input not ours now
+    int32_t net_busy;  // [ebp-0x2c]: multiplayer, input not ours now
     if (!MultiplayerActive || (!ControlTurnC && !NetLocked && !NetPendingInput)) {
         net_busy = 0;
     } else {
@@ -1665,10 +1664,22 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     }
     // Character commands.
     switch (ch) {
-    case 'z': pfncProcZoomKey(self, 0x203, 0); flush_input(); return 1;
-    case 'x': pfncProcZoomKey(self, 0x204, 0); flush_input(); return 1;
-    case 'Z': pfncProcZoomKey(self, 0x205, 0); flush_input(); return 1;
-    case 'X': pfncProcZoomKey(self, 0x206, 0); flush_input(); return 1;
+    case 'z':
+        pfncProcZoomKey(self, 0x203, 0);
+        flush_input();
+        return 1;
+    case 'x':
+        pfncProcZoomKey(self, 0x204, 0);
+        flush_input();
+        return 1;
+    case 'Z':
+        pfncProcZoomKey(self, 0x205, 0);
+        flush_input();
+        return 1;
+    case 'X':
+        pfncProcZoomKey(self, 0x206, 0);
+        flush_input();
+        return 1;
     case 't': Console_survey(self); return 1;
     case 'e':
         if (!net_busy) social_select(mw(self, kConFaction));
@@ -1799,32 +1810,32 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         if (InfcList[InfcUsed] != 5) confirm_quit();
         else console_not_reconstructed("ReportIf_done");
         break;
-    case 0x70: Datalink_exec(&DatalinkWin, 0xE, 0); break;          // F1
-    case 0x71: report_labs(); break;                                   // F2
-    case 0x72: report_energy(); break;                                 // F3
-    case 0x73: report_ops(); break;                                    // F4
-    case 0x74: report_projects(); break;                               // F5
-    case 0x75: report_sat(); break;                                    // F6
-    case 0x76: report_security(); break;                               // F7
-    case 0x78: monument(0); break;                                     // F9
-    case 0x79: hall_of_fame(0); break;                                 // F10
-    case 0x7A:                                                         // F11: menu detail
+    case 0x70: Datalink_exec(&DatalinkWin, 0xE, 0); break;  // F1
+    case 0x71: report_labs(); break;  // F2
+    case 0x72: report_energy(); break;  // F3
+    case 0x73: report_ops(); break;  // F4
+    case 0x74: report_projects(); break;  // F5
+    case 0x75: report_sat(); break;  // F6
+    case 0x76: report_security(); break;  // F7
+    case 0x78: monument(0); break;  // F9
+    case 0x79: hall_of_fame(0); break;  // F10
+    case 0x7A:  // F11: menu detail
         GameMorePreferences ^= MPREF_ADV_DETAIL_MAIN_MENUS;
         pfncMainMenuUpdateVisible(main_menu(self), mw(self, kConVeh));
         X_pop((GameMorePreferences & MPREF_ADV_DETAIL_MAIN_MENUS) ? "MENUDETAIL" : "MENUSIMPLE", 0);
         break;
     case 0x7B: MultiWin_show(nullptr); break;  // F12: MainInterface_on_iface_button_clicked(0x3EC)
     case 0x10008: Console_next_cursor(self); break;  // shift+Backspace
-    case 0x1004E: Console_name_landmark(self, -1, -1); break;   // shift+N
+    case 0x1004E: Console_name_landmark(self, -1, -1); break;  // shift+N
     case 0x3004E: Console_erase_landmark(self, -1, -1); break;  // ctrl+shift+N
     case 0x10051: Console_retire_game(self); break;  // shift+Q: Resign
     case 0x20042: Console_go_to(self, -1, -2, 0); break;  // ctrl+B
-    case 0x20051: confirm_quit(); break;                   // ctrl+Q
-    case 0x30051:                                          // ctrl+shift+Q: quit to the main menu
+    case 0x20051: confirm_quit(); break;  // ctrl+Q
+    case 0x30051:  // ctrl+shift+Q: quit to the main menu
         if (confirm_quit() && ControlTurnA) ControlTurnB = 1;
         break;
-    case 0x20053: save_game(0); break;                     // ctrl+S
-    case 0x2004C:                                          // ctrl+L
+    case 0x20053: save_game(0); break;  // ctrl+S
+    case 0x2004C:  // ctrl+L
         if (!MultiplayerActive || (GameState & STATE_DEBUG_MODE)) Console_load_proc(self, 0, 0);
         break;
     case 0x20058: pfncProcZoomKey(self, 0x208, 0); break;  // ctrl+X
@@ -1840,14 +1851,14 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     case 0x2004E: console_toggle_pref(0x210); break;  // ctrl+N: base names
     case 0x30041: console_toggle_pref(0x20C); break;  // ctrl+shift+A: rally points
     case 0x30058: console_toggle_pref(0x209); break;  // ctrl+shift+X: flat terrain
-    case 0x30057:                                     // ctrl+shift+W
+    case 0x30057:  // ctrl+shift+W
         GameMorePreferences ^= MPREF_MAP_SHOW_FOG_WAR;
         draw_map(1);
         prefs_save(0);
         break;
     case 0x2004B: Console_editor_on(self); break;  // ctrl+K: scenario editor
-    case 0x3004C: Console_load_proc(self, 0, 0); break;                    // ctrl+shift+L
-    case 0x20073:                                                          // ctrl+F4: version
+    case 0x3004C: Console_load_proc(self, 0, 0); break;  // ctrl+shift+L
+    case 0x20073:  // ctrl+F4: version
         parse_says(0, "RELEASE 2.0", -1, -1);
         parse_says(1, "20-Dec-1999", -1, -1);
         popp(ScriptFileName, "VERSIONCONTROLX", 0, "ac_logo_sm.pcx", 0);
@@ -1860,14 +1871,22 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     uint32_t k = ctrl ? (vk & 0xFFFCFFFF) : vk;
     int32_t dir = -1;
     switch (k) {
-    case 0x21: case 0x69: dir = 0; break;  // PgUp, keypad 9: north-east
-    case 0x27: case 0x66: dir = 1; break;  // right, keypad 6
-    case 0x22: case 0x63: dir = 2; break;  // PgDn, keypad 3
-    case 0x28: case 0x62: dir = 3; break;  // down, keypad 2
-    case 0x23: case 0x61: dir = 4; break;  // End, keypad 1
-    case 0x25: case 0x64: dir = 5; break;  // left, keypad 4
-    case 0x24: case 0x67: dir = 6; break;  // Home, keypad 7
-    case 0x26: case 0x68: dir = 7; break;  // up, keypad 8
+    case 0x21:
+    case 0x69: dir = 0; break;  // PgUp, keypad 9: north-east
+    case 0x27:
+    case 0x66: dir = 1; break;  // right, keypad 6
+    case 0x22:
+    case 0x63: dir = 2; break;  // PgDn, keypad 3
+    case 0x28:
+    case 0x62: dir = 3; break;  // down, keypad 2
+    case 0x23:
+    case 0x61: dir = 4; break;  // End, keypad 1
+    case 0x25:
+    case 0x64: dir = 5; break;  // left, keypad 4
+    case 0x24:
+    case 0x67: dir = 6; break;  // Home, keypad 7
+    case 0x26:
+    case 0x68: dir = 7; break;  // up, keypad 8
     default: break;
     }
     if (dir >= 0) {
@@ -1921,7 +1940,14 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     }
     uint8_t* w = main_view();
     switch (k) {
-    case 0x10026: case 0x10068: case 0x10027: case 0x10066: case 0x10028: case 0x10062: case 0x10025: case 0x10064: {
+    case 0x10026:
+    case 0x10068:
+    case 0x10027:
+    case 0x10066:
+    case 0x10028:
+    case 0x10062:
+    case 0x10025:
+    case 0x10064: {
         // shift+direction: scroll the main view by a third of its size.
         int32_t cx = mw(w, kMwCenterX), cy = mw(w, kMwCenterY);
         int32_t x = cx, y = cy;

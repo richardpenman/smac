@@ -59,8 +59,8 @@ ADDR(0x5591A0) void GAMEAPI say_tech(int32_t tech_id, int32_t with_category);
 // diplomacy: multiplayer-aware treaty and technology changes (single player: the plain call).
 ADDR(0x5391C0) void GAMEAPI net_treaty_on(int32_t faction_id, int32_t faction_id_with, uint32_t status, int32_t wait);
 ADDR(0x539230) void GAMEAPI net_treaty_off(int32_t faction_id, int32_t faction_id_with, uint32_t status, int32_t wait);
-ADDR(0x5392A0) void GAMEAPI net_set_treaty(int32_t faction_id, int32_t faction_id_with, uint32_t status, int32_t add,
-                                           int32_t wait);
+ADDR(0x5392A0)
+void GAMEAPI net_set_treaty(int32_t faction_id, int32_t faction_id_with, uint32_t status, int32_t add, int32_t wait);
 ADDR(0x5395F0) void GAMEAPI net_tech(int32_t faction_id, int32_t tech_id, int32_t from, int32_t wait);
 
 // ---- callees of other modules (not reconstructed) ----------------------------------------------

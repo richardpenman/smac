@@ -112,7 +112,8 @@ void THISCALL BaseWin_base_editor_proj(uint8_t* win) {
         int32_t sp = SecretProjects[j];
         if (sp == -2) std::strcat(StrBuffer, label_get(0xD54 / 4));
         else if (sp == -1)
-            std::strcat(StrBuffer, label_get(has_tech(Facility[70 + j].preq_tech, cb().faction_id) ? 0x3DC / 4 : 0x4D8 / 4));
+            std::strcat(StrBuffer,
+                        label_get(has_tech(Facility[70 + j].preq_tech, cb().faction_id) ? 0x3DC / 4 : 0x4D8 / 4));
         else std::strcat(StrBuffer, Bases[sp].name);
         BasePop_item(pop.p, StrBuffer, j);
     }
@@ -162,7 +163,8 @@ void THISCALL BaseWin_base_editor_copy(uint8_t* win, int32_t to) {
             base_raw(r)[0x8C + i] = c;
         } else {
             for (int32_t b = 0; b < BaseCount; b++)
-                if (b != CurrentBaseID && (r != 9998 || Bases[b].faction_id == cb().faction_id)) base_raw(b)[0x8C + i] = c;
+                if (b != CurrentBaseID && (r != 9998 || Bases[b].faction_id == cb().faction_id))
+                    base_raw(b)[0x8C + i] = c;
         }
     }
     std::fprintf(stderr, "base editor: facilities copied %s %d\n", to ? "to" : "from", r);

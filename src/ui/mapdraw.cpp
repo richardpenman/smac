@@ -35,7 +35,9 @@ int32_t wrap_x(int32_t x) {
     return x;
 }
 MAP* tile(int32_t x, int32_t y) { return &MapTiles[MapHalfX * y + (x >> 1)]; }
-bool omniscient(int32_t faction_id) { return faction_id >= 0 && faction_id < 8 && (Factions[faction_id].player_flags & 0x200); }
+bool omniscient(int32_t faction_id) {
+    return faction_id >= 0 && faction_id < 8 && (Factions[faction_id].player_flags & 0x200);
+}
 bool tile_known(int32_t faction_id, MAP* sq) {
     return (GameState & STATE_OMNISCIENT_VIEW) || omniscient(faction_id) ||
            (faction_id >= 0 && (sq->visibility & (1 << faction_id)));
@@ -159,7 +161,8 @@ void GAMEAPI base_draw(Buffer* dest, int32_t base_id, int32_t px, int32_t py, in
     }
     if (base_has_fac(base_id, 1) && ++size > 3) size = 3;  // headquarters
     int32_t def = 0;
-    if (base_has_fac(base_id, 4) || (BaseShownDefense >= 0 && (uint8_t)Bases[BaseShownDefense].faction_id == f)) def = 1;
+    if (base_has_fac(base_id, 4) || (BaseShownDefense >= 0 && (uint8_t)Bases[BaseShownDefense].faction_id == f))
+        def = 1;
     if (base_has_fac(base_id, 5)) def = 2;  // tachyon field
     MAP* sq = tile(base.x, base.y);
     bool water = (sq->climate & 0xE0) < 0x60;
@@ -285,12 +288,14 @@ void THISCALL MapWin_draw_base_names(uint8_t* win) {
         Buffer_set_font(canvas, font, nullptr, nullptr, nullptr);
         char line[256];
         std::snprintf(line, sizeof(line), "%s", b.name);
-        if ((b.state_flags & 0x10) && f == (uint32_t)viewer) std::strncat(line, str(0x686358), sizeof(line) - std::strlen(line) - 1);
+        if ((b.state_flags & 0x10) && f == (uint32_t)viewer)
+            std::strncat(line, str(0x686358), sizeof(line) - std::strlen(line) - 1);
         Buffer_set_text_color(canvas, FactionColorText[f], FactionColorShadow[f], 1, 1);
         if ((GameState & STATE_DEBUG_MODE) &&
             ((GameState & STATE_OMNISCIENT_VIEW) || !(FactionStatus[0] & (1 << viewer)))) {
             const uint8_t* fac = reinterpret_cast<const uint8_t*>(&Factions[f]);
-            int32_t tx = *reinterpret_cast<const int32_t*>(fac + 0x3F0), ty = *reinterpret_cast<const int32_t*>(fac + 0x3F4);
+            int32_t tx = *reinterpret_cast<const int32_t*>(fac + 0x3F0),
+                    ty = *reinterpret_cast<const int32_t*>(fac + 0x3F4);
             if (tx >= 0 && b.x == tx && b.y == ty) Buffer_set_text_color(canvas, 0xFF, 0, 1, 1);
         }
         int32_t cx = px + mw(win, kMwHalfW);
@@ -309,8 +314,8 @@ void THISCALL MapWin_draw_base_names(uint8_t* win) {
         if ((GameState & STATE_DEBUG_MODE) && (GameState & STATE_OMNISCIENT_VIEW) && mw(win, kMwZoom) >= -3) {
             uint8_t region = MapTiles[MapHalfX * b.y + (b.x >> 1)].region;
             uint8_t plan = Factions[f].region_base_plan[region];
-            std::snprintf(line, sizeof(line), "%s%s%s%s%s", str(0x682E9C), PlansShortName[plan], str(0x682E94), production(),
-                          str(0x682E98));
+            std::snprintf(line, sizeof(line), "%s%s%s%s%s", str(0x682E9C), PlansShortName[plan], str(0x682E94),
+                          production(), str(0x682E98));
             Buffer_write_cent_l_8(canvas, line, cx, second_line_y(py), (int32_t)std::strlen(line));
         } else if (!(GameMorePreferences & MPREF_MAP_SHOW_PROD_WITH_BASE_NAMES) && !(mw(win, kMwOptions) & 0x8000000)) {
             objective_line();
@@ -319,8 +324,11 @@ void THISCALL MapWin_draw_base_names(uint8_t* win) {
             if (!objective) {
                 uint32_t g = (uint32_t)b.governor_flags;
                 if ((g & 0x80000000u) && (g & 1)) {
-                    int32_t label = (g & 0x1000000) ? 650 : (g & 0x2000000) ? 651 : (g & 0x4000000) ? 652
-                                    : (g & 0x8000000) ? 653 : 649;
+                    int32_t label = (g & 0x1000000)   ? 650
+                                    : (g & 0x2000000) ? 651
+                                    : (g & 0x4000000) ? 652
+                                    : (g & 0x8000000) ? 653
+                                                      : 649;
                     std::strncat(line, label_get(label), sizeof(line) - std::strlen(line) - 1);
                     std::strncat(line, str(0x682E94), sizeof(line) - std::strlen(line) - 1);
                 }
@@ -352,7 +360,8 @@ void THISCALL MapWin_draw_base_names(uint8_t* win) {
         if ((sq->items & 1) && (sq->val2 & 0xF) <= 7) continue;  // a base is named instead
         int32_t px, py;
         pfncTileToPoint(win, lx, ly, &px, &py);
-        Buffer_write_cent_l_8(canvas, name, mw(win, kMwHalfW) + px, (mw(win, kMwQ) * 7) / 2 + py, (int32_t)std::strlen(name));
+        Buffer_write_cent_l_8(canvas, name, mw(win, kMwHalfW) + px, (mw(win, kMwQ) * 7) / 2 + py,
+                              (int32_t)std::strlen(name));
     }
     Buffer_set_clip(canvas, &saved);
 }

@@ -26,7 +26,7 @@ inline void bw_unlock_base(int32_t base_id) {
 struct Spot {
     UiRect r;
     int32_t index;  // +0x14 (Spot_add's first argument)
-    int32_t type;   // +0x10
+    int32_t type;  // +0x10
 };
 struct Spots {
     std::vector<Spot> list;
@@ -40,27 +40,27 @@ void spot_kill_type(Spots* s, int32_t type);
 // BaseButton / FlatButton (0xB4C bytes): a child window with its own canvas.
 struct BaseButton {
     bool inited = false, shown = false;
-    int32_t id = 0;            // +0xA78
-    UiRect r{};                // position in the parent's canvas
-    int32_t parent = 0;        // 0 the base window, 1 the main interface
-    std::string name;          // +0xA7C
+    int32_t id = 0;  // +0xA78
+    UiRect r{};  // position in the parent's canvas
+    int32_t parent = 0;  // 0 the base window, 1 the main interface
+    std::string name;  // +0xA7C
     bool has_name = false;
-    int32_t set_state = 0;     // +0xA18 (BaseButton_set)
-    std::string bubble;        // +0xA80 (BaseButton_set_bubble_text): shown by a right click
-    int32_t hover = 0;         // +0xA74
-    int32_t pressed = 0;       // +0xA9C
-    int32_t forced = -1;       // +0xAB8
+    int32_t set_state = 0;  // +0xA18 (BaseButton_set)
+    std::string bubble;  // +0xA80 (BaseButton_set_bubble_text): shown by a right click
+    int32_t hover = 0;  // +0xA74
+    int32_t pressed = 0;  // +0xA9C
+    int32_t forced = -1;  // +0xAB8
     int32_t text_color[3] = {-1, -1, -1};  // +0xABC per state
-    BoxDef* box[3] = {};       // +0xAC8
-    Sprite* sprite[3] = {};    // +0xAD4: a picture centred
-    Sprite* left[3] = {};      // +0xAE0
-    Sprite* right[3] = {};     // +0xAEC
-    Sprite* top[3] = {};       // +0xAF8
-    Sprite* bottom[3] = {};    // +0xB04
-    Sprite* tl[3] = {};        // +0xB10
-    Sprite* tr[3] = {};        // +0xB1C
-    Sprite* bl[3] = {};        // +0xB28
-    Sprite* br[3] = {};        // +0xB34
+    BoxDef* box[3] = {};  // +0xAC8
+    Sprite* sprite[3] = {};  // +0xAD4: a picture centred
+    Sprite* left[3] = {};  // +0xAE0
+    Sprite* right[3] = {};  // +0xAEC
+    Sprite* top[3] = {};  // +0xAF8
+    Sprite* bottom[3] = {};  // +0xB04
+    Sprite* tl[3] = {};  // +0xB10
+    Sprite* tr[3] = {};  // +0xB1C
+    Sprite* bl[3] = {};  // +0xB28
+    Sprite* br[3] = {};  // +0xB34
     Font* font = nullptr;
     int32_t color = 0, shadow = -1;
     Buffer canvas;
@@ -68,15 +68,15 @@ struct BaseButton {
 
 struct BaseWinNative {
     bool ready = false, mi_ready = false, visible = false;
-    int32_t x = 0, y = 0;            // window position on the screen
-    Buffer canvas;                   // +0x444
-    std::vector<uint8_t> back;       // the canvas after BaseWin_init (frame and boxes)
-    Buffer mi_canvas;                // MainInfc + 0x444
-    std::vector<uint8_t> mi_back;    // console art
-    Buffer mask;                     // +0x40ECC
-    Spots spots_iface, spots_win;    // +0x40EB4, +0x40EC0
-    BaseButton buttons[22];          // +0xD7C0
-    BaseButton staple2;              // +0xBE80
+    int32_t x = 0, y = 0;  // window position on the screen
+    Buffer canvas;  // +0x444
+    std::vector<uint8_t> back;  // the canvas after BaseWin_init (frame and boxes)
+    Buffer mi_canvas;  // MainInfc + 0x444
+    std::vector<uint8_t> mi_back;  // console art
+    Buffer mask;  // +0x40ECC
+    Spots spots_iface, spots_win;  // +0x40EB4, +0x40EC0
+    BaseButton buttons[22];  // +0xD7C0
+    BaseButton staple2;  // +0xBE80
     BaseButton* pressed_button = nullptr;
     int32_t down_parent = 0;
 };

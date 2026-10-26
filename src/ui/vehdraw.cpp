@@ -61,8 +61,8 @@ void GAMEAPI load_vehicles() {
     Buffer_change_color(&g_canvas, 0xFD, 0xFF);
     for (int32_t r = 0, y = 2; r < 9; r++, y += 0x31)
         for (int32_t k = 0, x = 2; k < 16; k++, x += 0x2D)
-            pfncSpriteFromCanvasRectTrans(ArtSprite(0x7A9B30u + (uint32_t)(r * 16 + k) * 0x2C), &g_canvas, 0xFF, x, y, 0x2B,
-                                          0x2F, 0);
+            pfncSpriteFromCanvasRectTrans(ArtSprite(0x7A9B30u + (uint32_t)(r * 16 + k) * 0x2C), &g_canvas, 0xFF, x, y,
+                                          0x2B, 0x2F, 0);
     Buffer_load_pcx(&g_canvas, "XF.PCX", nullptr, 0, 0x12);
     Buffer_change_color(&g_canvas, 0xFD, 0xFF);
     for (int32_t t = 0, y = 2; t < 4; t++, y += 0x130)
@@ -96,7 +96,7 @@ void GAMEAPI load_vehicles() {
                 cy = 0xE9;
             }
             cell(ArtSprite(kSprUnits + (idx * 8 + k) * 0x2C), cx, cy, 100, 0x4B);
-            int8_t(&o)[8][8] = VehSpriteOffsets[idx];
+            int8_t (&o)[8][8] = VehSpriteOffsets[idx];
             o[0][k] = o[1][k] = o[2][k] = o[3][k] = 0;
             o[4][k] = o[5][k] = o[6][k] = o[7][k] = (int8_t)0x9D;
             for (int32_t i = 0; i < 100; i++)
@@ -170,8 +170,8 @@ int32_t GAMEAPI pick_top_veh(int32_t veh_id) {
         if (v == MapWinVehA && Vehs[v].faction_id == CurrentPlayerFaction && !(Vehs[v].state & 0x4200) &&
             MapWinInVehMode && MapWinField23BE4)
             return v;
-        int32_t value = Chassis[Units[Vehs[v].unit_id].chassis_id].triad +
-                        (Vehs[v].faction_id != CurrentPlayerFaction ? 0 : 4);
+        int32_t value =
+            Chassis[Units[Vehs[v].unit_id].chassis_id].triad + (Vehs[v].faction_id != CurrentPlayerFaction ? 0 : 4);
         if (best < value) {
             best = value;
             veh_id = v;
@@ -184,10 +184,10 @@ int32_t GAMEAPI pick_top_veh(int32_t veh_id) {
 
 namespace {
 
-GLOBAL(float[3], VehLightDir, 0x687AD8);    // VEH_LIGHT_DIR_MAP, normalised
+GLOBAL(float[3], VehLightDir, 0x687AD8);  // VEH_LIGHT_DIR_MAP, normalised
 GLOBAL(float[3], VehModelOffset, 0x687AE8);  // offset of the infantry parts (-400, 200, 0)
-GLOBAL(float, CameraYaw, 0x8E9F40);          // compute_camera
-GLOBAL(int32_t, VehAnimFrame, 0x8E9F50);     // animation frame of the animated parts
+GLOBAL(float, CameraYaw, 0x8E9F40);  // compute_camera
+GLOBAL(int32_t, VehAnimFrame, 0x8E9F50);  // animation frame of the animated parts
 
 float fbits(uint32_t u) {
     float f;
@@ -226,139 +226,139 @@ struct VoxelFile {
     const char* file;
 };
 const VoxelFile kVoxelFiles[] = {
-        {0x7ACCA0, "ssf.cvr"},
-        {0x79A6A0, "sdp.cvr"},
-        {0x787E48, "sas.cvr"},
-        {0x799228, "scd.cvr"},
-        {0x7ACC90, "scj.cvr"},
-        {0x77A578, "sags.cvr"},
-        {0x79A6B0, "sft.cvr"},
-        {0x7765B0, "vhr.cvr"},
-        {0x78A5E0, "sht.cvr"},
-        {0x78A300, "srb.cvr"},
-        {0x7AC030, "asas.cvr"},
-        {0x7ACCC0, "reslaser.cvr"},
-        {0x7A7900, "resbolt.cvr"},
-        {0x7ACC10, "funload.cvr"},
-        {0x788028, "tecload.cvr"},
-        {0x7AD130, "SP-SOPORIFIC.cvr"},
-        {0x799E38, "SP-DISSWAVE.cvr"},
-        {0x7792A0, "SP-MARINED.cvr"},
-        {0x75AEF0, "SP-NANOO.cvr"},
-        {0x7AD040, "AA01.cvr"},
-        {0x75AFC0, "AA-Rover.cvr"},
-        {0x779288, "AA-WING0.cvr"},
-        {0x779294, "AA-WING.cvr"},
-        {0x78A610, "ACP00.cvr"},
-        {0x78A61C, "ACP01.cvr"},
-        {0x78A628, "ACP02.cvr"},
-        {0x78A634, "ACP03.cvr"},
-        {0x789A50, "AA.cvr"},
-        {0x78A510, "SSFA.CVR"},
-        {0x79A640, "SFTA.CVR"},
-        {0x7871C0, "vw00.cvr"},
-        {0x79A700, "viptawal.cvr"},
-        {0x7AB3F0, "viptasgn.cvr"},
-        {0x7795A0, "viptapsi.cvr"},
-        {0x799628, "viptr00.cvr"},
-        {0x799634, "viptr01.cvr"},
-        {0x799640, "viptr02.cvr"},
-        {0x79964C, "viptr03.cvr"},
-        {0x7791D0, "vipta00.cvr"},
-        {0x7791DC, "vipta01.cvr"},
-        {0x78A500, "ptmod.cvr"},
-        {0x7592D0, "vpt.cvr"},
-        {0x75AF00, "a.cvr"},
-        {0x78A490, "apwall.cvr"},
-        {0x7ACCB0, "apsid.cvr"},
-        {0x7AD120, "asgen.cvr"},
-        {0x779230, "VB.CVR"},
-        {0x78E968, "VBP.CVR"},
-        {0x75AED0, "VGMC.CVR"},
-        {0x76EBE0, "VGMCP.CVR"},
-        {0x75B848, "VLIGHTS.CVR"},
-        {0x7AD0E0, "VA01.cvr"},
-        {0x76E560, "VR00.cvr"},
-        {0x76E56C, "VR01.cvr"},
-        {0x76E578, "VR02.cvr"},
-        {0x76E584, "VR03.cvr"},
-        {0x779560, "VHR.CVR"},
-        {0x75ADB8, "VRCP00.cvr"},
-        {0x75ADC4, "VRCP01.cvr"},
-        {0x75ADD0, "VRCP02.cvr"},
-        {0x75ADDC, "VRCP03.cvr"},
-        {0x78B740, "VI.CVR"},
-        {0x77A5B8, "VGMT.CVR"},
-        {0x78B720, "VGMTP.CVR"},
-        {0x787100, "VW01.CVR"},
-        {0x78710C, "VW02.CVR"},
-        {0x787118, "VW03.CVR"},
-        {0x787124, "VW04.CVR"},
-        {0x787130, "VW05.CVR"},
-        {0x78713C, "VW06.CVR"},
-        {0x787148, "VW07.CVR"},
-        {0x787154, "VW08.CVR"},
-        {0x787160, "VW09.CVR"},
-        {0x78716C, "VW10.CVR"},
-        {0x787178, "VW11.CVR"},
-        {0x787184, "VW12.CVR"},
-        {0x78719C, "VW14.CVR"},
-        {0x7871A8, "VW12.CVR"},
-        {0x79A6F0, "AX.CVR"},
-        {0x78A600, "ACOLPOD.CVR"},
-        {0x787E60, "AT.CVR"},
-        {0x7880C0, "VTA.CVR"},
-        {0x7ABFC0, "ATp.CVR"},
-        {0, "AVGMTGUN.CVR"},
-        {0x7ACD60, "drop.cvr"},
-        {0x76EBD0, "droplet.cvr"},
-        {0, "adroper.cvr"},
-        {0x7796A0, "vwntu.cvr"},
-        {0x75AD78, "vt.cvr"},
-        {0x7AD170, "VCL.cvr"},
-        {0x789B58, "VCLT00.CVR"},
-        {0x7A6820, "VSP.cvr"},
-        {0x779270, "VSPA01.CVR"},
-        {0x77927C, "VSPA02.CVR"},
-        {0x7A7290, "vsptf.cvr"},
-        {0x7A7280, "vsptb.cvr"},
-        {0x779608, "vht-vbp.cvr"},
-        {0x78A640, "vhtp.cvr"},
-        {0x779648, "vhta00.cvr"},
-        {0x779654, "vhta01.cvr"},
-        {0x759310, "vhttp.cvr"},
-        {0x78B750, "vhtta00.cvr"},
-        {0x78B75C, "vhtta01.cvr"},
-        {0, "AVHT-GunReposition.cvr"},
-        {0, "AVHT-LightsReposition.cvr"},
-        {0x7ACC50, "VFL.cvr"},
-        {0x7A7240, "VGS.cvr"},
-        {0x798BF0, "VGSP.CVR"},
-        {0x7795B0, "VJTP.CVR"},
-        {0x78A2B8, "VJT00.cvr"},
-        {0x78A2C4, "VJT01.cvr"},
-        {0x75AEE0, "VCU.cvr"},
-        {0x75B440, "VCUP.CVR"},
-        {0x78CAB8, "VCUA00.cvr"},
-        {0x78CAC4, "VCUA01.cvr"},
-        {0x75B088, "VCUW.CVR"},
-        {0x79A680, "vct.cvr"},
-        {0x7ACFA0, "VCTP.CVR"},
-        {0x79A628, "vct00.cvr"},
-        {0x79A634, "vct01.cvr"},
-        {0x76E890, "VCTB.CVR"},
-        {0x78B730, "VWNTT.CVR"},
-        {0x78DE20, "VWNST.CVR"},
-        {0x7AC1A0, "VWNAA.CVR"},
-        {0x76E9B0, "vpbr00.cvr"},
-        {0x76E9BC, "vpbr01.cvr"},
-        {0x76E9C8, "vpbr02.cvr"},
-        {0x76E9D4, "vpbr03.cvr"},
-        {0x791D78, "VM.CVR"},
-        {0x78A5F0, "vw13.cvr"},
-        {0x79A690, "nw.CVR"},
-        {0x7791C0, "ni.CVR"},
-        {0x779660, "nlc.cvr"},
+    {0x7ACCA0, "ssf.cvr"},
+    {0x79A6A0, "sdp.cvr"},
+    {0x787E48, "sas.cvr"},
+    {0x799228, "scd.cvr"},
+    {0x7ACC90, "scj.cvr"},
+    {0x77A578, "sags.cvr"},
+    {0x79A6B0, "sft.cvr"},
+    {0x7765B0, "vhr.cvr"},
+    {0x78A5E0, "sht.cvr"},
+    {0x78A300, "srb.cvr"},
+    {0x7AC030, "asas.cvr"},
+    {0x7ACCC0, "reslaser.cvr"},
+    {0x7A7900, "resbolt.cvr"},
+    {0x7ACC10, "funload.cvr"},
+    {0x788028, "tecload.cvr"},
+    {0x7AD130, "SP-SOPORIFIC.cvr"},
+    {0x799E38, "SP-DISSWAVE.cvr"},
+    {0x7792A0, "SP-MARINED.cvr"},
+    {0x75AEF0, "SP-NANOO.cvr"},
+    {0x7AD040, "AA01.cvr"},
+    {0x75AFC0, "AA-Rover.cvr"},
+    {0x779288, "AA-WING0.cvr"},
+    {0x779294, "AA-WING.cvr"},
+    {0x78A610, "ACP00.cvr"},
+    {0x78A61C, "ACP01.cvr"},
+    {0x78A628, "ACP02.cvr"},
+    {0x78A634, "ACP03.cvr"},
+    {0x789A50, "AA.cvr"},
+    {0x78A510, "SSFA.CVR"},
+    {0x79A640, "SFTA.CVR"},
+    {0x7871C0, "vw00.cvr"},
+    {0x79A700, "viptawal.cvr"},
+    {0x7AB3F0, "viptasgn.cvr"},
+    {0x7795A0, "viptapsi.cvr"},
+    {0x799628, "viptr00.cvr"},
+    {0x799634, "viptr01.cvr"},
+    {0x799640, "viptr02.cvr"},
+    {0x79964C, "viptr03.cvr"},
+    {0x7791D0, "vipta00.cvr"},
+    {0x7791DC, "vipta01.cvr"},
+    {0x78A500, "ptmod.cvr"},
+    {0x7592D0, "vpt.cvr"},
+    {0x75AF00, "a.cvr"},
+    {0x78A490, "apwall.cvr"},
+    {0x7ACCB0, "apsid.cvr"},
+    {0x7AD120, "asgen.cvr"},
+    {0x779230, "VB.CVR"},
+    {0x78E968, "VBP.CVR"},
+    {0x75AED0, "VGMC.CVR"},
+    {0x76EBE0, "VGMCP.CVR"},
+    {0x75B848, "VLIGHTS.CVR"},
+    {0x7AD0E0, "VA01.cvr"},
+    {0x76E560, "VR00.cvr"},
+    {0x76E56C, "VR01.cvr"},
+    {0x76E578, "VR02.cvr"},
+    {0x76E584, "VR03.cvr"},
+    {0x779560, "VHR.CVR"},
+    {0x75ADB8, "VRCP00.cvr"},
+    {0x75ADC4, "VRCP01.cvr"},
+    {0x75ADD0, "VRCP02.cvr"},
+    {0x75ADDC, "VRCP03.cvr"},
+    {0x78B740, "VI.CVR"},
+    {0x77A5B8, "VGMT.CVR"},
+    {0x78B720, "VGMTP.CVR"},
+    {0x787100, "VW01.CVR"},
+    {0x78710C, "VW02.CVR"},
+    {0x787118, "VW03.CVR"},
+    {0x787124, "VW04.CVR"},
+    {0x787130, "VW05.CVR"},
+    {0x78713C, "VW06.CVR"},
+    {0x787148, "VW07.CVR"},
+    {0x787154, "VW08.CVR"},
+    {0x787160, "VW09.CVR"},
+    {0x78716C, "VW10.CVR"},
+    {0x787178, "VW11.CVR"},
+    {0x787184, "VW12.CVR"},
+    {0x78719C, "VW14.CVR"},
+    {0x7871A8, "VW12.CVR"},
+    {0x79A6F0, "AX.CVR"},
+    {0x78A600, "ACOLPOD.CVR"},
+    {0x787E60, "AT.CVR"},
+    {0x7880C0, "VTA.CVR"},
+    {0x7ABFC0, "ATp.CVR"},
+    {0, "AVGMTGUN.CVR"},
+    {0x7ACD60, "drop.cvr"},
+    {0x76EBD0, "droplet.cvr"},
+    {0, "adroper.cvr"},
+    {0x7796A0, "vwntu.cvr"},
+    {0x75AD78, "vt.cvr"},
+    {0x7AD170, "VCL.cvr"},
+    {0x789B58, "VCLT00.CVR"},
+    {0x7A6820, "VSP.cvr"},
+    {0x779270, "VSPA01.CVR"},
+    {0x77927C, "VSPA02.CVR"},
+    {0x7A7290, "vsptf.cvr"},
+    {0x7A7280, "vsptb.cvr"},
+    {0x779608, "vht-vbp.cvr"},
+    {0x78A640, "vhtp.cvr"},
+    {0x779648, "vhta00.cvr"},
+    {0x779654, "vhta01.cvr"},
+    {0x759310, "vhttp.cvr"},
+    {0x78B750, "vhtta00.cvr"},
+    {0x78B75C, "vhtta01.cvr"},
+    {0, "AVHT-GunReposition.cvr"},
+    {0, "AVHT-LightsReposition.cvr"},
+    {0x7ACC50, "VFL.cvr"},
+    {0x7A7240, "VGS.cvr"},
+    {0x798BF0, "VGSP.CVR"},
+    {0x7795B0, "VJTP.CVR"},
+    {0x78A2B8, "VJT00.cvr"},
+    {0x78A2C4, "VJT01.cvr"},
+    {0x75AEE0, "VCU.cvr"},
+    {0x75B440, "VCUP.CVR"},
+    {0x78CAB8, "VCUA00.cvr"},
+    {0x78CAC4, "VCUA01.cvr"},
+    {0x75B088, "VCUW.CVR"},
+    {0x79A680, "vct.cvr"},
+    {0x7ACFA0, "VCTP.CVR"},
+    {0x79A628, "vct00.cvr"},
+    {0x79A634, "vct01.cvr"},
+    {0x76E890, "VCTB.CVR"},
+    {0x78B730, "VWNTT.CVR"},
+    {0x78DE20, "VWNST.CVR"},
+    {0x7AC1A0, "VWNAA.CVR"},
+    {0x76E9B0, "vpbr00.cvr"},
+    {0x76E9BC, "vpbr01.cvr"},
+    {0x76E9C8, "vpbr02.cvr"},
+    {0x76E9D4, "vpbr03.cvr"},
+    {0x791D78, "VM.CVR"},
+    {0x78A5F0, "vw13.cvr"},
+    {0x79A690, "nw.CVR"},
+    {0x7791C0, "ni.CVR"},
+    {0x779660, "nlc.cvr"},
 };
 
 // Recolours VBP.CVR's shading table with a base colour (colortables_init, 0x423F55).
@@ -528,18 +528,48 @@ void GAMEAPI vehdraw_construct_chassis(int32_t f, int32_t chassis, int32_t weapo
     int32_t plated = 0;
     uint32_t acol = 0;
     switch (armor) {
-    case 0: case 9: break;
+    case 0:
+    case 9: break;
     case 1: plated = 1; break;
-    case 2: plated = 1; acol = 0x792664; break;
-    case 3: plated = 1; acol = 0x793E64; break;
-    case 4: case 8: plated = 2; break;
+    case 2:
+        plated = 1;
+        acol = 0x792664;
+        break;
+    case 3:
+        plated = 1;
+        acol = 0x793E64;
+        break;
+    case 4:
+    case 8: plated = 2; break;
     case 5: plated = 1; break;
-    case 6: plated = 1; acol = 0x795664; break;
-    case 7: plated = 1; acol = 0x796E64; break;
-    case 10: plated = 1; acol = 0x792664; add(sc, 0x7ACC90); break;
-    case 11: plated = 1; acol = 0x792664; add(sc, 0x78A5E0); break;
-    case 12: plated = 1; acol = 0x795664; add(sc, 0x7ACC90); break;
-    case 13: plated = 1; acol = 0x795664; add(sc, 0x78A5E0); break;
+    case 6:
+        plated = 1;
+        acol = 0x795664;
+        break;
+    case 7:
+        plated = 1;
+        acol = 0x796E64;
+        break;
+    case 10:
+        plated = 1;
+        acol = 0x792664;
+        add(sc, 0x7ACC90);
+        break;
+    case 11:
+        plated = 1;
+        acol = 0x792664;
+        add(sc, 0x78A5E0);
+        break;
+    case 12:
+        plated = 1;
+        acol = 0x795664;
+        add(sc, 0x7ACC90);
+        break;
+    case 13:
+        plated = 1;
+        acol = 0x795664;
+        add(sc, 0x78A5E0);
+        break;
     default: break;
     }
     if (weapon == 0x15 && chassis == 1) {
@@ -787,8 +817,16 @@ void GAMEAPI vehdraw_construct_armor(int32_t f, int32_t chassis, int32_t weapon,
     };
     switch (armor) {
     case 1: plated = 1; break;
-    case 2: case 10: case 11: plated = 1; acol = 0x792664; break;
-    case 3: plated = 1; acol = 0x793E64; break;
+    case 2:
+    case 10:
+    case 11:
+        plated = 1;
+        acol = 0x792664;
+        break;
+    case 3:
+        plated = 1;
+        acol = 0x793E64;
+        break;
     case 4: special(0x79A700, 0x78A490); break;
     case 5:
         if (!overlay) done = 1;
@@ -797,8 +835,16 @@ void GAMEAPI vehdraw_construct_armor(int32_t f, int32_t chassis, int32_t weapon,
             acol = 0x788250;
         }
         break;
-    case 6: case 12: case 13: plated = 1; acol = 0x795664; break;
-    case 7: plated = 1; acol = 0x796E64; break;
+    case 6:
+    case 12:
+    case 13:
+        plated = 1;
+        acol = 0x795664;
+        break;
+    case 7:
+        plated = 1;
+        acol = 0x796E64;
+        break;
     case 8: special(0x7AB3F0, 0x7AD120); break;
     case 9: special(0x7795A0, 0x7ACCB0); break;
     default: break;
@@ -889,8 +935,7 @@ void GAMEAPI vehdraw_construct_armor(int32_t f, int32_t chassis, int32_t weapon,
         if (!plated) return;
         plate();
         return;
-    default:
-        return;
+    default: return;
     }
 }
 
@@ -901,10 +946,8 @@ void GAMEAPI vehdraw_construct_vehicle(int32_t veh_id, VoxelScene* sc) {
     // Infantry with small arms (and the probe team...) are drawn larger, others smaller.
     // FP: the scale times a float constant, stored as float.
     if (u.chassis_id == 0) {
-        if (u.weapon_id < 3 || u.weapon_id == 0x15)
-            Scene_set_scale(sc, (float)((double)Scene_get_scale(sc) * 1.25f));
-        else
-            Scene_set_scale(sc, (float)((double)Scene_get_scale(sc) * fbits(0x3F4CCCCD)));  // 0.8
+        if (u.weapon_id < 3 || u.weapon_id == 0x15) Scene_set_scale(sc, (float)((double)Scene_get_scale(sc) * 1.25f));
+        else Scene_set_scale(sc, (float)((double)Scene_get_scale(sc) * fbits(0x3F4CCCCD)));  // 0.8
     } else if (u.chassis_id == 1 && u.weapon_id == 0x15) {
         Scene_set_scale(sc, (float)((double)Scene_get_scale(sc) * 1.25f));
     }
@@ -961,7 +1004,8 @@ void tile_up(int32_t veh_id, int32_t x, int32_t y, bool tilt, float* up) {
     up[1] = 0.0f;
     up[2] = 1.0f;
     const UNIT& u = Units[Vehs[veh_id].unit_id];
-    if (!tilt || (MapTiles[MapHalfX * y + (x >> 1)].climate & 0xE0) < 0x60 || (u.chassis_id == 0 && Weapon[u.weapon_id].mode < 3))
+    if (!tilt || (MapTiles[MapHalfX * y + (x >> 1)].climate & 0xE0) < 0x60 ||
+        (u.chassis_id == 0 && Weapon[u.weapon_id].mode < 3))
         return;
     uint8_t* win = &MainConsole;
     int32_t r[4];
@@ -985,8 +1029,8 @@ void tile_up(int32_t veh_id, int32_t x, int32_t y, bool tilt, float* up) {
 // `angle`: the facing in the x87 register; less the camera's yaw (CameraYaw) once the camera is
 // computed when `less_yaw` (vehdraw_draw, vehdraw_scoot: compute_camera runs before the
 // rotation), else already final (vehdraw_turn, which keeps the last camera).
-void render_vehicle(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t mode, int32_t zoom, const float* up_in,
-                    double angle, bool less_yaw) {
+void render_vehicle(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t mode, int32_t zoom,
+                    const float* up_in, double angle, bool less_yaw) {
     const float light[3] = {fbits(0xBF13CD36), fbits(0x3F13CD36), fbits(0x3F13CD36)};
     const float ldir[3] = {VehLightDir[0], VehLightDir[1], VehLightDir[2]};
     const UNIT& u = Units[Vehs[veh_id].unit_id];
@@ -1039,7 +1083,8 @@ struct ScootAnim {
 
 }  // namespace
 
-void GAMEAPI vehdraw_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t mode, int32_t zoom, int32_t a7) {
+void GAMEAPI vehdraw_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t mode, int32_t zoom,
+                          int32_t a7) {
     if (!dest) return;
     if (mode & 1) veh_id = pick_top_veh(veh_id);
     int32_t x, y;

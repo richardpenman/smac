@@ -127,8 +127,9 @@ void GAMEAPI colortables_init() {
             }
         }
         for (int32_t k = 0; k < 16; k++)
-            Palette_create_table_from_color(&GamePalette, color[k] + 10, mem::host(0x6F1B7Cu + (uint32_t)(g * 16 + k) * 0x100),
-                                            10, 0xEC, 100 - pct[k], pct[k]);
+            Palette_create_table_from_color(&GamePalette, color[k] + 10,
+                                            mem::host(0x6F1B7Cu + (uint32_t)(g * 16 + k) * 0x100), 10, 0xEC,
+                                            100 - pct[k], pct[k]);
     }
 }
 

@@ -22,7 +22,7 @@ struct CrtFile {
     std::vector<uint8_t> data;
     size_t pos = 0;
     bool text = true;
-    bool eof = false;   // _IOEOF
+    bool eof = false;  // _IOEOF
     FILE* out = nullptr;  // write stream
 };
 

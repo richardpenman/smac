@@ -16,8 +16,7 @@
 // chassis, weapons, armour, abilities, unit types; 3 miscellaneous: social models, citizens,
 // tech_heck), one item per line ("^" + link); section -1: all of them, each a "^HEADER: " line
 // with the items separated by ", " (help_tech_info_2, the tech popup).
-void help_tech_info(const std::function<void(const char*)>& out, int32_t tech_id, int32_t faction_id,
-                    int32_t section);
+void help_tech_info(const std::function<void(const char*)>& out, int32_t tech_id, int32_t faction_id, int32_t section);
 // The "$LINK<name=id>" of entry `index` of datalink category `cat` (help_create_link with
 // Datalink_construct_id).
 std::string help_link(const char* name, int32_t cat, int32_t index);

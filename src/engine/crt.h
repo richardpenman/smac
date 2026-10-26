@@ -60,8 +60,7 @@ inline uint32_t crt_strlen(const char* s) {
 }
 inline char* crt_strcpy(char* dst, const char* src) {
     char* d = dst;
-    while ((*d++ = *src++)) {
-    }
+    while ((*d++ = *src++)) {}
     return dst;
 }
 inline char* crt_strcat(char* dst, const char* src) {

@@ -29,51 +29,54 @@ GLOBAL(int32_t, TextureKey, 0x9BB548);
 
 // Texture_draw_trans_3 (0x61A240): the texture's own reference points (4 corners, or 8 points
 // with `eight`) mapped onto pts, texels equal to TextureKey skipped, no light (the map cursor).
-ADDR_NATIVE(0x61A240) void THISCALL Texture_draw_trans_3(Texture* self, Buffer* dest, const int32_t* pts, int32_t eight);
+ADDR_NATIVE(0x61A240)
+void THISCALL Texture_draw_trans_3(Texture* self, Buffer* dest, const int32_t* pts, int32_t eight);
 // Gouraud textured (lights clamped).
-ADDR_NATIVE(0x61B1F0) void THISCALL Texture_draw_2(Texture* self, Buffer* dest, const int32_t* pts, int32_t* light,
-                                                   int32_t n, const int32_t* uv);
+ADDR_NATIVE(0x61B1F0)
+void THISCALL
+    Texture_draw_2(Texture* self, Buffer* dest, const int32_t* pts, int32_t* light, int32_t n, const int32_t* uv);
 // Texture_draw_2, or dithered with `color`; the dithered variant's textured rows lag one texel
 // behind (pixel k shows texel k - 1, as in the original's loop).
-ADDR_NATIVE(0x6233C0) void THISCALL pfncImageCopytoCanvas2(Texture* self, Buffer* dest, const int32_t* pts,
-                                                           int32_t* light, int32_t n, const int32_t* uv,
-                                                           int32_t color);
+ADDR_NATIVE(0x6233C0)
+void THISCALL pfncImageCopytoCanvas2(Texture* self, Buffer* dest, const int32_t* pts, int32_t* light, int32_t n,
+                                     const int32_t* uv, int32_t color);
 // Gouraud textured, texels equal to TextureKey skipped (lights clamped).
-ADDR_NATIVE(0x61C090) void THISCALL Texture_draw_trans_4(Texture* self, Buffer* dest, const int32_t* pts,
-                                                         int32_t* light, int32_t n, const int32_t* uv);
+ADDR_NATIVE(0x61C090)
+void THISCALL
+    Texture_draw_trans_4(Texture* self, Buffer* dest, const int32_t* pts, int32_t* light, int32_t n, const int32_t* uv);
 // Texture_draw_trans_4, or dithered: even rows `color` where the texel is not transparent.
-ADDR_NATIVE(0x622DB0) void THISCALL Texture_draw_trans_5(Texture* self, Buffer* dest, const int32_t* pts,
-                                                         int32_t* light, int32_t n, const int32_t* uv,
-                                                         int32_t color);
+ADDR_NATIVE(0x622DB0)
+void THISCALL Texture_draw_trans_5(Texture* self, Buffer* dest, const int32_t* pts, int32_t* light, int32_t n,
+                                   const int32_t* uv, int32_t color);
 // Gouraud textured where the light's integer part (signed byte) is below `threshold`; nothing
 // when no vertex light is below it (lights not clamped).
-ADDR_NATIVE(0x61AC60) void THISCALL Texture_draw(Texture* self, Buffer* dest, const int32_t* pts,
-                                                 const int32_t* light, int32_t n, const int32_t* uv,
-                                                 int32_t threshold);
+ADDR_NATIVE(0x61AC60)
+void THISCALL Texture_draw(Texture* self, Buffer* dest, const int32_t* pts, const int32_t* light, int32_t n,
+                           const int32_t* uv, int32_t threshold);
 // Texture_draw, or dithered: even rows all `color`.
-ADDR_NATIVE(0x624670) void THISCALL Texture_draw_4(Texture* self, Buffer* dest, const int32_t* pts,
-                                                   const int32_t* light, int32_t n, const int32_t* uv,
-                                                   int32_t threshold, int32_t color);
+ADDR_NATIVE(0x624670)
+void THISCALL Texture_draw_4(Texture* self, Buffer* dest, const int32_t* pts, const int32_t* light, int32_t n,
+                             const int32_t* uv, int32_t threshold, int32_t color);
 // Textured without light, texels equal to TextureKey skipped.
-ADDR_NATIVE(0x61A760) void THISCALL Texture_draw_upper_threshold_trans(Texture* self, Buffer* dest,
-                                                                       const int32_t* pts, int32_t n,
-                                                                       const int32_t* uv);
+ADDR_NATIVE(0x61A760)
+void THISCALL
+    Texture_draw_upper_threshold_trans(Texture* self, Buffer* dest, const int32_t* pts, int32_t n, const int32_t* uv);
 // Texture_draw_upper_threshold_trans, or dithered: even rows `color` where not transparent.
-ADDR_NATIVE(0x6239E0) void THISCALL Texture_draw_upper_threshold_trans_2(Texture* self, Buffer* dest,
-                                                                         const int32_t* pts, int32_t n,
-                                                                         const int32_t* uv, int32_t color);
+ADDR_NATIVE(0x6239E0)
+void THISCALL Texture_draw_upper_threshold_trans_2(Texture* self, Buffer* dest, const int32_t* pts, int32_t n,
+                                                   const int32_t* uv, int32_t color);
 // Coast: `shape` (a texture with the same layout) is sampled at the same texel; mask[shape
 // texel] 0: nothing, 1: this texture's texel + light, other: that colour.
-ADDR_NATIVE(0x61EAD0) void THISCALL Texture_draw_coast(Texture* self, Buffer* dest, const int32_t* pts,
-                                                       const int32_t* light, const Texture* shape,
-                                                       const uint8_t* mask, int32_t n, const int32_t* uv);
+ADDR_NATIVE(0x61EAD0)
+void THISCALL Texture_draw_coast(Texture* self, Buffer* dest, const int32_t* pts, const int32_t* light,
+                                 const Texture* shape, const uint8_t* mask, int32_t n, const int32_t* uv);
 // Texture_draw_coast, or dithered: even rows `color` where mask[shape texel] != 0.
-ADDR_NATIVE(0x623F80) void THISCALL Texture_draw_coast_2(Texture* self, Buffer* dest, const int32_t* pts,
-                                                         const int32_t* light, const Texture* shape,
-                                                         const uint8_t* mask, int32_t n, const int32_t* uv,
-                                                         int32_t color);
+ADDR_NATIVE(0x623F80)
+void THISCALL
+    Texture_draw_coast_2(Texture* self, Buffer* dest, const int32_t* pts, const int32_t* light, const Texture* shape,
+                         const uint8_t* mask, int32_t n, const int32_t* uv, int32_t color);
 // Colour translation through a mask: m = mask[texel]; where m != 0 the destination pixel d
 // becomes table[(m - 1) * 256 + d] (territory borders: the faction colour tables).
-ADDR_NATIVE(0x61E540) void THISCALL Texture_draw_mask_dest(Texture* self, Buffer* dest, const int32_t* pts,
-                                                           const uint8_t* mask, const uint8_t* table, int32_t n,
-                                                           const int32_t* uv);
+ADDR_NATIVE(0x61E540)
+void THISCALL Texture_draw_mask_dest(Texture* self, Buffer* dest, const int32_t* pts, const uint8_t* mask,
+                                     const uint8_t* table, int32_t n, const int32_t* uv);

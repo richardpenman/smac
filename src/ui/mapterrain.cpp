@@ -117,11 +117,12 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
     int32_t lm_code = -1;  // local_94 (uninitialised in the original when unused)
     if (lm & 0x103) lm_code = (int32_t)lm >> 24;
     const int32_t q = trunc_div4(zoom_unit(zoom) + 1);  // local_98
-    const int32_t q2 = q * 2;                                    // local_78
-    int32_t lift = 0;                                            // local_44
+    const int32_t q2 = q * 2;  // local_78
+    int32_t lift = 0;  // local_44
     if (win)
         lift = (pfncMapGetCornerYOffset(win, x, y, 4) + pfncMapGetCornerYOffset(win, x, y, 3) +
-                pfncMapGetCornerYOffset(win, x, y, 2) + pfncMapGetCornerYOffset(win, x, y, 1)) >> 2;
+                pfncMapGetCornerYOffset(win, x, y, 2) + pfncMapGetCornerYOffset(win, x, y, 1)) >>
+               2;
     py += lift;
     int32_t terr = f;  // local_6c[8]: faction whose territory colours apply
     if (f < 0) {
@@ -129,13 +130,13 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
         if (terr < 1) terr = CurrentPlayerFaction;
     }
     int32_t rain = (sq->climate & 0x18) >> 3;  // local_84
-    const int32_t alt = sq->climate >> 5;      // local_8c
-    int32_t rocky = sq->val3 >> 6;             // local_38
+    const int32_t alt = sq->climate >> 5;  // local_8c
+    int32_t rocky = sq->val3 >> 6;  // local_38
     uint32_t items = (f < 0 || omniscient(f)) ? sq->items : known_items(sq, f);  // local_24
-    int32_t small = (zoom < -6 || (opts & 0x80000000u)) ? 1 : 0;              // local_90
-    const uint32_t flat_look = opts & 0x1000000;                               // local_11c
+    int32_t small = (zoom < -6 || (opts & 0x80000000u)) ? 1 : 0;  // local_90
+    const uint32_t flat_look = opts & 0x1000000;  // local_11c
     bool unexplored = false;  // local_70
-    bool seen = true;         // local_1c: currently in view (else dithered)
+    bool seen = true;  // local_1c: currently in view (else dithered)
     if (flat_look) {
         rain = 0;
         rocky = 0;
@@ -238,10 +239,10 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
 
     // Neighbour masks.
     uint32_t coast[4] = {0, 0, 0, 0};  // local_108[0..3]: water next to each quadrant
-    uint32_t rain_mask = 0;            // local_28
-    uint32_t fungus_mask = 0;          // local_40
-    uint32_t jungle_mask = 0;          // local_2c
-    bool jungle = false;               // local_30
+    uint32_t rain_mask = 0;  // local_28
+    uint32_t fungus_mask = 0;  // local_40
+    uint32_t jungle_mask = 0;  // local_2c
+    bool jungle = false;  // local_30
     const bool no_terrain = (opts & 0x80000000u) != 0;  // local_20
     if (!no_terrain) {
         if (!ocean) {
@@ -264,7 +265,8 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
                     if (!in_map(nx, ny)) continue;
                     MAP* n = tile(nx, ny);
                     if ((n->items & 0x20) && (n->climate & 0xE0) > 0x3F) fungus_mask |= 1u << k;
-                    if (jungle && (n->landmarks & 0x80000004) == 4 && (n->climate & 0xE0) > 0x5F) jungle_mask |= 1u << k;
+                    if (jungle && (n->landmarks & 0x80000004) == 4 && (n->climate & 0xE0) > 0x5F)
+                        jungle_mask |= 1u << k;
                     if (rain && ((n->climate & 0xE0) < 0x60 || rain <= ((n->climate >> 3) & 3))) rain_mask |= 1u << k;
                 }
             }
@@ -318,10 +320,10 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
         }
         return restore_and_return(0);
     }
-    uint32_t variant = 0;                           // local_bc
-    const int32_t rnd_variant = random_get(0, 2);   // local_c4
+    uint32_t variant = 0;  // local_bc
+    const int32_t rnd_variant = random_get(0, 2);  // local_c4
     const uint32_t keep_points = opts & 0x10000000;  // local_48
-    int32_t coast_pts[16][2], coast_uv[16][2];      // local_2ec, auStack_26c
+    int32_t coast_pts[16][2], coast_uv[16][2];  // local_2ec, auStack_26c
     if (!keep_points) {
         for (int32_t i = 0; i < 4; i++) {
             for (int32_t j = 0; j < 3; j++) {
@@ -329,7 +331,8 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
                 pts[idx][0] = TilePolyX[idx] * q2 + px;
                 pts[idx][1] = TilePolyY[idx] * q + py;
                 int32_t r = idx;
-                if (!ocean && !(items & 0x8000) && rain && !no_terrain) r = j + ((RainTransition[rain_mask][1] + i) & 3) * 3;
+                if (!ocean && !(items & 0x8000) && rain && !no_terrain)
+                    r = j + ((RainTransition[rain_mask][1] + i) & 3) * 3;
                 uv[idx][0] = TilePolyUV[r][0];
                 uv[idx][1] = TilePolyUV[r][1];
                 if (rocky) {
@@ -351,8 +354,9 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
     }
     bool territory_look = false;  // local_80
     const uint32_t territory = opts & 0x10000;  // local_c0
-    if (territory && (omniscient(CurrentPlayerFaction) || (sq->visibility & (1 << CurrentPlayerFaction)) ||
-                      (GameState & STATE_OMNISCIENT_VIEW)) &&
+    if (territory &&
+        (omniscient(CurrentPlayerFaction) || (sq->visibility & (1 << CurrentPlayerFaction)) ||
+         (GameState & STATE_OMNISCIENT_VIEW)) &&
         no_terrain) {
         territory_look = true;
         terr = whose_territory(CurrentPlayerFaction, x, y, nullptr, 0);
@@ -439,11 +443,11 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
                             Texture_draw_2(ArtTexture(kTexWater, 1), dest, &WaterQuadPoints[p][0][0], deep, 4,
                                            &quad_uv[p][0][0]);
                         else
-                            pfncImageCopytoCanvas2(ArtTexture(kTexWater, 1), dest, &WaterQuadPoints[p][0][0], deep,
-                                                   4, &quad_uv[p][0][0], 0x41);
+                            pfncImageCopytoCanvas2(ArtTexture(kTexWater, 1), dest, &WaterQuadPoints[p][0][0], deep, 4,
+                                                   &quad_uv[p][0][0], 0x41);
                     }
-                    Texture_draw_4(ArtTexture(kTexWater, 0), dest, &WaterQuadPoints[p][0][0], l, 4,
-                                   &quad_uv[p][0][0], 0x10, color);
+                    Texture_draw_4(ArtTexture(kTexWater, 0), dest, &WaterQuadPoints[p][0][0], l, 4, &quad_uv[p][0][0],
+                                   0x10, color);
                 }
             }
         }
@@ -551,13 +555,14 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
                 quad_uv[k][1] = TilePolyUV[((rot + k) & 3) * 3 + 1][1];
             }
             Texture_draw_upper_threshold_trans_2(
-                ArtTexture(kTexFungus, RainTransition[fungus_mask][0] + (ocean ? 15 : 0)), dest, &TileCorners[0][0],
-                4, &quad_uv[0][0], color);
+                ArtTexture(kTexFungus, RainTransition[fungus_mask][0] + (ocean ? 15 : 0)), dest, &TileCorners[0][0], 4,
+                &quad_uv[0][0], color);
         }
     }
     // Territory borders: edges to tiles of the same region owned by someone else.
-    if (territory && (omniscient(CurrentPlayerFaction) || (sq->visibility & (1 << CurrentPlayerFaction)) ||
-                      (GameState & STATE_OMNISCIENT_VIEW)) &&
+    if (territory &&
+        (omniscient(CurrentPlayerFaction) || (sq->visibility & (1 << CurrentPlayerFaction)) ||
+         (GameState & STATE_OMNISCIENT_VIEW)) &&
         !no_terrain) {
         terr = whose_territory(CurrentPlayerFaction, x, y, nullptr, 0);
         if (terr >= 0) {
@@ -691,13 +696,12 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
             }
             if (base_id < 0 && ((mag && !mag_drawn) || !any)) {
                 set_uv({0, 0, 0x37, 0, 0x37, 0x37, 0, 0x37});
-                Texture_draw_trans_4(ArtTexture((mag && !mag_drawn) ? kTexMagTube : kTexRoad), dest,
-                                     &TileCorners[0][0], corner_light, 4, &quad_uv[0][0]);
+                Texture_draw_trans_4(ArtTexture((mag && !mag_drawn) ? kTexMagTube : kTexRoad), dest, &TileCorners[0][0],
+                                     corner_light, 4, &quad_uv[0][0]);
             }
         }
     }
-    if ((improvements && (items & 0x8000) && zoom > -8) || (opts & 0x1000))
-        food = crop_yield(terr, -1, x, y, 0);
+    if ((improvements && (items & 0x8000) && zoom > -8) || (opts & 0x1000)) food = crop_yield(terr, -1, x, y, 0);
     if ((opts & 0x200)) {
         int32_t bonus = bonus_at(x, y);
         if (bonus && zoom > -8) {

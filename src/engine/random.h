@@ -19,4 +19,3 @@ ADDR(0x538FB0) void GAMEAPI game_srand(uint32_t seed);
 // CRT generator state access for the harness (native builds only).
 uint32_t crt_rand_state();
 void crt_set_rand_state(uint32_t state);
-

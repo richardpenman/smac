@@ -157,10 +157,8 @@ void THISCALL Path_continents(Path* self) {
         total += Continents[r].tile_count;
         if (largest < Continents[r].tile_count) largest = Continents[r].tile_count;
     }
-    if (largest < (total * 4) / 5)
-        GameState &= ~0x100;
-    else
-        GameState |= 0x100;  // one dominant landmass
+    if (largest < (total * 4) / 5) GameState &= ~0x100;
+    else GameState |= 0x100;  // one dominant landmass
     for (int32_t r = 0; r < 64; r++) std::memset(Continents[r].sea_coasts, 0, 8);
     for (int32_t y = 0; y < game().map.y; y++) {
         for (int32_t x = y & 1; x < game().map.x; x += 2) {
@@ -277,14 +275,14 @@ struct PathSearch {
     uint32_t flags;
     int32_t prev_dir;
     const UNIT* unit;
-    bool sea;             // sea unit: ocean tiles are passable
-    int32_t road_speed;   // the unit moves no faster than one road move (hex_cost ignore_terrain)
-    uint32_t ai_flag;     // flags & 0x80: avoid foreign territory and enemy surroundings
+    bool sea;  // sea unit: ocean tiles are passable
+    int32_t road_speed;  // the unit moves no faster than one road move (hex_cost ignore_terrain)
+    uint32_t ai_flag;  // flags & 0x80: avoid foreign territory and enemy surroundings
     uint32_t own_mask = 0, src_mask = 0, dst_mask = 0;
     uint32_t treaty_mask = 0, truce_mask = 0, war_mask = 0;
     int32_t dst_near = 0;  // enemy territory at (1) or next to (2) the destination
     int32_t cur_near = 0;  // same for the tile being expanded
-    int32_t zoc = 0;       // the tile being expanded is in a zone of control (Path_zoc_path)
+    int32_t zoc = 0;  // the tile being expanded is in a zone of control (Path_zoc_path)
 
     bool plan_watched() const { return unit->plan == 9 || unit->plan == 8; }
     // Enemy (vendetta) territory at the centre (1) or on a diagonal-free neighbour (2) of (x, y).
@@ -332,10 +330,8 @@ int32_t PathSearch::ai_cost(int32_t x, int32_t y, const MAP*& sq, int32_t cost, 
         uint32_t obit = owner_bit(sq);
         if (!(own_mask & obit)) {
             int32_t extra = 0;
-            if (treaty_mask & obit)
-                extra = SunspotDuration <= 0 ? 1000 : 2500;
-            else if (truce_mask & obit)
-                extra = human ? 1 : 100;
+            if (treaty_mask & obit) extra = SunspotDuration <= 0 ? 1000 : 2500;
+            else if (truce_mask & obit) extra = human ? 1 : 100;
             if (extra) {
                 if (src_mask & obit) extra = 1;
                 if (dst_mask & obit) extra = 1;
@@ -379,8 +375,8 @@ int32_t PathSearch::ai_cost(int32_t x, int32_t y, const MAP*& sq, int32_t cost, 
 // Path_find with the value of its uninitialised "expanded tile is in a ZOC" local made explicit
 // (start_zoc): it is read, unset, while the destination's neighbours are expanded (see
 // docs/RECONSTRUCTION.md, "Known uninitialised reads"; only the zero/non-zero distinction matters).
-int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t unit_id,
-                       int32_t faction_id, int32_t flags, int32_t prev_dir, int32_t start_zoc) {
+int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t unit_id, int32_t faction_id,
+                       int32_t flags, int32_t prev_dir, int32_t start_zoc) {
     PathSearch s;
     s.self = self;
     s.x1 = x1;
@@ -465,8 +461,8 @@ int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y
                 int32_t ny = cy + NearOffsetY[dir];
                 if (!map_in_bounds(nx, ny)) continue;
                 const MAP* sq = map_tile(nx, ny);
-                bool passable = ((sq->climate & 0xE0) < 0x60) == s.sea || (nx == x1 && ny == y1) ||
-                                (nx == x2 && ny == y2);
+                bool passable =
+                    ((sq->climate & 0xE0) < 0x60) == s.sea || (nx == x1 && ny == y1) || (nx == x2 && ny == y2);
                 if (!passable && s.sea && (sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8) {
                     int32_t owner = sq->val2 & 0xF;  // ships enter friendly bases
                     passable = owner == faction_id || (faction_raw(faction_id).diplo_status[owner] & DIPLO_PACT);

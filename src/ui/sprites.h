@@ -21,46 +21,46 @@ inline Texture* ArtTexture(uint32_t base, int32_t index) { return ArtTexture(bas
 inline Sprite* ArtSprite(uint32_t base, int32_t index) { return ArtSprite(base + (uint32_t)index * 0x2C); }
 
 // ---- terrain textures (TEXTURE.PCX, 56x56 cells; load_terrain) ----
-constexpr uint32_t kTexRocky = 0x76E9E0;       // [4]: rocky overlays, [rand + 2 * rocky - 2]
-constexpr uint32_t kTexWater = 0x7A7820;       // [2]: shallow, deep water
-constexpr uint32_t kTexArid = 0x799E48;        // arid land
-constexpr uint32_t kTexMoist = 0x799EB8;       // [16]: moist land, by rain transition
-constexpr uint32_t kTexRainy = 0x799738;       // [16]: rainy land, by rain transition
-constexpr uint32_t kTexJungle = 0x789C28;      // [15]: Monsoon Jungle
-constexpr uint32_t kTexDune = 0x7AC220;        // land texture of landmark bit 0x40 (dunes)
-constexpr uint32_t kTexMesa = 0x7797F8;        // [8]: mesa overlays (landmark 0x100)
-constexpr uint32_t kTexRoad = 0x792218;        // [9]: road centre, then the 8 directions
-constexpr uint32_t kTexMagTube = 0x798E08;     // [9]: mag tube centre, then the 8 directions
-constexpr uint32_t kTexRiver = 0x7A7AA0;       // [16]: rivers by diagonal river neighbours
-constexpr uint32_t kTexVolcano = 0x78A340;     // [3]: volcano overlays (landmark 2)
-constexpr uint32_t kTexCrater = 0x788100;      // [3]: crater overlays (landmark 1)
-constexpr uint32_t kTexFungus = 0x776A80;      // [15]: xenofungus by fungus transition
-constexpr uint32_t kTexSeaFungus = 0x777110;   // [15]: sea fungus
-constexpr uint32_t kTexFarm = 0x799238;        // [9]: farmland [3 * rand + rain]
-constexpr uint32_t kTexForest = 0x78A758;      // [16]: forest by diagonal forest neighbours
+constexpr uint32_t kTexRocky = 0x76E9E0;  // [4]: rocky overlays, [rand + 2 * rocky - 2]
+constexpr uint32_t kTexWater = 0x7A7820;  // [2]: shallow, deep water
+constexpr uint32_t kTexArid = 0x799E48;  // arid land
+constexpr uint32_t kTexMoist = 0x799EB8;  // [16]: moist land, by rain transition
+constexpr uint32_t kTexRainy = 0x799738;  // [16]: rainy land, by rain transition
+constexpr uint32_t kTexJungle = 0x789C28;  // [15]: Monsoon Jungle
+constexpr uint32_t kTexDune = 0x7AC220;  // land texture of landmark bit 0x40 (dunes)
+constexpr uint32_t kTexMesa = 0x7797F8;  // [8]: mesa overlays (landmark 0x100)
+constexpr uint32_t kTexRoad = 0x792218;  // [9]: road centre, then the 8 directions
+constexpr uint32_t kTexMagTube = 0x798E08;  // [9]: mag tube centre, then the 8 directions
+constexpr uint32_t kTexRiver = 0x7A7AA0;  // [16]: rivers by diagonal river neighbours
+constexpr uint32_t kTexVolcano = 0x78A340;  // [3]: volcano overlays (landmark 2)
+constexpr uint32_t kTexCrater = 0x788100;  // [3]: crater overlays (landmark 1)
+constexpr uint32_t kTexFungus = 0x776A80;  // [15]: xenofungus by fungus transition
+constexpr uint32_t kTexSeaFungus = 0x777110;  // [15]: sea fungus
+constexpr uint32_t kTexFarm = 0x799238;  // [9]: farmland [3 * rand + rain]
+constexpr uint32_t kTexForest = 0x78A758;  // [16]: forest by diagonal forest neighbours
 constexpr uint32_t kTexCoastShape = 0x76E8A0;  // [2]: coast shapes (RAINFALL.PCX through 0x6846F8)
-constexpr uint32_t kTexBorder = 0x78DD80;      // territory border directions (0..8 per texel)
+constexpr uint32_t kTexBorder = 0x78DD80;  // territory border directions (0..8 per texel)
 // Colours sampled from RAINFALL.PCX (load_terrain): 4 x 3 at (0x82 + 14i, 0x158 + 17j).
 GLOBAL(uint8_t[12], CoastColors, 0x787E54);
 
 // ---- terrain sprites (TER1.PCX etc., 100x62 cells) ----
-constexpr uint32_t kSprMine = 0x776A50, kSprMineSea = 0x789B68;      // mine, mining platform
-constexpr uint32_t kSprSolar = 0x7991F8, kSprSolarSea = 0x78A5B0;    // solar, tidal harness
-constexpr uint32_t kSprKelp = 0x7A6860;                              // kelp farm
+constexpr uint32_t kSprMine = 0x776A50, kSprMineSea = 0x789B68;  // mine, mining platform
+constexpr uint32_t kSprSolar = 0x7991F8, kSprSolarSea = 0x78A5B0;  // solar, tidal harness
+constexpr uint32_t kSprKelp = 0x7A6860;  // kelp farm
 constexpr uint32_t kSprBunker = 0x7AD010, kSprAirbase = 0x7ACC60, kSprSensor = 0x7A6830;
 constexpr uint32_t kSprCondenser = 0x779390, kSprMirror = 0x7ABF60;
 constexpr uint32_t kSprBorehole = 0x78DD20, kSprBoreholeGeo = 0x7ACB88;
 constexpr uint32_t kSprMonolith = 0x75B098;
-constexpr uint32_t kSprFarm = 0x791FC8;        // [4] farms by nutrients
-constexpr uint32_t kSprEnricher = 0x79A710;    // [4] farms with soil enricher
-constexpr uint32_t kSprSpecial = 0x78A700;     // [2] land / sea bonus 4 (landmarks 8, 0x400)
-constexpr uint32_t kSprBonus = 0x75B230;       // [12] resource icons [((bonus * 2 + sea) * 2 - 4) + parity]
-constexpr uint32_t kSprPod = 0x77AFF8;         // [6] supply pods [sea + 2 * ((7x + 5y) % 3)]
+constexpr uint32_t kSprFarm = 0x791FC8;  // [4] farms by nutrients
+constexpr uint32_t kSprEnricher = 0x79A710;  // [4] farms with soil enricher
+constexpr uint32_t kSprSpecial = 0x78A700;  // [2] land / sea bonus 4 (landmarks 8, 0x400)
+constexpr uint32_t kSprBonus = 0x75B230;  // [12] resource icons [((bonus * 2 + sea) * 2 - 4) + parity]
+constexpr uint32_t kSprPod = 0x77AFF8;  // [6] supply pods [sea + 2 * ((7x + 5y) % 3)]
 constexpr uint32_t kSprLandmark2000 = 0x7AC098;  // landmark 0x2000 sprites
 constexpr uint32_t kSprLandmark4000 = 0x776758;  // expansion landmarks 0x4000
 constexpr uint32_t kSprLandmark8000 = 0x7ACD70;  // expansion landmarks 0x8000
-constexpr uint32_t kSprElevation = 0x791C58;   // [6] map option 8
-constexpr uint32_t kSprRainfall = 0x7A99A0;    // [9] map option 0x10
+constexpr uint32_t kSprElevation = 0x791C58;  // [6] map option 8
+constexpr uint32_t kSprRainfall = 0x7A99A0;  // [9] map option 0x10
 
 // ---- base sprites (faction PCX, 100x75 cells) ----
 // [faction][(water * 4 + size) * 3 + defense]; 37 sprites per faction in the original (0x78E978,

@@ -313,10 +313,8 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
         for (int32_t i = 1; i < 8; i++) {
             if (game().factions[i].region_total_bases[region]) others |= 1 << i;
         }
-        if (!aquatic && killer_id != kSetupArrival)
-            near_base = base_find_filtered(x, y, -1, region, -1, -1);
-        else
-            near_base = base_find(x, y);
+        if (!aquatic && killer_id != kSetupArrival) near_base = base_find_filtered(x, y, -1, region, -1, -1);
+        else near_base = base_find(x, y);
         if (near_base < 0) BaseFindDist = 32;
         if (CurrentTurn == 0 || killer_id == kSetupArrival) {
             for (int32_t v = 0; v < game().veh_count; v++) {
@@ -463,8 +461,8 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
             parse_says(0, game().mfactions[k].noun_faction, -1, -1);
             if (MultiplayerActive) {
                 NetDaemon_hang_up(&NetState);
-                static const uint8_t kCleared[] = {0,  1,  2,  3,  12, 11, 15, 14, 19, 30, 28, 29, 39, 38,
-                                                   8,  9,  10, 37, 36, 32, 31, 33, 4,  5,  42, 41, 6,  7};
+                static const uint8_t kCleared[] = {0, 1, 2,  3,  12, 11, 15, 14, 19, 30, 28, 29, 39, 38,
+                                                   8, 9, 10, 37, 36, 32, 31, 33, 4,  5,  42, 41, 6,  7};
                 for (uint8_t i : kCleared) NetSessionState[i] = 0;
                 NetSessionState[40] = 0xFF;
                 NetSessionState[18] = 0;
@@ -511,7 +509,8 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
             ext |= PFLAG_EXT_STRAT_LOTS_MISSILES;
             F.player_flags |= PFLAG_EMPHASIZE_AIR_POWER;
         }
-        if (!crt_strcmp(StrBuffer, "DRONE")) ext = (ext & ~PFLAG_EXT_STRAT_LOTS_PROBE_TEAMS) | PFLAG_EXT_STRAT_LOTS_TERRAFORMERS;
+        if (!crt_strcmp(StrBuffer, "DRONE"))
+            ext = (ext & ~PFLAG_EXT_STRAT_LOTS_PROBE_TEAMS) | PFLAG_EXT_STRAT_LOTS_TERRAFORMERS;
         if (Continents[region].tile_count < 250 && game_rand() % 3 == 0) ext |= PFLAG_EXT_STRAT_LOTS_SEA_BASES;
         if (F.AI_fight >= 0 && game_rand() % 4 == 0) ext |= PFLAG_EXT_STRAT_LOTS_MISSILES;
         if (game_rand() % 6 == 0) ext |= PFLAG_EXT_STRAT_LOTS_TERRAFORMERS;
@@ -606,13 +605,15 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
             region = map_tile(x, y)->region;
             // Unity foils on a crowded continent, one tile off the coast.
             if (MultiplayerActive && Continents[region].tile_count / (bit_count(others) + 1) <= 75 && is_human(f)) {
-                int32_t veh_id = veh_init(BSC_UNITY_FOIL, f, map_wrap_x(x + TableOffsetX[coast]), y + TableOffsetY[coast]);
+                int32_t veh_id =
+                    veh_init(BSC_UNITY_FOIL, f, map_wrap_x(x + TableOffsetX[coast]), y + TableOffsetY[coast]);
                 game().vehs[veh_id].morale = MORALE_DISCIPLINED;
                 veh_demote(veh_id);
                 game().vehs[veh_id].home_base_id = -1;
             }
             if (Continents[region].tile_count / (bit_count(others) + 1) <= 50) {
-                int32_t veh_id = veh_init(BSC_UNITY_FOIL, f, map_wrap_x(x + TableOffsetX[coast]), y + TableOffsetY[coast]);
+                int32_t veh_id =
+                    veh_init(BSC_UNITY_FOIL, f, map_wrap_x(x + TableOffsetX[coast]), y + TableOffsetY[coast]);
                 game().vehs[veh_id].morale = MORALE_DISCIPLINED;
                 veh_demote(veh_id);
                 game().vehs[veh_id].home_base_id = -1;
@@ -781,10 +782,8 @@ void GAMEAPI balance() {
                 veh_vector_dist(x, y, game().vehs[other].x, game().vehs[other].y) * 3200 / game().map.tile_count;
             if (dist < room) room = dist;
         }
-        if (room < 1000)
-            room = room / 5 - 3;
-        else
-            room = clamp((Continents[region].tile_count + 31) / 32, 1, 8);
+        if (room < 1000) room = room / 5 - 3;
+        else room = clamp((Continents[region].tile_count + 31) / 32, 1, 8);
         int32_t good = 0;
         for (int32_t i = 0; i < 21; i++) {
             int32_t x2 = map_wrap_x(x + TableOffsetX[i]);
@@ -810,7 +809,8 @@ void GAMEAPI balance() {
         int32_t spiral = game_rand() % 16;
         int32_t deficit = best_score - score[f - 1];
         for (int32_t i = 0; i < m.faction_bonus_count; i++) {
-            if (m.faction_bonus_id[i] == RULE_UNIT) deficit -= Units[m.faction_bonus_val1[i]].plan != PLAN_COLONY ? 1 : 3;
+            if (m.faction_bonus_id[i] == RULE_UNIT)
+                deficit -= Units[m.faction_bonus_val1[i]].plan != PLAN_COLONY ? 1 : 3;
         }
         if (DiffLevel > 1 && (deficit >= 3 || DiffLevel >= (is_human(f) ? 4 : 5))) {
             deficit -= 3;
@@ -843,9 +843,9 @@ void GAMEAPI balance() {
 
 // Faction pairs (by search key) that start with the "personality conflict" agenda bit 0x200.
 static const char* const kRivalKeys[][2] = {
-    {"PEACE", "SPARTANS"}, {"GAIANS", "MORGAN"}, {"HIVE", "BELIEVE"}, {"UNIV", "BELIEVE"},
+    {"PEACE", "SPARTANS"},  {"GAIANS", "MORGAN"}, {"HIVE", "BELIEVE"},  {"UNIV", "BELIEVE"},
     {"FUNGBOY", "BELIEVE"}, {"PEACE", "PIRATES"}, {"DRONE", "PIRATES"}, {"DRONE", "MORGAN"},
-    {"DRONE", "HIVE"},      {"ANGELS", "HIVE"},  {"ANGELS", "CYBORG"},
+    {"DRONE", "HIVE"},      {"ANGELS", "HIVE"},   {"ANGELS", "CYBORG"},
 };
 
 void GAMEAPI setup_game(int32_t reload) {
@@ -968,8 +968,7 @@ void GAMEAPI setup_game(int32_t reload) {
                 j = game_rand() % 7 + 1;
                 tries++;
             } while (j == i);
-            if (pairs[j] != 0 &&
-                (tries < 200 || (tries < 400 && !(game().mfactions[j].rule_flags & RFLAG_COMMFREQ))))
+            if (pairs[j] != 0 && (tries < 200 || (tries < 400 && !(game().mfactions[j].rule_flags & RFLAG_COMMFREQ))))
                 continue;
             if (is_human(i) && is_human(j) && tries < 100) continue;
             break;
@@ -1062,10 +1061,8 @@ int32_t GAMEAPI eliminate_player(int32_t faction_id, int32_t killer_id) {
             game().factions[killer_id].eliminated_count++;
         if (f == CurrentPlayerFaction) return 1;
     }
-    if (killer_id < 0)
-        killer_id = 0;
-    else if (killer_id > 0)
-        set_treaty(f, killer_id, 0x2030, 1);
+    if (killer_id < 0) killer_id = 0;
+    else if (killer_id > 0) set_treaty(f, killer_id, 0x2030, 1);
     draw_map(1);
     MFaction& m = game().mfactions[f];
     GenderDefault = m.noun_gender;
@@ -1190,15 +1187,9 @@ void GAMEAPI time_warp() {
     // faction and the population of the first base.
     int32_t warp_turn = 0, tech_base = 0, tech_step = 0, bases_target = 0, first_pop = 0;
     switch (game_rand() % 3) {
-    case 0:
-        warp_turn = 30, tech_base = 6, tech_step = 2, bases_target = 3, first_pop = 5;
-        break;
-    case 1:
-        warp_turn = 60, tech_base = 12, tech_step = 3, bases_target = 4, first_pop = 6;
-        break;
-    case 2:
-        warp_turn = 80, tech_base = 16, tech_step = 4, bases_target = 5, first_pop = 6;
-        break;
+    case 0: warp_turn = 30, tech_base = 6, tech_step = 2, bases_target = 3, first_pop = 5; break;
+    case 1: warp_turn = 60, tech_base = 12, tech_step = 3, bases_target = 4, first_pop = 6; break;
+    case 2: warp_turn = 80, tech_base = 16, tech_step = 4, bases_target = 5, first_pop = 6; break;
     }
     for (int32_t f = 1; f < 8; f++) {
         const uint8_t bit = (uint8_t)(1 << f);
@@ -1253,8 +1244,7 @@ void GAMEAPI time_warp() {
         veh_id = veh_init(defender, f, fb.x, fb.y);
         game().vehs[veh_id].order = ORDER_HOLD;
         // last_veh: the vehicle the original keeps in a local (see the fallback below).
-        int32_t last_veh =
-            veh_init(ExpansionEnabled && is_aquatic(f) ? BSC_SEA_FORMERS : BSC_FORMERS, f, fb.x, fb.y);
+        int32_t last_veh = veh_init(ExpansionEnabled && is_aquatic(f) ? BSC_SEA_FORMERS : BSC_FORMERS, f, fb.x, fb.y);
         int32_t unit_id = get_plan(f, PLAN_COMBAT);
         if (unit_id >= 0) {
             Units[unit_id].unit_flags |= UNIT_PROTOTYPED;
@@ -1284,8 +1274,7 @@ void GAMEAPI time_warp() {
         int32_t project;
         do {
             project = game_rand() % 8;
-        } while (SecretProjects[project] != -1 || project == 4 ||
-                 (project == 5 && !crt_strcmp(m.filename, "HIVE")));
+        } while (SecretProjects[project] != -1 || project == 4 || (project == 5 && !crt_strcmp(m.filename, "HIVE")));
         SecretProjects[project] = first;
         // More bases: the best site 3-8 tiles from an own base.
         int32_t last_x = 0, last_y = 0;  // the last own base visited by the site search
@@ -1406,8 +1395,7 @@ void GAMEAPI time_warp() {
                 COMPAT_ORIGINAL(setup_escape_pod_location);
                 if (is_aquatic(f))
                     last_veh = veh_init(BSC_SEA_ESCAPE_POD, f, last_x, last_y);  // BUG(original): stale location
-                else
-                    veh_init(BSC_COLONY_POD, f, b.x, b.y);
+                else veh_init(BSC_COLONY_POD, f, b.x, b.y);
                 veh_init(BSC_ALIEN_ARTIFACT, f, b.x, b.y);
             }
         }

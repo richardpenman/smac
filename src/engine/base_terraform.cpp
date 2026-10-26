@@ -404,8 +404,8 @@ void GAMEAPI base_terraform(int32_t flag) {
         // Mine / farm.
         bool farm_eval;  // false: straight on to the fungus / borehole / condenser checks
         if ((!mineral_need && ((rain < 1 - Rules.nutrient_effect_mine_sq && rain) || rocky)) ||
-            (sensor && sensors <= 2 - (worked != 0)) || (solar_or_bore && (energy_need || height > 1)) ||
-            food_need || forest || (rocky == 1 && height > 1 && mineral_need < 2) ||
+            (sensor && sensors <= 2 - (worked != 0)) || (solar_or_bore && (energy_need || height > 1)) || food_need ||
+            forest || (rocky == 1 && height > 1 && mineral_need < 2) ||
             (food + mine_or_bore < (farm != 0) + 2 && rocky == 1)) {
             farm_eval = !farm;
         } else {
@@ -559,24 +559,21 @@ void GAMEAPI base_terraform(int32_t flag) {
             }
             MAP* sq = map_tile(x, y);
             switch (order) {
-                case 4:
-                    sq->items |= BIT_FARM | BIT_ROAD;
-                    if (!(sq->climate & 7) && (sq->climate & 0xE0) <= 0x60) sq->items |= BIT_MINE;
-                    else sq->items |= BIT_SOLAR;
-                    break;
-                case 6:
-                    sq->items |= BIT_MINE | BIT_ROAD;
-                    if ((sq->val3 & 0xC0) < 0x80) sq->items |= BIT_FARM;
-                    break;
-                case 7:
-                    sq->items |= BIT_SOLAR | BIT_ROAD;
-                    if ((sq->val3 & 0xC0) < 0x80) sq->items |= BIT_SOLAR;
-                    break;
-                case 8:
-                    sq->items |= BIT_FOREST;
-                    break;
-                default:
-                    break;
+            case 4:
+                sq->items |= BIT_FARM | BIT_ROAD;
+                if (!(sq->climate & 7) && (sq->climate & 0xE0) <= 0x60) sq->items |= BIT_MINE;
+                else sq->items |= BIT_SOLAR;
+                break;
+            case 6:
+                sq->items |= BIT_MINE | BIT_ROAD;
+                if ((sq->val3 & 0xC0) < 0x80) sq->items |= BIT_FARM;
+                break;
+            case 7:
+                sq->items |= BIT_SOLAR | BIT_ROAD;
+                if ((sq->val3 & 0xC0) < 0x80) sq->items |= BIT_SOLAR;
+                break;
+            case 8: sq->items |= BIT_FOREST; break;
+            default: break;
             }
         }
     }

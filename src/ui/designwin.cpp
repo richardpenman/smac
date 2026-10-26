@@ -83,27 +83,27 @@ UNIT& U(int32_t id) { return Units[id]; }
 const int32_t kPresetPlan[14] = {2, 3, 1, 4, 10, 6, 7, 8, 9, 0x11, 0xD, 0xE, 0xB, 0xC};
 
 struct DesignWinState : ScreenWin {
-    int32_t faction = 0;          // +0x141F4
-    int32_t unit = 0;             // +0x141F8
-    int32_t chassis = 0;          // +0x141FC
-    int32_t weapon = 0;           // +0x14200
-    int32_t armor = 0;            // +0x14204
-    uint32_t abil = 0;            // +0x14208
-    int32_t reactor = 1;          // +0x1420C
-    int32_t f14210 = 0;           // +0x14210
-    int32_t cf = 0;               // +0x14214: cost_factor
-    int32_t slot[2] = {-1, -1};   // +0x14218: the abilities shown in SP1 / SP2
-    char name[0x50]{};            // +0x14220
-    char labels[16][45]{};        // +0x14270: DESIGNLABELS
-    int32_t result = 0;           // +0xCDC
-    int32_t hover = -1;           // +0xCE0: the prototype clicked in the list
-    int32_t stack_pos = 0;        // +0xCE4
-    int32_t frames = 0;           // +0xCE8: redraws (the "Obsolete" blink)
-    float angle = 0;              // +0x12770: the model's rotation
-    VoxelScene scene;             // +0x1279C
+    int32_t faction = 0;  // +0x141F4
+    int32_t unit = 0;  // +0x141F8
+    int32_t chassis = 0;  // +0x141FC
+    int32_t weapon = 0;  // +0x14200
+    int32_t armor = 0;  // +0x14204
+    uint32_t abil = 0;  // +0x14208
+    int32_t reactor = 1;  // +0x1420C
+    int32_t f14210 = 0;  // +0x14210
+    int32_t cf = 0;  // +0x14214: cost_factor
+    int32_t slot[2] = {-1, -1};  // +0x14218: the abilities shown in SP1 / SP2
+    char name[0x50]{};  // +0x14220
+    char labels[16][45]{};  // +0x14270: DESIGNLABELS
+    int32_t result = 0;  // +0xCDC
+    int32_t hover = -1;  // +0xCE0: the prototype clicked in the list
+    int32_t stack_pos = 0;  // +0xCE4
+    int32_t frames = 0;  // +0xCE8: redraws (the "Obsolete" blink)
+    float angle = 0;  // +0x12770: the model's rotation
+    VoxelScene scene;  // +0x1279C
     bool scene_ready = false;
-    Font f10, f12, f16;           // +0x14540.., +0x14568, +0x14590
-    Buffer back;                  // deswin.pcx
+    Font f10, f12, f16;  // +0x14540.., +0x14568, +0x14590
+    Buffer back;  // deswin.pcx
     std::vector<uint8_t> back_px;
     std::vector<BaseButton*> win_buttons;
     // Costs shown by the last redraw (test aid).
@@ -112,31 +112,30 @@ struct DesignWinState : ScreenWin {
     void redraw() override;
     void on_button(int32_t id) override;
     void on_key(int32_t key) override;
-    void on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool right,
-                  bool dbl) override;
+    void on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool right, bool dbl) override;
     void log_state() override;
 
     // The original's methods.
     void rebuild_slots();
     void setup_veh(int32_t unit_id, int32_t fresh);  // 0x43E490
-    int32_t design_it();                             // 0x437BF0
-    void check_abil();                               // 0x439C00
-    void suggest_abil(uint32_t flag);                // 0x439D30
-    void select_chassis();                           // 0x439F20
-    void select_weapon();                            // 0x43A300
-    void select_armor();                             // 0x43A760
-    void select_reactor();                           // 0x43AA00
-    void select_special(int32_t which);              // 0x43AC70
-    void select_name();                              // 0x43BE30
-    void center_stack();                             // the stack position around the unit
+    int32_t design_it();  // 0x437BF0
+    void check_abil();  // 0x439C00
+    void suggest_abil(uint32_t flag);  // 0x439D30
+    void select_chassis();  // 0x439F20
+    void select_weapon();  // 0x43A300
+    void select_armor();  // 0x43A760
+    void select_reactor();  // 0x43AA00
+    void select_special(int32_t which);  // 0x43AC70
+    void select_name();  // 0x43BE30
+    void center_stack();  // the stack position around the unit
     bool same_as_unit(int32_t u) const;
     void draw_info(Buffer* c);
     void draw_vehicle(Buffer* c);
     void draw_component(Buffer* c, int32_t kind);
     void draw_stack(Buffer* c);
     void draw_flash(Buffer* c);
-    void render_model(Buffer* c, int32_t cx, int32_t cy, int32_t ch, int32_t w, int32_t ar, int32_t re,
-                      uint32_t ab, float rot, float scale, int32_t parts);
+    void render_model(Buffer* c, int32_t cx, int32_t cy, int32_t ch, int32_t w, int32_t ar, int32_t re, uint32_t ab,
+                      float rot, float scale, int32_t parts);
 };
 
 DesignWinState* g_dw = nullptr;
@@ -372,8 +371,7 @@ void DesignWinState::check_abil() {
         uint32_t bit = 1u << i;
         if (!(bit & abil)) continue;
         if ((bit == 0x80 && (abil & 0x40)) || !abil_cond(i, chassis, weapon, armor) ||
-            (bit_count(abil) > 1 &&
-             (bit_count(abil) != 2 || !has_tech(Rules.tech_preq_allow_2_spec_abil, faction)))) {
+            (bit_count(abil) > 1 && (bit_count(abil) != 2 || !has_tech(Rules.tech_preq_allow_2_spec_abil, faction)))) {
             abil &= ~bit;
             rebuild_slots();
         }
@@ -403,12 +401,12 @@ void DesignWinState::suggest_abil(uint32_t flag) {
 // ---- the component picker (FUN_00433F70) ----
 
 struct PickerState : ScreenWin {
-    int32_t kind = 0;        // 0 chassis, 1 weapon, 2 armour, 3 reactor
+    int32_t kind = 0;  // 0 chassis, 1 weapon, 2 armour, 3 reactor
     int32_t faction = 0;
     std::vector<int32_t> items;  // component ids listed
-    int32_t sel = -1;        // +0xAE0
-    int32_t valid = 0;       // +0x4648
-    int32_t first = 0;       // +0xAD8 (scroll position; 20 visible)
+    int32_t sel = -1;  // +0xAE0
+    int32_t valid = 0;  // +0x4648
+    int32_t first = 0;  // +0xAD8 (scroll position; 20 visible)
     bool missile_armor = false;
     void redraw() override;
     void on_key(int32_t key) override;
@@ -498,16 +496,20 @@ void PickerState::on_key(int32_t key) {
         return;
     case 0x24: sel = 0; break;
     case 0x23: sel = n - 1; break;
-    case 0x25: case 0x64:
+    case 0x25:
+    case 0x64:
         if (cur % 5 > 0) sel = cur - 1;
         break;
-    case 0x27: case 0x66:
+    case 0x27:
+    case 0x66:
         if (cur % 5 < 4 && cur + 1 < n) sel = cur + 1;
         break;
-    case 0x26: case 0x68:
+    case 0x26:
+    case 0x68:
         if (cur >= 5) sel = cur - 5;
         break;
-    case 0x28: case 0x62:
+    case 0x28:
+    case 0x62:
         if (cur + 5 < n) sel = cur + 5;
         break;
     default: break;
@@ -568,7 +570,8 @@ int32_t run_picker(DesignWinState* dw, int32_t kind, int32_t current) {
 }
 
 // The filtered index of `id` among the enabled components of a table, and back.
-template <typename T> int32_t filtered_index(const T* table, int32_t n, int32_t id) {
+template <typename T>
+int32_t filtered_index(const T* table, int32_t n, int32_t id) {
     int32_t k = 0;
     for (int32_t i = 0; i < n; i++) {
         if (table[i].preq_tech < -1) continue;
@@ -577,7 +580,8 @@ template <typename T> int32_t filtered_index(const T* table, int32_t n, int32_t 
     }
     return k;
 }
-template <typename T> int32_t from_filtered(const T* table, int32_t n, int32_t k) {
+template <typename T>
+int32_t from_filtered(const T* table, int32_t n, int32_t k) {
     int32_t i = 0;
     for (; i < n; i++) {
         if (table[i].preq_tech < -1) continue;
@@ -893,12 +897,18 @@ void DesignWinState::on_key(int32_t key) {
     switch (vk) {
     case 0xD: on_button(4); break;
     case 0x1B: on_button(8); break;
-    case 0x21: case 0x69: stack_pos = std::max(0, (stack_pos - 9 + n) % std::max(n, 1)); break;
-    case 0x22: case 0x63: stack_pos = std::max(0, (stack_pos + 9 + n) % std::max(n, 1)); break;
-    case 0x23: case 0x61: stack_pos = std::max(0, n - 10); break;
-    case 0x24: case 0x67: stack_pos = 0; break;
-    case 0x25: case 0x64: on_button(0x17); break;
-    case 0x27: case 0x66: on_button(0x18); break;
+    case 0x21:
+    case 0x69: stack_pos = std::max(0, (stack_pos - 9 + n) % std::max(n, 1)); break;
+    case 0x22:
+    case 0x63: stack_pos = std::max(0, (stack_pos + 9 + n) % std::max(n, 1)); break;
+    case 0x23:
+    case 0x61: stack_pos = std::max(0, n - 10); break;
+    case 0x24:
+    case 0x67: stack_pos = 0; break;
+    case 0x25:
+    case 0x64: on_button(0x17); break;
+    case 0x27:
+    case 0x66: on_button(0x18); break;
     default: break;
     }
     if (!open || (key & 0x60000)) return;
@@ -927,7 +937,7 @@ void DesignWinState::on_click(int32_t parent, int32_t index, int32_t, int32_t, i
 // ---- drawing ----
 
 // The component boxes (spots 0..5 of the window: chassis, weapon, armour / reactor, SP1, SP2).
-const UiRect kBoxes[6] = {{0x1E, 7, 0x81, 0x5C},   {0x1E, 0x65, 0x81, 0xBA},  {0x1E, 0xC3, 0x81, 0x118},
+const UiRect kBoxes[6] = {{0x1E, 7, 0x81, 0x5C},   {0x1E, 0x65, 0x81, 0xBA},   {0x1E, 0xC3, 0x81, 0x118},
                           {0x1CE, 7, 0x231, 0x5C}, {0x1CE, 0x65, 0x231, 0xBA}, {0x1CE, 0xC3, 0x231, 0x118}};
 const UiRect kVehicle{0x8C, 9, 0x1C3, 0x140};
 
@@ -1004,8 +1014,8 @@ void DesignWinState::draw_component(Buffer* c, int32_t kind) {
     if (parts) {
         Buffer_set_clip(c, &in);
         render_model(c, (in.left + in.right) / 2, (in.top + in.bottom) / 2 + 6, kind == 3 ? chassis : chassis,
-                     kind == 1 || kind == 0 ? weapon : 0, kind == 2 ? armor : 0, kind == 3 ? reactor : 0, 0,
-                     0.5233f, 0.07f, parts);
+                     kind == 1 || kind == 0 ? weapon : 0, kind == 2 ? armor : 0, kind == 3 ? reactor : 0, 0, 0.5233f,
+                     0.07f, parts);
         UiRect all{0, 0, c->width, c->height};
         Buffer_set_clip(c, &all);
     }
@@ -1032,8 +1042,8 @@ void DesignWinState::draw_vehicle(Buffer* c) {
         scratch.ability_flags = abil;
         scratch.icon_offset = U(unit).icon_offset;
         int32_t veh = veh_fake(63, faction);
-        veh_draw(c, veh, v.left + ((v.right - 0xBB) - v.left) / 2, v.top + ((v.bottom - 0x8C) - v.top) / 2, 0xE,
-                 0x44, 0);
+        veh_draw(c, veh, v.left + ((v.right - 0xBB) - v.left) / 2, v.top + ((v.bottom - 0x8C) - v.top) / 2, 0xE, 0x44,
+                 0);
     }
     UiRect all{0, 0, c->width, c->height};
     Buffer_set_clip(c, &all);
@@ -1339,10 +1349,11 @@ int32_t THISCALL DesignWin_exec(uint8_t*, int32_t f, int32_t unit_id) {
     const int32_t ids[5] = {4, 5, 6, 7, 8};
     const int32_t labs[5] = {270, 125, 756, 757, 102};
     for (int32_t i = 0; i < 5; i++)
-        w.win_buttons.push_back(
-            sw_button(&w, sw_upper(label_get(labs[i])).c_str(), ids[i], l0 + i * step, top, r0 - l0, bottom - top, 0, bf));
+        w.win_buttons.push_back(sw_button(&w, sw_upper(label_get(labs[i])).c_str(), ids[i], l0 + i * step, top, r0 - l0,
+                                          bottom - top, 0, bf));
     int32_t up = (top - bottom) - 6;
-    w.win_buttons.push_back(sw_button(&w, sw_upper(label_get(918)).c_str(), 1, l0, top + up, r0 - l0, bottom - top, 0, bf));
+    w.win_buttons.push_back(
+        sw_button(&w, sw_upper(label_get(918)).c_str(), 1, l0, top + up, r0 - l0, bottom - top, 0, bf));
     w.win_buttons.push_back(
         sw_button(&w, sw_upper(label_get(1033)).c_str(), 2, l0 + step, top + up, r0 - l0, bottom - top, 0, bf));
     w.win_buttons.push_back(
@@ -1359,7 +1370,8 @@ int32_t THISCALL DesignWin_exec(uint8_t*, int32_t f, int32_t unit_id) {
             for (int32_t row = 0; row < 7; row++) {
                 const char* t = text_get();
                 std::string label = sw_upper(t ? t : "");
-                sw_button(&w, label.c_str(), id++, px + col * (pw + 3), py + row * 0x17, pw, 0x15, 1, find_font(0xA, 1));
+                sw_button(&w, label.c_str(), id++, px + col * (pw + 3), py + row * 0x17, pw, 0x15, 1,
+                          find_font(0xA, 1));
             }
         text_close();
     }
@@ -1445,8 +1457,10 @@ void designwin_log_protos() {
         int32_t u = f * 64 + i;
         const UNIT& x = Units[u];
         if (!(x.unit_flags & 1)) continue;
-        std::fprintf(stderr, "proto %d name '%s' chassis %d weapon %d armor %d reactor %d abil %#x flags %#x obsolete %d cost %d\n",
-                     u, x.name, x.chassis_id, x.weapon_id, x.armor_id, x.reactor_id, x.ability_flags, x.unit_flags,
-                     (x.obsolete_factions >> f) & 1, x.cost);
+        std::fprintf(
+            stderr,
+            "proto %d name '%s' chassis %d weapon %d armor %d reactor %d abil %#x flags %#x obsolete %d cost %d\n", u,
+            x.name, x.chassis_id, x.weapon_id, x.armor_id, x.reactor_id, x.ability_flags, x.unit_flags,
+            (x.obsolete_factions >> f) & 1, x.cost);
     }
 }
