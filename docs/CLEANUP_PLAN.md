@@ -223,7 +223,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 7 | `GameState` view + `game()`; migrate module by module (map, factions, bases, vehs) | M ×4 | done (see note 7) |
 | 8 | Magic numbers → named constants/enums, module by module | M | first pass done (see note 8) |
 | 9 | `compat.h`: name and isolate all 173 `BUG(original)` sites | M | done (see note 9) |
-| 10 | Split `base_production` / yields + unit tests | M | |
+| 10 | Split `base_production` / yields + unit tests | M | done (see note 10) |
 | 11 | Split combat (`battle_fight_2`, odds) + unit tests | M | |
 | 12 | Split `base_build` | L | |
 | 13 | Split `goody_box`, `probe`, `random_events` (gotos out) | M | |
@@ -316,3 +316,32 @@ Notes on the increments:
    before, else `compat flag` in the comment's text), every flag to be declared and used, and
    docs/COMPAT.md (`compat.py doc`, sites listed per file, no line numbers) to be current.
    tests/unit/test_compat.cpp checks that every flag defaults on.
+
+10. `base_production`, `base_yield` and `base_growth` (base.cpp) keep their `ADDR` and become short
+    drivers over static helpers, each block moved unchanged in order. `base_production` shares its
+    state through a `Production` context (faction, the item being completed, and the original's
+    `[ebp-0x10]` slot that the Voice of Planet reads): `check_production_queue`, then
+    `complete_unit` (`colony_pod_may_abandon`, `mark_prototype_built`, `pay_production_cost`,
+    `announce_unit`, whose goto became one condition, `upgrade_obsolete_units`) or
+    `complete_facility` (`install_facility`, `announce_own_facility` / `announce_foreign_facility`,
+    `project_effects`, `transcend`, `reassign_project_builders`); `restore_current_base` replaces
+    two copies of the recompute sequence. `base_yield`: `init_satellite_intake`,
+    `keep_worked_tiles`, `release_specialists`, `choose_worked_tiles` (`score_tiles`,
+    `score_specialists`, `swap_worked_tile`), `compute_eco_damage`. `base_growth`: `base_starve`,
+    `pop_limit_facility`, `warn_low_nutrients`. The pure formulas went to `engine/base_rules.h`
+    (namespace `base_rules`, inline, no game state): tile and specialist scores, satellite intake,
+    governor priorities, eco-damage per tile, minerals carried over after completion, the low
+    nutrients test, the facility voice number. They are not `static` because the unit tests call
+    them (tests/unit/test_base_rules.cpp); helpers with side effects stay in the anonymous
+    namespace. Most expected values were recorded from native games (tiny20, late140,
+    cov_late300, small_wet), which match the original's; the others (human-only branches,
+    satellites, which no scenario builds) follow the code.
+    Coverage (`-DSMACX_COVERAGE`, all 29 scenarios, line counts of the code before the split): every
+    moved block of `base_yield` and `base_growth` runs except the governor priorities (now unit
+    tested), the convoy stop and death of a starving base. In `base_production` the blocks no
+    observer game reaches are human-player messages (ALREADYPROJECT, ABANDONBASE, the PRODUCE
+    popups, the first-facility blurb, governor flags), the satellite map reveal, and the Voice of
+    Planet / Ascent / Planetary Datalinks effects. The harness cannot play a human faction, so no
+    scenario was added: those blocks were moved verbatim (text unchanged apart from the context
+    struct's `p.` prefix), and the scripted UI tests run the human paths they reach.
+    fcompare: `none +base_production +base_yield +base_growth`.
