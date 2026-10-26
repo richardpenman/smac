@@ -311,4 +311,28 @@ run nocycle $NEW --keys "ENTER,PALTICK:1"
 nocheck nocycle "no cycles in the shipped system.txt" "^palette cycle"
 nocrash cycle
 
+# 19. scroll_show / scroll_hide (slide.cpp): a list popup with more items than rows (a test
+#     script, #listbox 4, in the game directory of case 18) gets the console's right arm and the
+#     scroll rail at its right edge, the scroll bar on the rail as tall as the rail allows
+#     (Popup_on_listbox_scroll_create: 255 - 10); closing it hides them. Base operations of
+#     turn_300 (faction 3, 15 bases) get the report window's scroll bar on its rail: its down
+#     button scrolls a row, its track a page; secret projects too, the score report hides it.
+printf '#LISTTEST\r\n#xs 440\r\n#caption Scroll test\r\n#listbox 4\r\n"Pick one:"\r\n\r\nOne\r\nTwo\r\nThree\r\nFour\r\nFive\r\nSix\r\nSeven\r\nEight\r\n\r\n' \
+    > "$OUT/cyclegame/listtest.txt"
+run listrail $NEW --gamedir "$OUT/cyclegame" --keys "ENTER,POPUP:listtest/LISTTEST/2,SHOT:list.bmp,DOWN,ENTER"
+check listrail "the rail arrives" "^scroll show 757x300 at 149,255: rail 255"
+check listrail "and leaves" "^scroll hide 757x300 at 149,255"
+check listrail "the list's choice" "^popup LISTTEST answer: 1 "
+nocrash listrail
+if [ -f "$ROOT/work/saves_late/turn_300.sav" ]; then
+    run opsrail --save work/saves_late/turn_300.sav --human 3 --keys \
+        "ESC,ESC,ESC,ESC,ESC,ESC,ESC,F4,CLICK:861x495,SCREENSTATE,CLICK:861x300,SCREENSTATE,SHOT:ops.bmp,F5,SCREENSTATE,F8,ESC"
+    check opsrail "the window's scroll bar" "^scroll show 728x553 at 164,3"
+    check opsrail "its down button: a row" "^report page scroll 1 of 5"
+    check opsrail "its track: a page" "^report page scroll 5 of 5"
+    check opsrail "secret projects" "^report page scroll 0 of 7"
+    check opsrail "the score report hides it" "^scroll hide 728x553 at 164,3"
+    nocrash opsrail
+fi
+
 exit $FAIL

@@ -230,6 +230,7 @@ void ui_councilwin_build(uint8_t* win) {
     int32_t avail = ScreenHeight - MiConsoleHeight;
     int32_t h = avail > 0x18B ? 0x18B : avail;
     sw_init(s, (ScreenWidth - 0x30C) / 2, avail - h, kW, h, true);
+    s->slide = true;  // FUN_00426FA0 (the window's on_status): slide_show / slide_hide
     s->f_title = find_font(14, 1);
     s->f_text = find_font(12, 0);
     s->f_bold = find_font(12, 1);

@@ -1,5 +1,7 @@
 // Script-driven popups of the original UI (see popup.h).
 #include "ui/popup.h"
+#include "ui/slide.h"
+#include "ui/diplowin.h"
 #include "ui/scroll.h"
 #include "ui/labs.h"
 #include "ui/sound.h"
@@ -439,6 +441,7 @@ public:
     // ---- window ----
     Buffer canvas;                     // the GraphicWin's Buffer (+0x444)
     bool shown = false;
+    bool scroll_shown = false;         // scroll_show ran (the rail is in the window)
     struct Button {
         UiRect r;
         int32_t id;
@@ -1093,6 +1096,13 @@ UiRect item_rect(BasePop* p, int32_t pos) {
     return {p->item_x + x, p->item_y + y, p->item_x + x + p->item_w, p->item_y + y + h};
 }
 
+// The list box has a scroll bar (Popup_on_listbox_scroll_create): more items than rows.
+bool has_scroll(BasePop* p) { return p->item_type == 2 && (int32_t)p->items.size() > p->rows && p->rows > 0; }
+UiRect scroll_rect(BasePop* p) {
+    int32_t w = p->canvas.width;
+    return {w - 0x2B, 0x15, w - 0x2B + 0x18, 0x15 + scroll_bar_height(p->canvas.height)};
+}
+
 void draw_items(BasePop* p) {
     Buffer* b = &p->canvas;
     if (p->item_type == -1 || p->items.empty()) return;
@@ -1130,11 +1140,11 @@ void draw_items(BasePop* p) {
     int32_t first = p->item_type == 2 ? p->top_item : 0;
     int32_t last = p->item_type == 2 ? std::min(n, first + p->rows) : n;
     // The list box's scroll bar (Popup_on_listbox_scroll_create: scroll_normal, at (width - 0x2B,
-    // 0x15), 0x18 wide, down to the last row; its height formula's margins approximated by the
-    // last row's bottom).
-    if (p->item_type == 2 && n > p->rows && p->rows > 0) {
+    // 0x15), 0x18 wide, as tall as scroll_show's rail allows) on the rail scroll_show drew.
+    if (has_scroll(p)) {
+        scroll_rail_draw(b, p->win_y);
         ScrollBar sb;
-        sb.r = {b->width - 0x2B, 0x15, b->width - 0x2B + 0x18, item_rect(p, p->rows - 1).bottom};
+        sb.r = scroll_rect(p);
         sb.max = n - p->rows;
         sb.pos = std::min(p->top_item, sb.max);
         if (sb.r.bottom > sb.r.top + 3 * 0x18) scroll_draw(b, sb);
@@ -1344,6 +1354,12 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
         std::snprintf(path, sizeof(path), "%s/pop_%03d_%s.bmp", dir, count++, p->label.c_str());
         ui_screenshot(path);
     }
+    // Popup_on_listbox_scroll_create -> scroll_show: the arm and the rail arrive.
+    if (has_scroll(p) && !p->scroll_shown) {
+        p->scroll_shown = true;
+        scroll_show_window(&p->canvas, p->win_x, p->win_y);
+        redraw(p);  // the scroll bar over the rail (Win_move / show of the Scroll)
+    }
     // The modal loop (Win_set_modal) with the key handling of Win_key_down_event (arrows to the
     // item group), Win_key_click_event (Enter: OK, Esc: cancel) and the mouse.
     bool& fresh = p->edit_fresh;
@@ -1395,6 +1411,15 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
                 }
             }
         } else {
+            // DiploPop_set_modal: the main interface's diplomacy buttons stay active.
+            if (in.x < p->win_x || in.y < p->win_y || in.x >= p->win_x + p->canvas.width ||
+                in.y >= p->win_y + p->canvas.height) {
+                if (diplowin_iface_mouse(in.type, in.x, in.y)) {
+                    redraw(p);
+                    ui_invalidate();
+                    continue;
+                }
+            }
             int32_t x = in.x - p->win_x, y = in.y - p->win_y;
             int32_t hit = item_at(p, x, y);
             int32_t btn = 0x7FFF;
@@ -1405,7 +1430,7 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
                 p->rows > 0) {
                 // The list box's scroll bar: a line (its buttons) or a page (its track).
                 ScrollBar sb;
-                sb.r = {p->canvas.width - 0x2B, 0x15, p->canvas.width - 0x2B + 0x18, item_rect(p, p->rows - 1).bottom};
+                sb.r = scroll_rect(p);
                 sb.max = nitems - p->rows;
                 sb.pos = std::min(p->top_item, sb.max);
                 if (int32_t d = scroll_click(sb, x, y, p->rows)) {
@@ -1479,6 +1504,9 @@ void BasePop_show(BasePop* p) {
 }
 
 void BasePop_hide(BasePop* p) {
+    // Popup_hide -> scroll_hide: the rail leaves.
+    if (p->shown && p->scroll_shown) scroll_hide_window(&p->canvas, p->win_x, p->win_y);
+    p->scroll_shown = false;
     g_windows.erase(std::remove(g_windows.begin(), g_windows.end(), p), g_windows.end());
     p->shown = false;
     ui_invalidate();

@@ -110,6 +110,8 @@ run council300 --save work/saves_late/turn_300.sav --human 6 --keys \
 SHOT:govvote.bmp,DOWN,ENTER,SHOT:result.bmp,SCREENSTATE,ENTER,SCREENSTATE,ESC,DIPLOSTATE,SAVE:after.sav"
 nocrash council300
 has council300 "council window" "^council window proposal 0"
+has council300 "the window slides in (slide_show)" "^slide show 812x395 at "
+has council300 "and out (slide_hide)" "^slide hide 812x395 at "
 check "council300 open" "$(grep -a '^councilstate' "$OUT/council300.log" | sed -n 1p | cut -d" " -f2-17)" \
     "proposal 0 candidate 6 result 0 governor 3 votes -5 -5 -3 -5 5 0 7"
 check "council300 voted" "$(grep -a '^councilstate' "$OUT/council300.log" | sed -n 2p | cut -d" " -f2-17)" \
@@ -118,5 +120,20 @@ check "council300 closed" "$(grep -a '^screenstate' "$OUT/council300.log" | sed 
 check "council300 governor" "$(dl council300 1 0 | sed 's/.*governor/governor/')" "governor 5"
 run council300r --save "$OUT/council300/after.sav" --human 6 --keys "DIPLOSTATE"
 check "council300 reload governor" "$(dl council300r 1 0 | sed 's/.*governor/governor/')" "governor 5"
+
+# 5. DiploPop's interface buttons during the Hive's call (turn_147, faction 3), clicked while its
+#    popup is open (DiploPop_set_modal): PROFILE (report_intel on the Hive), DATALINKS (the Hive's
+#    datalink entry, category 15); the right pane starts with the Hive's headquarters
+#    (DiploPop_on_status sets HQINFO: DiploPop_draw_hq in place of the world map), a globe button
+#    shows the map (HQINFO cleared), HQINFO the headquarters again.
+run diplopop147 --save work/saves_late/turn_147.sav --human 3 --keys \
+"ENTER,CLICK:630x728,SCREENSTATE,ESC,CLICK:390x728,SCREENSTATE,ESC,SHOT:hq0.bmp,CLICK:930x740,SHOT:map.bmp,CLICK:840x740,SHOT:hq.bmp"
+nocrash diplopop147
+has diplopop147 "PROFILE" "^diplopop button 1"
+has diplopop147 "the Hive's intelligence report" "^screentext \\[HIVE INTELLIGENCE FILES\\]"
+has diplopop147 "DATALINKS" "^diplopop button 0"
+has diplopop147 "the faction's datalink" "^datalink cat 15 index 2 "
+has diplopop147 "HQINFO" "^diplopop button 2"
+has diplopop147 "a globe button clears it" "^diplopop globe 1006: hq 0"
 
 exit $FAIL

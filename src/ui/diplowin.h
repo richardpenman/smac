@@ -12,6 +12,15 @@ bool diplowin_draw_console(Buffer* screen, int32_t ox, int32_t oy);
 // Animations follow real time only when enabled (interactive play); scripted and hidden runs
 // show the first frames so that screenshots are reproducible.
 void diplowin_set_animate(bool on);
+// DiploPop's interface buttons (DATALINKS, PROFILE, HQINFO) and the globe buttons during the
+// diplomacy mode: mouse input at screen (x, y) outside the popups; true when it was theirs.
+bool diplowin_iface_mouse(int32_t type, int32_t x, int32_t y);
+// DiploPop's HQ pane and buttons over the main interface's canvas (after its date box).
+void diplowin_draw_iface(Buffer* mi);
+// BaseButton_set of HQINFO (DiploPop +0x4208).
+void diplowin_set_hq(int32_t on);
+// HQINFO is set: the right pane shows the HQ instead of the world map (WorldWin hidden).
+bool diplowin_hq_shown();
 // The faction on the commlink (-1: none).
 int32_t diplowin_faction();
 // The diplomacy menu's initial selection (COUNCILVOTEGOV: the human's own entry; popup_menus.cpp).

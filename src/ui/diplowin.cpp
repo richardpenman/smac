@@ -14,9 +14,10 @@
 // original's BasePop_set_def_external_window places them.
 // FLC files are decoded here (COLOR_256, BRUN, COPY, BLACK, SS2/DELTA_FLC, LC) and their colours
 // mapped to the game palette (the original's player loads their palette into the reserved range).
-// DiploPop_draw_info: the centre pane's two faction boxes (draw_info below). Not reconstructed:
-// DiploPop_draw_hq (its pane is shown only with a toggle whose button is not reconstructed:
-// DiploPop + 0x4208 stays 0, the pane's background),
+// DiploPop_draw_info: the centre pane's two faction boxes (draw_info below); DiploPop's buttons
+// (DATALINKS: the faction's datalink entry, PROFILE: report_intel, HQINFO: DiploPop_draw_hq's pane
+// in place of the world map until a globe button is clicked), clickable while the dialog's popups
+// are open (DiploPop_set_modal: the interface belongs to the modal set). Not reconstructed:
 // the PlanWin map previews of the base and battle plan menus (FUN_0048b3f0.., battle_routine),
 // the multiplayer paths (channels, diplo lock messages, PBEM diplo).
 #include "ui/diplowin.h"
@@ -50,6 +51,8 @@
 #include "platform/ui_platform.h"
 #include "platform/win32.h"
 #include "ui/basewin.h"
+#include "ui/basewin_internal.h"
+#include "ui/help.h"
 #include "ui/colortables.h"
 #include "ui/popup.h"
 #include "ui/sprites.h"
@@ -240,6 +243,164 @@ bool diplowin_draw_console(Buffer* s, int32_t ox, int32_t oy) {
     return true;
 }
 
+// ---- DiploPop's interface buttons and HQ pane ----
+
+namespace {
+// DiploPop_init's buttons (BaseButton, parent MainInfc): DATALINKS (id 0, +0x2158), PROFILE (id 1,
+// +0x2CA4) under the centre pane's two boxes, HQINFO (id 2, +0x37F0) in the right pane left of the
+// globe buttons; boxes 27..29 (0x78D960 / 988 / 9B0) by state, text colour 0x41, font +0xA6C.
+BaseButton g_btn[3];
+bool g_btn_ready = false;
+int32_t g_hq = 0;  // +0x4208: HQINFO's state (BaseButton_set): the HQ pane shown
+
+UiRect btn_rect(int32_t id) {
+    UiRect c = mi_rect(kMiPaneCenter2);
+    int32_t l = c.left + 7, r = c.right - 7, b = c.bottom - 7;
+    int32_t half = ((r - l) + 3) / 2 - 3 + l, d = (half - l) + 3;
+    if (id == 0) return {l, b - 0x14, half, b};
+    if (id == 1) return {l + d, b - 0x14, half + d, b};
+    const UiRect R = mi_rect(kMiPaneRight), g1 = mi_rect(0xA8C), g2 = mi_rect(0xA9C);
+    return {(R.right - g2.right) + R.left, g1.top, g1.left - 3, g1.bottom};
+}
+
+void buttons_init() {
+    static const uint32_t kLabel[3] = {0xEA8, 0x774, 0xEAC};
+    Font* fa = find_font(ScreenWidth == 800 ? 12 : 14, 1);
+    for (int32_t i = 0; i < 3; i++) {
+        BaseButton* b = &g_btn[i];
+        UiRect r = btn_rect(i);
+        if (g_btn_ready && b->r.left == r.left && b->r.top == r.top && b->r.right == r.right && b->r.bottom == r.bottom)
+            continue;
+        int32_t state = b->set_state;
+        std::string text = label_get(kLabel[i] / 4);
+        if (i == 1) win32::CharUpperA(&text[0]);  // StrBuffer upper-cased (PROFILE)
+        bw_button_ctor(b);
+        bw_button_init(b, text.c_str(), i, r.left, r.top, r.right - r.left, r.bottom - r.top, 1);
+        for (int32_t k = 0; k < 3; k++) {
+            b->box[k] = box_def(27 + k);
+            b->text_color[k] = 0x41;
+        }
+        b->font = fa;
+        b->shown = true;
+        b->set_state = state;
+    }
+    g_btn_ready = true;
+}
+
+// DiploPop_draw_hq (0x440080): with HQINFO set, the right pane (+0x2114: the pane inset 4 down to
+// 6 above the button) shows the faction's headquarters: a box, the HQ base's name in capitals
+// (NO HEADQUARTERS without one) and the faction's picture 30 (DiploPop +0x20C0) centred below.
+void draw_hq(Buffer* mi) {
+    if (!g_hq) return;  // MainInterface_restore_back: the world map pane as usual
+    const UiRect R = mi_rect(kMiPaneRight);
+    UiRect box{R.left + 4, R.top + 4, R.right - 4, btn_rect(2).top - 6 - 4};
+    Buffer_box_sprite(mi, &box, box_def(0));
+    UiRect t{box.left + 1, box.top + 1, box.right - 1, box.top + 0x15};
+    int32_t i = 0;
+    for (; i < BaseCount; i++)
+        if (Bases[i].faction_id == g_faction && has_fac(1, i, 0)) break;
+    StrBuffer[0] = 0;
+    crt_strcat(StrBuffer, i == BaseCount ? label_get(0xEA4 / 4) : Bases[i].name);
+    win32::CharUpperA(StrBuffer);
+    Buffer_set_font(mi, find_font(ScreenWidth == 800 ? 12 : 14, 1), nullptr, nullptr, nullptr);
+    Buffer_set_text_color(mi, 0xA0, -1, 1, 1);
+    Buffer_write_cent_l_7(mi, StrBuffer, &t, (int32_t)std::strlen(StrBuffer));
+    Sprite* pic = &BaseSprites[g_faction & 7][30];
+    if (pic->width) {
+        BlitDestScale = BlitSourceScale = 1;
+        pfncSpriteStretchCopyToCanvas(pic, mi, pic->key, ((t.right - pic->full_width) - t.left) / 2 + t.left,
+                                      t.bottom + 1);
+    }
+}
+
+void draw_buttons(Buffer* mi) {
+    buttons_init();
+    for (BaseButton& b : g_btn) {
+        bw_button_draw(&b);
+        const Buffer& c = b.canvas;
+        for (int32_t y = 0; y < c.height; y++) {
+            int32_t dy = b.r.top + y;
+            if (dy < 0 || dy >= mi->height) continue;
+            for (int32_t x = 0; x < c.width; x++) {
+                int32_t dx = b.r.left + x;
+                uint8_t v = c.data[(size_t)y * c.stride + x];
+                if (dx >= 0 && dx < mi->width && v != 9) mi->data[(size_t)dy * mi->stride + dx] = v;
+            }
+        }
+    }
+}
+
+// DiploPop_on_iface_button_clicked (0x440550).
+void button_clicked(int32_t id) {
+    std::fprintf(stderr, "diplopop button %d\n", id);
+    if (id == 0) {
+        Datalink_exec(&DatalinkWin, 0xF, g_faction);  // (DAT_00737CD0 set around it)
+    } else if (id == 1) {
+        report_intel(g_faction);
+    } else if (id == 2) {
+        // The world map pane hidden (WorldWin, MapWins[1]), no globe button pressed, HQINFO set.
+        diplowin_set_hq(1);
+    }
+    ui_invalidate();
+}
+}  // namespace
+
+void diplowin_draw_iface(Buffer* mi) {
+    if (g_faction < 0) return;
+    draw_hq(mi);
+    draw_buttons(mi);  // child windows: over the date box
+}
+
+void diplowin_set_hq(int32_t on) {
+    g_btn[2].set_state = on;
+    g_hq = on;
+}
+
+bool diplowin_hq_shown() { return g_faction >= 0 && g_hq; }
+
+// DiploPop_on_iface_group_clicked (0x440620): a globe button (0x3EE the world map, 0x3EF the
+// detail map) shows the map pane again and clears HQINFO.
+void diplowin_globe_clicked(int32_t id) {
+    diplowin_set_hq(0);
+    std::fprintf(stderr, "diplopop globe %d: hq 0\n", id);
+    ui_invalidate();
+}
+
+bool diplowin_iface_mouse(int32_t type, int32_t x, int32_t y) {
+    if (g_faction < 0 || !g_btn_ready) return false;
+    const UiRect& pos = mi_rect(kMiPos);
+    x -= pos.left;
+    y -= pos.top;
+    static int32_t pressed = -1;
+    for (int32_t i = 0; i < 3; i++) {
+        const UiRect& r = g_btn[i].r;
+        bool in = x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+        if (type == UiInput::LDOWN && in) {
+            pressed = i;
+            g_btn[i].pressed = 1;
+            ui_invalidate();
+            return true;
+        }
+        if (type == UiInput::LUP && pressed == i) {
+            g_btn[i].pressed = 0;
+            pressed = -1;
+            if (in) button_clicked(i);
+            ui_invalidate();
+            return true;
+        }
+    }
+    if (type == UiInput::LUP) {
+        for (int32_t i = 0; i < 2; i++) {
+            const UiRect& r = mi_rect(i ? 0xA9C : 0xA8C);
+            if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) {
+                diplowin_globe_clicked(i ? 0x3EF : 0x3EE);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 // ---- DiploPop methods ----
 
 void THISCALL DiploPop_draw_info(uint8_t*) { ui_invalidate(); }
@@ -250,6 +411,9 @@ void THISCALL GraphicWin_soft_update_3(uint8_t*, uint8_t*) { ui_invalidate(); }
 // <faction file>.flc (faction.flc when missing).
 void THISCALL DiploPop_start(uint8_t*, int32_t faction_id_with) {
     diplomacy_check(CurrentPlayerFaction, faction_id_with, 0);
+    // SubInterface_set_iface_mode -> DiploPop_on_status(1) when the mode starts: the main
+    // interface's WorldWin hidden, no globe button pressed, HQINFO set (the HQ pane shown).
+    if (g_faction < 0) diplowin_set_hq(1);
     if (g_faction != faction_id_with) {
         g_faction = faction_id_with;
         const char* kind = (ExpansionEnabled && (MFactions[faction_id_with].rule_flags & 0x80))

@@ -63,6 +63,7 @@
 #include "ui/reports.h"
 #include "ui/screenwin.h"
 #include "ui/scroll.h"
+#include "ui/slide.h"
 #include "ui/sprites.h"
 #include "ui/techwin.h"
 #include "ui/vehdraw.h"
@@ -108,6 +109,9 @@ struct ReportScreen : ScreenWin {
     int32_t energy_top = 0, energy_itop[2] = {0, 0};
     int32_t list_keep[8] = {-2, -2, -2, -2, -2, -2, -2, -2};  // the selection last kept in view
     ScrollBar list_bars[8];
+    ScrollBar page_bar;          // the window's scroll bar (ReportWin's Scroll 0x882584)
+    bool rail_shown = false;     // DAT_00882570: scroll_show ran
+    bool drawn = false;          // drawn since the window opened
     int32_t* list_top(int32_t type) {
         switch (type) {
         case 4: return &labs_top;
@@ -1250,12 +1254,43 @@ void ReportScreen::redraw() {
     case kScore: draw_score(); break;
     default: draw_intel(); break;
     }
+    // ReportIf_report: base operations, secret projects and the security nexus get the window's
+    // scroll bar (0x882584) when their rows do not fit: scroll_show puts the rail and the arm at
+    // the window's right edge (the first time, with its animation), scroll_hide removes them.
+    {
+        bool need = (kind() == kOps || kind() == kProjects || kind() == kSecurity) && rows_total > rows_shown;
+        if (need && !rail_shown) {
+            rail_shown = true;
+            // (When the window opens it comes after slide_show; here the first frame has no
+            // animation.)
+            if (drawn) scroll_show_window(c, x, y);
+            else std::fprintf(stderr, "scroll show %dx%d at %d,%d (opening)\n", c->width, c->height, x, y);
+        } else if (!need && rail_shown) {
+            rail_shown = false;
+            scroll_hide_window(c, x, y);
+        }
+        if (need) {
+            scroll_rail_draw(c, y);
+            ScrollBar sb;
+            sb.r = {c->width - 0x2B, 0x15, c->width - 0x2B + 0x18, 0x15 + scroll_bar_height(c->height)};
+            sb.max = rows_total - rows_shown;
+            sb.pos = std::min(scroll, sb.max);
+            scroll_draw(c, sb);
+            int32_t w = 0x18;
+            spot_add(&spots[0], -1, 99, sb.r.left, sb.r.top, w, w);
+            spot_add(&spots[0], 1, 99, sb.r.left, sb.r.bottom - w, w, w);
+            spot_add(&spots[0], -rows_shown, 99, sb.r.left, sb.r.top + w, w, (sb.r.bottom - sb.r.top) - 2 * w);
+            page_bar = sb;
+            state.push_back("page scroll " + num(sb.pos) + " of " + num(sb.max));
+        }
+    }
     for (int32_t i = 0; i < 7; i++)
         if (report_btn[i]) bw_button_set(report_btn[i], kind() == i + 2);
     for (BaseButton* b : ops_iface) {
         b->shown = kind() == kOps && (b->id == 0xD0A || b->id == 0xD0B || !ops_best);
         if (b->id == 0xD0A || b->id == 0xD0B) bw_button_set(b, (b->id == 0xD0B) == ops_best);
     }
+    drawn = true;
     for (BaseButton* b : labs_iface) {
         b->shown = kind() == kLabs;
         bw_button_set(b, (b->id == 0x92) == (labs_tab != 0));
@@ -1349,6 +1384,12 @@ void ReportScreen::on_key(int32_t key) {
 }
 
 void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool, bool dbl) {
+    if (type == 99) {  // the window's scroll bar (Scroll 0x882584): a line or a page
+        int32_t d = index;
+        if (d < -1 || d > 1) d = scroll_click(page_bar, x, y, -d);
+        scroll = std::max(0, std::min(scroll + d, std::max(rows_total - rows_shown, 0)));
+        return;
+    }
     if (type >= 100) {  // a list's scroll bar: a line (the buttons) or a page (the track)
         int32_t* t = list_top(type - 100);
         if (t) {
@@ -1476,6 +1517,8 @@ void open_reports(int32_t k) {
         return;
     }
     s->name = "report";
+    s->rail_shown = false;
+    s->drawn = false;
     s->slide = true;  // ReportIf_on_status: slide_show / slide_hide
     basewin_mi_init();
     int32_t w = 0x28A + 0x4E, h = 0x161 + 200;
