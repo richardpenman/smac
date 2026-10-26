@@ -192,8 +192,9 @@ The original reads stack memory it never wrote in these places. The oracle makes
 5. **`order_veh` (0x5947C0), `[ebp-0x24]`** ("move shown to the viewer"): the slot also holds the
    target stack offset (`stack_id * 0x34`) and the native-spawn chance; the dir 8 path reaches the
    post-move code without setting it. Only display timing (`clock_wait`), `boom` and viewer
-   messages depend on it; the reconstruction uses 0 there. Also `[ebp-0x90..-0x80]` (ZOCMSG
-   tutorial coordinates) stay unset when `quick_zoc` finds nothing (UI only).
+   messages depend on it; the reconstruction uses 0 there (`OrderVeh::visible`, compat flag
+   `residue.order_veh_visible`). Also `[ebp-0x90..-0x80]` (ZOCMSG tutorial coordinates) stay
+   unset when `quick_zoc` finds nothing (UI only).
 
 6. **`call_council` (0x52C880), local `[ebp-0x14]`** ("aliens alive" flag): written only when
    proposal 1 (Supreme Leader) is examined (Diplomatic Victory on, not yet passed, caller among

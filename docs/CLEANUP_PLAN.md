@@ -227,7 +227,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 11 | Split combat (`battle_resolve`, odds) + unit tests | M | done (see note 11) |
 | 12 | Split `base_build` | L | done (see note 12) |
 | 13 | Split `goody_box`, `probe`, `random_events` (gotos out) | M | done (see note 13) |
-| 14 | Split `order_veh` (176 gotos) | L | |
+| 14 | Split `order_veh` (176 gotos) | L | done (see note 14) |
 | 15 | Methods on layout structs (`Base::`, `Faction::`, `Veh::`) with `ADDR` forwarders | L | |
 | 16 | Scratch globals → contexts/locals | L | |
 | 17 | Golden-record fcompare mode + data-dependent unit tests | M | |
@@ -440,3 +440,38 @@ Notes on the increments:
     left out as in increment 9 (fcompare_table.h: called with a native vehicle it can give a
     technology to the viewer, whose window blocks the run); it is proven by the hybrid games (all
     patches) and the native scenarios, cov_goody among them.
+
+14. `order_veh` (move_order.cpp) keeps its `ADDR`; its 176 gotos are gone (engine: 257 → 81). Same
+    pattern as notes 12 and 13: an `OrderVeh` object whose members are the original's locals
+    (with their stack slots; `scroll` stays a reference onto `delayed`, the slot both use) and a
+    driver loop over `Step` values named after the original's labels: `start` (L_5949b3, also the
+    restart with a disembarking passenger), `land_on_sea`, `zoc_check`, `target`, `movement`,
+    `enter_base`, `move`, `after_move`, `no_direction`, `end` (L_599b1a), and `done` for the
+    returns that skip the end's processing (the multiplayer synch returns, a vanished unit, the
+    aircraft sent home). Join points reached from one block only became calls returning the next
+    step: `probe_team` (`probe_pact_declined`, `probe_base`), `transports_full`,
+    `amphibious_base` (two labels with the same message), `zoc_blocked`, `native_life`
+    (`natives_spawned`), `units_spotted` (L_596c9f and L_596d5d, which differ only by a viewer test
+    that holds on the second), `fighter_rule`, `attack_checks`, `enemy_probe` (`probe_captured`),
+    `prepare_attack`, `capture_natives` (`natives_captured`, `take_natives`), `attack`,
+    `disembark`, `ask_goody`; the move is `partial_move_succeeds` / `move_failed`,
+    `surprise_attack`, `move_shown`, `follow_unit`, `leave_tile`, `enter_bunker`,
+    `natives_attack_base`, `arrive` (`coastal_artillery`), `wake_passengers`, `wake_at_coast`; after
+    it `air_fuel` (`keeps_flying`, `viewer_auto_home`, `refuel`), `use_monolith`,
+    `artifact_taken`, `use_artifact`, `board_transport`, `colony_pod_at_sea`, `keep_moving`. Where
+    a label's test was pure, two jumps were merged into one condition (each call and random draw
+    still happens on the same paths, in the same order: `natives_captured` keeps the original's
+    short-circuit). Stack residue #5 (`[ebp-0x24]`, docs/RECONSTRUCTION.md) is the member
+    `visible`; the two paths that reach the post-move code with the slot's stale value (a won
+    battle: the target's stack offset; dir 8: unset, 0 here) are `BUG(original)` sites of the new
+    flag `residue.order_veh_visible` (compat.h; 128 flags, 175 sites). Pure parts went to
+    `engine/move_rules.h`: `unit_hit_points` (the fuel damage), `native_life_chance` and
+    `native_life_cover`, `pod_meeting_point`, tested in tests/unit/test_move_rules.cpp (values
+    recorded from tiny20, late140, cov_late300, cov_natives). Coverage before the split (29
+    scenarios): 67% of the file's lines; the blocks no scenario reaches are the viewer's paths
+    (messages, tutorial, disembark and artifact menus, the probe pact question, keep moving),
+    multiplayer synchs, and a few rare AI cases (unseen units in the way, full transports, an
+    artifact taken by enemy units, capture of an enemy probe team away from own bases); they were
+    moved verbatim. fcompare cannot check `order_veh` (fcompare_table.h: real battles free UI heap
+    objects twice), as before the split; it is proven by the native scenarios, the observer and
+    ASan games and the hybrid games (all patches).

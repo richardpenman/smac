@@ -7,7 +7,7 @@ Every bug of the original that the reconstruction reproduces is behind one of th
 flag off stops the game at its first site (`compat_unfixed`). Sites are the `BUG(original)`
 comments; each names its flag with `COMPAT_ORIGINAL(flag)` next to it.
 
-127 flags, 173 sites.
+128 flags, 175 sites.
 
 ## bugs at several sites
 
@@ -330,3 +330,4 @@ comments; each names its flag with `COMPAT_ORIGINAL(flag)` next to it.
 | `residue.enemy_move_s38` | enemy_move reads [ebp-0x38], not written on this path in the call. Fix: 0. | `src/engine/ai_move.cpp` |
 | `residue.enemy_move_s48` | [ebp-0x48] is read where it was not written (uninitialised read #2). Fix: 0. | `src/engine/ai_move.cpp` (2) |
 | `residue.enemy_move_edi` | EDI holds [ebp-0x38], unwritten when no transport was examined (uninitialised read #3). Fix: 0. | `src/engine/ai_move.cpp` |
+| `residue.order_veh_visible` | order_veh's post-move code reads [ebp-0x24] ("move shown to the viewer"), which a won battle leaves holding the target's stack offset and the dir 8 path leaves unset (0 here; uninitialised read #5). Fix: compute whether the unit is shown on these paths too. | `src/engine/move_order.cpp` (2) |

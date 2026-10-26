@@ -325,6 +325,10 @@ struct Compat {
         bool enemy_move_s48 = true;
         // EDI holds [ebp-0x38], unwritten when no transport was examined (uninitialised read #3). Fix: 0.
         bool enemy_move_edi = true;
+        // order_veh's post-move code reads [ebp-0x24] ("move shown to the viewer"), which a won battle leaves
+        // holding the target's stack offset and the dir 8 path leaves unset (0 here; uninitialised read #5). Fix:
+        // compute whether the unit is shown on these paths too.
+        bool order_veh_visible = true;
     } residue;
 };
 
