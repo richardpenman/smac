@@ -224,7 +224,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 8 | Magic numbers → named constants/enums, module by module | M | first pass done (see note 8) |
 | 9 | `compat.h`: name and isolate all 173 `BUG(original)` sites | M | done (see note 9) |
 | 10 | Split `base_production` / yields + unit tests | M | done (see note 10) |
-| 11 | Split combat (`battle_resolve`, odds) + unit tests | M | |
+| 11 | Split combat (`battle_resolve`, odds) + unit tests | M | done (see note 11) |
 | 12 | Split `base_build` | L | |
 | 13 | Split `goody_box`, `probe`, `random_events` (gotos out) | M | |
 | 14 | Split `order_veh` (176 gotos) | L | |
@@ -345,3 +345,39 @@ Notes on the increments:
     scenario was added: those blocks were moved verbatim (text unchanged apart from the context
     struct's `p.` prefix), and the scripted UI tests run the human paths they reach.
     fcompare: `none +base_production +base_yield +base_growth`.
+
+11. Two commits. First the rename alone (section 5: one rename batch per commit, nothing else):
+    `battle_fight_2` → `battle_resolve` (`rename.py`; it resolves the attack of a unit on a tile,
+    after `battle_compute`, `battle_kill`, `battle_init`). Then the split (battle.cpp), with the same
+    pattern as note 10. `battle_compute` keeps its `ADDR` and runs `psi_combat_lines`,
+    `attacker_modifiers` (`attack_on_defender`), then `artillery_duel` or `defender_modifiers`
+    (`conventional_defense` → `land_attack_modifiers`, `tile_defense`; `flechette_defense`,
+    `sensor_defense`, `ability_modifiers`) over a `Strength` context; its four `goto done` became
+    returns. `battle_resolve` keeps its `ADDR` and drives a `Battle` context through
+    `prepare_battle`, `treaty_stops_attack`, `decide_nerve_gas` (`ai_uses_nerve_gas`, kept in the
+    original's shape since no scenario uses nerve gas), `spend_attack_moves`,
+    `diplomatic_consequences`, `difficulty_modifiers`, `confirm_attack` (`show_odds`,
+    `say_strength`), `battle_visibility`, `bombard` (`bombard_unit`), `show_battle_start`,
+    `withdraw_threshold`, `marine_threshold`, `fight_rounds` (`capture_by_marines`,
+    `withdraw_defender`), `show_outcome`, `third_faction_friction`, `promote_winner`,
+    `attacker_destroyed` / `defender_destroyed` (`defeat_hits_stack`, `damage_stack`,
+    `base_lost_defender`, whose `goto base_survives` became a flag), `collect_husks`,
+    `report_battle`, `report_treaty_battle`, `winner_ends_move`; the four copies of the combat
+    message parameters became `say_combat_units`, the two battle pauses `battle_pause`.
+    `compute_odds` (ai.cpp, the AI's use of the odds) was left as it is: it is AI scoring, short,
+    and not part of the combat rules. Pure formulas went to `engine/battle_rules.h` (namespace
+    `battle_rules`): `percent_bonus` (every `(bonus + 100) * value / 100` modifier; the `* 125 /
+    100` and `* 3 / 2` ones stay literal), `attack_odds` (the `is_real 0` result), `reduce_odds`
+    (GOODIDEA), `bombard_damage_range`, `bombard_hp_floor`, `attack_moves`, `withdraw_angle`;
+    tests/unit/test_battle_rules.cpp checks them with values recorded from native games (tiny20,
+    late140, probe131, cov_missiles) where the scenarios reach them. Coverage before the split:
+    the blocks no scenario reaches are human-player paths (nerve gas question, BADIDEA/GOODIDEA,
+    surprise attack messages, PBEM and multiplayer messages, battle pauses, marine capture
+    messages), the AI's nerve gas decision, and modifiers whose rules are 0 in alpha.txt
+    (mobile units in rough terrain, road attack, elevation); they were moved verbatim.
+    fcompare: `none +battle_compute +battle_resolve` passes on tiny20, small12 and std8 (8600 calls;
+    `battle_resolve` with `is_real` 0, the rating). `battle_fight`, the entry that fights real
+    battles, cannot be checked by fcompare, with the unsplit code (HEAD a234e20) as with the split:
+    one UI dword written during displayed battles (0x90FC90, next to boom()'s ignored objects)
+    differs between the two calls, and the game crashes a few turns later. Real battles are proven
+    by the native scenarios and the hybrid games (all patches).

@@ -7,6 +7,7 @@
 #include "engine/base.h"
 #include "engine/action.h"
 #include "engine/base_misc.h"
+#include "engine/battle_rules.h"
 #include "engine/compat.h"
 #include "engine/crt.h"
 #include "engine/design.h"
@@ -577,430 +578,474 @@ void GAMEAPI add_bat(int32_t side, int32_t value, const char* text) {
     if (value != 0) bat_line(side, value, text);
 }
 
+namespace {
+// State of one battle_compute call: the combatants, the combat type and the two strengths.
+struct Strength {
+    int32_t veh_id_atk, veh_id_def, combat_type;
+    int32_t is_arty, is_bombard;
+    int32_t psi = 0;  // bit 1: psi attack (the attacker's weapon), bit 2: psi defense (the defender's armor)
+    int32_t offense = 8, defense = 8;
+};
+
+// Psi combat flags, with the factions' psi bonus lines (rule_psi, Dream Twister, Neural Amplifier,
+// Fungal Tower). A bombardment is psi combat only with a spore launcher on either side.
+int32_t psi_combat_lines(const Strength& s, int32_t atk_unit_raw) {
+    int32_t psi = 0;
+    if (s.is_bombard && atk_unit_raw != BSC_SPORE_LAUNCHER && veh_unit_raw(s.veh_id_def) != BSC_SPORE_LAUNCHER)
+        return psi;
+    if (s.veh_id_atk >= 0 && weapon_value(game().vehs[s.veh_id_atk].unit_id) < 0) psi = 1;
+    if (s.veh_id_def >= 0 && armor_value(game().vehs[s.veh_id_def].unit_id) < 0) psi |= 2;
+    if (psi) {
+        uint32_t faction_id = veh_faction_raw(s.veh_id_atk);
+        if (game().mfactions[faction_id].rule_psi) {
+            char* text = label(0x558);
+            bat_line(0, game().mfactions[faction_id].rule_psi, text);
+        }
+        if (owns_project(19, faction_id)) bat_line(0, 50, label(0x55C));  // Dream Twister
+    }
+    uint32_t faction_def = veh_faction_raw(s.veh_id_def);
+    if (psi) {
+        if (game().mfactions[faction_def].rule_psi) {
+            char* text = label(0x558);
+            bat_line(1, game().mfactions[faction_def].rule_psi, text);
+        }
+        if (owns_project(9, faction_def)) bat_line(1, 50, label(0x560));  // Neural Amplifier
+        if (s.veh_id_def >= 0 && game().vehs[s.veh_id_def].unit_id == BSC_FUNGAL_TOWER)
+            bat_line(1, 50, Units[BSC_FUNGAL_TOWER].name);
+    }
+    return psi;
+}
+// Attacks on a defender (combat type 0): fungus, resonance weapons and empaths against psi.
+void attack_on_defender(Strength& s) {
+    int32_t atk_unit = game().vehs[s.veh_id_atk].unit_id;
+    uint32_t faction_atk = game().vehs[s.veh_id_atk].faction_id;
+    MAP* sq = map_tile(game().vehs[s.veh_id_def].x, game().vehs[s.veh_id_def].y);
+    if ((sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) > 0x3F &&
+        ((atk_unit < 64 && weapon_value(atk_unit) < 0) || owns_project(16, faction_atk)) &&
+        weapon_value(game().vehs[s.veh_id_def].unit_id) >= 0) {
+        s.offense += s.offense / 2;  // fungus
+        bat_line(0, 50, label(0x548));
+    }
+    int32_t psi_def = s.psi & 2;
+    if (psi_def && (Units[game().vehs[s.veh_id_atk].unit_id].weapon_id == WPN_RESONANCE_LASER ||
+                    Units[game().vehs[s.veh_id_atk].unit_id].weapon_id == WPN_RESONANCE_BOLT)) {
+        s.offense = s.offense * 125 / 100;
+        bat_line(0, 25, label(0x1158));
+    }
+    if (!has_abil(game().vehs[s.veh_id_def].unit_id, ABL_DISSOCIATIVE_WAVE) && psi_def &&
+        has_abil(game().vehs[s.veh_id_atk].unit_id, ABL_EMPATH) && Rules.combat_bonus_empath_song_vs_psi) {
+        s.offense = battle_rules::percent_bonus(s.offense, Rules.combat_bonus_empath_song_vs_psi);
+        char* text = Strings_get(&StringTable, Ability[abil_index(ABL_EMPATH)].name);
+        bat_line(0, Rules.combat_bonus_empath_song_vs_psi, text);
+    }
+}
+// The attacker's own modifiers: basic offense, airdrop penalty, fanatic and faction offense
+// bonuses, PLANET rating in psi combat (probe teams have none of them).
+void attacker_modifiers(Strength& s) {
+    s.offense = get_basic_offense(s.veh_id_atk, s.veh_id_def, s.psi, s.is_bombard, 0);
+    int32_t atk_unit = game().vehs[s.veh_id_atk].unit_id;
+    if (Units[atk_unit].plan == PLAN_PROBE) return;
+    if (s.veh_id_def >= 0 && s.combat_type == 0) attack_on_defender(s);
+    if ((game().vehs[s.veh_id_atk].state & VSTATE_MADE_AIRDROP) &&
+        has_abil(game().vehs[s.veh_id_atk].unit_id, ABL_DROP_POD) && Rules.combat_penalty_atk_airdrop) {
+        s.offense = battle_rules::percent_bonus(s.offense, -Rules.combat_penalty_atk_airdrop);
+        int32_t faction = (int8_t)game().vehs[s.veh_id_atk].faction_id;
+        int32_t range;
+        if (has_tech(Rules.tech_preq_orb_insert_wo_space, faction) ||
+            (range = Rules.max_airdrop_rng_wo_orbital_insert,
+             SecretProjects[FAC_SPACE_ELEVATOR - SP_ID_First] >= 0 &&
+                 game().bases[SecretProjects[FAC_SPACE_ELEVATOR - SP_ID_First]].faction_id == faction))
+            range = game().map.x > game().map.y ? game().map.x : game().map.y;
+        char* text = label(Rules.max_airdrop_rng_wo_orbital_insert < range ? 0x6D8 : 0x6D4);
+        bat_line(0, -Rules.combat_penalty_atk_airdrop, text);
+    }
+    if ((game().mfactions[game().vehs[s.veh_id_atk].faction_id].rule_flags & 0x400) && Rules.combat_bonus_fanatic &&
+        s.combat_type == 0 && s.psi == 0) {
+        s.offense = battle_rules::percent_bonus(s.offense, Rules.combat_bonus_fanatic);
+        char* text = label(0x840);
+        bat_line(0, Rules.combat_bonus_fanatic, text);
+    }
+    uint32_t faction = game().vehs[s.veh_id_atk].faction_id;
+    for (int32_t i = 0; i < game().mfactions[faction].faction_bonus_count; i++) {
+        if (game().mfactions[faction].faction_bonus_id[i] == 0x12) {  // offense bonus
+            int32_t value = game().mfactions[faction].faction_bonus_val1[i];
+            s.offense = value * s.offense / 100;
+            bat_line(0, value - 100, label(0x1150));
+        }
+    }
+    if (s.psi && game().vehs[s.veh_id_atk].faction_id != 0) {
+        uint32_t f = game().vehs[s.veh_id_atk].faction_id;
+        if (game().factions[f].SE_planet != 0 && Rules.combat_psi_bonus_per_planet) {
+            char* text = label(0x9C4);
+            bat_line(0, game().factions[f].SE_planet * Rules.combat_psi_bonus_per_planet, text);
+            s.offense = battle_rules::percent_bonus(s.offense,
+                                                    game().factions[f].SE_planet * Rules.combat_psi_bonus_per_planet);
+        }
+    }
+}
+// Artillery duel (combat type bit 2): the defender fires back with its offense; land/sea and
+// altitude modifiers.
+void artillery_duel(Strength& s) {
+    if (s.veh_id_def < 0) return;
+    s.defense = get_basic_offense(s.veh_id_def, s.veh_id_atk, s.psi, s.is_bombard, 1);
+    if (s.combat_type & 0x18) return;
+    int32_t triad_def = chassis_triad(game().vehs[s.veh_id_def].unit_id);
+    int32_t triad_atk = chassis_triad(game().vehs[s.veh_id_atk].unit_id);
+    if (triad_def == TRIAD_SEA && triad_atk == TRIAD_LAND) {
+        if (!Rules.combat_land_vs_sea_artillery) return;
+        s.offense = battle_rules::percent_bonus(s.offense, Rules.combat_land_vs_sea_artillery);
+        char* text = label(0x6CC);
+        bat_line(0, Rules.combat_land_vs_sea_artillery, text);
+    } else if (triad_atk == TRIAD_SEA && triad_def == TRIAD_LAND) {
+        if (!Rules.combat_land_vs_sea_artillery) return;
+        s.defense = battle_rules::percent_bonus(s.defense, Rules.combat_land_vs_sea_artillery);
+        char* text = label(0x6CC);
+        bat_line(1, Rules.combat_land_vs_sea_artillery, text);
+    } else {
+        if (!Rules.combat_artillery_bonus_altitude) return;
+        uint32_t alt_atk = map_tile(game().vehs[s.veh_id_atk].x, game().vehs[s.veh_id_atk].y)->climate >> 5;
+        uint32_t alt_def = map_tile(game().vehs[s.veh_id_def].x, game().vehs[s.veh_id_def].y)->climate >> 5;
+        if (alt_def < alt_atk) {
+            int32_t value = (int32_t)(alt_atk - alt_def) * Rules.combat_artillery_bonus_altitude;
+            s.offense = battle_rules::percent_bonus(s.offense, value);
+            char* text = label(0x900);
+            bat_line(0, value, text);
+        } else if (alt_atk < alt_def) {
+            int32_t value = (int32_t)(alt_def - alt_atk) * Rules.combat_artillery_bonus_altitude;
+            s.defense = battle_rules::percent_bonus(s.defense, value);
+            char* text = label(0x900);
+            bat_line(1, value, text);
+        }
+    }
+}
+// A land attacker against a defender at (x, y): altitude (artillery), mobile units in the open or
+// in rough terrain, roads, elevation.
+void land_attack_modifiers(Strength& s, int32_t x, int32_t y, int32_t base_id, int32_t def_unit, int32_t terrain) {
+    int32_t atk_unit = game().vehs[s.veh_id_atk].unit_id;
+    MAP* sq_atk = map_tile(game().vehs[s.veh_id_atk].x, game().vehs[s.veh_id_atk].y);
+    MAP* sq_def = map_tile(x, y);
+    if (s.combat_type != 0 && Rules.combat_artillery_bonus_altitude && chassis_triad(def_unit) == TRIAD_LAND) {
+        uint32_t alt_atk = sq_atk->climate >> 5;
+        uint32_t alt_def = sq_def->climate >> 5;
+        if (alt_def < alt_atk) {
+            int32_t diff = (int32_t)(alt_atk - alt_def);
+            s.offense = battle_rules::percent_bonus(s.offense, diff * Rules.combat_artillery_bonus_altitude);
+            char* text = label(0x900);
+            bat_line(0, diff * Rules.combat_artillery_bonus_altitude, text);
+        }
+    }
+    if (Rules.combat_mobile_open_ground && s.combat_type == 0 && base_id < 0 && terrain == 2 &&
+        (sq_def->val3 & 0xC0) < 0x80 && speed_proto(atk_unit) > Rules.move_rate_roads) {
+        int32_t speed_atk = speed_proto(atk_unit);
+        int32_t speed_def = speed_proto(def_unit);
+        if (speed_def <= speed_atk) {
+            s.offense = battle_rules::percent_bonus(s.offense, Rules.combat_mobile_open_ground);
+            char* text = label(0x98C);
+            bat_line(0, Rules.combat_mobile_open_ground, text);
+        }
+    }
+    if (Rules.combat_mobile_def_in_rough && s.combat_type == 0 && (terrain > 2 || base_id >= 0) &&
+        speed_proto(atk_unit) > Rules.move_rate_roads) {
+        s.defense = battle_rules::percent_bonus(s.defense, Rules.combat_mobile_def_in_rough);
+        char* text = label(base_id < 0 ? 0x890 : 0x990);
+        bat_line(1, Rules.combat_mobile_def_in_rough, text);
+    }
+    if (Rules.combat_bonus_atk_road && s.combat_type == 0) {
+        s.offense = battle_rules::percent_bonus(s.offense, Rules.combat_bonus_atk_road);
+        char* text = label(0x978);
+        bat_line(0, Rules.combat_bonus_atk_road, text);
+    }
+    if (Rules.combat_penalty_atk_lower_elevation && s.combat_type == 0 &&
+        (sq_atk->climate & 0xE0) < (sq_def->climate & 0xE0) && !has_abil(atk_unit, ABL_ANTIGRAV_STRUTS)) {
+        char* text = label(0x6E4);
+        bat_line(1, Rules.combat_penalty_atk_lower_elevation, text);
+        s.defense = battle_rules::percent_bonus(s.defense, Rules.combat_penalty_atk_lower_elevation);
+    }
+    if (Rules.combat_bonus_atk_higher_elevation && s.combat_type == 0 &&
+        (sq_def->climate & 0xE0) < (sq_atk->climate & 0xE0) && !has_abil(def_unit, ABL_ANTIGRAV_STRUTS)) {
+        char* text = label(0x528);
+        bat_line(0, Rules.combat_bonus_atk_higher_elevation, text);
+        s.offense = battle_rules::percent_bonus(s.offense, Rules.combat_bonus_atk_higher_elevation);
+    }
+}
+// Defense multiplier of the defender's tile (x2 normal, x3 bunker, base defenses up to x4 with a
+// Tachyon Field), and the intrinsic base defense; also infantry against bases and artillery
+// against units in the open.
+void tile_defense(Strength& s, int32_t x, int32_t y, int32_t base_id, uint32_t faction_def) {
+    MAP* sq = map_tile(x, y);
+    char* text_ptr = nullptr;
+    int32_t mult = 2;
+    if ((sq->items & 0x800) && (s.veh_id_atk < 0 || chassis_triad(game().vehs[s.veh_id_atk].unit_id) != TRIAD_AIR)) {
+        text_ptr = TextLabels[0x598 / 4];  // bunker
+        mult = 3;
+    }
+    if (base_id >= 0) {
+        text_ptr = TextLabels[0x530 / 4];
+        mult = 2;
+        COMPAT_ORIGINAL(level_without_attacker);
+        int32_t level = s.veh_id_atk;  // BUG(original): -1 without an attacker (see below)
+        if (s.veh_id_atk >= 0) {
+            int32_t triad = chassis_triad(game().vehs[s.veh_id_atk].unit_id);
+            level = 2;
+            if (triad == TRIAD_LAND) {
+                if (bat_base_fac(base_id, FAC_PERIMETER_DEFENSE) || owns_project(5, faction_def)) {
+                    text_ptr = TextLabels[0x588 / 4];
+                    level = 4;
+                }
+            } else if (triad == TRIAD_SEA) {
+                if (bat_base_fac(base_id, FAC_NAVAL_YARD) ||
+                    (SecretProjects[FAC_MARITIME_CONTROL_CENTER - SP_ID_First] >= 0 &&
+                     game().bases[SecretProjects[FAC_MARITIME_CONTROL_CENTER - SP_ID_First]].faction_id ==
+                         game().bases[base_id].faction_id)) {
+                    text_ptr = Facility[FAC_NAVAL_YARD].name;
+                    level = 4;
+                }
+            } else if (triad == TRIAD_AIR) {
+                if (bat_base_fac(base_id, FAC_AEROSPACE_COMPLEX) ||
+                    (SecretProjects[FAC_CLOUDBASE_ACADEMY - SP_ID_First] >= 0 &&
+                     game().bases[SecretProjects[FAC_CLOUDBASE_ACADEMY - SP_ID_First]].faction_id ==
+                         game().bases[base_id].faction_id)) {
+                    text_ptr = Facility[FAC_AEROSPACE_COMPLEX].name;
+                    level = 4;
+                }
+            }
+        }
+        if (bat_base_fac(base_id, FAC_TACHYON_FIELD)) {
+            level += 2;
+            text_ptr = TextLabels[0x594 / 4];
+        }
+        // The Tachyon Field counts only with an attacker (level -1 + 2 stays below 2).
+        if ((level < 2 || (mult = level, level == 2)) &&
+            (s.veh_id_atk < 0 || !has_abil(game().vehs[s.veh_id_atk].unit_id, ABL_BLINK_DISPLACER)) &&
+            Rules.combat_bonus_intrinsic_base_def) {
+            char* text = label(0x530);
+            bat_line(1, Rules.combat_bonus_intrinsic_base_def, text);
+            s.defense = battle_rules::percent_bonus(s.defense, Rules.combat_bonus_intrinsic_base_def);
+        }
+    }
+    if (s.veh_id_atk >= 0 && has_abil(game().vehs[s.veh_id_atk].unit_id, ABL_BLINK_DISPLACER)) {
+        if (mult > 2) mult = 2;
+        text_ptr = TextLabels[0x6B0 / 4];
+        Strings_get(&StringTable, text_ptr);
+    }
+    if (Rules.combat_infantry_vs_base && s.combat_type == 0 && base_id >= 0 && veh_faction_raw(s.veh_id_atk) != 0) {
+        int32_t unit = veh_unit_raw(s.veh_id_atk);
+        if (!unit_is_native(unit) && chassis_triad(unit) == TRIAD_LAND && Chassis[Units[unit].chassis_id].speed == 1) {
+            s.offense = battle_rules::percent_bonus(s.offense, Rules.combat_infantry_vs_base);
+            char* text = label(0x88C);
+            bat_line(0, Rules.combat_infantry_vs_base, text);
+        }
+    }
+    if (s.is_arty && mult < 3 && base_id < 0 && (sq->val3 & 0xC0) < 0x80 && !(sq->items & BIT_FOREST) &&
+        (!(sq->items & BIT_FUNGUS) || (sq->climate & 0xE0) < 0x40)) {
+        mult = 3;
+        text_ptr = TextLabels[0x834 / 4];  // open ground vs artillery
+    }
+    s.defense = mult * s.defense;
+    if (mult > 2) {
+        char* text = Strings_get(&StringTable, text_ptr);
+        bat_line(1, (mult * 5 - 10) * 10, text);
+    }
+}
+// Conventional (non-psi) defense: terrain, the land attacker's modifiers, the tile's defenses.
+void conventional_defense(Strength& s, int32_t x, int32_t y, int32_t base_id, int32_t def_unit, uint32_t faction_def) {
+    int32_t terrain;
+    if (chassis_triad(def_unit) == TRIAD_AIR) terrain = 2;
+    else terrain = defense_value(game().vehs[s.veh_id_def].faction_id, x, y, s.veh_id_def, s.veh_id_atk);
+    if (s.veh_id_atk >= 0 && chassis_triad(game().vehs[s.veh_id_atk].unit_id) == TRIAD_LAND)
+        land_attack_modifiers(s, x, y, base_id, def_unit, terrain);
+    s.defense = terrain * s.defense;
+    if (terrain > 2) {
+        StrBuffer[0] = 0;
+        crt_strcat(StrBuffer, label(0x52C));
+        crt_strcat(StrBuffer, " ");
+        crt_strcat(StrBuffer, "(");
+        crt_strcat(StrBuffer, Strings_get(&StringTable, VehBattleDisplayTerrain));
+        crt_strcat(StrBuffer, ")");
+        bat_line(1, (terrain * 5 - 10) * 10, StrBuffer);
+    }
+    tile_defense(s, x, y, base_id, faction_def);
+}
+// Flechette Defense Systems of the defender's bases within two tiles, against missiles.
+void flechette_defense(Strength& s, int32_t x, int32_t y) {
+    for (int32_t i = 0; i < 25; i++) {
+        int32_t x2 = map_wrap_x(TableOffsetX[i] + x);
+        int32_t y2 = TableOffsetY[i] + y;
+        if (!map_in_bounds(x2, y2)) continue;
+        int32_t base2 = base_at(x2, y2);
+        if (base2 < 0 || (uint8_t)game().bases[base2].faction_id != game().vehs[s.veh_id_def].faction_id) continue;
+        if (bat_base_fac(base2, FAC_FLECHETTE_DEFENSE_SYS)) {
+            s.defense = s.defense * 3 / 2;
+            bat_line(1, 50, label(0x1164));
+        }
+    }
+}
+// Own sensors within two tiles of a land tile (x, y): +combat_defend_sensor, once more for a
+// sensor that counts twice.
+void sensor_defense(Strength& s, int32_t x, int32_t y) {
+    int32_t sensors = 0;
+    if (game().vehs[s.veh_id_def].faction_id != 0) {
+        for (int32_t i = 0; i < 25; i++) {
+            int32_t x2 = map_wrap_x(TableOffsetX[i] + x);
+            int32_t y2 = TableOffsetY[i] + y;
+            if (!map_in_bounds(x2, y2) || !is_sensor(x2, y2)) continue;
+            bool own;
+            if ((map_tile(x2, y2)->climate & 0xE0) < 0x60) {
+                // BUG(original): base_find may return -1 (no bases): Bases[-1] is read.
+                COMPAT_ORIGINAL(out_of_range_reads);
+                own = base_faction_raw(base_find(x2, y2)) == game().vehs[s.veh_id_def].faction_id;
+            } else {
+                int32_t owner = whose_territory(game().vehs[s.veh_id_def].faction_id, x2, y2, nullptr, 0);
+                own = owner < 0 || (uint32_t)owner == game().vehs[s.veh_id_def].faction_id;
+            }
+            if (own) {
+                sensors |= 1;
+                if (is_sensor(x2, y2) > 1) sensors |= 2;
+            }
+        }
+    }
+    if (sensors & 1) {
+        s.defense = battle_rules::percent_bonus(s.defense, Rules.combat_defend_sensor);
+        char* text = label(0x994);
+        bat_line(1, Rules.combat_defend_sensor, text);
+    }
+    if (sensors & 2) {
+        s.defense = battle_rules::percent_bonus(s.defense, Rules.combat_defend_sensor);
+        char* text = label(0x118C);
+        bat_line(1, Rules.combat_defend_sensor, text);
+    }
+}
+// Abilities and unit types of both sides: air superiority, non-combat units, ships in port,
+// pulse armor, comm jammer and AAA tracking against their targets.
+void ability_modifiers(Strength& s, int32_t base_id) {
+    int32_t def_unit = game().vehs[s.veh_id_def].unit_id;
+    int32_t atk_unit = game().vehs[s.veh_id_atk].unit_id;
+    if (chassis_triad(atk_unit) == TRIAD_AIR && has_abil(atk_unit, ABL_AIR_SUPERIORITY) && s.psi == 0) {
+        if (chassis_triad(def_unit) == TRIAD_AIR) {
+            if (Rules.combat_bonus_air_supr_vs_air && !has_abil(def_unit, ABL_AIR_SUPERIORITY)) {
+                s.offense = battle_rules::percent_bonus(s.offense, Rules.combat_bonus_air_supr_vs_air);
+                char* text = label(0x704);
+                bat_line(0, Rules.combat_bonus_air_supr_vs_air, text);
+            }
+        } else if (Rules.combat_penalty_air_supr_vs_ground) {
+            s.offense = battle_rules::percent_bonus(s.offense, -Rules.combat_penalty_air_supr_vs_ground);
+            char* text = label(0x700);
+            bat_line(0, -Rules.combat_penalty_air_supr_vs_ground, text);
+        }
+    }
+    if (chassis_triad(atk_unit) == TRIAD_AIR && chassis_triad(def_unit) == TRIAD_AIR &&
+        has_abil(def_unit, ABL_AIR_SUPERIORITY) && !has_abil(atk_unit, ABL_AIR_SUPERIORITY) && s.psi == 0 &&
+        !unit_missile(atk_unit) && !unit_missile(def_unit) && Rules.combat_bonus_air_supr_vs_air) {
+        s.defense = battle_rules::percent_bonus(s.defense, Rules.combat_bonus_air_supr_vs_air);
+        char* text = label(0x704);
+        bat_line(1, Rules.combat_bonus_air_supr_vs_air, text);
+    }
+    if (weapon_value(def_unit) == 0 && armor_value(def_unit) == 1 &&
+        (game().vehs[s.veh_id_atk].faction_id != 0 || base_id < 0) && Rules.combat_penalty_non_combat_vs_combat) {
+        s.defense = battle_rules::percent_bonus(s.defense, -Rules.combat_penalty_non_combat_vs_combat);
+        char* text = label(0x6DC);
+        bat_line(1, -Rules.combat_penalty_non_combat_vs_combat, text);
+    }
+    if (chassis_triad(atk_unit) != TRIAD_SEA && chassis_triad(def_unit) == TRIAD_SEA && base_id >= 0 &&
+        Rules.combat_bonus_vs_ship_port) {
+        s.offense = battle_rules::percent_bonus(s.offense, Rules.combat_bonus_vs_ship_port);
+        char* text = label(0x53C);
+        bat_line(0, Rules.combat_bonus_vs_ship_port, text);
+    }
+    int32_t armor = Units[def_unit].armor_id;
+    if ((armor == ARM_PULSE_3_ARMOR || armor == ARM_PULSE_8_ARMOR) && chassis_triad(atk_unit) == TRIAD_LAND &&
+        Chassis[Units[atk_unit].chassis_id].speed > 1) {
+        s.defense = s.defense * 125 / 100;
+        bat_line(1, 25, label(0x1160));
+    }
+    if (!has_abil(atk_unit, ABL_DISSOCIATIVE_WAVE) && has_abil(def_unit, ABL_COMM_JAMMER) &&
+        chassis_triad(atk_unit) == TRIAD_LAND && Chassis[Units[atk_unit].chassis_id].speed > 1 &&
+        Rules.combat_comm_jammer_vs_mobile) {
+        s.defense = battle_rules::percent_bonus(s.defense, Rules.combat_comm_jammer_vs_mobile);
+        char* text = label(0x540);
+        bat_line(1, Rules.combat_comm_jammer_vs_mobile, text);
+    }
+    if (!has_abil(atk_unit, ABL_DISSOCIATIVE_WAVE) && has_abil(def_unit, ABL_AAA) &&
+        chassis_triad(atk_unit) == TRIAD_AIR && Rules.combat_aaa_bonus_vs_air) {
+        s.defense = battle_rules::percent_bonus(s.defense, Rules.combat_aaa_bonus_vs_air);
+        char* text = label(0x544);
+        bat_line(1, Rules.combat_aaa_bonus_vs_air, text);
+    }
+}
+// The defender's strength in a normal attack: basic defense, faction bonus, terrain and tile,
+// Flechettes, sensors, psi defense (trance, resonance armor), then the abilities.
+void defender_modifiers(Strength& s) {
+    if (s.veh_id_def < 0) return;
+    s.defense = get_basic_defense(s.veh_id_def, s.veh_id_atk, s.psi, s.is_bombard);
+    uint32_t faction_def = game().vehs[s.veh_id_def].faction_id;
+    for (int32_t i = 0; i < game().mfactions[faction_def].faction_bonus_count; i++) {
+        if (game().mfactions[faction_def].faction_bonus_id[i] == 0x11) {  // defense bonus
+            s.defense = game().mfactions[faction_def].faction_bonus_val1[i] * s.defense / 100;
+            char* text = label(0x1154);
+            bat_line(1, game().mfactions[faction_def].faction_bonus_val1[i] - 100, text);
+        }
+    }
+    if (s.veh_id_atk >= 0 && Units[game().vehs[s.veh_id_atk].unit_id].plan == PLAN_PROBE) {
+        s.defense *= 4;
+        return;
+    }
+    int32_t x = game().vehs[s.veh_id_def].x;
+    int32_t y = game().vehs[s.veh_id_def].y;
+    int32_t base_id = base_at(x, y);
+    int32_t def_unit = game().vehs[s.veh_id_def].unit_id;
+    if (s.psi == 0) {
+        conventional_defense(s, x, y, base_id, def_unit, faction_def);
+    } else {
+        if (base_id >= 0 && Rules.combat_bonus_intrinsic_base_def) {
+            char* text = label(0x530);
+            bat_line(1, Rules.combat_bonus_intrinsic_base_def, text);
+            s.defense = battle_rules::percent_bonus(s.defense, Rules.combat_bonus_intrinsic_base_def);
+        }
+        s.defense = s.defense * 4;
+    }
+    if (game().vehs[s.veh_id_def].faction_id != 0 && s.veh_id_atk >= 0 &&
+        unit_missile(game().vehs[s.veh_id_atk].unit_id))
+        flechette_defense(s, x, y);
+    if ((map_tile(x, y)->climate & 0xE0) > 0x5F) sensor_defense(s, x, y);  // land tiles only
+    int32_t atk_unit = veh_unit_raw(s.veh_id_atk);
+    if (!has_abil(atk_unit, ABL_DISSOCIATIVE_WAVE) && Rules.combat_bonus_trance_vs_psi && s.veh_id_atk >= 0 &&
+        (s.psi & 1) && has_abil(game().vehs[s.veh_id_def].unit_id, ABL_TRANCE)) {
+        s.defense = battle_rules::percent_bonus(s.defense, Rules.combat_bonus_trance_vs_psi);
+        char* text = label(0x524);
+        bat_line(1, Rules.combat_bonus_trance_vs_psi, text);
+    }
+    if (s.veh_id_atk < 0) return;
+    if (s.psi & 1) {
+        int32_t armor = Units[game().vehs[s.veh_id_def].unit_id].armor_id;
+        if (armor == ARM_RESONANCE_3_ARMOR || armor == ARM_RESONANCE_8_ARMOR) {
+            s.defense = s.defense * 125 / 100;
+            bat_line(1, 25, label(0x115C));
+        }
+    }
+    ability_modifiers(s, base_id);
+}
+}  // namespace
+
+// Offense and defense of an attack (combat_type bit 1: artillery, bit 2: artillery duel, bits
+// 8/0x10: air-to-air), and the modifier lines of the battle window. Always returns 0.
 int32_t GAMEAPI battle_compute(int32_t veh_id_atk, int32_t veh_id_def, int32_t* offense_out, int32_t* defense_out,
                                int32_t combat_type) {
-    int32_t offense = 8;
-    int32_t defense = 8;
+    Strength s{veh_id_atk, veh_id_def, combat_type, 0, 0};
     VehBattleModCount[0] = 0;
     VehBattleModCount[1] = 0;
     VehBattleState[0] = 0;
     VehBattleState[1] = 0;
-    int32_t is_arty = combat_type & 1;
+    s.is_arty = combat_type & 1;
     // BUG(original): without an attacker (veh_id_atk -1), Vehs[-1] is read in several tests below.
     COMPAT_ORIGINAL(out_of_range_reads);
     int32_t atk_unit_raw = veh_unit_raw(veh_id_atk);
-    int32_t is_bombard = (is_arty || unit_missile(atk_unit_raw)) ? 1 : 0;
-    int32_t psi = 0;
-    if (!is_bombard || atk_unit_raw == BSC_SPORE_LAUNCHER || veh_unit_raw(veh_id_def) == BSC_SPORE_LAUNCHER) {
-        if (veh_id_atk >= 0 && weapon_value(game().vehs[veh_id_atk].unit_id) < 0) psi = 1;
-        if (veh_id_def >= 0 && armor_value(game().vehs[veh_id_def].unit_id) < 0) psi |= 2;
-        if (psi) {
-            uint32_t faction_id = veh_faction_raw(veh_id_atk);
-            if (game().mfactions[faction_id].rule_psi) {
-                char* text = label(0x558);
-                bat_line(0, game().mfactions[faction_id].rule_psi, text);
-            }
-            if (owns_project(19, faction_id)) bat_line(0, 50, label(0x55C));  // Dream Twister
-        }
-        uint32_t faction_def = veh_faction_raw(veh_id_def);
-        if (psi) {
-            if (game().mfactions[faction_def].rule_psi) {
-                char* text = label(0x558);
-                bat_line(1, game().mfactions[faction_def].rule_psi, text);
-            }
-            if (owns_project(9, faction_def)) bat_line(1, 50, label(0x560));  // Neural Amplifier
-            if (veh_id_def >= 0 && game().vehs[veh_id_def].unit_id == BSC_FUNGAL_TOWER)
-                bat_line(1, 50, Units[BSC_FUNGAL_TOWER].name);
-        }
-    }
-    if (veh_id_atk >= 0) {
-        offense = get_basic_offense(veh_id_atk, veh_id_def, psi, is_bombard, 0);
-        int32_t atk_unit = game().vehs[veh_id_atk].unit_id;
-        uint32_t faction_atk = game().vehs[veh_id_atk].faction_id;
-        if (Units[atk_unit].plan != PLAN_PROBE) {
-            if (veh_id_def >= 0 && combat_type == 0) {
-                MAP* sq = map_tile(game().vehs[veh_id_def].x, game().vehs[veh_id_def].y);
-                if ((sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) > 0x3F &&
-                    ((atk_unit < 64 && weapon_value(atk_unit) < 0) || owns_project(16, faction_atk)) &&
-                    weapon_value(game().vehs[veh_id_def].unit_id) >= 0) {
-                    offense += offense / 2;  // fungus
-                    bat_line(0, 50, label(0x548));
-                }
-                int32_t psi_def = psi & 2;
-                if (psi_def && (Units[game().vehs[veh_id_atk].unit_id].weapon_id == WPN_RESONANCE_LASER ||
-                                Units[game().vehs[veh_id_atk].unit_id].weapon_id == WPN_RESONANCE_BOLT)) {
-                    offense = offense * 125 / 100;
-                    bat_line(0, 25, label(0x1158));
-                }
-                if (!has_abil(game().vehs[veh_id_def].unit_id, ABL_DISSOCIATIVE_WAVE) && psi_def &&
-                    has_abil(game().vehs[veh_id_atk].unit_id, ABL_EMPATH) && Rules.combat_bonus_empath_song_vs_psi) {
-                    offense = (Rules.combat_bonus_empath_song_vs_psi + 100) * offense / 100;
-                    char* text = Strings_get(&StringTable, Ability[abil_index(ABL_EMPATH)].name);
-                    bat_line(0, Rules.combat_bonus_empath_song_vs_psi, text);
-                }
-            }
-            if ((game().vehs[veh_id_atk].state & VSTATE_MADE_AIRDROP) &&
-                has_abil(game().vehs[veh_id_atk].unit_id, ABL_DROP_POD) && Rules.combat_penalty_atk_airdrop) {
-                offense = (100 - Rules.combat_penalty_atk_airdrop) * offense / 100;
-                int32_t faction = (int8_t)game().vehs[veh_id_atk].faction_id;
-                int32_t range;
-                if (has_tech(Rules.tech_preq_orb_insert_wo_space, faction) ||
-                    (range = Rules.max_airdrop_rng_wo_orbital_insert,
-                     SecretProjects[FAC_SPACE_ELEVATOR - SP_ID_First] >= 0 &&
-                         game().bases[SecretProjects[FAC_SPACE_ELEVATOR - SP_ID_First]].faction_id == faction))
-                    range = game().map.x > game().map.y ? game().map.x : game().map.y;
-                char* text = label(Rules.max_airdrop_rng_wo_orbital_insert < range ? 0x6D8 : 0x6D4);
-                bat_line(0, -Rules.combat_penalty_atk_airdrop, text);
-            }
-            if ((game().mfactions[game().vehs[veh_id_atk].faction_id].rule_flags & 0x400) &&
-                Rules.combat_bonus_fanatic && combat_type == 0 && psi == 0) {
-                offense = (Rules.combat_bonus_fanatic + 100) * offense / 100;
-                char* text = label(0x840);
-                bat_line(0, Rules.combat_bonus_fanatic, text);
-            }
-            uint32_t faction = game().vehs[veh_id_atk].faction_id;
-            for (int32_t i = 0; i < game().mfactions[faction].faction_bonus_count; i++) {
-                if (game().mfactions[faction].faction_bonus_id[i] == 0x12) {  // offense bonus
-                    int32_t value = game().mfactions[faction].faction_bonus_val1[i];
-                    offense = value * offense / 100;
-                    bat_line(0, value - 100, label(0x1150));
-                }
-            }
-            if (psi && game().vehs[veh_id_atk].faction_id != 0) {
-                uint32_t f = game().vehs[veh_id_atk].faction_id;
-                if (game().factions[f].SE_planet != 0 && Rules.combat_psi_bonus_per_planet) {
-                    char* text = label(0x9C4);
-                    bat_line(0, game().factions[f].SE_planet * Rules.combat_psi_bonus_per_planet, text);
-                    offense = (game().factions[f].SE_planet * Rules.combat_psi_bonus_per_planet + 100) * offense / 100;
-                }
-            }
-        }
-    }
-    if (combat_type & 2) {
-        // Artillery duel: the defender fires back with its offense.
-        if (veh_id_def < 0) goto done;
-        defense = get_basic_offense(veh_id_def, veh_id_atk, psi, is_bombard, 1);
-        if (combat_type & 0x18) goto done;
-        int32_t triad_def = chassis_triad(game().vehs[veh_id_def].unit_id);
-        int32_t triad_atk = chassis_triad(game().vehs[veh_id_atk].unit_id);
-        if (triad_def == TRIAD_SEA && triad_atk == TRIAD_LAND) {
-            if (!Rules.combat_land_vs_sea_artillery) goto done;
-            offense = (Rules.combat_land_vs_sea_artillery + 100) * offense / 100;
-            char* text = label(0x6CC);
-            bat_line(0, Rules.combat_land_vs_sea_artillery, text);
-        } else if (triad_atk == TRIAD_SEA && triad_def == TRIAD_LAND) {
-            if (!Rules.combat_land_vs_sea_artillery) goto done;
-            defense = (Rules.combat_land_vs_sea_artillery + 100) * defense / 100;
-            char* text = label(0x6CC);
-            bat_line(1, Rules.combat_land_vs_sea_artillery, text);
-        } else {
-            if (!Rules.combat_artillery_bonus_altitude) goto done;
-            uint32_t alt_atk = map_tile(game().vehs[veh_id_atk].x, game().vehs[veh_id_atk].y)->climate >> 5;
-            uint32_t alt_def = map_tile(game().vehs[veh_id_def].x, game().vehs[veh_id_def].y)->climate >> 5;
-            if (alt_def < alt_atk) {
-                int32_t value = (int32_t)(alt_atk - alt_def) * Rules.combat_artillery_bonus_altitude;
-                offense = (value + 100) * offense / 100;
-                char* text = label(0x900);
-                bat_line(0, value, text);
-            } else if (alt_atk < alt_def) {
-                int32_t value = (int32_t)(alt_def - alt_atk) * Rules.combat_artillery_bonus_altitude;
-                defense = (value + 100) * defense / 100;
-                char* text = label(0x900);
-                bat_line(1, value, text);
-            }
-        }
-        goto done;
-    }
-    {
-        if (veh_id_def < 0) goto done;
-        defense = get_basic_defense(veh_id_def, veh_id_atk, psi, is_bombard);
-        uint32_t faction_def = game().vehs[veh_id_def].faction_id;
-        for (int32_t i = 0; i < game().mfactions[faction_def].faction_bonus_count; i++) {
-            if (game().mfactions[faction_def].faction_bonus_id[i] == 0x11) {  // defense bonus
-                defense = game().mfactions[faction_def].faction_bonus_val1[i] * defense / 100;
-                char* text = label(0x1154);
-                bat_line(1, game().mfactions[faction_def].faction_bonus_val1[i] - 100, text);
-            }
-        }
-        if (veh_id_atk >= 0 && Units[game().vehs[veh_id_atk].unit_id].plan == PLAN_PROBE) {
-            defense *= 4;
-            goto done;
-        }
-        int32_t x = game().vehs[veh_id_def].x;
-        int32_t y = game().vehs[veh_id_def].y;
-        int32_t base_id = base_at(x, y);
-        int32_t def_unit = game().vehs[veh_id_def].unit_id;
-        if (psi == 0) {
-            int32_t terrain;
-            if (chassis_triad(def_unit) == TRIAD_AIR) terrain = 2;
-            else terrain = defense_value(game().vehs[veh_id_def].faction_id, x, y, veh_id_def, veh_id_atk);
-            if (veh_id_atk >= 0 && chassis_triad(game().vehs[veh_id_atk].unit_id) == TRIAD_LAND) {
-                int32_t atk_unit = game().vehs[veh_id_atk].unit_id;
-                MAP* sq_atk = map_tile(game().vehs[veh_id_atk].x, game().vehs[veh_id_atk].y);
-                MAP* sq_def = map_tile(x, y);
-                if (combat_type != 0 && Rules.combat_artillery_bonus_altitude &&
-                    chassis_triad(def_unit) == TRIAD_LAND) {
-                    uint32_t alt_atk = sq_atk->climate >> 5;
-                    uint32_t alt_def = sq_def->climate >> 5;
-                    if (alt_def < alt_atk) {
-                        int32_t diff = (int32_t)(alt_atk - alt_def);
-                        offense = (diff * Rules.combat_artillery_bonus_altitude + 100) * offense / 100;
-                        char* text = label(0x900);
-                        bat_line(0, diff * Rules.combat_artillery_bonus_altitude, text);
-                    }
-                }
-                if (Rules.combat_mobile_open_ground && combat_type == 0 && base_id < 0 && terrain == 2 &&
-                    (sq_def->val3 & 0xC0) < 0x80 && speed_proto(atk_unit) > Rules.move_rate_roads) {
-                    int32_t speed_atk = speed_proto(atk_unit);
-                    int32_t speed_def = speed_proto(def_unit);
-                    if (speed_def <= speed_atk) {
-                        offense = (Rules.combat_mobile_open_ground + 100) * offense / 100;
-                        char* text = label(0x98C);
-                        bat_line(0, Rules.combat_mobile_open_ground, text);
-                    }
-                }
-                if (Rules.combat_mobile_def_in_rough && combat_type == 0 && (terrain > 2 || base_id >= 0) &&
-                    speed_proto(atk_unit) > Rules.move_rate_roads) {
-                    defense = (Rules.combat_mobile_def_in_rough + 100) * defense / 100;
-                    char* text = label(base_id < 0 ? 0x890 : 0x990);
-                    bat_line(1, Rules.combat_mobile_def_in_rough, text);
-                }
-                if (Rules.combat_bonus_atk_road && combat_type == 0) {
-                    offense = (Rules.combat_bonus_atk_road + 100) * offense / 100;
-                    char* text = label(0x978);
-                    bat_line(0, Rules.combat_bonus_atk_road, text);
-                }
-                if (Rules.combat_penalty_atk_lower_elevation && combat_type == 0 &&
-                    (sq_atk->climate & 0xE0) < (sq_def->climate & 0xE0) && !has_abil(atk_unit, ABL_ANTIGRAV_STRUTS)) {
-                    char* text = label(0x6E4);
-                    bat_line(1, Rules.combat_penalty_atk_lower_elevation, text);
-                    defense = (Rules.combat_penalty_atk_lower_elevation + 100) * defense / 100;
-                }
-                if (Rules.combat_bonus_atk_higher_elevation && combat_type == 0 &&
-                    (sq_def->climate & 0xE0) < (sq_atk->climate & 0xE0) && !has_abil(def_unit, ABL_ANTIGRAV_STRUTS)) {
-                    char* text = label(0x528);
-                    bat_line(0, Rules.combat_bonus_atk_higher_elevation, text);
-                    offense = (Rules.combat_bonus_atk_higher_elevation + 100) * offense / 100;
-                }
-            }
-            defense = terrain * defense;
-            if (terrain > 2) {
-                StrBuffer[0] = 0;
-                crt_strcat(StrBuffer, label(0x52C));
-                crt_strcat(StrBuffer, " ");
-                crt_strcat(StrBuffer, "(");
-                crt_strcat(StrBuffer, Strings_get(&StringTable, VehBattleDisplayTerrain));
-                crt_strcat(StrBuffer, ")");
-                bat_line(1, (terrain * 5 - 10) * 10, StrBuffer);
-            }
-            // Bunker, base defenses
-            MAP* sq = map_tile(x, y);
-            char* text_ptr = nullptr;
-            int32_t mult = 2;
-            if ((sq->items & 0x800) &&
-                (veh_id_atk < 0 || chassis_triad(game().vehs[veh_id_atk].unit_id) != TRIAD_AIR)) {
-                text_ptr = TextLabels[0x598 / 4];  // bunker
-                mult = 3;
-            }
-            if (base_id >= 0) {
-                text_ptr = TextLabels[0x530 / 4];
-                mult = 2;
-                COMPAT_ORIGINAL(level_without_attacker);
-                int32_t level = veh_id_atk;  // BUG(original): -1 without an attacker (see below)
-                if (veh_id_atk >= 0) {
-                    int32_t triad = chassis_triad(game().vehs[veh_id_atk].unit_id);
-                    level = 2;
-                    if (triad == TRIAD_LAND) {
-                        if (bat_base_fac(base_id, FAC_PERIMETER_DEFENSE) || owns_project(5, faction_def)) {
-                            text_ptr = TextLabels[0x588 / 4];
-                            level = 4;
-                        }
-                    } else if (triad == TRIAD_SEA) {
-                        if (bat_base_fac(base_id, FAC_NAVAL_YARD) ||
-                            (SecretProjects[FAC_MARITIME_CONTROL_CENTER - SP_ID_First] >= 0 &&
-                             game().bases[SecretProjects[FAC_MARITIME_CONTROL_CENTER - SP_ID_First]].faction_id ==
-                                 game().bases[base_id].faction_id)) {
-                            text_ptr = Facility[FAC_NAVAL_YARD].name;
-                            level = 4;
-                        }
-                    } else if (triad == TRIAD_AIR) {
-                        if (bat_base_fac(base_id, FAC_AEROSPACE_COMPLEX) ||
-                            (SecretProjects[FAC_CLOUDBASE_ACADEMY - SP_ID_First] >= 0 &&
-                             game().bases[SecretProjects[FAC_CLOUDBASE_ACADEMY - SP_ID_First]].faction_id ==
-                                 game().bases[base_id].faction_id)) {
-                            text_ptr = Facility[FAC_AEROSPACE_COMPLEX].name;
-                            level = 4;
-                        }
-                    }
-                }
-                if (bat_base_fac(base_id, FAC_TACHYON_FIELD)) {
-                    level += 2;
-                    text_ptr = TextLabels[0x594 / 4];
-                }
-                // The Tachyon Field counts only with an attacker (level -1 + 2 stays below 2).
-                if ((level < 2 || (mult = level, level == 2)) &&
-                    (veh_id_atk < 0 || !has_abil(game().vehs[veh_id_atk].unit_id, ABL_BLINK_DISPLACER)) &&
-                    Rules.combat_bonus_intrinsic_base_def) {
-                    char* text = label(0x530);
-                    bat_line(1, Rules.combat_bonus_intrinsic_base_def, text);
-                    defense = (Rules.combat_bonus_intrinsic_base_def + 100) * defense / 100;
-                }
-            }
-            if (veh_id_atk >= 0 && has_abil(game().vehs[veh_id_atk].unit_id, ABL_BLINK_DISPLACER)) {
-                if (mult > 2) mult = 2;
-                text_ptr = TextLabels[0x6B0 / 4];
-                Strings_get(&StringTable, text_ptr);
-            }
-            if (Rules.combat_infantry_vs_base && combat_type == 0 && base_id >= 0 && veh_faction_raw(veh_id_atk) != 0) {
-                int32_t unit = veh_unit_raw(veh_id_atk);
-                if (!unit_is_native(unit) && chassis_triad(unit) == TRIAD_LAND &&
-                    Chassis[Units[unit].chassis_id].speed == 1) {
-                    offense = (Rules.combat_infantry_vs_base + 100) * offense / 100;
-                    char* text = label(0x88C);
-                    bat_line(0, Rules.combat_infantry_vs_base, text);
-                }
-            }
-            if (is_arty && mult < 3 && base_id < 0 && (sq->val3 & 0xC0) < 0x80 && !(sq->items & BIT_FOREST) &&
-                (!(sq->items & BIT_FUNGUS) || (sq->climate & 0xE0) < 0x40)) {
-                mult = 3;
-                text_ptr = TextLabels[0x834 / 4];  // open ground vs artillery
-            }
-            defense = mult * defense;
-            if (mult > 2) {
-                char* text = Strings_get(&StringTable, text_ptr);
-                bat_line(1, (mult * 5 - 10) * 10, text);
-            }
-        } else {
-            if (base_id >= 0 && Rules.combat_bonus_intrinsic_base_def) {
-                char* text = label(0x530);
-                bat_line(1, Rules.combat_bonus_intrinsic_base_def, text);
-                defense = (Rules.combat_bonus_intrinsic_base_def + 100) * defense / 100;
-            }
-            defense = defense * 4;
-        }
-        // Flechette Defense Systems of nearby friendly bases against missiles.
-        if (game().vehs[veh_id_def].faction_id != 0 && veh_id_atk >= 0 &&
-            unit_missile(game().vehs[veh_id_atk].unit_id)) {
-            for (int32_t i = 0; i < 25; i++) {
-                int32_t x2 = map_wrap_x(TableOffsetX[i] + x);
-                int32_t y2 = TableOffsetY[i] + y;
-                if (!map_in_bounds(x2, y2)) continue;
-                int32_t base2 = base_at(x2, y2);
-                if (base2 < 0 || (uint8_t)game().bases[base2].faction_id != game().vehs[veh_id_def].faction_id)
-                    continue;
-                if (bat_base_fac(base2, FAC_FLECHETTE_DEFENSE_SYS)) {
-                    defense = defense * 3 / 2;
-                    bat_line(1, 50, label(0x1164));
-                }
-            }
-        }
-        // Sensors (land tiles only).
-        if ((map_tile(x, y)->climate & 0xE0) > 0x5F) {
-            int32_t sensors = 0;
-            if (game().vehs[veh_id_def].faction_id != 0) {
-                for (int32_t i = 0; i < 25; i++) {
-                    int32_t x2 = map_wrap_x(TableOffsetX[i] + x);
-                    int32_t y2 = TableOffsetY[i] + y;
-                    if (!map_in_bounds(x2, y2) || !is_sensor(x2, y2)) continue;
-                    bool own;
-                    if ((map_tile(x2, y2)->climate & 0xE0) < 0x60) {
-                        // BUG(original): base_find may return -1 (no bases): Bases[-1] is read.
-                        COMPAT_ORIGINAL(out_of_range_reads);
-                        own = base_faction_raw(base_find(x2, y2)) == game().vehs[veh_id_def].faction_id;
-                    } else {
-                        int32_t owner = whose_territory(game().vehs[veh_id_def].faction_id, x2, y2, nullptr, 0);
-                        own = owner < 0 || (uint32_t)owner == game().vehs[veh_id_def].faction_id;
-                    }
-                    if (own) {
-                        sensors |= 1;
-                        if (is_sensor(x2, y2) > 1) sensors |= 2;
-                    }
-                }
-            }
-            if (sensors & 1) {
-                defense = (Rules.combat_defend_sensor + 100) * defense / 100;
-                char* text = label(0x994);
-                bat_line(1, Rules.combat_defend_sensor, text);
-            }
-            if (sensors & 2) {
-                defense = (Rules.combat_defend_sensor + 100) * defense / 100;
-                char* text = label(0x118C);
-                bat_line(1, Rules.combat_defend_sensor, text);
-            }
-        }
-        int32_t atk_unit = veh_unit_raw(veh_id_atk);
-        if (!has_abil(atk_unit, ABL_DISSOCIATIVE_WAVE) && Rules.combat_bonus_trance_vs_psi && veh_id_atk >= 0 &&
-            (psi & 1) && has_abil(game().vehs[veh_id_def].unit_id, ABL_TRANCE)) {
-            defense = (Rules.combat_bonus_trance_vs_psi + 100) * defense / 100;
-            char* text = label(0x524);
-            bat_line(1, Rules.combat_bonus_trance_vs_psi, text);
-        }
-        if (psi & 1) {
-            if (veh_id_atk < 0) goto done;
-            int32_t armor = Units[game().vehs[veh_id_def].unit_id].armor_id;
-            if (armor == ARM_RESONANCE_3_ARMOR || armor == ARM_RESONANCE_8_ARMOR) {
-                defense = defense * 125 / 100;
-                bat_line(1, 25, label(0x115C));
-            }
-        }
-        if (veh_id_atk < 0) goto done;
-        def_unit = game().vehs[veh_id_def].unit_id;
-        atk_unit = game().vehs[veh_id_atk].unit_id;
-        if (chassis_triad(atk_unit) == TRIAD_AIR && has_abil(atk_unit, ABL_AIR_SUPERIORITY) && psi == 0) {
-            if (chassis_triad(def_unit) == TRIAD_AIR) {
-                if (Rules.combat_bonus_air_supr_vs_air && !has_abil(def_unit, ABL_AIR_SUPERIORITY)) {
-                    offense = (Rules.combat_bonus_air_supr_vs_air + 100) * offense / 100;
-                    char* text = label(0x704);
-                    bat_line(0, Rules.combat_bonus_air_supr_vs_air, text);
-                }
-            } else if (Rules.combat_penalty_air_supr_vs_ground) {
-                offense = (100 - Rules.combat_penalty_air_supr_vs_ground) * offense / 100;
-                char* text = label(0x700);
-                bat_line(0, -Rules.combat_penalty_air_supr_vs_ground, text);
-            }
-        }
-        if (chassis_triad(atk_unit) == TRIAD_AIR && chassis_triad(def_unit) == TRIAD_AIR &&
-            has_abil(def_unit, ABL_AIR_SUPERIORITY) && !has_abil(atk_unit, ABL_AIR_SUPERIORITY) && psi == 0 &&
-            !unit_missile(atk_unit) && !unit_missile(def_unit) && Rules.combat_bonus_air_supr_vs_air) {
-            defense = (Rules.combat_bonus_air_supr_vs_air + 100) * defense / 100;
-            char* text = label(0x704);
-            bat_line(1, Rules.combat_bonus_air_supr_vs_air, text);
-        }
-        if (weapon_value(def_unit) == 0 && armor_value(def_unit) == 1 &&
-            (game().vehs[veh_id_atk].faction_id != 0 || base_id < 0) && Rules.combat_penalty_non_combat_vs_combat) {
-            defense = (100 - Rules.combat_penalty_non_combat_vs_combat) * defense / 100;
-            char* text = label(0x6DC);
-            bat_line(1, -Rules.combat_penalty_non_combat_vs_combat, text);
-        }
-        if (chassis_triad(atk_unit) != TRIAD_SEA && chassis_triad(def_unit) == TRIAD_SEA && base_id >= 0 &&
-            Rules.combat_bonus_vs_ship_port) {
-            offense = (Rules.combat_bonus_vs_ship_port + 100) * offense / 100;
-            char* text = label(0x53C);
-            bat_line(0, Rules.combat_bonus_vs_ship_port, text);
-        }
-        int32_t armor = Units[def_unit].armor_id;
-        if ((armor == ARM_PULSE_3_ARMOR || armor == ARM_PULSE_8_ARMOR) && chassis_triad(atk_unit) == TRIAD_LAND &&
-            Chassis[Units[atk_unit].chassis_id].speed > 1) {
-            defense = defense * 125 / 100;
-            bat_line(1, 25, label(0x1160));
-        }
-        if (!has_abil(atk_unit, ABL_DISSOCIATIVE_WAVE) && has_abil(def_unit, ABL_COMM_JAMMER) &&
-            chassis_triad(atk_unit) == TRIAD_LAND && Chassis[Units[atk_unit].chassis_id].speed > 1 &&
-            Rules.combat_comm_jammer_vs_mobile) {
-            defense = (Rules.combat_comm_jammer_vs_mobile + 100) * defense / 100;
-            char* text = label(0x540);
-            bat_line(1, Rules.combat_comm_jammer_vs_mobile, text);
-        }
-        if (!has_abil(atk_unit, ABL_DISSOCIATIVE_WAVE) && has_abil(def_unit, ABL_AAA) &&
-            chassis_triad(atk_unit) == TRIAD_AIR && Rules.combat_aaa_bonus_vs_air) {
-            defense = (Rules.combat_aaa_bonus_vs_air + 100) * defense / 100;
-            char* text = label(0x544);
-            bat_line(1, Rules.combat_aaa_bonus_vs_air, text);
-        }
-    }
-done:
-    if (offense_out) *offense_out = offense;
-    if (defense_out) *defense_out = defense;
+    s.is_bombard = (s.is_arty || unit_missile(atk_unit_raw)) ? 1 : 0;
+    s.psi = psi_combat_lines(s, atk_unit_raw);
+    if (veh_id_atk >= 0) attacker_modifiers(s);
+    if (combat_type & 2) artillery_duel(s);
+    else defender_modifiers(s);
+    if (offense_out) *offense_out = s.offense;
+    if (defense_out) *defense_out = s.defense;
     return 0;
 }
 
@@ -1360,1058 +1405,1019 @@ void GAMEAPI mon_enemy_destroyed(int32_t faction_id, int32_t faction_id_killed) 
     if (faction_id == CurrentPlayerFaction) monument(1);
 }
 
-int32_t GAMEAPI battle_resolve(int32_t veh_id, int32_t dir, int32_t x, int32_t y, int32_t is_arty, int32_t is_real,
-                               int32_t* def_out) {
+namespace {
+// State of one battle_resolve call, shared by its phases.
+struct Battle {
+    int32_t veh_id, dir, x, y, is_real;
+    int32_t arty = 0;  // artillery flags: 1 bombardment, 2 duel, 0x18 air-to-air
+    int32_t ax = 0, ay = 0;  // the attacker's tile
+    uint32_t atk_f = 0, def_f = 0;
+    uint32_t atk_bit = 0;
+    int32_t def_id = -1;  // best_defender's choice
+    int32_t veh_id_def = -1;  // the defender (def_id; -1 with no unit on the tile)
+    int32_t def_unit = 0, atk_unit = 0;
+    int32_t base_id = -1;
+    int32_t moves_cost = 0;
+    int32_t offense = 0, defense = 0;
+    int32_t atk_hp = 0, def_hp = 0;
+    int32_t atk_power = 1, def_power = 1;  // damage per round dealt to the attacker / defender
     int32_t report_type = 0;  // pact/vendetta battle report for the viewer
     int32_t disengaged = 0;  // the defender withdrew
     int32_t show_interlude = 0;
     int32_t intercepted = 0;
     int32_t captured = 0;  // marine detachment captured the defender's stack
-    int32_t arty = is_arty;
+    int32_t nerve = 0;
+    char nerve_base[80];
+    int32_t atk_unit_saved = 0, def_unit_saved = 0;
+    int32_t husk_refresh = 0, display = 0, visible = 0;
+    int32_t retreat = 0, marine = 0;  // hit points the defender loses before withdrawing / capture
+    int32_t single = 0;  // ship/land artillery duel: one exchange when displayed
+    int32_t round_div = 0, last_hit = 0;
+    int32_t rx = 0, ry = 0;  // retreat destination
+    int32_t atk_left = 0;
+    int32_t kills = 0, captures = 0, energy = 0, collateral = 0;
+    Battle(int32_t veh, int32_t direction, int32_t tx, int32_t ty, int32_t real)
+        : veh_id(veh), dir(direction), x(tx), y(ty), is_real(real) {}
+    bool human(uint32_t faction_id) const { return (FactionStatus[0] & (uint8_t)(1 << (faction_id & 31))) != 0; }
+};
+
+// The combatants: artillery flags, interceptors, the best defender, the strengths and hit points.
+void prepare_battle(Battle& b, int32_t is_arty) {
+    int32_t veh_id = b.veh_id;
+    b.arty = is_arty;
     {
         int32_t unit_id = game().vehs[veh_id].unit_id;
-        arty = (arty == 0 && (!can_arty(unit_id, 1) || chassis_triad(unit_id) != TRIAD_LAND)) ? 0 : 1;
+        b.arty = (b.arty == 0 && (!can_arty(unit_id, 1) || chassis_triad(unit_id) != TRIAD_LAND)) ? 0 : 1;
     }
-    int32_t ax = game().vehs[veh_id].x;
-    int32_t ay = game().vehs[veh_id].y;
-    uint32_t atk_f = game().vehs[veh_id].faction_id;
-    int32_t top = veh_at(x, y);
-    MAP* sq = map_tile(x, y);
+    b.ax = game().vehs[veh_id].x;
+    b.ay = game().vehs[veh_id].y;
+    b.atk_f = game().vehs[veh_id].faction_id;
+    int32_t top = veh_at(b.x, b.y);
+    MAP* sq = map_tile(b.x, b.y);
     // A ship bombards a land tile where the units are mostly non-combat (or a base).
     if (can_arty(game().vehs[veh_id].unit_id, 1) && veh_triad(veh_id) == TRIAD_SEA && (sq->climate & 0xE0) > 0x5F) {
         int32_t combat = stack_check(top, 3, 2, -1, -1);
         int32_t all = stack_check(top, 1, -1, -1, -1);
-        if (combat < all || ((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8)) arty = 1;
+        if (combat < all || ((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8)) b.arty = 1;
     }
     int32_t def_top = stack_fix(top);
     if (veh_triad(veh_id) == TRIAD_AIR && !unit_missile(game().vehs[veh_id].unit_id) &&
-        !stack_check(def_top, 6, 0x20, -1, -1) && is_real && (VehAttackFlags & 2))
-        intercepted = interceptor(veh_faction_raw(def_top), atk_f, x, y);
-    int32_t def_id = best_defender(def_top, veh_id, arty);
-    int32_t veh_id_def = def_id;
+        !stack_check(def_top, 6, 0x20, -1, -1) && b.is_real && (VehAttackFlags & 2))
+        b.intercepted = interceptor(veh_faction_raw(def_top), b.atk_f, b.x, b.y);
+    b.def_id = best_defender(def_top, veh_id, b.arty);
+    b.veh_id_def = b.def_id;
     // BUG(original): with no unit on the target tile (veh_id_def -1; enemy_move rates such attacks
     // with is_real 0), Vehs[-1] is read for the defender's faction, unit and damage.
     COMPAT_ORIGINAL(out_of_range_reads);
-    uint32_t def_f = veh_faction_raw(veh_id_def);
-    int32_t def_unit = veh_unit_raw(veh_id_def);
-    int32_t base_id = base_at(x, y);
-    if (can_arty(game().vehs[veh_id].unit_id, 1) && can_arty(def_unit, 1)) {
-        if (veh_triad(veh_id) == TRIAD_LAND) arty |= 2;
-        else if (arty || (sq->climate & 0xE0) > 0x5F) arty |= 2;
+    b.def_f = veh_faction_raw(b.veh_id_def);
+    b.def_unit = veh_unit_raw(b.veh_id_def);
+    b.base_id = base_at(b.x, b.y);
+    if (can_arty(game().vehs[veh_id].unit_id, 1) && can_arty(b.def_unit, 1)) {
+        if (veh_triad(veh_id) == TRIAD_LAND) b.arty |= 2;
+        else if (b.arty || (sq->climate & 0xE0) > 0x5F) b.arty |= 2;
     }
-    if (has_abil(def_unit, ABL_AIR_SUPERIORITY) && veh_triad(veh_id) == TRIAD_AIR &&
-        !unit_missile(game().vehs[veh_id].unit_id) && !unit_missile(def_unit) && chassis_triad(def_unit) == TRIAD_AIR)
-        arty |= 0x1A;
-    int32_t moves_cost;
-    if ((arty & 3) == 0 || arty > 3) {
-        moves_cost = Rules.move_rate_roads;
+    if (has_abil(b.def_unit, ABL_AIR_SUPERIORITY) && veh_triad(veh_id) == TRIAD_AIR &&
+        !unit_missile(game().vehs[veh_id].unit_id) && !unit_missile(b.def_unit) &&
+        chassis_triad(b.def_unit) == TRIAD_AIR)
+        b.arty |= 0x1A;
+    if ((b.arty & 3) == 0 || b.arty > 3) {
+        b.moves_cost = Rules.move_rate_roads;
     } else {
-        moves_cost = speed(veh_id, 0) - game().vehs[veh_id].moves_spent;
-        moves_cost = moves_cost < 0 ? 0 : moves_cost > 999 ? 999 : moves_cost;
+        b.moves_cost = speed(veh_id, 0) - game().vehs[veh_id].moves_spent;
+        b.moves_cost = b.moves_cost < 0 ? 0 : b.moves_cost > 999 ? 999 : b.moves_cost;
     }
-    int32_t offense, defense;
-    battle_compute(veh_id, veh_id_def, &offense, &defense, arty);
-    int32_t atk_hp = veh_hp(veh_id);
-    int32_t def_hp;
-    if (veh_id_def >= 0) {
-        def_hp = veh_hp(veh_id_def);
+    battle_compute(veh_id, b.veh_id_def, &b.offense, &b.defense, b.arty);
+    b.atk_hp = veh_hp(veh_id);
+    if (b.veh_id_def >= 0) {
+        b.def_hp = veh_hp(b.veh_id_def);
     } else {
-        def_hp = unit_max_hp(def_unit) - rules_orig_byte(veh_raw_addr(veh_id_def, offsetof(VEH, damage_taken)));
-        def_hp = def_hp < 0 ? 0 : def_hp > 9999 ? 9999 : def_hp;
+        b.def_hp = unit_max_hp(b.def_unit) - rules_orig_byte(veh_raw_addr(b.veh_id_def, offsetof(VEH, damage_taken)));
+        b.def_hp = b.def_hp < 0 ? 0 : b.def_hp > 9999 ? 9999 : b.def_hp;
     }
-    int32_t atk_unit = game().vehs[veh_id].unit_id;
+    b.atk_unit = game().vehs[veh_id].unit_id;
     // Psi combat: each round's damage is the opponent's reactor (hit points are reactor x 10).
-    bool psi = weapon_value(atk_unit) < 0 || armor_value(def_unit) < 0;
-    int32_t def_power = psi ? Units[def_unit].reactor_id : 1;
-    int32_t atk_power = psi ? Units[atk_unit].reactor_id : 1;
-    if (!is_real) {
-        int32_t max_atk = unit_max_hp(atk_unit);
-        int32_t max_def = unit_max_hp(def_unit);
-        if (def_out) *def_out = veh_id_def;
-        return ((arty & 1) ? 4 : 8) * (atk_hp * def_power * offense / max_atk) /
-               (def_hp * atk_power * defense / max_def + 1);
-    }
-    uint32_t atk_bit = 1u << (atk_f & 31);
-    if ((FactionStatus[0] & (uint8_t)atk_bit) && Units[atk_unit].plan != PLAN_PROBE &&
-        (Units[def_unit].plan != PLAN_ARTIFACT || base_id >= 0) && (VehAttackFlags & 1) &&
-        (!MultiplayerActive || !intercepted) && break_treaty(atk_f, def_f, 0xB))
-        return 2;
-    // Nerve gas
-    int32_t nerve = 0;
-    if (has_abil(game().vehs[veh_id].unit_id, ABL_NERVE_GAS) && weapon_value(game().vehs[veh_id].unit_id) >= 0 &&
-        armor_value(game().vehs[veh_id_def].unit_id) >= 0) {
-        uint32_t humans = *reinterpret_cast<uint32_t*>(&FactionStatus[0]);
-        if (!MultiplayerActive || (VehAttackFlags & 1)) {
-            uint32_t state = game().vehs[veh_id].state & ~VSTATE_USED_NERVE_GAS;
-            game().vehs[veh_id].state = state;
-            if (atk_f == (uint32_t)CurrentPlayerFaction && (atk_bit & (uint8_t)humans)) {
-                parse_says(0, Units[game().vehs[veh_id].unit_id].name, -1, -1);
-                parse_say(1, Ability[abil_index(ABL_NERVE_GAS)].name, -1, -1);
-                BattleWin_stop_timer(&BattleWin);
-                if (popp(ScriptFileName, "USENERVE", 0, "biohazd_sm.pcx", 0) != 0)
-                    game().vehs[veh_id].state |= VSTATE_USED_NERVE_GAS;
-                BattleWin_pulse_timer(&BattleWin);
-            } else {
-                humans &= 0xFF;
-                if (!(atk_bit & humans)) {
-                    bool use = false;
-                    uint32_t status = game().factions[atk_f].diplo_status[def_f];
-                    uint32_t def_human = (1u << (def_f & 31)) & humans;
-                    if (!(status & 0x40000) &&
-                        !(game().factions[atk_f].player_flags & PFLAG_COMMIT_ATROCITIES_WANTONLY) &&
-                        (def_human == 0 || ProposalPassCount[8] <= ProposalPassCount[9])) {
-                        if (def_human && (status & 0x20)) {
-                            int32_t extra;
-                            if (!(GameRules & RULES_INTENSE_RIVALRY) ||
-                                (game().factions[def_f].ranking <= game().factions[atk_f].ranking &&
-                                 game().factions[def_f].diplo_combat_count[atk_f] <=
-                                     game().factions[atk_f].diplo_combat_count[def_f]))
-                                extra = 0;
-                            else extra = (game().factions[atk_f].AI_fight + 1) * 3;
-                            if (game().factions[def_f].integrity_blemishes + extra > 5) use = true;
-                        }
-                    } else {
-                        use = true;
-                    }
-                    if (use) game().vehs[veh_id].state = state | VSTATE_USED_NERVE_GAS;
-                }
-            }
-            if (MultiplayerActive) synch_veh(veh_id);
+    bool psi = weapon_value(b.atk_unit) < 0 || armor_value(b.def_unit) < 0;
+    b.def_power = psi ? Units[b.def_unit].reactor_id : 1;
+    b.atk_power = psi ? Units[b.atk_unit].reactor_id : 1;
+}
+// A human attacker who would break a treaty or pact may call the attack off (break_treaty).
+bool treaty_stops_attack(const Battle& b) {
+    return (FactionStatus[0] & (uint8_t)b.atk_bit) && Units[b.atk_unit].plan != PLAN_PROBE &&
+           (Units[b.def_unit].plan != PLAN_ARTIFACT || b.base_id >= 0) && (VehAttackFlags & 1) &&
+           (!MultiplayerActive || !b.intercepted) && break_treaty(b.atk_f, b.def_f, 0xB);
+}
+// Whether the AI uses nerve gas: with diplo bit 0x40000 toward the defender, when it commits
+// atrocities wantonly, or against a human defender while proposal 8 passed more often than 9;
+// otherwise only against a human defender with bit 0x20 whose integrity blemishes (plus a margin
+// under intense rivalry) exceed 5.
+bool ai_uses_nerve_gas(const Battle& b, uint32_t humans) {
+    uint32_t atk_f = b.atk_f, def_f = b.def_f;
+    bool use = false;
+    uint32_t status = game().factions[atk_f].diplo_status[def_f];
+    uint32_t def_human = (1u << (def_f & 31)) & humans;
+    if (!(status & 0x40000) && !(game().factions[atk_f].player_flags & PFLAG_COMMIT_ATROCITIES_WANTONLY) &&
+        (def_human == 0 || ProposalPassCount[8] <= ProposalPassCount[9])) {
+        if (def_human && (status & 0x20)) {
+            int32_t extra;
+            if (!(GameRules & RULES_INTENSE_RIVALRY) ||
+                (game().factions[def_f].ranking <= game().factions[atk_f].ranking &&
+                 game().factions[def_f].diplo_combat_count[atk_f] <= game().factions[atk_f].diplo_combat_count[def_f]))
+                extra = 0;
+            else extra = (game().factions[atk_f].AI_fight + 1) * 3;
+            if (game().factions[def_f].integrity_blemishes + extra > 5) use = true;
         }
-        if ((VehAttackFlags & 2) && (game().vehs[veh_id].state & VSTATE_USED_NERVE_GAS)) nerve = 1;
+    } else {
+        use = true;
     }
-    if (base_id >= 0) game().vehs[veh_id].state &= ~0x40000u;
+    return use;
+}
+// Nerve gas pods: the human viewer is asked, the AI decides (ai_uses_nerve_gas). Sets b.nerve.
+void decide_nerve_gas(Battle& b) {
+    int32_t veh_id = b.veh_id;
+    if (!has_abil(game().vehs[veh_id].unit_id, ABL_NERVE_GAS) || weapon_value(game().vehs[veh_id].unit_id) < 0 ||
+        armor_value(game().vehs[b.veh_id_def].unit_id) < 0)
+        return;
+    uint32_t humans = *reinterpret_cast<uint32_t*>(&FactionStatus[0]);
+    if (!MultiplayerActive || (VehAttackFlags & 1)) {
+        uint32_t state = game().vehs[veh_id].state & ~VSTATE_USED_NERVE_GAS;
+        game().vehs[veh_id].state = state;
+        if (b.atk_f == (uint32_t)CurrentPlayerFaction && (b.atk_bit & (uint8_t)humans)) {
+            parse_says(0, Units[game().vehs[veh_id].unit_id].name, -1, -1);
+            parse_say(1, Ability[abil_index(ABL_NERVE_GAS)].name, -1, -1);
+            BattleWin_stop_timer(&BattleWin);
+            if (popp(ScriptFileName, "USENERVE", 0, "biohazd_sm.pcx", 0) != 0)
+                game().vehs[veh_id].state |= VSTATE_USED_NERVE_GAS;
+            BattleWin_pulse_timer(&BattleWin);
+        } else {
+            humans &= 0xFF;
+            if (!(b.atk_bit & humans) && ai_uses_nerve_gas(b, humans))
+                game().vehs[veh_id].state = state | VSTATE_USED_NERVE_GAS;
+        }
+        if (MultiplayerActive) synch_veh(veh_id);
+    }
+    if ((VehAttackFlags & 2) && (game().vehs[veh_id].state & VSTATE_USED_NERVE_GAS)) b.nerve = 1;
+}
+// The attack costs moves; a unit with less than a full move left attacks at reduced strength.
+void spend_attack_moves(Battle& b) {
+    int32_t veh_id = b.veh_id;
+    if (b.base_id >= 0) game().vehs[veh_id].state &= ~0x40000u;
     if (!(game().vehs[veh_id].state & 0x1000) && (VehAttackFlags & 2)) {
-        if (atk_f != 0 && game().vehs[veh_id].unit_id != BSC_SPORE_LAUNCHER &&
+        if (b.atk_f != 0 && game().vehs[veh_id].unit_id != BSC_SPORE_LAUNCHER &&
             game().vehs[veh_id].unit_id != BSC_MIND_WORMS) {
-            // A unit with less than a full move left attacks at reduced strength.
             int32_t moves = speed(veh_id, 0) - game().vehs[veh_id].moves_spent;
             moves = moves < 0 ? 0 : moves > 999 ? 999 : moves;
-            if (Rules.move_rate_roads < 0) moves = 0;
-            else if (moves > Rules.move_rate_roads) moves = Rules.move_rate_roads;
-            offense = moves * offense / Rules.move_rate_roads;
+            moves = battle_rules::attack_moves(moves, Rules.move_rate_roads);
+            b.offense = moves * b.offense / Rules.move_rate_roads;
             char* text = label(0x54C);
             bat_line(0, (moves - Rules.move_rate_roads) * 100 / Rules.move_rate_roads, text);
         }
-        if (arty != 1) game().vehs[veh_id].moves_spent += (uint8_t)moves_cost;
+        if (b.arty != 1) game().vehs[veh_id].moves_spent += (uint8_t)b.moves_cost;
     }
     game().vehs[veh_id].state = (game().vehs[veh_id].state & ~0x1000u) | 4;
-    game().vehs[veh_id_def].state |= VSTATE_HAS_MOVED;
-    if (!(VehAttackFlags & 2)) return 0;
-    game().vehs[veh_id].state |= 0x40;
-    // Diplomatic consequences
-    if (Units[game().vehs[veh_id].unit_id].plan != PLAN_PROBE &&
-        Units[game().vehs[veh_id_def].unit_id].plan != PLAN_ARTIFACT) {
-        bool surprise = false;
-        if (FactionStatus[0] & (uint8_t)(1 << (def_f & 31))) {
-            uint32_t status = game().factions[def_f].diplo_status[atk_f];
-            surprise = (status & 6) || !(((status & 8) == 0 && !(game().factions[atk_f].diplo_status[def_f] & 0x800)) ||
-                                         (status & 0x10));
-        }
-        if (!surprise) {
-            if (((game().factions[atk_f].diplo_status[def_f] & DIPLO_TREATY) ||
-                 (game().factions[def_f].diplo_status[atk_f] & DIPLO_TREATY)) &&
-                atk_f != (uint32_t)CurrentPlayerFaction && def_f != (uint32_t)CurrentPlayerFaction) {
-                if (!(game().factions[CurrentPlayerFaction].diplo_status[def_f] & DIPLO_PACT)) {
-                    if (!(game().factions[CurrentPlayerFaction].diplo_status[atk_f] & DIPLO_PACT)) {
-                        if (GameState & STATE_OMNISCIENT_VIEW) report_type = 1;
-                    } else {
-                        report_type = 3;
-                    }
+    game().vehs[b.veh_id_def].state |= VSTATE_HAS_MOVED;
+}
+// Leader title, name and faction noun of a faction as $TITLE0, $NAME1, $FACTION2.
+void say_leader(const MFaction& m) {
+    PluralDefault = 0;
+    GenderDefault = m.is_leader_female;
+    parse_says(0, m.title_leader, -1, -1);
+    GenderDefault = m.is_leader_female;
+    PluralDefault = 0;
+    parse_says(1, m.name_leader, -1, -1);
+    GenderDefault = m.noun_gender;
+    PluralDefault = m.is_noun_plural;
+    parse_says(2, m.noun_faction, -1, -1);
+}
+// Diplomatic consequences of the attack: a surprise attack on a human player, battle reports of
+// treaty partners for the viewer, the act of aggression, and pact partners of the attacker whose
+// territory the attack came from.
+void diplomatic_consequences(Battle& b) {
+    uint32_t atk_f = b.atk_f, def_f = b.def_f;
+    bool surprise = false;
+    if (b.human(def_f)) {
+        uint32_t status = game().factions[def_f].diplo_status[atk_f];
+        surprise = (status & 6) ||
+                   !(((status & 8) == 0 && !(game().factions[atk_f].diplo_status[def_f] & 0x800)) || (status & 0x10));
+    }
+    if (!surprise) {
+        if (((game().factions[atk_f].diplo_status[def_f] & DIPLO_TREATY) ||
+             (game().factions[def_f].diplo_status[atk_f] & DIPLO_TREATY)) &&
+            atk_f != (uint32_t)CurrentPlayerFaction && def_f != (uint32_t)CurrentPlayerFaction) {
+            if (!(game().factions[CurrentPlayerFaction].diplo_status[def_f] & DIPLO_PACT)) {
+                if (!(game().factions[CurrentPlayerFaction].diplo_status[atk_f] & DIPLO_PACT)) {
+                    if (GameState & STATE_OMNISCIENT_VIEW) b.report_type = 1;
                 } else {
-                    report_type = 2;
+                    b.report_type = 3;
                 }
-            }
-        } else {
-            MFaction& m = game().mfactions[atk_f];
-            if (def_f == (uint32_t)CurrentPlayerFaction) {
-                PluralDefault = 0;
-                GenderDefault = m.is_leader_female;
-                parse_says(0, m.title_leader, -1, -1);
-                GenderDefault = m.is_leader_female;
-                PluralDefault = 0;
-                parse_says(1, m.name_leader, -1, -1);
-                GenderDefault = m.noun_gender;
-                PluralDefault = m.is_noun_plural;
-                parse_says(2, m.noun_faction, -1, -1);
-                NetMsg_pop(&NetMsg, "SURPRISE", -5000, 0, nullptr);
-            } else if (PbemActive) {
-                PluralDefault = 0;
-                GenderDefault = m.is_leader_female;
-                parse_says(0, m.title_leader, -1, -1);
-                GenderDefault = m.is_leader_female;
-                PluralDefault = 0;
-                parse_says(1, m.name_leader, -1, -1);
-                GenderDefault = m.noun_gender;
-                PluralDefault = m.is_noun_plural;
-                parse_says(2, m.noun_faction, -1, -1);
-                POP2("SURPRISE", nullptr, -1 - (int32_t)def_f);
-            }
-            game().factions[def_f].diplo_spoke[atk_f] = CurrentTurn;
-        }
-        act_of_aggression(atk_f, def_f);
-        // Pact members of the attacker whose territory the attack came from annoy the defender.
-        int8_t owner = map_tile(ax, ay)->owner;
-        for (int32_t i = 1; i < 8; i++) {
-            if ((uint32_t)i == atk_f || (uint32_t)i == def_f || owner != i) continue;
-            if ((game().factions[atk_f].diplo_status[i] & DIPLO_PACT) &&
-                !(game().factions[def_f].diplo_status[i] & DIPLO_VENDETTA) &&
-                (game().factions[def_f].diplo_status[i] & DIPLO_COMMLINK) &&
-                game().factions[i].mil_strength_1 < game().factions[def_f].mil_strength_1) {
-                treaty_on(i, def_f, 0x2000);
-                if (game().factions[i].diplo_status[def_f] & 0x800000) cause_friction(def_f, i, 3);
+            } else {
+                b.report_type = 2;
             }
         }
+    } else {
+        MFaction& m = game().mfactions[atk_f];
+        if (def_f == (uint32_t)CurrentPlayerFaction) {
+            say_leader(m);
+            NetMsg_pop(&NetMsg, "SURPRISE", -5000, 0, nullptr);
+        } else if (PbemActive) {
+            say_leader(m);
+            POP2("SURPRISE", nullptr, -1 - (int32_t)def_f);
+        }
+        game().factions[def_f].diplo_spoke[atk_f] = CurrentTurn;
     }
-    if (nerve) {
-        offense += offense / 2;
-        bat_line(0, 50, label(0x554));
+    act_of_aggression(atk_f, def_f);
+    // Pact members of the attacker whose territory the attack came from annoy the defender.
+    int8_t owner = map_tile(b.ax, b.ay)->owner;
+    for (int32_t i = 1; i < 8; i++) {
+        if ((uint32_t)i == atk_f || (uint32_t)i == def_f || owner != i) continue;
+        if ((game().factions[atk_f].diplo_status[i] & DIPLO_PACT) &&
+            !(game().factions[def_f].diplo_status[i] & DIPLO_VENDETTA) &&
+            (game().factions[def_f].diplo_status[i] & DIPLO_COMMLINK) &&
+            game().factions[i].mil_strength_1 < game().factions[def_f].mil_strength_1) {
+            treaty_on(i, def_f, 0x2000);
+            if (game().factions[i].diplo_status[def_f] & 0x800000) cause_friction(def_f, i, 3);
+        }
     }
-    if (MultiplayerActive) log_say_values("Battle Resolution!", veh_id, veh_id_def, 0);
-    int32_t atk_unit_saved = game().vehs[veh_id].unit_id;
-    int32_t def_unit_saved = game().vehs[veh_id_def].unit_id;
-    if ((atk_f == (uint32_t)CurrentPlayerFaction || def_f == (uint32_t)CurrentPlayerFaction) && !MultiplayerActive &&
-        (weapon_value(atk_unit_saved) < 0 || armor_value(def_unit_saved) < 0) && tut_check2(2))
-        TutWin_tut_map(&TutWin, "PSICOMBAT", x, y, atk_f != (uint32_t)CurrentPlayerFaction ? veh_id_def : veh_id,
-                       nullptr, 1, -1, -1);
-    // Difficulty adjustments against human players.
+}
+// Difficulty adjustments against (and for) human players, natives' strength, and the first turns.
+void difficulty_modifiers(Battle& b) {
+    uint32_t atk_f = b.atk_f, def_f = b.def_f;
     int32_t level = 3 - (atk_f != 0);
     uint8_t humans = FactionStatus[0];
     if (game().factions[def_f].diff_level < level) {
-        if ((humans & (1 << (def_f & 31))) && !(atk_bit & humans))
-            offense = (game().factions[def_f].diff_level + 1) * offense / 4;
+        if ((humans & (1 << (def_f & 31))) && !(b.atk_bit & humans))
+            b.offense = (game().factions[def_f].diff_level + 1) * b.offense / 4;
     }
-    if (game().factions[atk_f].diff_level < level && (atk_bit & humans) && !(humans & (1 << (def_f & 31))))
-        offense = (4 - game().factions[atk_f].diff_level) * offense / 2;
+    if (game().factions[atk_f].diff_level < level && (b.atk_bit & humans) && !(humans & (1 << (def_f & 31))))
+        b.offense = (4 - game().factions[atk_f].diff_level) * b.offense / 2;
     if (atk_f == 0) {
-        if (!(FactionStatus[0] & (uint8_t)(1 << (def_f & 31)))) {
-            if (Units[game().vehs[veh_id_def].unit_id].plan == PLAN_TERRAFORM) {
-                offense /= 2;
+        if (!b.human(def_f)) {
+            if (Units[game().vehs[b.veh_id_def].unit_id].plan == PLAN_TERRAFORM) {
+                b.offense /= 2;
                 if (!(GameState & STATE_OMNISCIENT_VIEW) && !MultiplayerActive &&
-                    (game().vehs[veh_id_def].faction_id != (uint32_t)CurrentPlayerFaction ||
-                     (game().vehs[veh_id_def].flags & (VFLAG_LURKER | VFLAG_INVISIBLE)) == 0x440) &&
-                    !(game().vehs[veh_id_def].visibility & (1 << (CurrentPlayerFaction & 31))))
-                    offense /= 2;
+                    (game().vehs[b.veh_id_def].faction_id != (uint32_t)CurrentPlayerFaction ||
+                     (game().vehs[b.veh_id_def].flags & (VFLAG_LURKER | VFLAG_INVISIBLE)) == 0x440) &&
+                    !(game().vehs[b.veh_id_def].visibility & (1 << (CurrentPlayerFaction & 31))))
+                    b.offense /= 2;
             } else {
-                offense = (game().factions[def_f].ranking + 8) * offense / 16;
+                b.offense = (game().factions[def_f].ranking + 8) * b.offense / 16;
             }
         }
-        if (base_id >= 0) {
-            if (def_f == (uint32_t)CurrentPlayerFaction) show_interlude = 1;
-            if (game().factions[def_f].base_count < 2) offense /= 2;
-            if (CurrentTurn < 50) offense /= 2;
-            if (bat_base_fac(base_id, FAC_HEADQUARTERS) && game().factions[def_f].base_count < 4) offense /= 2;
+        if (b.base_id >= 0) {
+            if (def_f == (uint32_t)CurrentPlayerFaction) b.show_interlude = 1;
+            if (game().factions[def_f].base_count < 2) b.offense /= 2;
+            if (CurrentTurn < 50) b.offense /= 2;
+            if (bat_base_fac(b.base_id, FAC_HEADQUARTERS) && game().factions[def_f].base_count < 4) b.offense /= 2;
         }
     }
     if (CurrentTurn < 15) {
-        if (atk_f == 0) offense /= 3;
-        if (def_f == 0) defense /= 2;
+        if (atk_f == 0) b.offense /= 3;
+        if (def_f == 0) b.defense /= 2;
     }
-    if (base_id >= 0 && veh_triad(veh_id) == TRIAD_AIR) game().bases[base_id].state_flags |= 0x100000;
-    // Human attackers are warned about bad odds (and may see them).
-    if ((VehAttackFlags & 1) && !intercepted && (FactionStatus[0] & (uint8_t)atk_bit) &&
-        atk_f == (uint32_t)CurrentPlayerFaction && arty == 0 && !unit_missile(game().vehs[veh_id].unit_id) &&
-        !(game().vehs[veh_id].state & (VSTATE_ON_ALERT | VSTATE_EXPLORE))) {
-        bool ask = true;
-        const char* text;
-        if (atk_hp * def_power * offense * 2 < def_hp * atk_power * defense) {
-            SubInterface_set_iface_mode(&BattleWin);
-            BattleWin_clear(&BattleWin);
-            bat_status(veh_id, veh_id_def, offense, defense, 0);
-            InfoWinBattleShown = 1;
-            MFaction& m = game().mfactions[CurrentPlayerFaction];
-            PluralDefault = 0;
-            GenderDefault = m.is_leader_female;
-            parse_says(0, m.title_leader, -1, -1);
-            PluralDefault = 0;
-            GenderDefault = m.is_leader_female;
-            parse_says(1, m.name_leader, -1, -1);
-            BattleWin_stop_timer(&BattleWin);
-            text = "BADIDEA";
-        } else if (GameMorePreferences & MPREF_ADV_CONFIRM_ODDS_BF_ATTACKING) {
-            SubInterface_set_iface_mode(&BattleWin);
-            BattleWin_clear(&BattleWin);
-            bat_status(veh_id, veh_id_def, offense, defense, 0);
-            InfoWinBattleShown = 1;
-            MFaction& m = game().mfactions[CurrentPlayerFaction];
-            PluralDefault = 0;
-            GenderDefault = m.is_leader_female;
-            parse_says(0, m.title_leader, -1, -1);
-            PluralDefault = 0;
-            GenderDefault = m.is_leader_female;
-            parse_says(1, m.name_leader, -1, -1);
-            char num[80];
-            StrBuffer[0] = 0;
-            crt_itoa(offense >> 8, num, 10);
-            crt_strcat(StrBuffer, num);
-            crt_strcat(StrBuffer, ".");
-            crt_itoa((int32_t)((offense & 0xFF) * 10) >> 8, num, 10);
-            crt_strcat(StrBuffer, num);
-            parse_says(2, StrBuffer, -1, -1);
-            StrBuffer[0] = 0;
-            crt_itoa(defense >> 8, num, 10);
-            crt_strcat(StrBuffer, num);
-            crt_strcat(StrBuffer, ".");
-            crt_itoa((int32_t)((defense & 0xFF) * 10) >> 8, num, 10);
-            crt_strcat(StrBuffer, num);
-            parse_says(3, StrBuffer, -1, -1);
-            // Odds as a reduced fraction.
-            int32_t a = veh_hp(veh_id) * offense;
-            int32_t b = veh_hp(veh_id_def) * defense;
-            for (int32_t d = 2;; d++) {
-                int32_t lo = a <= b ? a : b;  // min(a, b)
-                lo = b <= a ? b : a;
-                if (lo <= d) break;
-                for (; a != 0 && b != 0 && a % d == 0 && b % d == 0; b /= d) a /= d;
-            }
-            for (; a > 19999 && b > 19999; b /= 10000) a /= 10000;
-            for (; a > 9999 && b > 9999; b /= 5000) a /= 5000;
-            for (; a > 1999 && b > 1999; b /= 1000) a /= 1000;
-            for (; a > 999 && b > 999; b /= 500) a /= 500;
-            for (; a > 199 && b > 199; b /= 100) a /= 100;
-            for (; a > 99 && b > 99; b /= 50) a /= 50;
-            BattleWin_stop_timer(&BattleWin);
-            parse_num(0, a);
-            parse_num(1, b);
-            text =
-                (game().vehs[veh_id].damage_taken || game().vehs[veh_id_def].damage_taken) ? "GOODIDEA2" : "GOODIDEA";
-        } else {
-            ask = false;
-        }
-        if (ask) {
-            if (popp(ScriptFileName, text, 0, "hasty_sm.pcx", 0) == 0) {
-                BattleWin_pulse_timer(&BattleWin);
-                if (VehAttackFlags & 2) game().vehs[veh_id].moves_spent -= (uint8_t)moves_cost;
-                game().vehs[veh_id].order = ORDER_NONE;
-                game().vehs[veh_id].state &= 0xFCFFBDFF;
-                StatusWin_reset(&InfoWin);
-                StatusWin_redraw(&InfoWin);
-                return 1;
-            }
-            BattleWin_pulse_timer(&BattleWin);
-        }
+}
+// Strength as "N.M" ($slot): the 8.8 fixed point value with one decimal.
+void say_strength(int32_t slot, int32_t value) {
+    char num[80];
+    StrBuffer[0] = 0;
+    crt_itoa(value >> 8, num, 10);
+    crt_strcat(StrBuffer, num);
+    crt_strcat(StrBuffer, ".");
+    crt_itoa((int32_t)((value & 0xFF) * 10) >> 8, num, 10);
+    crt_strcat(StrBuffer, num);
+    parse_says(slot, StrBuffer, -1, -1);
+}
+// The battle window with the odds, before the viewer's question.
+void show_odds(const Battle& b) {
+    SubInterface_set_iface_mode(&BattleWin);
+    BattleWin_clear(&BattleWin);
+    bat_status(b.veh_id, b.veh_id_def, b.offense, b.defense, 0);
+    InfoWinBattleShown = 1;
+    MFaction& m = game().mfactions[CurrentPlayerFaction];
+    PluralDefault = 0;
+    GenderDefault = m.is_leader_female;
+    parse_says(0, m.title_leader, -1, -1);
+    PluralDefault = 0;
+    GenderDefault = m.is_leader_female;
+    parse_says(1, m.name_leader, -1, -1);
+}
+// The human viewer is warned about bad odds (BADIDEA), or shown the odds when the preference asks
+// for it (GOODIDEA). Returns false when the attack is called off (the moves are refunded).
+bool confirm_attack(Battle& b) {
+    int32_t veh_id = b.veh_id;
+    const char* text;
+    if (b.atk_hp * b.def_power * b.offense * 2 < b.def_hp * b.atk_power * b.defense) {
+        show_odds(b);
+        BattleWin_stop_timer(&BattleWin);
+        text = "BADIDEA";
+    } else if (GameMorePreferences & MPREF_ADV_CONFIRM_ODDS_BF_ATTACKING) {
+        show_odds(b);
+        say_strength(2, b.offense);
+        say_strength(3, b.defense);
+        int32_t a = veh_hp(veh_id) * b.offense;
+        int32_t d = veh_hp(b.veh_id_def) * b.defense;
+        battle_rules::reduce_odds(a, d);
+        BattleWin_stop_timer(&BattleWin);
+        parse_num(0, a);
+        parse_num(1, d);
+        text = (game().vehs[veh_id].damage_taken || game().vehs[b.veh_id_def].damage_taken) ? "GOODIDEA2" : "GOODIDEA";
+    } else {
+        return true;
     }
-    char nerve_base[80];
-    if (nerve) {
-        atrocity(atk_f, def_f, base_id >= 0, 0);
-        nerve_base[0] = 0;
-        if (base_id >= 0) crt_strcpy(nerve_base, game().bases[base_id].name);
-    }
-    if (game().vehs[veh_id].order == ORDER_MOVE_TO) {
+    if (popp(ScriptFileName, text, 0, "hasty_sm.pcx", 0) == 0) {
+        BattleWin_pulse_timer(&BattleWin);
+        if (VehAttackFlags & 2) game().vehs[veh_id].moves_spent -= (uint8_t)b.moves_cost;
         game().vehs[veh_id].order = ORDER_NONE;
         game().vehs[veh_id].state &= 0xFCFFBDFF;
+        StatusWin_reset(&InfoWin);
+        StatusWin_redraw(&InfoWin);
+        return false;
     }
-    int32_t husk_refresh = 0;
+    BattleWin_pulse_timer(&BattleWin);
+    return true;
+}
+// Whether the battle is shown: the viewer takes part (or the omniscient view), or it is visible
+// and the viewer's preferences show battles of others.
+void battle_visibility(Battle& b) {
     uint32_t viewer = CurrentPlayerFaction;
-    // Whether the battle is shown: the viewer takes part (or the omniscient view), or it is visible
-    // and the viewer's preferences show battles of others.
-    int32_t display = (atk_f == viewer || def_f == viewer || (GameState & STATE_OMNISCIENT_VIEW)) ? 1 : 0;
+    b.display = (b.atk_f == viewer || b.def_f == viewer || (GameState & STATE_OMNISCIENT_VIEW)) ? 1 : 0;
     uint8_t vbit = (uint8_t)(1 << (viewer & 31));
-    int32_t visible = ((game().vehs[veh_id].faction_id == viewer &&
-                        (game().vehs[veh_id].flags & (VFLAG_LURKER | VFLAG_INVISIBLE)) != 0x440) ||
-                       (game().vehs[veh_id].visibility & vbit) ||
-                       (game().vehs[veh_id_def].faction_id == viewer &&
-                        (game().vehs[veh_id_def].flags & (VFLAG_LURKER | VFLAG_INVISIBLE)) != 0x440) ||
-                       (game().vehs[veh_id_def].visibility & vbit))
-                          ? 1
-                          : 0;
-    uint32_t pref = (game().factions[viewer].diplo_status[atk_f] & DIPLO_PACT)
+    const VEH& atk = game().vehs[b.veh_id];
+    const VEH& def = game().vehs[b.veh_id_def];
+    b.visible = ((atk.faction_id == viewer && (atk.flags & (VFLAG_LURKER | VFLAG_INVISIBLE)) != 0x440) ||
+                 (atk.visibility & vbit) ||
+                 (def.faction_id == viewer && (def.flags & (VFLAG_LURKER | VFLAG_INVISIBLE)) != 0x440) ||
+                 (def.visibility & vbit))
+                    ? 1
+                    : 0;
+    uint32_t pref = (game().factions[viewer].diplo_status[b.atk_f] & DIPLO_PACT)
                         ? (GamePreferences & PREF_BSC_DONT_QUICK_MOVE_ALLY_VEH)
                         : (GamePreferences & PREF_BSC_DONT_QUICK_MOVE_ENEMY_VEH);
-    if (pref) display |= visible;
-    if (arty == 1) {
-        // ---- bombardment: every defender of the stack takes damage, none is killed outright ----
-        add_goal(def_f, 0x10, 4, x, y, -1);
-        add_goal(def_f, 0, 4, ax, ay, -1);
-        if (base_id >= 0) {
-            game().bases[base_id].state_flags |= 0x200000;
-            game().bases[base_id].event_flags |= 0x100;
-        }
-        if (def_id >= 0) {
-            bool paused = true;
-            int32_t v = head_of_stack(veh_id_def);
-            while (v >= 0) {
-                int32_t v_unit = game().vehs[v].unit_id;
-                if (chassis_triad(v_unit) != TRIAD_AIR || has_abil(game().vehs[veh_id].unit_id, ABL_AIR_SUPERIORITY) ||
-                    base_id >= 0 || (map_tile(x, y)->items & BIT_AIRBASE)) {
-                    veh_skip(veh_id);
-                    battle_compute(veh_id, v, &offense, &defense, 1);
-                    int32_t den = Rules.artillery_dmg_denominator * defense;
-                    den = den < 1 ? 1 : den > 9999999 ? 9999999 : den;
-                    int32_t rounds = Rules.artillery_dmg_numerator * offense / den + 1;
-                    rounds = rounds < 1 ? 1 : rounds > 999 ? 999 : rounds;
-                    int32_t damage = rounds - 1 > 0 ? game_rand() % rounds : 0;
-                    // Maximum damage: a share of the hit points that bombardment cannot remove.
-                    int32_t keep;
-                    if (base_id < 0 && !(map_tile(x, y)->items & 0x800)) {
-                        int32_t pct = chassis_triad(game().vehs[v].unit_id) != TRIAD_LAND
-                                          ? Rules.max_dmg_percent_arty_sea
-                                          : Rules.max_dmg_percent_arty_open;
-                        keep = (100 - pct) * unit_max_hp(game().vehs[v].unit_id) + 99;
-                    } else {
-                        keep =
-                            (100 - Rules.max_dmg_percent_arty_base_bunker) * unit_max_hp(game().vehs[v].unit_id) + 99;
-                    }
-                    keep /= 100;
-                    for (; damage > 0; damage--)
-                        if (keep <= veh_hp(v) - damage) break;
-                    if (display) {
-                        paused = false;
-                        VehDrawDefendID = v;
-                        game().vehs[veh_id].visibility |= (uint8_t)(1 << (def_f & 31));
-                        VehDrawAttackID = veh_id;
-                        if (!Console_focus(&MainConsole, x, y, atk_f)) {
-                            draw_tile(ax, ay, 2);
-                            draw_tile(x, y, 2);
-                        }
-                        SubInterface_set_iface_mode(&BattleWin);
-                        BattleWin_clear(&BattleWin);
-                        bat_status(veh_id, v, offense, defense, 1);
-                        InfoWinBattleShown = 1;
-                        flush_input();
-                        if (keep == 0 || game().vehs[v].damage_taken != (uint32_t)keep || v < 0 ||
-                            game().vehs[v].next_veh_id_stack < 0) {
-                            boom(x, y, 0);
-                            paused = true;
-                        }
-                    }
-                    game().vehs[v].damage_taken += (uint8_t)damage;
-                    game().vehs[v].state |= VSTATE_HAS_MOVED;
-                    if (Units[game().vehs[v].unit_id].plan == PLAN_TERRAFORM) game().vehs[v].movement_turns = 0;
-                    if (base_id < 0) game().vehs[v].state |= 8;
-                    if (display) {
-                        bat_status(veh_id, v, offense, defense, 1);
-                        draw_tile(x, y, 2);
-                        VehDrawAttackID = -1;
-                        VehDrawDefendID = -1;
-                        if (!(GameMorePreferences & MPREF_ADV_PAUSE_AFTER_BATTLES)) {
-                            if (!ui_shift_pressed() && !(GamePreferences & PREF_ADV_FAST_BATTLE_RESOLUTION) &&
-                                !MultiplayerActive && paused)
-                                clock_wait(200);
-                        } else {
-                            BattleWin_stop_timer(&BattleWin);
-                            popp(ScriptFileName, "BATTLEPAUSE", 0, "batwon_sm.pcx", 0);
-                            BattleWin_pulse_timer(&BattleWin);
-                            if (DialogToggle) {
-                                GameMorePreferences &= ~MPREF_ADV_PAUSE_AFTER_BATTLES;
-                                prefs_save(0);
-                            }
-                        }
-                    }
-                }
-                if (v < 0) break;
-                v = game().vehs[v].next_veh_id_stack;
-            }
-        }
-        int32_t v = stack_fix(veh_at(x, y));
-        while (v >= 0) {
-            if (unit_max_hp(game().vehs[v].unit_id) - game().vehs[v].damage_taken < 1) {
-                stack_veh(v, 2);
-                stack_kill(v);
-                v = stack_fix(veh_at(x, y));
-                game().factions[atk_f].diplo_combat_total[def_f]++;
-                game().factions[atk_f].diplo_combat_count[def_f]++;
-            } else {
-                v = game().vehs[v].next_veh_id_stack;
-            }
-        }
-        draw_tile_fixup(x, y, 1, 2);
-        if (base_id >= 0 && !(FactionStatus[0] & (uint8_t)(1 << (def_f & 31)))) base_reset(base_id, 0);
-        return 0;
+    if (pref) b.display |= b.visible;
+}
+// The pause after a displayed battle (BATTLEPAUSE), switched off by its dialog toggle.
+void battle_pause() {
+    BattleWin_stop_timer(&BattleWin);
+    popp(ScriptFileName, "BATTLEPAUSE", 0, "batwon_sm.pcx", 0);
+    BattleWin_pulse_timer(&BattleWin);
+    if (DialogToggle) {
+        GameMorePreferences &= ~MPREF_ADV_PAUSE_AFTER_BATTLES;
+        prefs_save(0);
     }
-    if (arty) add_goal(def_f, 0x10, 2, x, y, -1);
-    if (display) {
-        if (MultiplayerActive && BaseWinMultiplayerRefresh) husk_refresh = 1;
-        game().vehs[veh_id].visibility |= (uint8_t)(1 << (def_f & 31));
+}
+// Bombardment of one defender v: random damage, never below the hit points that bombardment
+// cannot remove (more in bases and bunkers); shown to the viewer.
+void bombard_unit(Battle& b, int32_t v, bool& paused) {
+    int32_t veh_id = b.veh_id, x = b.x, y = b.y;
+    veh_skip(veh_id);
+    battle_compute(veh_id, v, &b.offense, &b.defense, 1);
+    int32_t rounds = battle_rules::bombard_damage_range(Rules.artillery_dmg_numerator, Rules.artillery_dmg_denominator,
+                                                        b.offense, b.defense);
+    int32_t damage = rounds - 1 > 0 ? game_rand() % rounds : 0;
+    int32_t keep;
+    if (b.base_id < 0 && !(map_tile(x, y)->items & 0x800)) {
+        int32_t pct = chassis_triad(game().vehs[v].unit_id) != TRIAD_LAND ? Rules.max_dmg_percent_arty_sea
+                                                                          : Rules.max_dmg_percent_arty_open;
+        keep = battle_rules::bombard_hp_floor(pct, unit_max_hp(game().vehs[v].unit_id));
+    } else {
+        keep =
+            battle_rules::bombard_hp_floor(Rules.max_dmg_percent_arty_base_bunker, unit_max_hp(game().vehs[v].unit_id));
+    }
+    for (; damage > 0; damage--)
+        if (keep <= veh_hp(v) - damage) break;
+    if (b.display) {
+        paused = false;
+        VehDrawDefendID = v;
+        game().vehs[veh_id].visibility |= (uint8_t)(1 << (b.def_f & 31));
         VehDrawAttackID = veh_id;
-        VehDrawDefendID = veh_id_def;
-        if (!Console_focus(&MainConsole, x, y, atk_f)) {
-            draw_tile(ax, ay, 2);
+        if (!Console_focus(&MainConsole, x, y, b.atk_f)) {
+            draw_tile(b.ax, b.ay, 2);
             draw_tile(x, y, 2);
         }
-        stack_veh(veh_id, 1);
         SubInterface_set_iface_mode(&BattleWin);
         BattleWin_clear(&BattleWin);
-        bat_status(veh_id, veh_id_def, offense, defense, arty);
+        bat_status(veh_id, v, b.offense, b.defense, 1);
         InfoWinBattleShown = 1;
         flush_input();
-        if (!ui_shift_pressed() && !(arty & 1)) veh_scoot(veh_id, ax, ay, dir, 1);
-        stack_put(veh_id, ax, ay);
-        draw_tile(ax, ay, 2);
+        if (keep == 0 || game().vehs[v].damage_taken != (uint32_t)keep || v < 0 ||
+            game().vehs[v].next_veh_id_stack < 0) {
+            boom(x, y, 0);
+            paused = true;
+        }
+    }
+    game().vehs[v].damage_taken += (uint8_t)damage;
+    game().vehs[v].state |= VSTATE_HAS_MOVED;
+    if (Units[game().vehs[v].unit_id].plan == PLAN_TERRAFORM) game().vehs[v].movement_turns = 0;
+    if (b.base_id < 0) game().vehs[v].state |= 8;
+    if (b.display) {
+        bat_status(veh_id, v, b.offense, b.defense, 1);
         draw_tile(x, y, 2);
+        VehDrawAttackID = -1;
+        VehDrawDefendID = -1;
+        if (!(GameMorePreferences & MPREF_ADV_PAUSE_AFTER_BATTLES)) {
+            if (!ui_shift_pressed() && !(GamePreferences & PREF_ADV_FAST_BATTLE_RESOLUTION) && !MultiplayerActive &&
+                paused)
+                clock_wait(200);
+        } else {
+            battle_pause();
+        }
     }
-    // A faster defender in the open may withdraw after losing half its hit points.
-    int32_t retreat = 0;
-    {
-        int32_t speed_def = speed(veh_id_def, 1);
-        int32_t speed_atk = speed(veh_id, 1);
-        int32_t du = game().vehs[veh_id_def].unit_id;
-        if (speed_atk < speed_def && arty == 0 && weapon_value(du) != 0 && !(game().vehs[veh_id_def].state & 0x40) &&
-            veh_triad(veh_id) != TRIAD_AIR && chassis_triad(du) != TRIAD_AIR &&
-            (!has_abil(game().vehs[veh_id].unit_id, ABL_COMM_JAMMER) ||
-             has_abil(game().vehs[veh_id_def].unit_id, ABL_DISSOCIATIVE_WAVE)) &&
-            game().vehs[veh_id_def].order != ORDER_HOLD && base_id < 0 && !(map_tile(x, y)->items & 0x40800) &&
-            stack_check(veh_id_def, 1, -1, -1, -1) == 1)
-            retreat = (veh_hp(veh_id_def) + 1) / 2;
+}
+// Bombardment: every defender of the stack takes damage (air units only from air superiority
+// units, or in a base or airbase), none is killed outright; then the units without hit points
+// die.
+void bombard(Battle& b) {
+    int32_t x = b.x, y = b.y;
+    add_goal(b.def_f, 0x10, 4, x, y, -1);
+    add_goal(b.def_f, 0, 4, b.ax, b.ay, -1);
+    if (b.base_id >= 0) {
+        game().bases[b.base_id].state_flags |= 0x200000;
+        game().bases[b.base_id].event_flags |= 0x100;
     }
-    // Marine detachment: may capture a ship at sea.
-    int32_t marine = 0;
-    if (has_abil(game().vehs[veh_id].unit_id, ABL_MARINE_DETACHMENT) && veh_triad(veh_id) == TRIAD_SEA &&
-        (map_tile(x, y)->climate & 0xE0) < 0x60) {
-        int32_t du = game().vehs[veh_id_def].unit_id;
-        if (chassis_triad(du) == TRIAD_SEA && !unit_is_native(du) && base_id < 0) marine = veh_hp(veh_id_def) * 2 / 3;
+    if (b.def_id >= 0) {
+        bool paused = true;
+        int32_t v = head_of_stack(b.veh_id_def);
+        while (v >= 0) {
+            int32_t v_unit = game().vehs[v].unit_id;
+            if (chassis_triad(v_unit) != TRIAD_AIR || has_abil(game().vehs[b.veh_id].unit_id, ABL_AIR_SUPERIORITY) ||
+                b.base_id >= 0 || (map_tile(x, y)->items & BIT_AIRBASE))
+                bombard_unit(b, v, paused);
+            if (v < 0) break;
+            v = game().vehs[v].next_veh_id_stack;
+        }
     }
-    if (Units[game().vehs[veh_id].unit_id].plan == PLAN_PLANET_BUSTER &&
-        Units[game().vehs[veh_id].unit_id].reactor_id) {
-        planet_busting(veh_id, x, y);
-        GameDrawState |= 4;
+    int32_t v = stack_fix(veh_at(x, y));
+    while (v >= 0) {
+        if (unit_max_hp(game().vehs[v].unit_id) - game().vehs[v].damage_taken < 1) {
+            stack_veh(v, 2);
+            stack_kill(v);
+            v = stack_fix(veh_at(x, y));
+            game().factions[b.atk_f].diplo_combat_total[b.def_f]++;
+            game().factions[b.atk_f].diplo_combat_count[b.def_f]++;
+        } else {
+            v = game().vehs[v].next_veh_id_stack;
+        }
+    }
+    draw_tile_fixup(x, y, 1, 2);
+    if (b.base_id >= 0 && !b.human(b.def_f)) base_reset(b.base_id, 0);
+}
+// The viewer's battle window at the start of the fight; the attacker steps toward the defender.
+void show_battle_start(Battle& b) {
+    int32_t veh_id = b.veh_id;
+    if (MultiplayerActive && BaseWinMultiplayerRefresh) b.husk_refresh = 1;
+    game().vehs[veh_id].visibility |= (uint8_t)(1 << (b.def_f & 31));
+    VehDrawAttackID = veh_id;
+    VehDrawDefendID = b.veh_id_def;
+    if (!Console_focus(&MainConsole, b.x, b.y, b.atk_f)) {
+        draw_tile(b.ax, b.ay, 2);
+        draw_tile(b.x, b.y, 2);
+    }
+    stack_veh(veh_id, 1);
+    SubInterface_set_iface_mode(&BattleWin);
+    BattleWin_clear(&BattleWin);
+    bat_status(veh_id, b.veh_id_def, b.offense, b.defense, b.arty);
+    InfoWinBattleShown = 1;
+    flush_input();
+    if (!ui_shift_pressed() && !(b.arty & 1)) veh_scoot(veh_id, b.ax, b.ay, b.dir, 1);
+    stack_put(veh_id, b.ax, b.ay);
+    draw_tile(b.ax, b.ay, 2);
+    draw_tile(b.x, b.y, 2);
+}
+// Hit points after which a faster defender alone in the open withdraws (half of its own), else 0.
+int32_t withdraw_threshold(const Battle& b) {
+    int32_t veh_id = b.veh_id, veh_id_def = b.veh_id_def;
+    int32_t speed_def = speed(veh_id_def, 1);
+    int32_t speed_atk = speed(veh_id, 1);
+    int32_t du = game().vehs[veh_id_def].unit_id;
+    if (speed_atk < speed_def && b.arty == 0 && weapon_value(du) != 0 && !(game().vehs[veh_id_def].state & 0x40) &&
+        veh_triad(veh_id) != TRIAD_AIR && chassis_triad(du) != TRIAD_AIR &&
+        (!has_abil(game().vehs[veh_id].unit_id, ABL_COMM_JAMMER) ||
+         has_abil(game().vehs[veh_id_def].unit_id, ABL_DISSOCIATIVE_WAVE)) &&
+        game().vehs[veh_id_def].order != ORDER_HOLD && b.base_id < 0 && !(map_tile(b.x, b.y)->items & 0x40800) &&
+        stack_check(veh_id_def, 1, -1, -1, -1) == 1)
+        return (veh_hp(veh_id_def) + 1) / 2;
+    return 0;
+}
+// Hit points after which a marine detachment may capture a ship at sea (two thirds), else 0.
+int32_t marine_threshold(const Battle& b) {
+    int32_t veh_id = b.veh_id;
+    if (!has_abil(game().vehs[veh_id].unit_id, ABL_MARINE_DETACHMENT) || veh_triad(veh_id) != TRIAD_SEA ||
+        (map_tile(b.x, b.y)->climate & 0xE0) >= 0x60)
         return 0;
+    int32_t du = game().vehs[b.veh_id_def].unit_id;
+    if (chassis_triad(du) == TRIAD_SEA && !unit_is_native(du) && b.base_id < 0) return veh_hp(b.veh_id_def) * 2 / 3;
+    return 0;
+}
+// The marines take over the defender's stack.
+void capture_by_marines(Battle& b) {
+    int32_t veh_id = b.veh_id, veh_id_def = b.veh_id_def, x = b.x, y = b.y;
+    uint32_t old_f = game().vehs[veh_id_def].faction_id;
+    b.captured = game().vehs[veh_id].faction_id;
+    if (b.def_id >= 0) {
+        for (int32_t v = head_of_stack(veh_id_def); v >= 0; v = game().vehs[v].next_veh_id_stack) {
+            game().vehs[v].faction_id = game().vehs[veh_id].faction_id;
+            parse_says(0, Units[game().vehs[v].unit_id].name, -1, -1);
+            int32_t base = base_find(x, y);
+            // BUG(original): base_find may return -1 (no bases): Bases[-1] is read.
+            COMPAT_ORIGINAL(out_of_range_reads);
+            const uint8_t* braw = reinterpret_cast<const uint8_t*>(&game().bases[0]) + base * (int32_t)sizeof(BASE);
+            if (braw[offsetof(BASE, faction_id)] == game().vehs[veh_id].faction_id &&
+                (int8_t)braw[offsetof(BASE, pop_size)] > 2)
+                game().vehs[v].home_base_id = (int16_t)base;
+            else game().vehs[v].home_base_id = -1;
+            veh_skip(v);
+        }
     }
-    int32_t round_div = (unit_missile(game().vehs[veh_id].unit_id) || MultiplayerActive) ? 0 : 3;
-    int32_t last_hit = 0;
-    if (unit_missile(game().vehs[veh_id].unit_id) || MultiplayerActive) boom(x, y, 2 - (veh_hp(veh_id_def) != 0));
-    // Artillery duel between a ship and a land unit: one exchange only (when displayed, see below).
-    int32_t single = ((arty & 2) && ((veh_triad(veh_id) == TRIAD_SEA) != (veh_triad(veh_id_def) == TRIAD_SEA))) ? 1 : 0;
-    int32_t rx = 0, ry = 0;  // retreat destination
+    bit_set(x, y, 0x100000, 1);
+    owner_set(x, y, game().vehs[veh_id].faction_id);
+    if (game().vehs[veh_id].faction_id == (uint32_t)CurrentPlayerFaction) draw_tile_fixup(x, y, 1, 2);
+    else draw_tile(x, y, 2);
+    if ((uint32_t)b.captured == (uint32_t)CurrentPlayerFaction) {
+        parse_says(1, game().mfactions[old_f].adj_name_faction, -1, -1);
+        popp(ScriptFileName, "WEMARINEDETACH", 0, "navun_sm.pcx", 0);
+    }
+    if (old_f == (uint32_t)CurrentPlayerFaction) {
+        parse_says(1, game().mfactions[b.captured].adj_name_faction, -1, -1);
+        popp(ScriptFileName, "THEYMARINEDETACH", 0, "navun_sm.pcx", 0);
+    }
+    log_say_values("Detachment", 0, 0, 0);
+    b.captured = 1;
+}
+// The defender withdraws to the free tile that turns most away from the attack (more than 90
+// degrees). Returns true if it found one (b.rx, b.ry; the last tile examined otherwise).
+bool withdraw_defender(Battle& b) {
+    int32_t x = b.x, y = b.y;
+    uint32_t def_f = b.def_f;
+    int32_t best_dir = -1;
+    uint32_t best = 0;
+    for (int32_t d = 0; d < 8; d++) {
+        int32_t x2 = map_wrap_x(NearOffsetX[d] + x);
+        int32_t y2 = NearOffsetY[d] + y;
+        b.rx = x2;
+        b.ry = y2;
+        if (!map_in_bounds(x2, y2) || zoc_move(x2, y2, def_f)) continue;
+        int32_t du = game().vehs[b.veh_id_def].unit_id;
+        MAP* sq2 = map_tile(x2, y2);
+        if (!(chassis_triad(du) == TRIAD_AIR || ((sq2->climate & 0xE0) < 0x60) == (chassis_triad(du) == TRIAD_SEA)))
+            continue;
+        if (goody_at(x2, y2)) continue;
+        if (!(!(sq2->items & BIT_FUNGUS) || (sq2->climate & 0xE0) < 0x40 || owns_project(16, def_f) ||
+              unit_is_native(du)))
+            continue;
+        uint32_t occupant = sq2->val2 & 0xF;
+        if ((sq2->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) && occupant <= 7 && occupant != def_f &&
+            !(game().factions[occupant].diplo_status[def_f] & DIPLO_PACT))
+            continue;
+        uint32_t diff = (uint32_t)battle_rules::withdraw_angle(d, b.dir);
+        if ((int32_t)diff > 2 && (int32_t)best < (int32_t)diff) {
+            best = diff;
+            best_dir = d;
+        }
+    }
+    if (best_dir < 0) return false;
+    b.rx = map_wrap_x(NearOffsetX[best_dir] + x);
+    b.ry = NearOffsetY[best_dir] + y;
+    stack_put(stack_veh(b.veh_id_def, 1), b.rx, b.ry);
+    b.disengaged = 1;
+    return true;
+}
+// The combat rounds until one side has no hit points left (or the marines capture the defender,
+// or it withdraws, or a displayed duel ends after one exchange): each round, the side with the
+// lower random roll below its strength takes the other's power in damage.
+void fight_rounds(Battle& b) {
+    int32_t veh_id = b.veh_id, veh_id_def = b.veh_id_def;
     for (;;) {
         if (veh_hp(veh_id) == 0 || veh_hp(veh_id_def) == 0) break;
-        int32_t roll_atk = offense - 1 > 0 ? game_rand() % offense : 0;
-        int32_t roll_def = defense - 1 > 0 ? game_rand() % defense : 0;
+        int32_t roll_atk = b.offense - 1 > 0 ? game_rand() % b.offense : 0;
+        int32_t roll_def = b.defense - 1 > 0 ? game_rand() % b.defense : 0;
         if (roll_atk <= roll_def) {
-            uint8_t damage = (uint8_t)(game().vehs[veh_id].damage_taken + atk_power);
+            uint8_t damage = (uint8_t)(game().vehs[veh_id].damage_taken + b.atk_power);
             game().vehs[veh_id].damage_taken = damage;
             // BUG(original): the single exchange of a ship/land artillery duel ends early only when
             // the battle is displayed.
             COMPAT_ORIGINAL(duel_ends_if_displayed);
-            if (!display || !round_div ||
-                (int32_t)damage / (round_div * atk_power) == (int32_t)(damage - atk_power) / (round_div * atk_power))
+            if (!b.display || !b.round_div ||
+                (int32_t)damage / (b.round_div * b.atk_power) ==
+                    (int32_t)(damage - b.atk_power) / (b.round_div * b.atk_power))
                 continue;
-            last_hit = 1;
-            bat_status(veh_id, veh_id_def, offense, defense, arty);
-            boom(ax, ay, 9);
+            b.last_hit = 1;
+            bat_status(veh_id, veh_id_def, b.offense, b.defense, b.arty);
+            boom(b.ax, b.ay, 9);
             if (veh_hp(veh_id) > 0) {
-                draw_tile(ax, ay, 2);
-                draw_tile(x, y, 2);
+                draw_tile(b.ax, b.ay, 2);
+                draw_tile(b.x, b.y, 2);
             }
-            if (!single) continue;
+            if (!b.single) continue;
             break;
         }
-        uint8_t damage = (uint8_t)(game().vehs[veh_id_def].damage_taken + def_power);
+        uint8_t damage = (uint8_t)(game().vehs[veh_id_def].damage_taken + b.def_power);
         game().vehs[veh_id_def].damage_taken = damage;
-        if (display && round_div &&
-            (int32_t)damage / (round_div * def_power) != (int32_t)(damage - def_power) / (round_div * def_power)) {
-            last_hit = 2;
-            bat_status(veh_id, veh_id_def, offense, defense, arty);
-            boom(x, y, 1);
+        if (b.display && b.round_div &&
+            (int32_t)damage / (b.round_div * b.def_power) !=
+                (int32_t)(damage - b.def_power) / (b.round_div * b.def_power)) {
+            b.last_hit = 2;
+            bat_status(veh_id, veh_id_def, b.offense, b.defense, b.arty);
+            boom(b.x, b.y, 1);
             if (veh_hp(veh_id_def) > 0) {
-                draw_tile(ax, ay, 2);
-                draw_tile(x, y, 2);
+                draw_tile(b.ax, b.ay, 2);
+                draw_tile(b.x, b.y, 2);
             }
-            if (single) break;
+            if (b.single) break;
         }
-        if (marine && veh_hp(veh_id_def) > 0 && (marine -= def_power) < 1 && game_rand() % 100 < 50) {
-            // The marines take over the defender's stack.
-            uint32_t old_f = game().vehs[veh_id_def].faction_id;
-            captured = game().vehs[veh_id].faction_id;
-            if (def_id >= 0) {
-                for (int32_t v = head_of_stack(veh_id_def); v >= 0; v = game().vehs[v].next_veh_id_stack) {
-                    game().vehs[v].faction_id = game().vehs[veh_id].faction_id;
-                    parse_says(0, Units[game().vehs[v].unit_id].name, -1, -1);
-                    int32_t b = base_find(x, y);
-                    // BUG(original): base_find may return -1 (no bases): Bases[-1] is read.
-                    COMPAT_ORIGINAL(out_of_range_reads);
-                    const uint8_t* braw =
-                        reinterpret_cast<const uint8_t*>(&game().bases[0]) + b * (int32_t)sizeof(BASE);
-                    if (braw[offsetof(BASE, faction_id)] == game().vehs[veh_id].faction_id &&
-                        (int8_t)braw[offsetof(BASE, pop_size)] > 2)
-                        game().vehs[v].home_base_id = (int16_t)b;
-                    else game().vehs[v].home_base_id = -1;
-                    veh_skip(v);
-                }
-            }
-            bit_set(x, y, 0x100000, 1);
-            owner_set(x, y, game().vehs[veh_id].faction_id);
-            if (game().vehs[veh_id].faction_id == (uint32_t)CurrentPlayerFaction) draw_tile_fixup(x, y, 1, 2);
-            else draw_tile(x, y, 2);
-            if ((uint32_t)captured == (uint32_t)CurrentPlayerFaction) {
-                parse_says(1, game().mfactions[old_f].adj_name_faction, -1, -1);
-                popp(ScriptFileName, "WEMARINEDETACH", 0, "navun_sm.pcx", 0);
-            }
-            if (old_f == (uint32_t)CurrentPlayerFaction) {
-                parse_says(1, game().mfactions[captured].adj_name_faction, -1, -1);
-                popp(ScriptFileName, "THEYMARINEDETACH", 0, "navun_sm.pcx", 0);
-            }
-            log_say_values("Detachment", 0, 0, 0);
-            captured = 1;
+        if (b.marine && veh_hp(veh_id_def) > 0 && (b.marine -= b.def_power) < 1 && game_rand() % 100 < 50) {
+            capture_by_marines(b);
             break;
         }
-        if (retreat && veh_hp(veh_id_def) > 0 && (retreat -= def_power) < 1) {
-            // Withdraw to the free tile most opposite to the attack.
-            int32_t best_dir = -1;
-            uint32_t best = 0;
-            for (int32_t d = 0; d < 8; d++) {
-                int32_t x2 = map_wrap_x(NearOffsetX[d] + x);
-                int32_t y2 = NearOffsetY[d] + y;
-                rx = x2;
-                ry = y2;
-                if (!map_in_bounds(x2, y2) || zoc_move(x2, y2, def_f)) continue;
-                int32_t du = game().vehs[veh_id_def].unit_id;
-                MAP* sq2 = map_tile(x2, y2);
-                if (!(chassis_triad(du) == TRIAD_AIR ||
-                      ((sq2->climate & 0xE0) < 0x60) == (chassis_triad(du) == TRIAD_SEA)))
-                    continue;
-                if (goody_at(x2, y2)) continue;
-                if (!(!(sq2->items & BIT_FUNGUS) || (sq2->climate & 0xE0) < 0x40 || owns_project(16, def_f) ||
-                      unit_is_native(du)))
-                    continue;
-                uint32_t occupant = sq2->val2 & 0xF;
-                if ((sq2->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) && occupant <= 7 && occupant != def_f &&
-                    !(game().factions[occupant].diplo_status[def_f] & DIPLO_PACT))
-                    continue;
-                uint32_t diff = (uint32_t)(d - (dir ^ 4));
-                if ((int32_t)diff < 0) diff = (uint32_t)((dir ^ 4) - d);
-                diff &= 7;
-                if (diff > 4) diff = 8 - diff;
-                if ((int32_t)diff > 2 && (int32_t)best < (int32_t)diff) {
-                    best = diff;
-                    best_dir = d;
-                }
-            }
-            if (best_dir >= 0) {
-                rx = map_wrap_x(NearOffsetX[best_dir] + x);
-                ry = NearOffsetY[best_dir] + y;
-                stack_put(stack_veh(veh_id_def, 1), rx, ry);
-                disengaged = 1;
-                break;
-            }
-            retreat = 0;
+        if (b.retreat && veh_hp(veh_id_def) > 0 && (b.retreat -= b.def_power) < 1) {
+            if (withdraw_defender(b)) break;
+            b.retreat = 0;
         }
     }
-    // ---- outcome ----
-    int32_t atk_left = veh_hp(veh_id);
-    if (display || visible) {
-        draw_tile_fixup_pair(ax, ay, x, y, 2, 2);
-        if (disengaged && (ax != rx || ay != ry) && (x != rx || y != ry)) draw_tile_fixup(rx, ry, 2, 2);
-        if (display) {
-            bat_status(veh_id, veh_id_def, offense, defense, arty);
-            if (!disengaged) {
-                if (atk_left == 0) {
-                    if (!single) {
-                        if (last_hit == 1 || MultiplayerActive) {
-                            if (!(veh_hp(veh_id) > 0 && !MultiplayerActive)) boom(ax, ay, veh_hp(veh_id) != 0 ? 0 : 2);
-                        } else {
-                            boom(ax, ay, veh_hp(veh_id) != 0 ? 1 : 2);
-                        }
-                    } else {
-                        if (last_hit != 2 && !MultiplayerActive) boom(x, y, veh_hp(veh_id_def) != 0);
-                        boom(ax, ay, veh_hp(veh_id) != 0 ? 1 : 2);
-                    }
-                } else if (!single) {
-                    if (last_hit == 2 ? (MultiplayerActive || veh_hp(veh_id_def) == 0) : MultiplayerActive)
-                        boom(x, y, (veh_hp(veh_id_def) != 0 ? 0 : 2) | 8);
-                    else if (last_hit != 2) boom(x, y, (2 - (veh_hp(veh_id_def) != 0)) | 8);
+}
+// The explosions of the battle's end, for the viewer.
+void show_outcome(const Battle& b) {
+    int32_t veh_id = b.veh_id, veh_id_def = b.veh_id_def, ax = b.ax, ay = b.ay, x = b.x, y = b.y;
+    draw_tile_fixup_pair(ax, ay, x, y, 2, 2);
+    if (b.disengaged && (ax != b.rx || ay != b.ry) && (x != b.rx || y != b.ry)) draw_tile_fixup(b.rx, b.ry, 2, 2);
+    if (!b.display) return;
+    bat_status(veh_id, veh_id_def, b.offense, b.defense, b.arty);
+    if (!b.disengaged) {
+        if (b.atk_left == 0) {
+            if (!b.single) {
+                if (b.last_hit == 1 || MultiplayerActive) {
+                    if (!(veh_hp(veh_id) > 0 && !MultiplayerActive)) boom(ax, ay, veh_hp(veh_id) != 0 ? 0 : 2);
                 } else {
-                    if (last_hit != 1 && !MultiplayerActive) boom(ax, ay, (2 - (veh_hp(veh_id) != 0)) | 8);
-                    boom(x, y, (2 - (veh_hp(veh_id_def) != 0)) | 8);
+                    boom(ax, ay, veh_hp(veh_id) != 0 ? 1 : 2);
                 }
+            } else {
+                if (b.last_hit != 2 && !MultiplayerActive) boom(x, y, veh_hp(veh_id_def) != 0);
+                boom(ax, ay, veh_hp(veh_id) != 0 ? 1 : 2);
             }
-            VehDrawAttackID = -1;
-            VehDrawDefendID = -1;
+        } else if (!b.single) {
+            if (b.last_hit == 2 ? (MultiplayerActive || veh_hp(veh_id_def) == 0) : MultiplayerActive)
+                boom(x, y, (veh_hp(veh_id_def) != 0 ? 0 : 2) | 8);
+            else if (b.last_hit != 2) boom(x, y, (2 - (veh_hp(veh_id_def) != 0)) | 8);
+        } else {
+            if (b.last_hit != 1 && !MultiplayerActive) boom(ax, ay, (2 - (veh_hp(veh_id) != 0)) | 8);
+            boom(x, y, (2 - (veh_hp(veh_id_def) != 0)) | 8);
         }
     }
-    if (single && veh_hp(veh_id) > 0 && veh_hp(veh_id_def) > 0) {
-        // Both survive the duel.
-        if (MultiplayerActive && def_f == (uint32_t)CurrentPlayerFaction) {
-            parse_says(0, Units[game().vehs[veh_id_def].unit_id].name, -1, -1);
-            StrBuffer[0] = 0;
-            say_stats_short(StrBuffer, veh_id_def);
-            parse_says(1, StrBuffer, -1, -1);
-            parse_says(2, game().mfactions[atk_f].adj_name_faction, -1, -1);
-            parse_says(3, Units[game().vehs[veh_id].unit_id].name, -1, -1);
-            StrBuffer[0] = 0;
-            say_stats_short(StrBuffer, game().vehs[veh_id].unit_id);
-            parse_says(4, StrBuffer, -1, -1);
-            int32_t b = base_find_filtered(x, y, -1, -1, -1, CurrentPlayerFaction);
-            if (b >= 0) parse_says(5, game().bases[b].name, -1, -1);
-            bat_msg("COMBATSURVIVE", nullptr);
-        }
-        return 0;
+    VehDrawAttackID = -1;
+    VehDrawDefendID = -1;
+}
+// The units of a battle message: $UNIT0 / stats1 (the defender's), $FACTION2, $UNIT3 / stats4
+// (the attacker's), $BASENAME5 (the base nearest the battle among `faction_id`'s). The defender's
+// stats are those of `def_stats_id` (a unit id, except in COMBATSURVIVE: the vehicle id).
+void say_combat_units(const Battle& b, int32_t def_stats_id, int32_t faction_id) {
+    parse_says(0, Units[game().vehs[b.veh_id_def].unit_id].name, -1, -1);
+    StrBuffer[0] = 0;
+    say_stats_short(StrBuffer, def_stats_id);
+    parse_says(1, StrBuffer, -1, -1);
+    parse_says(2, game().mfactions[b.atk_f].adj_name_faction, -1, -1);
+    parse_says(3, Units[game().vehs[b.veh_id].unit_id].name, -1, -1);
+    StrBuffer[0] = 0;
+    say_stats_short(StrBuffer, game().vehs[b.veh_id].unit_id);
+    parse_says(4, StrBuffer, -1, -1);
+    int32_t base = base_find_filtered(b.x, b.y, -1, -1, -1, faction_id);
+    if (base >= 0) parse_says(5, game().bases[base].name, -1, -1);
+}
+// A battle on a third faction's land: it loses patience with the attacker.
+void third_faction_friction(const Battle& b) {
+    MAP* sq = map_tile(b.x, b.y);
+    int32_t owner = sq->owner;
+    if ((sq->climate & 0xE0) > 0x5F && (uint32_t)owner != b.atk_f && (uint32_t)owner != b.def_f &&
+        (diplo_status_raw(owner, b.def_f) & 0x10) && (diplo_status_raw(owner, b.atk_f) & 7)) {
+        // BUG(original): owner -1 (unowned land) indexes Factions[-1] / diplo_gifts[-1].
+        COMPAT_ORIGINAL(out_of_range_reads);
+        int32_t* gifts = reinterpret_cast<int32_t*>(
+            reinterpret_cast<uint8_t*>(&game().factions[b.atk_f].diplo_gifts[0]) + owner * 4);
+        if (*gifts == 0) *gifts = 1;
+        cause_friction(owner, b.atk_f, -1);
     }
-    // A battle on a third faction's land: it loses patience with the attacker.
-    {
-        MAP* sq2 = map_tile(x, y);
-        int32_t owner = sq2->owner;
-        if ((sq2->climate & 0xE0) > 0x5F && (uint32_t)owner != atk_f && (uint32_t)owner != def_f &&
-            (diplo_status_raw(owner, def_f) & 0x10) && (diplo_status_raw(owner, atk_f) & 7)) {
-            // BUG(original): owner -1 (unowned land) indexes Factions[-1] / diplo_gifts[-1].
-            COMPAT_ORIGINAL(out_of_range_reads);
-            int32_t* gifts = reinterpret_cast<int32_t*>(
-                reinterpret_cast<uint8_t*>(&game().factions[atk_f].diplo_gifts[0]) + owner * 4);
-            if (*gifts == 0) *gifts = 1;
-            cause_friction(owner, atk_f, -1);
-        }
-    }
-    // Promotion of the winner.
-    if (atk_left == 0) {
-        offense = (int32_t)((uint32_t)Units[game().vehs[veh_id].unit_id].reactor_id * atk_hp * offense) /
-                  unit_max_hp(game().vehs[veh_id].unit_id);
-        defense =
-            (int32_t)((uint32_t)Units[game().vehs[veh_id_def].unit_id].reactor_id * veh_hp(veh_id_def) * defense) /
-            def_hp;
+}
+// Promotion of the winner: certain unless the loser was veteran or better and the winner's
+// strength loses a roll against the sum of both (a defending base needs an elite attacker).
+void promote_winner(Battle& b) {
+    int32_t veh_id = b.veh_id, veh_id_def = b.veh_id_def;
+    if (b.atk_left == 0) {
+        b.offense = (int32_t)((uint32_t)Units[game().vehs[veh_id].unit_id].reactor_id * b.atk_hp * b.offense) /
+                    unit_max_hp(game().vehs[veh_id].unit_id);
+        b.defense =
+            (int32_t)((uint32_t)Units[game().vehs[veh_id_def].unit_id].reactor_id * veh_hp(veh_id_def) * b.defense) /
+            b.def_hp;
         if (Units[game().vehs[veh_id].unit_id].plan != PLAN_ARTIFACT) {
             bool promo = true;
             if (morale_veh(veh_id_def, 1, 0) > 1) {
-                int32_t sum = offense + defense;
+                int32_t sum = b.offense + b.defense;
                 int32_t roll = sum - 1 > 0 ? game_rand() % sum : 0;
-                if (offense < roll && (base_id < 0 || morale_veh(veh_id_def, 1, 0) > 3)) promo = false;
+                if (b.offense < roll && (b.base_id < 0 || morale_veh(veh_id_def, 1, 0) > 3)) promo = false;
             }
             if (promo) promote(veh_id_def);
         }
-        if (def_f == 0) game().vehs[veh_id_def].home_base_id = game().vehs[veh_id].home_base_id;
+        if (b.def_f == 0) game().vehs[veh_id_def].home_base_id = game().vehs[veh_id].home_base_id;
     } else {
-        offense =
-            (int32_t)((uint32_t)Units[game().vehs[veh_id].unit_id].reactor_id * veh_hp(veh_id) * offense) / atk_hp;
-        defense = (int32_t)((uint32_t)Units[game().vehs[veh_id_def].unit_id].reactor_id * def_hp * defense) /
-                  unit_max_hp(game().vehs[veh_id_def].unit_id);
+        b.offense =
+            (int32_t)((uint32_t)Units[game().vehs[veh_id].unit_id].reactor_id * veh_hp(veh_id) * b.offense) / b.atk_hp;
+        b.defense = (int32_t)((uint32_t)Units[game().vehs[veh_id_def].unit_id].reactor_id * b.def_hp * b.defense) /
+                    unit_max_hp(game().vehs[veh_id_def].unit_id);
         if (Units[game().vehs[veh_id_def].unit_id].plan != PLAN_ARTIFACT) {
             bool promo = true;
             if (morale_veh(veh_id, 1, 0) > 1) {
-                int32_t sum = offense + defense;
+                int32_t sum = b.offense + b.defense;
                 int32_t roll = sum - 1 > 0 ? game_rand() % sum : 0;
-                if (defense < roll) promo = false;
+                if (b.defense < roll) promo = false;
             }
             if (promo) promote(veh_id);
         }
-        if (atk_f == 0) game().vehs[veh_id].home_base_id = game().vehs[veh_id_def].home_base_id;
+        if (b.atk_f == 0) game().vehs[veh_id].home_base_id = game().vehs[veh_id_def].home_base_id;
     }
-    int32_t kills = 0, captures = 0, energy = 0, collateral = 0;
-    if (!captured && !disengaged) {
-        if (atk_left == 0) {
-            // ---- the attacker is destroyed ----
-            FactionCombatWin[def_f]++;
-            FactionCombatLoss[atk_f]++;
-            if (!MultiplayerActive || def_f != (uint32_t)CurrentPlayerFaction) {
-                if (PbemActive && (FactionStatus[0] & (uint8_t)(1 << (def_f & 31)))) {
-                    parse_says(0, Units[game().vehs[veh_id_def].unit_id].name, -1, -1);
-                    clear();
-                    say_stats_short(StrBuffer, game().vehs[veh_id_def].unit_id);
-                    parse_says(1, StrBuffer, -1, -1);
-                    parse_says(2, game().mfactions[atk_f].adj_name_faction, -1, -1);
-                    parse_says(3, Units[game().vehs[veh_id].unit_id].name, -1, -1);
-                    clear();
-                    say_stats_short(StrBuffer, game().vehs[veh_id].unit_id);
-                    parse_says(4, StrBuffer, -1, -1);
-                    int32_t b = base_find_filtered(x, y, -1, -1, -1, def_f);
-                    if (b >= 0) parse_says(5, game().bases[b].name, -1, -1);
-                    POP3("COMBATWIN", 0, def_f, x, y);
-                }
+}
+// The attacker is destroyed (with its stack): messages, counts, monument.
+void attacker_destroyed(Battle& b) {
+    uint32_t atk_f = b.atk_f, def_f = b.def_f;
+    FactionCombatWin[def_f]++;
+    FactionCombatLoss[atk_f]++;
+    if (!MultiplayerActive || def_f != (uint32_t)CurrentPlayerFaction) {
+        if (PbemActive && b.human(def_f)) {
+            say_combat_units(b, game().vehs[b.veh_id_def].unit_id, def_f);
+            POP3("COMBATWIN", 0, def_f, b.x, b.y);
+        }
+    } else {
+        say_combat_units(b, game().vehs[b.veh_id_def].unit_id, CurrentPlayerFaction);
+        bat_msg("COMBATWIN", nullptr);
+    }
+    stack_veh(b.veh_id, 1);
+    battle_kill_stack(b.veh_id, &b.kills, &b.captures, &b.energy, -1, def_f);
+    game().factions[def_f].diplo_combat_total[atk_f]++;
+    game().factions[def_f].diplo_combat_count[atk_f]++;
+    if (atk_f != 0 && def_f != 0) mon_enemy_destroyed(def_f, atk_f);
+}
+// Whether the defender's whole stack takes the defeat (collateral damage): in the open (not in a
+// base or bunker, no air units, a sea battle or no transport) or an artifact; for the AI and
+// humans alike also a loaded transport in the open, or a stack of at most one combat unit.
+bool defeat_hits_stack(const Battle& b) {
+    MAP* sq = map_tile(b.x, b.y);
+    int32_t du = game().vehs[b.veh_id_def].unit_id;
+    int32_t au = game().vehs[b.veh_id].unit_id;
+    bool whole_stack = (b.base_id < 0 && !(sq->items & 0x800) && chassis_triad(du) != TRIAD_AIR &&
+                        chassis_triad(au) != TRIAD_AIR && Units[au].plan != PLAN_PROBE && Units[du].plan != 6 &&
+                        (!stack_check(b.veh_id_def, 2, 8, -1, -1) || (sq->climate & 0xE0) < 0x60)) ||
+                       Units[du].plan == PLAN_ARTIFACT;
+    if (!whole_stack && b.atk_f != 0) {
+        if (veh_cargo(b.veh_id_def) && b.base_id < 0 && Units[game().vehs[b.veh_id].unit_id].plan != PLAN_PROBE) {
+            whole_stack = true;
+        } else if (Units[game().vehs[b.veh_id].unit_id].plan != PLAN_PROBE) {
+            int32_t c12 = stack_check(b.veh_id_def, 2, 0xC, -1, -1);
+            int32_t c1 = stack_check(b.veh_id_def, 1, -1, -1, -1);
+            int32_t c8 = stack_check(b.veh_id_def, 2, 8, -1, -1);
+            int32_t c11 = stack_check(b.veh_id_def, 2, 0xB, -1, -1);
+            int32_t c10 = stack_check(b.veh_id_def, 2, 10, -1, -1);
+            if (c1 - c12 - c8 - c11 - c10 < 2) whole_stack = true;
+        }
+    }
+    return whole_stack;
+}
+// Collateral damage to the defender's whole stack; land units at sea outside a transport die.
+// Returns the stack left on the tile (-1 if none).
+int32_t damage_stack(Battle& b) {
+    int32_t veh_id = b.veh_id, veh_id_def = b.veh_id_def, x = b.x, y = b.y;
+    stack_veh(veh_id_def, 0);
+    if (veh_id_def >= 0) {
+        for (int32_t v = head_of_stack(veh_id_def); v >= 0; v = game().vehs[v].next_veh_id_stack) {
+            int32_t vu = game().vehs[v].unit_id;
+            MAP* sq3 = map_tile(x, y);
+            bool hit;
+            if (chassis_triad(vu) == TRIAD_LAND && (sq3->climate & 0xE0) < 0x60 &&
+                (!(sq3->items & BIT_BASE_IN_TILE) || (sq3->val2 & 0xF) > 7) &&
+                (game().vehs[v].order != ORDER_SENTRY_BOARD || game().vehs[v].waypoint_x[0] == veh_id_def ||
+                 game().vehs[v].waypoint_x[0] < 0)) {
+                int32_t hp = unit_max_hp(vu) - game().vehs[v].damage_taken;
+                hp = hp < 0 ? 0 : hp > 9999 ? 9999 : hp;
+                game().vehs[v].damage_taken += (uint8_t)hp;
+                hit = true;
             } else {
-                parse_says(0, Units[game().vehs[veh_id_def].unit_id].name, -1, -1);
-                clear();
-                say_stats_short(StrBuffer, game().vehs[veh_id_def].unit_id);
-                parse_says(1, StrBuffer, -1, -1);
-                parse_says(2, game().mfactions[atk_f].adj_name_faction, -1, -1);
-                parse_says(3, Units[game().vehs[veh_id].unit_id].name, -1, -1);
-                clear();
-                say_stats_short(StrBuffer, game().vehs[veh_id].unit_id);
-                parse_says(4, StrBuffer, -1, -1);
-                int32_t b = base_find_filtered(x, y, -1, -1, -1, CurrentPlayerFaction);
-                if (b >= 0) parse_says(5, game().bases[b].name, -1, -1);
-                bat_msg("COMBATWIN", nullptr);
+                int8_t plan = Units[vu].plan;
+                hit = v == veh_id_def ||
+                      (plan != PLAN_ARTIFACT && plan != PLAN_COLONY && plan != PLAN_PROBE && plan != PLAN_SUPPLY);
             }
-            stack_veh(veh_id, 1);
-            battle_kill_stack(veh_id, &kills, &captures, &energy, -1, def_f);
-            game().factions[def_f].diplo_combat_total[atk_f]++;
-            game().factions[def_f].diplo_combat_count[atk_f]++;
-            if (atk_f != 0 && def_f != 0) mon_enemy_destroyed(def_f, atk_f);
+            if (hit) {
+                int32_t au2 = game().vehs[veh_id].unit_id;
+                uint8_t power =
+                    weapon_value(au2) < 0 ? Units[game().vehs[v].unit_id].reactor_id : Units[au2].reactor_id;
+                game().vehs[v].damage_taken += (uint8_t)(power * 3);
+                b.collateral++;
+                game().vehs[v].state |= VSTATE_HAS_MOVED;
+            }
+        }
+    }
+    int32_t killer = veh_id;
+    if (veh_id_def >= 0) {
+        int32_t v = head_of_stack(veh_id_def);
+        while (v >= 0) {
+            int32_t next = game().vehs[v].next_veh_id_stack;
+            int32_t hp = range(unit_max_hp(game().vehs[v].unit_id) - game().vehs[v].damage_taken, 0, 9999);
+            if ((hp < 1 || game().vehs[v].faction_id == 0) &&
+                battle_kill(v, &b.kills, &b.captures, &b.energy, killer, b.atk_f)) {
+                if (v < killer) killer--;
+                if (v < next) next--;
+            }
+            v = next;
+        }
+    }
+    b.collateral -= b.captures + b.kills;
+    if (b.collateral < 0) b.collateral = 0;
+    int32_t remaining = stack_fix(veh_at(x, y));
+    if (remaining >= 0) {
+        // Only non-combat units left (artifacts, colony pods, probes, supply): they are lost too.
+        int32_t c12 = stack_check(remaining, 2, 0xC, -1, -1);
+        int32_t c1 = stack_check(remaining, 1, -1, -1, -1);
+        int32_t c8 = stack_check(remaining, 2, 8, -1, -1);
+        int32_t c11 = stack_check(remaining, 2, 0xB, -1, -1);
+        int32_t c10 = stack_check(remaining, 2, 10, -1, -1);
+        if (c1 - c12 - c8 - c11 == c10) {
+            battle_kill_stack(remaining, &b.kills, &b.captures, &b.energy, veh_id, b.atk_f);
+            b.collateral = 0;
+        }
+    }
+    return remaining;
+}
+// The base loses its defender: an undefended base may lose a citizen (and die), nerve gas kills
+// half its citizens; human bases see the invasion.
+void base_lost_defender(Battle& b, int32_t remaining) {
+    uint32_t atk_f = b.atk_f, def_f = b.def_f;
+    int32_t x = b.x, y = b.y;
+    BASE& base = game().bases[b.base_id];
+    base.state_flags |= BSTATE_COMBAT_LOSS_LAST_TURN;
+    // BUG(original): the weapon test reads the vehicle id of the defender or of the stack
+    // left behind, which a kill may have renumbered (or -1: Vehs[-1]).
+    COMPAT_ORIGINAL(read_after_kill);
+    int32_t base_now = b.base_id;
+    bool survives = true;
+    if (!is_ocean(b.ax, b.ay) && (!is_objective(base_now) || base.pop_size > 1) &&
+        !has_fac(FAC_PERIMETER_DEFENSE, base_now, 0) && !has_fac(FAC_TACHYON_FIELD, base_now, 0) &&
+        !has_project(FAC_CITIZENS_DEFENSE_FORCE - SP_ID_First, def_f) && weapon_value(veh_unit_raw(remaining)) != 0 &&
+        atk_f != 0 && veh_who(x, y) < 0 && (game().factions[def_f].diff_level != 0 || !b.human(def_f))) {
+        // The attack kills a citizen of an undefended base.
+        int8_t pop = --base.pop_size;
+        if (pop > 0) {
+            base.factions_pop_size_intel[atk_f] = pop;
         } else {
-            // ---- the defender is destroyed ----
-            game().factions[atk_f].diplo_combat_total[def_f]++;
-            FactionCombatWin[atk_f]++;
-            game().factions[atk_f].diplo_combat_count[def_f]++;
-            FactionCombatLoss[def_f]++;
-            if (!MultiplayerActive || def_f != (uint32_t)CurrentPlayerFaction) {
-                if (PbemActive && (FactionStatus[0] & (uint8_t)(1 << (def_f & 31)))) {
-                    parse_says(0, Units[game().vehs[veh_id_def].unit_id].name, -1, -1);
-                    StrBuffer[0] = 0;
-                    say_stats_short(StrBuffer, game().vehs[veh_id_def].unit_id);
-                    parse_says(1, StrBuffer, -1, -1);
-                    parse_says(2, game().mfactions[atk_f].adj_name_faction, -1, -1);
-                    parse_says(3, Units[game().vehs[veh_id].unit_id].name, -1, -1);
-                    StrBuffer[0] = 0;
-                    say_stats_short(StrBuffer, game().vehs[veh_id].unit_id);
-                    parse_says(4, StrBuffer, -1, -1);
-                    int32_t b = base_find_filtered(x, y, -1, -1, -1, def_f);
-                    if (b >= 0) parse_says(5, game().bases[b].name, -1, -1);
-                    POP3("COMBATLOSS", 0, def_f, x, y);
-                }
-            } else {
-                parse_says(0, Units[game().vehs[veh_id_def].unit_id].name, -1, -1);
-                StrBuffer[0] = 0;
-                say_stats_short(StrBuffer, game().vehs[veh_id_def].unit_id);
-                parse_says(1, StrBuffer, -1, -1);
-                parse_says(2, game().mfactions[atk_f].adj_name_faction, -1, -1);
-                parse_says(3, Units[game().vehs[veh_id].unit_id].name, -1, -1);
-                StrBuffer[0] = 0;
-                say_stats_short(StrBuffer, game().vehs[veh_id].unit_id);
-                parse_says(4, StrBuffer, -1, -1);
-                int32_t b = base_find_filtered(x, y, -1, -1, -1, CurrentPlayerFaction);
-                if (b >= 0) parse_says(5, game().bases[b].name, -1, -1);
-                NetMsg_pop(&NetMsg, "COMBATLOSS", 5000, 0, nullptr);
-            }
-            MAP* sq2 = map_tile(x, y);
-            int32_t du = game().vehs[veh_id_def].unit_id;
-            int32_t au = game().vehs[veh_id].unit_id;
-            bool whole_stack = (base_id < 0 && !(sq2->items & 0x800) && chassis_triad(du) != TRIAD_AIR &&
-                                chassis_triad(au) != TRIAD_AIR && Units[au].plan != PLAN_PROBE && Units[du].plan != 6 &&
-                                (!stack_check(veh_id_def, 2, 8, -1, -1) || (sq2->climate & 0xE0) < 0x60)) ||
-                               Units[du].plan == PLAN_ARTIFACT;
-            if (!whole_stack && atk_f != 0) {
-                if (veh_cargo(veh_id_def) && base_id < 0 && Units[game().vehs[veh_id].unit_id].plan != PLAN_PROBE) {
-                    whole_stack = true;
-                } else if (Units[game().vehs[veh_id].unit_id].plan != PLAN_PROBE) {
-                    int32_t c12 = stack_check(veh_id_def, 2, 0xC, -1, -1);
-                    int32_t c1 = stack_check(veh_id_def, 1, -1, -1, -1);
-                    int32_t c8 = stack_check(veh_id_def, 2, 8, -1, -1);
-                    int32_t c11 = stack_check(veh_id_def, 2, 0xB, -1, -1);
-                    int32_t c10 = stack_check(veh_id_def, 2, 10, -1, -1);
-                    if (c1 - c12 - c8 - c11 - c10 < 2) whole_stack = true;
-                }
-            }
-            int32_t remaining = def_id;  // the original keeps the defender id (stale after a kill)
-            if (whole_stack) {
-                // Collateral damage to the whole stack; land units at sea outside a transport die.
-                stack_veh(veh_id_def, 0);
-                if (veh_id_def >= 0) {
-                    for (int32_t v = head_of_stack(veh_id_def); v >= 0; v = game().vehs[v].next_veh_id_stack) {
-                        int32_t vu = game().vehs[v].unit_id;
-                        MAP* sq3 = map_tile(x, y);
-                        bool hit;
-                        if (chassis_triad(vu) == TRIAD_LAND && (sq3->climate & 0xE0) < 0x60 &&
-                            (!(sq3->items & BIT_BASE_IN_TILE) || (sq3->val2 & 0xF) > 7) &&
-                            (game().vehs[v].order != ORDER_SENTRY_BOARD || game().vehs[v].waypoint_x[0] == veh_id_def ||
-                             game().vehs[v].waypoint_x[0] < 0)) {
-                            int32_t hp = unit_max_hp(vu) - game().vehs[v].damage_taken;
-                            hp = hp < 0 ? 0 : hp > 9999 ? 9999 : hp;
-                            game().vehs[v].damage_taken += (uint8_t)hp;
-                            hit = true;
-                        } else {
-                            int8_t plan = Units[vu].plan;
-                            hit = v == veh_id_def || (plan != PLAN_ARTIFACT && plan != PLAN_COLONY &&
-                                                      plan != PLAN_PROBE && plan != PLAN_SUPPLY);
-                        }
-                        if (hit) {
-                            int32_t au2 = game().vehs[veh_id].unit_id;
-                            uint8_t power = weapon_value(au2) < 0 ? Units[game().vehs[v].unit_id].reactor_id
-                                                                  : Units[au2].reactor_id;
-                            game().vehs[v].damage_taken += (uint8_t)(power * 3);
-                            collateral++;
-                            game().vehs[v].state |= VSTATE_HAS_MOVED;
-                        }
-                    }
-                }
-                int32_t killer = veh_id;
-                if (veh_id_def >= 0) {
-                    int32_t v = head_of_stack(veh_id_def);
-                    while (v >= 0) {
-                        int32_t next = game().vehs[v].next_veh_id_stack;
-                        int32_t hp = range(unit_max_hp(game().vehs[v].unit_id) - game().vehs[v].damage_taken, 0, 9999);
-                        if ((hp < 1 || game().vehs[v].faction_id == 0) &&
-                            battle_kill(v, &kills, &captures, &energy, killer, atk_f)) {
-                            if (v < killer) killer--;
-                            if (v < next) next--;
-                        }
-                        v = next;
-                    }
-                }
-                collateral -= captures + kills;
-                if (collateral < 0) collateral = 0;
-                remaining = stack_fix(veh_at(x, y));
-                if (remaining >= 0) {
-                    // Only non-combat units left (artifacts, colony pods, probes, supply): they are lost too.
-                    int32_t c12 = stack_check(remaining, 2, 0xC, -1, -1);
-                    int32_t c1 = stack_check(remaining, 1, -1, -1, -1);
-                    int32_t c8 = stack_check(remaining, 2, 8, -1, -1);
-                    int32_t c11 = stack_check(remaining, 2, 0xB, -1, -1);
-                    int32_t c10 = stack_check(remaining, 2, 10, -1, -1);
-                    if (c1 - c12 - c8 - c11 == c10) {
-                        battle_kill_stack(remaining, &kills, &captures, &energy, veh_id, atk_f);
-                        collateral = 0;
-                    }
-                }
-            } else {
-                battle_kill(veh_id_def, &kills, &captures, &energy, veh_id, atk_f);
-            }
-            if (base_id >= 0) {
-                BASE& base = game().bases[base_id];
-                base.state_flags |= BSTATE_COMBAT_LOSS_LAST_TURN;
-                // BUG(original): the weapon test reads the vehicle id of the defender or of the stack
-                // left behind, which a kill may have renumbered (or -1: Vehs[-1]).
-                COMPAT_ORIGINAL(read_after_kill);
-                int32_t base_now = base_id;
-                if (!is_ocean(ax, ay) && (!is_objective(base_now) || base.pop_size > 1) &&
-                    !has_fac(FAC_PERIMETER_DEFENSE, base_now, 0) && !has_fac(FAC_TACHYON_FIELD, base_now, 0) &&
-                    !has_project(FAC_CITIZENS_DEFENSE_FORCE - SP_ID_First, def_f) &&
-                    weapon_value(veh_unit_raw(remaining)) != 0 && atk_f != 0 && veh_who(x, y) < 0 &&
-                    (game().factions[def_f].diff_level != 0 || !(FactionStatus[0] & (uint8_t)(1 << (def_f & 31))))) {
-                    // The attack kills a citizen of an undefended base.
-                    int8_t pop = --base.pop_size;
-                    bool destroyed = false;
-                    if (pop > 0) {
-                        base.factions_pop_size_intel[atk_f] = pop;
-                    } else {
-                        nerve = 0;
-                        base_kill(base_now);
-                        base_id = -1;
-                        for (int32_t i = 0; i < 8; i++) synch_bit(x, y, i);
-                        draw_map(1);
-                        destroyed = true;
-                    }
-                    if (destroyed) {
-                        base_now = -1;
-                        if (eliminate_player(def_f, atk_f)) report_type = 0;
-                    } else {
-                        goto base_survives;
-                    }
-                } else {
-                base_survives:
-                    if (!(FactionStatus[0] & (uint8_t)(1 << (def_f & 31)))) base_reset(base_now, 0);
-                    if (nerve) {
-                        nerve = (game().bases[base_now].pop_size + 1) / 2;
-                        game().bases[base_now].pop_size -= (int8_t)nerve;
-                        if (is_objective(base_now) && game().bases[base_now].pop_size < 1)
-                            game().bases[base_now].pop_size = 1;
-                        if (game().bases[base_now].pop_size < 1) {
-                            base_kill(base_now);
-                            base_id = -1;
-                            for (int32_t i = 0; i < 8; i++) synch_bit(x, y, i);
-                            draw_map(1);
-                            base_now = -1;
-                            if (eliminate_player(def_f, atk_f)) report_type = 0;
-                        } else {
-                            spot_base(base_now, atk_f);
-                        }
-                    }
-                }
-                if (veh_who(x, y) < 0 && (FactionStatus[0] & (uint8_t)(1 << (def_f & 31))) && base_now >= 0)
-                    invasions(base_now);
-            }
-            if (atk_f != 0 && def_f != 0) mon_enemy_destroyed(atk_f, def_f);
-        }
-        if (captures && !(FactionStatus[0] & (uint8_t)(1 << (def_f & 31))) && !has_treaty(atk_f, def_f, 0x10)) {
-            cause_friction(def_f, atk_f, 5);
-            treaty_on(atk_f, def_f, 0x2000);
+            b.nerve = 0;
+            base_kill(base_now);
+            b.base_id = -1;
+            for (int32_t i = 0; i < 8; i++) synch_bit(x, y, i);
+            draw_map(1);
+            survives = false;
+            base_now = -1;
+            if (eliminate_player(def_f, atk_f)) b.report_type = 0;
         }
     }
-    // Mind worm husks: energy for the winner, and nearby natives grow bolder.
-    if (atk_left != 0 && energy != 0) {
-        game().factions[atk_f].energy_credits += energy;
-        Console_update_data(&MainConsole, 0);
-        for (int32_t i = 0; i < 8; i++) {
-            int32_t x2 = map_wrap_x(NearOffsetX[i] + x);
-            int32_t y2 = NearOffsetY[i] + y;
-            if (!on_map(x2, y2)) continue;
-            for (int32_t v = veh_at(x2, y2); v >= 0; v = game().vehs[v].next_veh_id_stack) {
-                if (game().vehs[v].faction_id != 0) continue;
-                uint16_t flags = game().vehs[v].flags;
-                uint32_t level2 = (flags >> 3) & 3;
-                flags &= (uint16_t)~(level2 * 8);
-                game().vehs[v].flags = flags;
-                game().vehs[v].flags |= (uint16_t)(range(level2 + 1, 0, 3) << 3);
-                draw_tile(x2, y2, 2);
+    if (survives) {
+        if (!b.human(def_f)) base_reset(base_now, 0);
+        if (b.nerve) {
+            b.nerve = (game().bases[base_now].pop_size + 1) / 2;
+            game().bases[base_now].pop_size -= (int8_t)b.nerve;
+            if (is_objective(base_now) && game().bases[base_now].pop_size < 1) game().bases[base_now].pop_size = 1;
+            if (game().bases[base_now].pop_size < 1) {
+                base_kill(base_now);
+                b.base_id = -1;
+                for (int32_t i = 0; i < 8; i++) synch_bit(x, y, i);
+                draw_map(1);
+                base_now = -1;
+                if (eliminate_player(def_f, atk_f)) b.report_type = 0;
+            } else {
+                spot_base(base_now, atk_f);
             }
         }
     }
-    if (display) {
-        if (atk_left == 0) {
-            draw_tile_fixup(ax, ay, 2, 1);
-            draw_tile(x, y, 1);
-        } else {
-            draw_tile(ax, ay, 1);
-            draw_tile_fixup(x, y, 2, 1);
+    if (veh_who(x, y) < 0 && b.human(def_f) && base_now >= 0) invasions(base_now);
+}
+// The defender is destroyed (with its stack when the defeat hits it): messages, counts, the
+// base's losses, monument.
+void defender_destroyed(Battle& b) {
+    uint32_t atk_f = b.atk_f, def_f = b.def_f;
+    game().factions[atk_f].diplo_combat_total[def_f]++;
+    FactionCombatWin[atk_f]++;
+    game().factions[atk_f].diplo_combat_count[def_f]++;
+    FactionCombatLoss[def_f]++;
+    if (!MultiplayerActive || def_f != (uint32_t)CurrentPlayerFaction) {
+        if (PbemActive && b.human(def_f)) {
+            say_combat_units(b, game().vehs[b.veh_id_def].unit_id, def_f);
+            POP3("COMBATLOSS", 0, def_f, b.x, b.y);
         }
+    } else {
+        say_combat_units(b, game().vehs[b.veh_id_def].unit_id, CurrentPlayerFaction);
+        NetMsg_pop(&NetMsg, "COMBATLOSS", 5000, 0, nullptr);
+    }
+    int32_t remaining = b.def_id;  // the original keeps the defender id (stale after a kill)
+    if (defeat_hits_stack(b)) remaining = damage_stack(b);
+    else battle_kill(b.veh_id_def, &b.kills, &b.captures, &b.energy, b.veh_id, atk_f);
+    if (b.base_id >= 0) base_lost_defender(b, remaining);
+    if (atk_f != 0 && def_f != 0) mon_enemy_destroyed(atk_f, def_f);
+}
+// Mind worm husks: energy for the winner, and nearby natives grow bolder.
+void collect_husks(const Battle& b) {
+    game().factions[b.atk_f].energy_credits += b.energy;
+    Console_update_data(&MainConsole, 0);
+    for (int32_t i = 0; i < 8; i++) {
+        int32_t x2 = map_wrap_x(NearOffsetX[i] + b.x);
+        int32_t y2 = NearOffsetY[i] + b.y;
+        if (!on_map(x2, y2)) continue;
+        for (int32_t v = veh_at(x2, y2); v >= 0; v = game().vehs[v].next_veh_id_stack) {
+            if (game().vehs[v].faction_id != 0) continue;
+            uint16_t flags = game().vehs[v].flags;
+            uint32_t level2 = (flags >> 3) & 3;
+            flags &= (uint16_t)~(level2 * 8);
+            game().vehs[v].flags = flags;
+            game().vehs[v].flags |= (uint16_t)(range(level2 + 1, 0, 3) << 3);
+            draw_tile(x2, y2, 2);
+        }
+    }
+}
+// The viewer's messages after the battle: kills and collateral damage, husks, captured units
+// (booty), nerve gas, the defender's withdrawal; the pause after battles.
+void report_battle(const Battle& b) {
+    uint32_t atk_f = b.atk_f, def_f = b.def_f;
+    if (b.atk_left == 0) {
+        draw_tile_fixup(b.ax, b.ay, 2, 1);
+        draw_tile(b.x, b.y, 1);
+    } else {
+        draw_tile(b.ax, b.ay, 1);
+        draw_tile_fixup(b.x, b.y, 2, 1);
+    }
+    do_all_draws();
+    if (b.atk_left == 0 || b.energy == 0 || atk_f != (uint32_t)CurrentPlayerFaction) {
+        if ((b.kills > 1 || b.collateral != 0) &&
+            (atk_f == (uint32_t)CurrentPlayerFaction || def_f == (uint32_t)CurrentPlayerFaction)) {
+            parse_num(0, b.kills);
+            parse_num(1, b.collateral);
+            clear();
+            says((atk_f == (uint32_t)CurrentPlayerFaction) == (b.atk_left != 0) ? "NUMGOT" : "NUMLOST");
+            if (b.kills < 2) {
+                if (b.collateral) says("1");
+            } else if (b.collateral) {
+                says("2");
+            }
+            bat_msg(StrBuffer, nullptr);
+        }
+    } else {
+        parse_num(0, b.energy);
+        bat_msg("HUSKS", nullptr);
+    }
+    if (b.captures) {
+        parse_num(0, b.captures);
+        if (def_f == (uint32_t)CurrentPlayerFaction) {
+            clear();
+            says("THEIRBOOTY");
+            if (!has_treaty(atk_f, def_f, 0x10)) {
+                parse_says(0, bat_noun(atk_f), -1, -1);
+                bat_say_num(3);
+            } else {
+                bat_say_num(range(b.captures, 1, 2));
+            }
+            bat_msg(StrBuffer, nullptr);
+        } else if (atk_f == (uint32_t)CurrentPlayerFaction) {
+            clear();
+            says("OURBOOTY");
+            bat_say_num(range(b.captures, 1, 2));
+            bat_msg(StrBuffer, nullptr);
+        }
+    }
+    if (b.nerve && crt_strlen(b.nerve_base)) {
+        parse_says(0, b.nerve_base, -1, -1);
+        bat_msg("NERVEGAS", nullptr);
+    }
+    if (b.disengaged) {
+        parse_says(0, Units[game().vehs[b.def_id].unit_id].name, -1, -1);
+        parse_says(1, game().mfactions[def_f].adj_name_faction, -1, -1);
+        if (def_f == (uint32_t)CurrentPlayerFaction) bat_msg("WEDISENGAGED", nullptr);
+        else if (atk_f == (uint32_t)CurrentPlayerFaction) bat_msg("THEYDISENGAGED", nullptr);
+    }
+    StatusWin_redraw(&InfoWin);
+    if (b.husk_refresh) {
+        BaseWin_focus(&BaseWin);
+        GraphicWin_redraw(&MainInterfaceWin);
         do_all_draws();
-        if (atk_left == 0 || energy == 0 || atk_f != (uint32_t)CurrentPlayerFaction) {
-            if ((kills > 1 || collateral != 0) &&
-                (atk_f == (uint32_t)CurrentPlayerFaction || def_f == (uint32_t)CurrentPlayerFaction)) {
-                parse_num(0, kills);
-                parse_num(1, collateral);
-                clear();
-                says((atk_f == (uint32_t)CurrentPlayerFaction) == (atk_left != 0) ? "NUMGOT" : "NUMLOST");
-                if (kills < 2) {
-                    if (collateral) says("1");
-                } else if (collateral) {
-                    says("2");
-                }
-                bat_msg(StrBuffer, nullptr);
-            }
-        } else {
-            parse_num(0, energy);
-            bat_msg("HUSKS", nullptr);
-        }
-        if (captures) {
-            parse_num(0, captures);
-            if (def_f == (uint32_t)CurrentPlayerFaction) {
-                clear();
-                says("THEIRBOOTY");
-                if (!has_treaty(atk_f, def_f, 0x10)) {
-                    parse_says(0, bat_noun(atk_f), -1, -1);
-                    bat_say_num(3);
-                } else {
-                    bat_say_num(range(captures, 1, 2));
-                }
-                bat_msg(StrBuffer, nullptr);
-            } else if (atk_f == (uint32_t)CurrentPlayerFaction) {
-                clear();
-                says("OURBOOTY");
-                bat_say_num(range(captures, 1, 2));
-                bat_msg(StrBuffer, nullptr);
-            }
-        }
-        if (nerve && crt_strlen(nerve_base)) {
-            parse_says(0, nerve_base, -1, -1);
-            bat_msg("NERVEGAS", nullptr);
-        }
-        if (disengaged) {
-            parse_says(0, Units[game().vehs[def_id].unit_id].name, -1, -1);
-            parse_says(1, game().mfactions[def_f].adj_name_faction, -1, -1);
-            if (def_f == (uint32_t)CurrentPlayerFaction) bat_msg("WEDISENGAGED", nullptr);
-            else if (atk_f == (uint32_t)CurrentPlayerFaction) bat_msg("THEYDISENGAGED", nullptr);
-        }
-        StatusWin_redraw(&InfoWin);
-        if (husk_refresh) {
-            BaseWin_focus(&BaseWin);
-            GraphicWin_redraw(&MainInterfaceWin);
-            do_all_draws();
-        }
-        if (GameMorePreferences & MPREF_ADV_PAUSE_AFTER_BATTLES) {
-            BattleWin_stop_timer(&BattleWin);
-            popp(ScriptFileName, "BATTLEPAUSE", 0, "batwon_sm.pcx", 0);
-            BattleWin_pulse_timer(&BattleWin);
-            if (DialogToggle) {
-                GameMorePreferences &= ~MPREF_ADV_PAUSE_AFTER_BATTLES;
-                prefs_save(0);
-            }
-        }
     }
-    if (report_type == 1) {
-        parse_says(0, game().mfactions[atk_f].adj_name_faction, -1, -1);
-        parse_says(1, bat_noun(def_f), -1, -1);
+    if (GameMorePreferences & MPREF_ADV_PAUSE_AFTER_BATTLES) battle_pause();
+}
+// Battle reports of treaty partners for the viewer (see diplomatic_consequences).
+void report_treaty_battle(const Battle& b) {
+    if (b.report_type == 1) {
+        parse_says(0, game().mfactions[b.atk_f].adj_name_faction, -1, -1);
+        parse_says(1, bat_noun(b.def_f), -1, -1);
         bat_msg_2("VENDETTAREPORT", nullptr);
-    } else if (report_type == 2) {
-        parse_says(0, game().mfactions[atk_f].adj_name_faction, -1, -1);
-        parse_says(1, bat_noun(def_f), -1, -1);
+    } else if (b.report_type == 2) {
+        parse_says(0, game().mfactions[b.atk_f].adj_name_faction, -1, -1);
+        parse_says(1, bat_noun(b.def_f), -1, -1);
         bat_msg_2("PACTATTACKED", nullptr);
-    } else if (report_type == 3) {
-        parse_says(0, bat_noun(atk_f), -1, -1);
-        parse_says(1, bat_noun(def_f), -1, -1);
+    } else if (b.report_type == 3) {
+        parse_says(0, bat_noun(b.atk_f), -1, -1);
+        parse_says(1, bat_noun(b.def_f), -1, -1);
         bat_msg_2("PACTATTACKING", nullptr);
     }
-    Units[atk_unit_saved].combat_factions |= (uint8_t)(1 << (def_f & 31));
-    Units[def_unit_saved].combat_factions |= (uint8_t)(1 << (atk_f & 31));
-    if (show_interlude) interlude(0, 0, 1, 0);
-    if (atk_left == 0) return 0;
-    // The winner: air units (except missiles' range 1 chassis) and ships end their move.
+}
+// The winning attacker: air units (except range 1 chassis) and ships end their move, a missile
+// is spent. Returns battle_resolve's result: 1 if the attacker cannot act any more.
+int32_t winner_ends_move(const Battle& b) {
     int32_t v = CurrentVehID;
     int32_t vu = game().vehs[v].unit_id;
     if (chassis_triad(vu) == TRIAD_AIR && Chassis[Units[vu].chassis_id].range != 1) {
@@ -2425,12 +2431,111 @@ int32_t GAMEAPI battle_resolve(int32_t veh_id, int32_t dir, int32_t x, int32_t y
     if (missile) kill(v);
     // BUG(original): after kill(v), Vehs[v] is another vehicle (or past the end of the table).
     COMPAT_ORIGINAL(read_after_kill);
-    if (!(FactionStatus[0] & (uint8_t)atk_bit) && base_id >= 0 && veh_who(x, y) < 0 &&
+    if (!(FactionStatus[0] & (uint8_t)b.atk_bit) && b.base_id >= 0 && veh_who(b.x, b.y) < 0 &&
         chassis_triad(game().vehs[v].unit_id) == TRIAD_AIR &&
         Chassis[Units[game().vehs[v].unit_id].chassis_id].range != 0 &&
         game().vehs[v].movement_turns + 1 >= (int32_t)Chassis[Units[game().vehs[v].unit_id].chassis_id].range)
         return 1;
     return missile == 0;
+}
+}  // namespace
+
+int32_t GAMEAPI battle_resolve(int32_t veh_id, int32_t dir, int32_t x, int32_t y, int32_t is_arty, int32_t is_real,
+                               int32_t* def_out) {
+    Battle b(veh_id, dir, x, y, is_real);
+    prepare_battle(b, is_arty);
+    int32_t veh_id_def = b.veh_id_def;
+    if (!is_real) {
+        if (def_out) *def_out = veh_id_def;
+        return battle_rules::attack_odds(b.atk_hp, unit_max_hp(b.atk_unit), b.atk_power, b.offense, b.def_hp,
+                                         unit_max_hp(b.def_unit), b.def_power, b.defense, (b.arty & 1) != 0);
+    }
+    b.atk_bit = 1u << (b.atk_f & 31);
+    if (treaty_stops_attack(b)) return 2;
+    decide_nerve_gas(b);
+    spend_attack_moves(b);
+    if (!(VehAttackFlags & 2)) return 0;
+    game().vehs[veh_id].state |= 0x40;
+    if (Units[game().vehs[veh_id].unit_id].plan != PLAN_PROBE &&
+        Units[game().vehs[veh_id_def].unit_id].plan != PLAN_ARTIFACT)
+        diplomatic_consequences(b);
+    if (b.nerve) {
+        b.offense += b.offense / 2;
+        bat_line(0, 50, label(0x554));
+    }
+    if (MultiplayerActive) log_say_values("Battle Resolution!", veh_id, veh_id_def, 0);
+    b.atk_unit_saved = game().vehs[veh_id].unit_id;
+    b.def_unit_saved = game().vehs[veh_id_def].unit_id;
+    if ((b.atk_f == (uint32_t)CurrentPlayerFaction || b.def_f == (uint32_t)CurrentPlayerFaction) &&
+        !MultiplayerActive && (weapon_value(b.atk_unit_saved) < 0 || armor_value(b.def_unit_saved) < 0) &&
+        tut_check2(2))
+        TutWin_tut_map(&TutWin, "PSICOMBAT", x, y, b.atk_f != (uint32_t)CurrentPlayerFaction ? veh_id_def : veh_id,
+                       nullptr, 1, -1, -1);
+    difficulty_modifiers(b);
+    if (b.base_id >= 0 && veh_triad(veh_id) == TRIAD_AIR) game().bases[b.base_id].state_flags |= 0x100000;
+    // Human attackers are warned about bad odds (and may see them).
+    if ((VehAttackFlags & 1) && !b.intercepted && (FactionStatus[0] & (uint8_t)b.atk_bit) &&
+        b.atk_f == (uint32_t)CurrentPlayerFaction && b.arty == 0 && !unit_missile(game().vehs[veh_id].unit_id) &&
+        !(game().vehs[veh_id].state & (VSTATE_ON_ALERT | VSTATE_EXPLORE)) && !confirm_attack(b))
+        return 1;
+    if (b.nerve) {
+        atrocity(b.atk_f, b.def_f, b.base_id >= 0, 0);
+        b.nerve_base[0] = 0;
+        if (b.base_id >= 0) crt_strcpy(b.nerve_base, game().bases[b.base_id].name);
+    }
+    if (game().vehs[veh_id].order == ORDER_MOVE_TO) {
+        game().vehs[veh_id].order = ORDER_NONE;
+        game().vehs[veh_id].state &= 0xFCFFBDFF;
+    }
+    battle_visibility(b);
+    if (b.arty == 1) {
+        bombard(b);
+        return 0;
+    }
+    if (b.arty) add_goal(b.def_f, 0x10, 2, x, y, -1);
+    if (b.display) show_battle_start(b);
+    b.retreat = withdraw_threshold(b);
+    b.marine = marine_threshold(b);
+    if (Units[game().vehs[veh_id].unit_id].plan == PLAN_PLANET_BUSTER &&
+        Units[game().vehs[veh_id].unit_id].reactor_id) {
+        planet_busting(veh_id, x, y);
+        GameDrawState |= 4;
+        return 0;
+    }
+    b.round_div = (unit_missile(game().vehs[veh_id].unit_id) || MultiplayerActive) ? 0 : 3;
+    if (unit_missile(game().vehs[veh_id].unit_id) || MultiplayerActive) boom(x, y, 2 - (veh_hp(veh_id_def) != 0));
+    // Artillery duel between a ship and a land unit: one exchange only (when displayed, see below).
+    b.single = ((b.arty & 2) && ((veh_triad(veh_id) == TRIAD_SEA) != (veh_triad(veh_id_def) == TRIAD_SEA))) ? 1 : 0;
+    fight_rounds(b);
+    // ---- outcome ----
+    b.atk_left = veh_hp(veh_id);
+    if (b.display || b.visible) show_outcome(b);
+    if (b.single && veh_hp(veh_id) > 0 && veh_hp(veh_id_def) > 0) {
+        // Both survive the duel.
+        if (MultiplayerActive && b.def_f == (uint32_t)CurrentPlayerFaction) {
+            say_combat_units(b, veh_id_def, CurrentPlayerFaction);
+            bat_msg("COMBATSURVIVE", nullptr);
+        }
+        return 0;
+    }
+    third_faction_friction(b);
+    promote_winner(b);
+    if (!b.captured && !b.disengaged) {
+        if (b.atk_left == 0) attacker_destroyed(b);
+        else defender_destroyed(b);
+        if (b.captures && !b.human(b.def_f) && !has_treaty(b.atk_f, b.def_f, 0x10)) {
+            cause_friction(b.def_f, b.atk_f, 5);
+            treaty_on(b.atk_f, b.def_f, 0x2000);
+        }
+    }
+    if (b.atk_left != 0 && b.energy != 0) collect_husks(b);
+    if (b.display) report_battle(b);
+    report_treaty_battle(b);
+    Units[b.atk_unit_saved].combat_factions |= (uint8_t)(1 << (b.def_f & 31));
+    Units[b.def_unit_saved].combat_factions |= (uint8_t)(1 << (b.atk_f & 31));
+    if (b.show_interlude) interlude(0, 0, 1, 0);
+    if (b.atk_left == 0) return 0;
+    return winner_ends_move(b);
 }
 
 #ifdef SMACX_HYBRID
