@@ -5,6 +5,7 @@
 #include "engine/base.h"
 #include "engine/base_misc.h"
 #include "engine/clock.h"
+#include "engine/compat.h"
 #include "engine/design.h"
 #include "engine/game_state.h"
 #include "engine/goals.h"
@@ -234,6 +235,7 @@ void GAMEAPI base_terraform(int32_t flag) {
             if (zoc == 1) continue;
             // BUG(original): zoc_move returns 0 when there is no zone of control, so this reads the
             // word before diplo_status (last_base_turn).
+            COMPAT_ORIGINAL(out_of_range_reads);
             uint32_t status = zoc ? f.diplo_status[zoc - 1] : (uint32_t)f.last_base_turn;
             if (status & 0xC30) continue;
             MAP* sq = map_tile(x, y);

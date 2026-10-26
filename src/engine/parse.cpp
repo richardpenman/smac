@@ -1,6 +1,7 @@
 // Text substitution (see parse.h).
 #include "engine/parse.h"
 
+#include "engine/compat.h"
 #include "engine/crt.h"
 #include "engine/strings.h"
 #include "engine/util.h"
@@ -12,6 +13,7 @@ int32_t GAMEAPI parse_string(const char* src, char* dst) {
     if (!src || !dst) return 3;
     char* const start = dst;
     char num[80];
+    COMPAT_ORIGINAL(residue.parse_gender);
     int32_t gender = 0;  // BUG(original): uninitialized when "$<#n" sets only the plurality
     for (;;) {
         const char* mark = crt_strstr(src, "$");
@@ -61,6 +63,7 @@ int32_t GAMEAPI parse_string(const char* src, char* dst) {
         string_slot:
             digit = findnum(mark);
             // BUG(original): without any digit the same marker is found again forever.
+            COMPAT_ORIGINAL(parse_marker_no_digit);
             if (!digit) continue;
             n = (int8_t)*digit - '0';
             if (n > 9) return 14;

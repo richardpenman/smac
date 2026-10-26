@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "engine/base.h"
+#include "engine/compat.h"
 #include "engine/council.h"
 #include "engine/crt.h"
 #include "engine/diplo_act.h"
@@ -768,6 +769,7 @@ int32_t GAMEAPI proposal_menu(int32_t f, int32_t fw) {
         if (DiploProposalFaction < 0) goto none;
         // BUG(original): the loop's counter (8) is used as the faction: diplo_status[8] of
         // faction_id_with is its diplo_agenda[0].
+        COMPAT_ORIGINAL(diplo_agenda_loop_counter);
         if (Factions[fw].diplo_agenda[0] & 0x10) {
             int32_t p = DiploProposalFaction;
             PluralDefault = 0;

@@ -20,6 +20,7 @@ void GAMEAPI mem_free(void* ptr) { std::free(ptr); }
 #endif
 
 // ---- Heap (gfx module) ----
+#include "engine/compat.h"
 #include "engine/crt.h"
 #include "engine/globals.h"
 #include "engine/strings.h"
@@ -80,6 +81,7 @@ void* THISCALL Heap_get(Heap* self, int32_t size) {
         if (self->flags & 1) return nullptr;
         // BUG(original): blocks handed out earlier keep pointing into the old buffer if realloc
         // moves it.
+        COMPAT_ORIGINAL(heap_realloc_moves);
         uint8_t* p = (uint8_t*)crt_realloc(self->base, (uint32_t)(self->base_size + 0x400));
         if (!p) {
             char num[80];

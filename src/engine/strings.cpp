@@ -1,6 +1,7 @@
 // File lookup, string helpers, the string table and interface labels (see strings.h).
 #include "engine/strings.h"
 
+#include "engine/compat.h"
 #include "engine/crt.h"
 #include "engine/text.h"
 #include "engine/ui_bridge.h"
@@ -106,6 +107,7 @@ CrtFile* GAMEAPI env_open(const char* name, const char* mode) {
 
 void GAMEAPI purge_leading(char* str) {
     // BUG(original): the scan result is discarded; the string is not modified.
+    COMPAT_ORIGINAL(purge_leading_noop);
     while (*str == ' ') str++;
 }
 

@@ -8,6 +8,7 @@
 #include "engine/base_misc.h"
 #include "engine/battle.h"
 #include "engine/clock.h"
+#include "engine/compat.h"
 #include "engine/design.h"
 #include "engine/diplomacy.h"
 #include "engine/game_state.h"
@@ -313,6 +314,7 @@ int32_t GAMEAPI success_rates(int32_t n, int32_t morale, int32_t difficulty, int
         if (ProbeHasAlgoEnhancement && !ProbeTargetHasHSA) lose /= 2;
         int32_t survive = 100 - lose;
         // BUG(original): halves the success chance a second time instead of the survival chance.
+        COMPAT_ORIGINAL(probe_survival_halved);
         if (ProbeTargetHasHSA) chance /= 2;
         if (survive != chance) {
             std::strcat(StrBuffer, ", ");
@@ -917,6 +919,7 @@ ai_choose: {
                     if (mon_field(t, 15 + k, 0x10) && !(st & 0x10)) {
                         any = true;
                         // BUG(original): compares with the status of faction freed + 1
+                        COMPAT_ORIGINAL(probe_freed_status_offset);
                         if (freed == -1 || (st & 1) ||
                             ((st & 2) && !((uint8_t)(&game().factions[f].diplo_status[1])[freed] & 1)))
                             freed = k + 1;

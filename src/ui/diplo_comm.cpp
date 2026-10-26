@@ -14,6 +14,7 @@
 #include "engine/base.h"
 #include "engine/battle.h"
 #include "engine/clock.h"
+#include "engine/compat.h"
 #include "engine/council.h"
 #include "engine/crt.h"
 #include "engine/diplo_act.h"
@@ -220,6 +221,7 @@ int32_t GAMEAPI communicate(int32_t f, int32_t fw, int32_t a3) {
             draw_map(1);
         }
         // BUG(original): base_id may be -1 here (the name is read before Bases).
+        COMPAT_ORIGINAL(territory_base_minus1);
         says_n(0, (&Bases[0] + base_id)->name);
         says_n(1, MFactions[fw].adj_name_faction);
         pop("INOURTERRITORY2", fw);
@@ -484,6 +486,7 @@ L_551ecb:
                 says_n(3, get_phrase(DiploUnmetEnemy, 5));
                 says_n(4, get_pact_hood(f, fw));
                 // BUG(original): the alien text is chosen by DiploHelpFaction, not the faction met.
+                COMPAT_ORIGINAL(introduce_alien_text);
                 if (!pop(alien(DiploHelpFaction) ? "INTRODUCEENEMYALIEN" : "INTRODUCEENEMY", fw)) goto L_553464;
                 lock();
                 net_set_treaty(f, DiploUnmetEnemy, 0x10000000, 1, 0);
@@ -1849,6 +1852,7 @@ L_55778a:
         if (losing && !has_treaty(f, fw, 0x2000)) {
             for (int32_t g = 1; g < 128; g++) {
                 // BUG(original): the faction bit of DiploRegionFactions is not tested (1 << losing only).
+                COMPAT_ORIGINAL(region_factions_bit);
                 if (!bad_reg(g) && DiploRegionFactions[g] &&
                     Factions[fw].region_force_rating[g] > Factions[losing].region_total_combat_units[g]) {
                     says_n(0, get_adjective(losing));

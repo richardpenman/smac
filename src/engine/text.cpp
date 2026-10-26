@@ -1,6 +1,7 @@
 // Text file parsing (see text.h).
 #include "engine/text.h"
 
+#include "engine/compat.h"
 #include "engine/log.h"
 #include "engine/strings.h"
 #include "engine/util.h"
@@ -59,6 +60,7 @@ char* GAMEAPI text_string() {
     if (crt_feof(TextBuffer.file)) {
         *TextBuffer.buffer = 0;
         // BUG(original): stores a null string (Strings_put(nullptr) reads address 0).
+        COMPAT_ORIGINAL(text_null_string);
         return Strings_put(&StringTable, nullptr);
     }
     if (!crt_fgets(TextBuffer.buffer, 0x1FF, TextBuffer.file)) {
@@ -218,6 +220,7 @@ char* THISCALL Text_get(Text* self) {
 char* THISCALL Text_string(Text* self) {
     if (crt_feof(self->file)) {
         *self->buffer = 0;
+        COMPAT_ORIGINAL(text_null_string);
         return Strings_put(&StringTable, nullptr);  // BUG(original): see text_string
     }
     if (!crt_fgets(self->buffer, 0x1FF, self->file)) {

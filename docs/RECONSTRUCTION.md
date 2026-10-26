@@ -7,7 +7,9 @@ behaves identically. Read this fully before reconstructing anything.
 
 Every reconstructed function must behave **bit-identically** to the original: same results, same
 side effects on game memory, same sequence of random number draws. Readability matters, but never
-at the cost of behaviour. Original bugs are preserved and marked `// BUG(original): ...`.
+at the cost of behaviour. Original bugs are preserved and marked `// BUG(original): ...`, each with
+its compatibility flag next to it (`COMPAT_ORIGINAL(flag);`, declared in `src/engine/compat.h`;
+catalogue docs/COMPAT.md, checked by `src/tools/compat.py check`).
 
 ## Where things are
 

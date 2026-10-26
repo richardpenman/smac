@@ -6,6 +6,7 @@
 
 #include "engine/ai.h"
 #include "engine/base.h"
+#include "engine/compat.h"
 #include "engine/crt.h"
 #include "engine/design.h"
 #include "engine/diplo_act.h"
@@ -391,6 +392,7 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
                 base_find(x2, y2);
                 for (int32_t v = 0; v < game().veh_count; v++) {
                     // BUG(original): the distance is measured from (x, y), not from the candidate.
+                    COMPAT_ORIGINAL(setup_site_distance_origin);
                     int32_t dist = veh_vector_dist(x, y, game().vehs[v].x, game().vehs[v].y);
                     if (dist < BaseFindDist) BaseFindDist = dist;
                 }
@@ -643,6 +645,7 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
             if (!is_human(f)) {
                 // Sea colony pod prototype for the AI in the first free slot.
                 // BUG(original): with no free slot the prototype id is killer_id.
+                COMPAT_ORIGINAL(sea_pod_slot_killer_id);
                 int32_t unit_id = killer_id;
                 for (int32_t i = 0; i < 64; i++) {
                     if (!(Units[f * 64 + i].unit_flags & UNIT_ACTIVE)) {
@@ -1232,6 +1235,7 @@ void GAMEAPI time_warp() {
                 unit_id = has_tech(Units[BSC_TRANSPORT_FOIL].preq_tech, f) ? BSC_TRANSPORT_FOIL : BSC_UNITY_FOIL;
             veh_init(unit_id, f, fb.x, fb.y);
             // BUG(original): arguments out of order: facility 4 (perimeter defense) set at base 1.
+            COMPAT_ORIGINAL(perimeter_defense_args);
             set_fac(FAC_PERIMETER_DEFENSE, 1, first);
         }
         F.energy_credits += (F.AI_wealth * 9 + F.AI_growth * 5 + F.AI_tech + 1) * 25;
@@ -1276,6 +1280,7 @@ void GAMEAPI time_warp() {
         // A secret project in the first base (not 4, nor 5 for the Hive).
         // BUG(original): never ends when the eligible projects 0-7 are all built (only possible if
         // time_warp runs on a game in progress).
+        COMPAT_ORIGINAL(time_warp_project_loop);
         int32_t project;
         do {
             project = game_rand() % 8;
@@ -1324,6 +1329,7 @@ void GAMEAPI time_warp() {
                     }
                     if (game().bases[near_base].faction_id != f) {
                         // BUG(original): compares the tile's region with itself: always skipped.
+                        COMPAT_ORIGINAL(setup_region_self_compare);
                         if (map_tile(x2, y2)->region == region) continue;
                         value /= 2;
                     }
@@ -1394,8 +1400,10 @@ void GAMEAPI time_warp() {
                 if (combat >= 0) {
                     veh_init(combat, f, b.x, b.y);
                     // BUG(original): the morale goes to the vehicle created last before, not this one.
+                    COMPAT_ORIGINAL(setup_morale_last_veh);
                     if (combat == BSC_MIND_WORMS) game().vehs[last_veh].morale = MORALE_DISCIPLINED;
                 }
+                COMPAT_ORIGINAL(setup_escape_pod_location);
                 if (is_aquatic(f))
                     last_veh = veh_init(BSC_SEA_ESCAPE_POD, f, last_x, last_y);  // BUG(original): stale location
                 else

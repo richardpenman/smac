@@ -6,7 +6,8 @@
 #
 # Steps (in order; STEPS is a comma-separated list):
 #   static    src/tools/names.py check (no original address lost, names table current, fcompare
-#             entries name declared functions)
+#             entries name declared functions) and src/tools/compat.py check (every BUG(original)
+#             site names a declared compat flag, docs/COMPAT.md current)
 #   build     native (smacx_headless, smacx, smacx_unit), ASan native, hybrid (i686 mingw)
 #   unit      ctest in the native build (smacx_smoke, smacx_unit) and smacx_unit under ASan
 #   native    harness/verify.sh native over every harness/scenarios/*.cmd
@@ -78,8 +79,9 @@ refs_ok() {  # refs_ok SCENARIO...: every oracle reference exists (never created
 
 # ---- static ----------------------------------------------------------------------------------
 if want static; then
-    if python3 src/tools/names.py check > "$OUT/static.log" 2>&1; then
-        report static PASS "$(tail -n 1 "$OUT/static.log")"
+    if python3 src/tools/names.py check > "$OUT/static.log" 2>&1 && \
+        python3 src/tools/compat.py check >> "$OUT/static.log" 2>&1; then
+        report static PASS "$(tail -n 2 "$OUT/static.log" | tr '\n' ' ')"
     else
         report static FAIL "see $OUT/static.log"
     fi

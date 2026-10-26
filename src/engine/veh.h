@@ -91,7 +91,7 @@ ADDR(0x5C1540) int32_t GAMEAPI speed(int32_t veh_id, int32_t skip_morale);
 // Emulation of an original uninitialised read (not an original global): the dead stack value that
 // speed() leaves where Path_find later reads its uninitialised "start tile in ZOC" flag. Non-zero
 // exactly when the original would leave a non-zero value; set by speed(), read by Path_move.
-// BUG(original); see docs/RECONSTRUCTION.md "Known uninitialised reads".
+// BUG(original), compat residue.path_start_zoc; see docs/RECONSTRUCTION.md "Known uninitialised reads".
 extern int32_t SpeedStackResidue;
 // Cargo capacity of a vehicle (native transports: morale + 1).
 ADDR(0x5C1760) int32_t GAMEAPI veh_cargo(int32_t veh_id);

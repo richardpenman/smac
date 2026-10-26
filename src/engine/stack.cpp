@@ -4,6 +4,7 @@
 #include <cstdlib>
 
 #include "engine/base.h"
+#include "engine/compat.h"
 #include "engine/design.h"
 #include "engine/diplomacy.h"
 #include "engine/game_state.h"
@@ -250,6 +251,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                             break;
                         }
                         // BUG(original): tests the base nearest to the unit, not to the sensor tile
+                        COMPAT_ORIGINAL(sensor_base_nearest_unit);
                         int32_t base_id = base_find(x, y);
                         if (base_id != -1) {
                             BASE& base = game().bases[base_id];
@@ -540,6 +542,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                 MAP* osq = map_tile(other.x, other.y);
                 if (!(osq->items & BIT_FUNGUS) || (osq->climate & 0xE0) < 0x40 || other.unit_id == 19) {
                     // BUG(original): tests the visibility of the spotting unit, not of the spotted one
+                    COMPAT_ORIGINAL(spot_visibility_spotter);
                     if (faction_id == CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW) &&
                         !(veh.visibility & fbit) && redraw < 3)
                         redraw = 2;
@@ -682,6 +685,7 @@ int32_t GAMEAPI stack_fix(int32_t veh_id) {
     int32_t y = game().vehs[veh_id].y;
     for (int32_t i = 0; i < game().veh_count; i++) {
         // BUG(original): tests the position of veh_id instead of vehicle i
+        COMPAT_ORIGINAL(promote_position_veh_id);
         if (game().vehs[veh_id].x == x && game().vehs[veh_id].y == y) {
             veh_promote(i);
             stack_sort(veh_id);
@@ -704,6 +708,7 @@ int32_t GAMEAPI stack_veh(int32_t veh_id, int32_t mode) {
     } else {
         if (mode > 1) {
             // BUG(original): no map bounds check
+            COMPAT_ORIGINAL(stack_map_bounds);
             MAP* sq = map_tile(veh.x, veh.y);
             if ((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8) return veh_drop(veh_lift(veh_id), -2, -2);
         }
@@ -743,6 +748,7 @@ int32_t GAMEAPI stack_veh(int32_t veh_id, int32_t mode) {
                         bool allowed = true;
                         if (is_air) {
                             // BUG(original): no map bounds check
+                            COMPAT_ORIGINAL(stack_map_bounds);
                             MAP* sq = map_tile(veh.x, veh.y);
                             uint32_t owner = sq->val2 & 0xF;
                             if (!((sq->items & BIT_BASE_IN_TILE) && owner < 8 && owner > 0) &&
@@ -759,9 +765,9 @@ int32_t GAMEAPI stack_veh(int32_t veh_id, int32_t mode) {
                             } else if (cargo.state & 0x40000) {
                                 if (cargo.state & 0x20000) {
                                     // BUG(original): no map bounds check
-                                    load = game()
-                                               .factions[cargo_faction]
-                                               .region_base_plan[map_tile(cargo.x, cargo.y)->region] == 7;
+                                    COMPAT_ORIGINAL(stack_map_bounds);
+                                    const uint8_t* plans = game().factions[cargo_faction].region_base_plan;
+                                    load = plans[map_tile(cargo.x, cargo.y)->region] == 7;
                                 }
                             } else {
                                 uint8_t plan = (uint8_t)Units[cargo.unit_id].plan;

@@ -7,6 +7,7 @@
 #include "engine/base.h"
 #include "engine/action.h"
 #include "engine/base_misc.h"
+#include "engine/compat.h"
 #include "engine/crt.h"
 #include "engine/design.h"
 #include "engine/diplo_act.h"
@@ -447,6 +448,7 @@ int32_t GAMEAPI SHADOWABLE(morale_alien)(int32_t veh_id, int32_t faction_id_vs_n
     }
     // BUG(original): the Fungal Tower test also runs for veh_id -1, reading Vehs[-1] (the upper half
     // of a Reactor name pointer, never 19 in practice).
+    COMPAT_ORIGINAL(out_of_range_reads);
     if (veh_unit_raw(veh_id) == BSC_FUNGAL_TOWER) {
         // A tower's morale: adjacent fungus tiles (not deep ocean) minus 2.
         int32_t fungus = 0;
@@ -553,6 +555,7 @@ int32_t GAMEAPI get_basic_defense(int32_t veh_id, int32_t veh_id_atk, int32_t ps
     int32_t unit_id = game().vehs[veh_id].unit_id;
     if (Units[unit_id].plan == PLAN_ARTIFACT) return 1;
     // BUG(original): without an attacker, Vehs[-1] is read for its unit's plan.
+    COMPAT_ORIGINAL(out_of_range_reads);
     if (Units[unit_id].plan == PLAN_PROBE && armor_value(unit_id) == 1 &&
         Units[veh_unit_raw(veh_id_atk)].plan != PLAN_PROBE)
         return 1;
@@ -587,6 +590,7 @@ int32_t GAMEAPI battle_compute(int32_t veh_id_atk, int32_t veh_id_def, int32_t* 
     VehBattleState[1] = 0;
     int32_t is_arty = combat_type & 1;
     // BUG(original): without an attacker (veh_id_atk -1), Vehs[-1] is read in several tests below.
+    COMPAT_ORIGINAL(out_of_range_reads);
     int32_t atk_unit_raw = veh_unit_raw(veh_id_atk);
     int32_t is_bombard = (is_arty || unit_missile(atk_unit_raw)) ? 1 : 0;
     int32_t psi = 0;
@@ -806,6 +810,7 @@ int32_t GAMEAPI battle_compute(int32_t veh_id_atk, int32_t veh_id_def, int32_t* 
             if (base_id >= 0) {
                 text_ptr = TextLabels[0x530 / 4];
                 mult = 2;
+                COMPAT_ORIGINAL(level_without_attacker);
                 int32_t level = veh_id_atk;  // BUG(original): -1 without an attacker (see below)
                 if (veh_id_atk >= 0) {
                     int32_t triad = chassis_triad(game().vehs[veh_id_atk].unit_id);
@@ -905,6 +910,7 @@ int32_t GAMEAPI battle_compute(int32_t veh_id_atk, int32_t veh_id_def, int32_t* 
                     bool own;
                     if ((map_tile(x2, y2)->climate & 0xE0) < 0x60) {
                         // BUG(original): base_find may return -1 (no bases): Bases[-1] is read.
+                        COMPAT_ORIGINAL(out_of_range_reads);
                         own = base_faction_raw(base_find(x2, y2)) == game().vehs[veh_id_def].faction_id;
                     } else {
                         int32_t owner = whose_territory(game().vehs[veh_id_def].faction_id, x2, y2, nullptr, 0);
@@ -1018,6 +1024,7 @@ int32_t GAMEAPI best_defender(int32_t veh_id_def, int32_t veh_id_atk, int32_t ch
     int32_t veh_id = veh_id_def;
     while (game().vehs[veh_id].prev_veh_id_stack >= 0) veh_id = game().vehs[veh_id].prev_veh_id_stack;
     // BUG(original): without an attacker (veh_id_atk -1), Vehs[-1] is read for its unit.
+    COMPAT_ORIGINAL(out_of_range_reads);
     int32_t atk_unit = veh_unit_raw(veh_id_atk);
     for (; veh_id >= 0; veh_id = game().vehs[veh_id].next_veh_id_stack) {
         int32_t unit_id = game().vehs[veh_id].unit_id;
@@ -1124,6 +1131,7 @@ int32_t GAMEAPI battle_kill(int32_t veh_id, int32_t* kill_count, int32_t* captur
         }
     }
     // BUG(original): without a killer (veh_id_killer -1), Vehs[-1] is read for its faction.
+    COMPAT_ORIGINAL(out_of_range_reads);
     if (game().vehs[veh_id].faction_id == 0 && veh_faction_raw(veh_id_killer) != 0 && energy)
         *energy += (morale_veh(veh_id, 1, 0) + 1) * 10;
     if (kill_count) (*kill_count)++;
@@ -1241,6 +1249,7 @@ int32_t GAMEAPI interceptor(int32_t faction_id_def, int32_t faction_id_atk, int3
         int32_t cy = game().vehs[best_id].y;
         int32_t cx = game().vehs[best_id].x;
         // BUG(original): base_find may return -1 (no bases): the name before Bases[0] is used.
+        COMPAT_ORIGINAL(out_of_range_reads);
         parse_says(1, reinterpret_cast<const char*>(&game().bases[0]) + base_find(cx, cy) * (int32_t)sizeof(BASE) +
                           offsetof(BASE, name), -1, -1);
         Console_focus(&MainConsole, cx, cy, faction_id_def);
@@ -1290,6 +1299,7 @@ int32_t GAMEAPI battle_fight(int32_t veh_id, int32_t dir, int32_t is_arty, int32
         // dir -1. The original reads the dword before each table: NearOffsetX[-1] (0x66EF4C) = 0,
         // NearOffsetY[-1] = NearOffsetX[8] = 0, TableOffsetX[-1] (0x66EFB8) = 5,
         // TableOffsetY[-1] = TableOffsetX[288] = -1.
+        COMPAT_ORIGINAL(out_of_range_reads);
         dx = is_arty ? 5 : 0;
         dy = is_arty ? -1 : 0;
     } else {
@@ -1384,6 +1394,7 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
     int32_t veh_id_def = def_id;
     // BUG(original): with no unit on the target tile (veh_id_def -1; enemy_move rates such attacks
     // with is_real 0), Vehs[-1] is read for the defender's faction, unit and damage.
+    COMPAT_ORIGINAL(out_of_range_reads);
     uint32_t def_f = veh_faction_raw(veh_id_def);
     int32_t def_unit = veh_unit_raw(veh_id_def);
     int32_t base_id = base_at(x, y);
@@ -1878,6 +1889,7 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
             game().vehs[veh_id].damage_taken = damage;
             // BUG(original): the single exchange of a ship/land artillery duel ends early only when
             // the battle is displayed.
+            COMPAT_ORIGINAL(duel_ends_if_displayed);
             if (!display || !round_div ||
                 (int32_t)damage / (round_div * atk_power) == (int32_t)(damage - atk_power) / (round_div * atk_power))
                 continue;
@@ -1914,6 +1926,7 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
                     parse_says(0, Units[game().vehs[v].unit_id].name, -1, -1);
                     int32_t b = base_find(x, y);
                     // BUG(original): base_find may return -1 (no bases): Bases[-1] is read.
+                    COMPAT_ORIGINAL(out_of_range_reads);
                     const uint8_t* braw =
                         reinterpret_cast<const uint8_t*>(&game().bases[0]) + b * (int32_t)sizeof(BASE);
                     if (braw[offsetof(BASE, faction_id)] == game().vehs[veh_id].faction_id &&
@@ -2042,6 +2055,7 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
         if ((sq2->climate & 0xE0) > 0x5F && (uint32_t)owner != atk_f && (uint32_t)owner != def_f &&
             (diplo_status_raw(owner, def_f) & 0x10) && (diplo_status_raw(owner, atk_f) & 7)) {
             // BUG(original): owner -1 (unowned land) indexes Factions[-1] / diplo_gifts[-1].
+            COMPAT_ORIGINAL(out_of_range_reads);
             int32_t* gifts = reinterpret_cast<int32_t*>(
                 reinterpret_cast<uint8_t*>(&game().factions[atk_f].diplo_gifts[0]) + owner * 4);
             if (*gifts == 0) *gifts = 1;
@@ -2245,6 +2259,7 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
                 base.state_flags |= BSTATE_COMBAT_LOSS_LAST_TURN;
                 // BUG(original): the weapon test reads the vehicle id of the defender or of the stack
                 // left behind, which a kill may have renumbered (or -1: Vehs[-1]).
+                COMPAT_ORIGINAL(read_after_kill);
                 int32_t base_now = base_id;
                 if (!is_ocean(ax, ay) && (!is_objective(base_now) || base.pop_size > 1) &&
                     !has_fac(FAC_PERIMETER_DEFENSE, base_now, 0) && !has_fac(FAC_TACHYON_FIELD, base_now, 0) &&
@@ -2423,6 +2438,7 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
     int32_t missile = Chassis[Units[game().vehs[v].unit_id].chassis_id].missile;
     if (missile) kill(v);
     // BUG(original): after kill(v), Vehs[v] is another vehicle (or past the end of the table).
+    COMPAT_ORIGINAL(read_after_kill);
     if (!(FactionStatus[0] & (uint8_t)atk_bit) && base_id >= 0 && veh_who(x, y) < 0 &&
         chassis_triad(game().vehs[v].unit_id) == TRIAD_AIR &&
         Chassis[Units[game().vehs[v].unit_id].chassis_id].range != 0 &&

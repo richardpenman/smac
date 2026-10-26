@@ -5,6 +5,7 @@
 
 #include "engine/base.h"
 #include "engine/battle.h"
+#include "engine/compat.h"
 #include "engine/design.h"
 #include "engine/diplo_act.h"
 #include "engine/diplomacy.h"
@@ -357,6 +358,7 @@ int32_t GAMEAPI action_terraform(int32_t veh_id, int32_t terraform_id, int32_t i
             NetMsg_pop(&NetMsg, faction_id == CurrentPlayerFaction ? "TERRAMINE" : "TERRAYOURS", 5000, 0, nullptr);
         }
         // BUG(original): tests the viewer's entry but names the base of faction_id's entry.
+        COMPAT_ORIGINAL(drown_base_entry);
         if (MapBaseIdClosestSubmergedVeh[CurrentPlayerFaction] >= 0) {
             parse_says(0, game().bases[MapBaseIdClosestSubmergedVeh[faction_id]].name, -1, -1);
             parse_says(1, game().mfactions[faction_id].adj_name_faction, -1, -1);
@@ -1181,6 +1183,7 @@ int32_t GAMEAPI valid_patrol(int32_t veh_id, int32_t x, int32_t y) {
     if (triad != 2) return 1;
     if (!Chassis[Units[v.unit_id].chassis_id].range) return 1;
     // BUG(original): compares base_at() with 0 (base id 0 counts as no base, no base as a base).
+    COMPAT_ORIGINAL(base_at_zero_test);
     bool from_base = base_at(v.x, v.y) != 0 || (map_tile(v.x, v.y)->items & BIT_AIRBASE);
     bool to_base = base_at(x, y) != 0 || (map_tile(x, y)->items & BIT_AIRBASE);
     int32_t left = moves_left(veh_id);
@@ -1393,6 +1396,7 @@ void GAMEAPI action_tectonic(int32_t veh_id, int32_t x, int32_t y) {
     world_climate();
     draw_map(1);
     // BUG(original): Vehs[veh_id] was removed by kill(); these read the next vehicle's faction.
+    COMPAT_ORIGINAL(read_after_kill);
     if (focused) {
         parse_says(0, game().bases[base_id].name, -1, -1);
         set_leader_title(1, game().vehs[veh_id].faction_id);
@@ -1450,6 +1454,7 @@ void GAMEAPI action_fungal(int32_t veh_id, int32_t x, int32_t y) {
     if (shot) return;
     // BUG(original): Vehs[veh_id] was removed by kill(); the reactor and faction read below are the
     // next vehicle's.
+    COMPAT_ORIGINAL(read_after_kill);
     int32_t count = Units[game().vehs[veh_id].unit_id].reactor_id * 2;
     for (int32_t i = 0; i < count; i++) {
         int32_t k = 0;

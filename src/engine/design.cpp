@@ -5,6 +5,7 @@
 #include "engine/ai.h"
 #include "engine/base.h"
 #include "engine/battle.h"
+#include "engine/compat.h"
 #include "engine/crt.h"
 #include "engine/diplo_act.h"
 #include "engine/diplomacy.h"
@@ -31,6 +32,7 @@ inline int32_t weap_off(int32_t weapon_id) { return Weapon[weapon_id].offense_va
 // which reads past the table into Tech and the globals after it: those reads see the original's
 // memory (rules_orig_byte), including the low bytes of Tech name pointers.
 inline int32_t arm_def(int32_t armor_id) {
+    COMPAT_ORIGINAL(arm_val_unit_ids);
     if ((uint32_t)armor_id < 14) return Armor[armor_id].defense_value;
     return (int8_t)rules_orig_byte(0x94F278 + (uint32_t)armor_id * 0x10 + 8);
 }
@@ -266,6 +268,7 @@ void GAMEAPI header_check(char* buffer, CrtFile* file) {
     while (c) {
         buffer++;
         n++;
+        COMPAT_ORIGINAL(read_name_unterminated);
         if (n > 0xFF) break;  // BUG(original): 256 characters without NUL leave buffer unterminated
         c = (char)crt_fgetc(file);
         *buffer = c;
@@ -404,6 +407,7 @@ void GAMEAPI name_proto(char* name, int32_t unit_id, int32_t faction_id, int32_t
             } else {
                 if (std::strlen(name)) name[std::strlen(name) - 1] = 0;
                 // BUG(original): truncates alt at the (already shortened) length of name
+                COMPAT_ORIGINAL(alt_truncated_by_name);
                 if (std::strlen(alt)) alt[std::strlen(name) - 1] = 0;
             }
             special = 1;
@@ -547,6 +551,7 @@ dedupe : {
             i = -1;
         }
         // BUG(original): after a rename above, this compares with Units[-1] (memory before the table)
+        COMPAT_ORIGINAL(out_of_range_reads);
         if (!same && !std::strcmp(alt, unit_name_raw(i))) {
             parity = 0;
             name_bump(alt, &stop);
@@ -781,6 +786,7 @@ void GAMEAPI prune_protos(int32_t faction_id, int32_t unit_id, int32_t net_synch
                 bool same_roles = v.plan == 3 || ((weap_off(v.weapon_id) > 1) == (weap_off(u.weapon_id) > 1) &&
                                                   (arm_def(v.armor_id) > 1) == (arm_def(u.armor_id) > 1));
                 // BUG(original): compares the range with unit_id's chassis instead of u's
+                COMPAT_ORIGINAL(range_wrong_chassis);
                 if (!(same_roles && v.reactor_id <= u.reactor_id && v.carry_capacity <= u.carry_capacity &&
                       Chassis[v.chassis_id].range == Chassis[Units[unit_id].chassis_id].range))
                     continue;

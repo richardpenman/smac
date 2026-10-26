@@ -1,5 +1,6 @@
 #include "engine/veh.h"
 
+#include "engine/compat.h"
 #include "engine/game_state.h"
 #include "engine/hybrid_shadow.h"
 #ifdef SMACX_HYBRID
@@ -181,6 +182,7 @@ int32_t GAMEAPI do_unity_crash(int32_t x, int32_t y, int32_t faction_id) {
             }
         }
         int32_t veh_id = veh_init(unit_id, faction_id, x, y);
+        COMPAT_ORIGINAL(out_of_range_reads);
         veh_raw(veh_id)[offsetof(VEH, morale)] = 2;  // BUG(original): writes Vehs[-1] when the table is full
         return 1;
     }
@@ -400,6 +402,7 @@ int32_t GAMEAPI veh_init(int32_t unit_id, int32_t faction_id, int32_t x, int32_t
     int32_t best = 0;
     for (int32_t i = 1; i < 8; i++) {
         // BUG(original): compares the faction's own base count in the region, not the enemy's
+        COMPAT_ORIGINAL(enemy_region_own_count);
         if (i != faction_id && (f.diplo_status[i] & DIPLO_VENDETTA) && f.region_total_bases[region] > best) {
             best = f.region_total_bases[region];
             enemy_id = i;
@@ -711,6 +714,7 @@ int32_t GAMEAPI prototype_factor(int32_t unit_id) {
 int32_t GAMEAPI veh_cost(int32_t unit_id, int32_t base_id, int32_t* has_proto_cost) {
     int32_t cost = Units[unit_id].cost;
     // BUG(original): the Brood Pit check reads Bases[-1] without a base
+    COMPAT_ORIGINAL(out_of_range_reads);
     if (unit_is_native(unit_id) && base_has_fac(base_id, 0x23)) cost = (cost * 3) >> 2;
     if (Units[unit_id].plan == 8 && base_id >= 0) cost = cost < 1 ? 1 : cost > 999 ? 999 : cost;  // colony pod
     if (unit_id < 64 || (Units[unit_id].unit_flags & UNIT_PROTOTYPED)) {

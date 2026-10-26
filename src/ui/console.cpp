@@ -20,6 +20,7 @@
 #include "engine/action.h"
 #include "engine/ai.h"
 #include "engine/base.h"
+#include "engine/compat.h"
 #include "engine/crt.h"
 #include "engine/design.h"
 #include "engine/diplo_act.h"
@@ -1114,6 +1115,7 @@ void THISCALL Console_terraform(uint8_t* self, int32_t veh_id, int32_t type) {
                 return;
             }
         } else if (!a) {
+            COMPAT_ORIGINAL(terraform_sea_too_low);
             NetMsg_pop(&NetMsg, "SEATOOLOW", 5000, 0, nullptr);  // BUG(original): the order is given anyway
         }
         log_say_values("Want to terraform", faction_id, 0, 0);

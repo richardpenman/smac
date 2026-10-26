@@ -1,6 +1,7 @@
 // Prototypes (see proto.h).
 #include "engine/proto.h"
 
+#include "engine/compat.h"
 #include "engine/design.h"
 #include "engine/game_state.h"
 #include "engine/map.h"
@@ -114,6 +115,7 @@ void GAMEAPI make_proto(int32_t unit_id, int32_t chassis_id, int32_t weapon_id, 
         if (better_weapon && better_armor && better_chassis) {
             prototyped = 1;
             // BUG(original): tests the last unit of the loop, not the matching one
+            COMPAT_ORIGINAL(prototyped_last_unit);
             if (id >= 64 && (Units[id].unit_flags & 0x10)) prototyped = 3;
         }
     }

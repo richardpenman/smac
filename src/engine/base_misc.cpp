@@ -7,6 +7,7 @@
 #include "engine/ai.h"
 #include "engine/base.h"
 #include "engine/battle.h"
+#include "engine/compat.h"
 #include "engine/design.h"
 #include "engine/diplo_act.h"
 #include "engine/diplomacy.h"
@@ -300,6 +301,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
         // BUG(original): for facilities (item < 0) the plan and triad are read from Units[item]
         // (memory before the unit table) and has_abil(item, ...) may be called; the values are only
         // used for units, so they are computed for unit items only here.
+        COMPAT_ORIGINAL(out_of_range_reads);
         int32_t plan = 0, triad = 0;
         if (item >= 0) {
             plan = Units[item].plan;
@@ -638,6 +640,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                 if (!is_human && (f.player_flags & PFLAG_EMPHASIZE_SEA_POWER)) w /= 2;
                 if (!is_human && (m.rule_flags & 0x100)) {
                     w /= 2;
+                    COMPAT_ORIGINAL(base_build_persisting_locals);
                     regions_with_bases++;  // BUG(original): persists for the following units
                 }
                 int32_t s = range(8 - regions_with_bases, 4, 8) * w / 8;
@@ -1079,6 +1082,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                 int32_t formers = veh_region[pt(triad, 9)];  // [ebp-0x44]
                 bool low = false;
                 if (!formers && !queued_region[u] && CurrentTurn < 25 && !gov_conquer && !gov_explore) {
+                    COMPAT_ORIGINAL(base_build_persisting_locals);
                     need = 0;  // BUG(original): persists for the following units
                     low = true;
                 } else if (need < 3) {
@@ -1268,6 +1272,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                     if (!(fl & 1) || (id >= 64 && !(fl & 4))) continue;
                     if (best_weap <= weap_val(id, faction_id)) best_weap = weap_val(id, faction_id);
                     // BUG(original): arm_val takes an armor id but is passed the unit id.
+                    COMPAT_ORIGINAL(arm_val_unit_ids);
                     if (best_arm <= arm_val(id, faction_id)) best_arm = arm_val(id, faction_id);
                     abil_any |= Units[id].ability_flags;
                     int32_t t = Chassis[Units[id].chassis_id].triad;
@@ -1276,6 +1281,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                 }
                 (void)abil_any;
                 int32_t wv = weap_val(u, faction_id);
+                COMPAT_ORIGINAL(arm_val_unit_ids);
                 int32_t av = arm_val(u, faction_id);  // BUG(original): unit id as armor id
                 int32_t sp = speed_proto(u);
                 if (plan == 2) {
@@ -1512,6 +1518,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             int32_t r = range(bit_count(unit.ability_flags) + ws + as, 1, 999);
             // BUG(original): the speed of the unit on top of the base tile (Vehs[-1] when there is none)
             // instead of the candidate's.
+            COMPAT_ORIGINAL(out_of_range_reads);
             int32_t spd = raw_chassis_speed(raw_unit_chassis(raw_veh_unit_id(stack))) / Rules.move_rate_roads + 1;
             int32_t val = w / (r * spd);
             if (vendetta_plan7 && plan_region == 7 && (uint8_t)unit.plan <= 1 && !need) {
@@ -1536,6 +1543,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             }
             bool riot_adjust = false;
             if (unk1_flag == 1) {
+                COMPAT_ORIGINAL(base_build_persisting_locals);
                 if (plan_region != 7) unk1_flag = 0;  // BUG(original): persists for the following units
                 else riot_adjust = true;
             } else if (unk1_flag) {
@@ -1602,6 +1610,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
     // ---- facilities ----
     // BUG(original): a few cases read the population of Bases[BaseCount] (the base loop counter
     // left in the argument slot) instead of the current base.
+    COMPAT_ORIGINAL(base_build_stale_base);
     const int32_t stale_base = game().base_count > 0 ? game().base_count : 0;
     for (int32_t fac = 1; fac < 70; fac++) {
         if (!facility_avail(fac, faction_id, CurrentBaseID, 0)) continue;
@@ -1965,6 +1974,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
         case FAC_GEOSYNC_SURVEY_POD:
             value = 7;
             // BUG(original): adjusts the stored base stack id instead of a score.
+            COMPAT_ORIGINAL(base_build_stack_adjust);
             if (f.AI_growth) stack++;
             if (f.AI_tech) stack--;
             if (f.AI_wealth) stack -= 3;

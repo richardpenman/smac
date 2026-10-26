@@ -1,6 +1,7 @@
 // order_veh (0x5947C0): one step of a unit in a direction, with everything that can happen on the
 // way (move module; kept in its own file for its size). Structure follows the original's control
 // flow closely; labels named L_<address> are the original's join points.
+#include "engine/compat.h"
 #include "engine/game_state.h"
 #include "engine/move.h"
 
@@ -1206,6 +1207,7 @@ L_5962f2:  // no direction (dir 8): end of the unit's move
             for (int32_t v = veh_id < 0 ? -1 : top_of(veh_id); v >= 0 && !carried;
                  v = game().vehs[v].next_veh_id_stack) {
                 // BUG(original): tests the moving unit's abilities, not those of the stack member.
+                COMPAT_ORIGINAL(carried_ability_mover);
                 if (has_abil(game().vehs[veh_id].unit_id, 0x80)) carried = true;
                 else if (veh_unit(v).plan == 10 && veh_chassis_triad(v) == 2) carried = true;
             }

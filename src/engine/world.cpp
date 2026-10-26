@@ -2,6 +2,7 @@
 
 #include "engine/base.h"
 #include "engine/clock.h"
+#include "engine/compat.h"
 #include "engine/game_state.h"
 #include "engine/log.h"
 #include "engine/map.h"
@@ -1131,6 +1132,7 @@ void GAMEAPI world_linearize_contours() {
         for (int32_t x = y & 1; x < game().map.x; x += 2) {
             int32_t alt = alt_natural(x, y);
             // BUG(original): for altitude 6 the upper bound is entry 10, not 7.
+            COMPAT_ORIGINAL(alt_upper_bound_6);
             int32_t upper = alt < 6 ? AltNaturalLinear[alt + 1] : AltNaturalLinear[alt + 4];
             int32_t detail = map_tile(x, y)->contour;
             alt_put_detail(x, y,

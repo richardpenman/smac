@@ -20,7 +20,7 @@ Every commit passes `src/tools/gate.sh`. The script exits non-zero on any failur
 
 | Step | What it proves | Command it runs |
 | --- | --- | --- |
-| `static` | No original address was lost or added. The names table is current. Every fcompare entry names a declared function. | `src/tools/names.py check` |
+| `static` | No original address was lost or added. The names table is current. Every fcompare entry names a declared function. Every `BUG(original)` site names a declared compat flag, and docs/COMPAT.md is current. | `src/tools/names.py check`, `src/tools/compat.py check` |
 | `build` | Native, ASan and hybrid builds compile | `cmake` into `$GATE_PREFIX-{native,asan,hybrid}` |
 | `unit` | Unit tests pass, also under ASan | `ctest` (smoke + `smacx_unit`), ASan `smacx_unit` |
 | `native` | The game is identical to the original on all 29 scenarios | `harness/verify.sh native <all>` |
@@ -222,7 +222,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 6 | One-time reformat (if approved) | S (mechanical) | |
 | 7 | `GameState` view + `game()`; migrate module by module (map, factions, bases, vehs) | M ×4 | done (see note 7) |
 | 8 | Magic numbers → named constants/enums, module by module | M | first pass done (see note 8) |
-| 9 | `compat.h`: name and isolate all 173 `BUG(original)` sites | M | |
+| 9 | `compat.h`: name and isolate all 173 `BUG(original)` sites | M | done (see note 9) |
 | 10 | Split `base_production` / yields + unit tests | M | |
 | 11 | Split combat (`battle_fight_2`, odds) + unit tests | M | |
 | 12 | Split `base_build` | L | |
@@ -290,3 +290,20 @@ Notes on the increments:
    combined bitwise (checked by script: none feeds arithmetic or an ordering comparison).
    Remaining: other literal ids (weapons, chassis, abilities, plans, terrain values such as
    `climate & 0xE0`), and the UI's own fields.
+
+9. `src/engine/compat.h` declares 127 flags for the 173 sites (`g_compat`, all on), grouped by
+   module; a bug repeated at several sites has one flag (`out_of_range_reads` 27 sites,
+   `read_after_kill`, `arm_val_unit_ids`, `queue_scan_one_past`), and the stack residues and
+   uninitialised reads are grouped in `Compat::StackResidue` (`g_compat.residue.*`). Each flag's
+   comment says what the bug is and what the fix would be. Conservative choice: no fixed path is
+   written in the cleanup phase ("the else branch asserts"): each site gets
+   `COMPAT_ORIGINAL(flag);` next to its `BUG(original)` comment, which keeps the original's code
+   unchanged and stops the game with a message (`compat_unfixed`) if the flag is switched off.
+   Writing a fix later replaces that statement with `if (g_compat.flag) { original } else { fix }`
+   plus the fix's unit test. The residue values themselves (`SpeedStackResidue`, enemy_move's
+   slots) stay where they are until the scratch globals become contexts (increment 16).
+   `src/tools/compat.py check` (in the gate's static step) requires every `BUG(original)` comment
+   to name its flag (a `COMPAT_ORIGINAL` within the comment and the 12 lines after it or the 4
+   before, else `compat flag` in the comment's text), every flag to be declared and used, and
+   docs/COMPAT.md (`compat.py doc`, sites listed per file, no line numbers) to be current.
+   tests/unit/test_compat.cpp checks that every flag defaults on.

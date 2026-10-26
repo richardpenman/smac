@@ -5,6 +5,7 @@
 #include <cstring>
 #include <string>
 
+#include "engine/compat.h"
 #include "engine/map.h"
 #include "engine/battle.h"
 #include "engine/globals.h"
@@ -115,6 +116,7 @@ void GAMEAPI load_vehicles() {
     // Chassis 0..8: the flag markers right of the model column (x 0x394..0x3F9). The vertical
     // position is stored in the variant slot of the last special row's count (BUG(original):
     // a stale loop counter; veh_draw reads slot 0, which stays 0).
+    COMPAT_ORIGINAL(flag_marker_stale_slot);
     for (int32_t c = 0; c < 9; c++) {
         int32_t y0 = 2 + 0x4D * c;
         for (int32_t i = 0; i < 100; i++)
@@ -757,6 +759,7 @@ void GAMEAPI vehdraw_construct_abil(uint32_t abil, VoxelScene* sc, int32_t f) {
         if (bits & 0x40000) add(sc, 0x78A5E0);
     };
     // BUG(original): the faction's free abilities (bonus FREEABIL) the unit has are drawn twice.
+    COMPAT_ORIGINAL(free_abilities_twice);
     const MFaction& m = MFactions[f];
     for (int32_t k = 0; k < m.faction_bonus_count; k++) {
         if (m.faction_bonus_id[k] != 0xF) continue;

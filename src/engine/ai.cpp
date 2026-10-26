@@ -4,6 +4,7 @@
 #include <cstdlib>
 
 #include "engine/action.h"
+#include "engine/compat.h"
 #include "engine/crt.h"
 #include "engine/base.h"
 #include "engine/battle.h"
@@ -347,6 +348,7 @@ int32_t GAMEAPI coast_or_border(int32_t x, int32_t y, int32_t x_dst, int32_t y_d
         int32_t sy = TableOffsetY[i] + y;
         if (!map_in_bounds(sx, sy)) continue;
         // BUG(original): compares the region of (x, y), not of the neighbour.
+        COMPAT_ORIGINAL(region_of_origin);
         if (map_is_ocean(sx, sy) || whose_territory(faction_id, sx, sy, nullptr, 0) != faction_id ||
             (int8_t)tile_region(x, y) != region) {
             return i;
@@ -430,6 +432,7 @@ int32_t GAMEAPI compute_odds(int32_t odds, int32_t faction_id, int32_t veh_id, i
                 if (!map_in_bounds(sx, sy)) continue;
                 int32_t v = veh_at(sx, sy);
                 // BUG(original): v may be -1 (no unit): Vehs[-1] lies in the Reactor table.
+                COMPAT_ORIGINAL(out_of_range_reads);
                 uint32_t v_faction = (uint32_t)v < 2049 ? game().vehs[v].faction_id
                                                         : rules_orig_byte(0x952828 + (uint32_t)v * 0x34 + offsetof(VEH, faction_id));
                 if (v_faction == (uint32_t)faction_id && stack_check(v, 3, 0, -1, -1)) {
@@ -461,6 +464,7 @@ int32_t GAMEAPI compute_odds(int32_t odds, int32_t faction_id, int32_t veh_id, i
                 if (!map_in_bounds(sx, sy)) continue;
                 int32_t v = veh_at(sx, sy);
                 // BUG(original): v may be -1 (no unit): Vehs[-1] lies in the Reactor table.
+                COMPAT_ORIGINAL(out_of_range_reads);
                 uint32_t v_faction = (uint32_t)v < 2049 ? game().vehs[v].faction_id
                                                         : rules_orig_byte(0x952828 + (uint32_t)v * 0x34 + offsetof(VEH, faction_id));
                 if (v_faction == (uint32_t)faction_id) near += stack_check(v, 3, 0, -1, -1);
@@ -822,6 +826,7 @@ int32_t GAMEAPI alien_move(int32_t veh_id) {
     v.movement_turns++;
     int32_t dir = -1;
     int32_t best = 0;
+    COMPAT_ORIGINAL(residue.ai_score);
     int32_t score = 0;  // BUG(original): read before written below (0x3039 test); never 0x3039 initially
     if (veh_cargo(veh_id) && stack_check(veh_id, 3, 0, -1, -1)) {
         // Isle of the Deep carrying units: land them next to the target base.
@@ -1212,6 +1217,7 @@ int32_t GAMEAPI enemy_planet_buster(int32_t veh_id) {
             }
         } else if (best_own >= 0 && (uint8_t)game().bases[best_own].faction_id == faction_id) {
             // BUG(original): best_own stays 0 when no target was found (moves to base 0 if own).
+            COMPAT_ORIGINAL(ai_best_own_base_0);
             veh_drop(veh_lift(veh_id), game().bases[best_own].x, game().bases[best_own].y);
             game().vehs[veh_id].visibility = 0;
         }
@@ -1698,6 +1704,7 @@ void GAMEAPI enemy_strategy(int32_t faction_id) {
                         if ((pu.unit_flags & UNIT_ACTIVE) && !(self_bit & pu.obsolete_factions) &&
                             pu.plan == Units[v.unit_id].plan && unit_triad(u) == unit_triad(v.unit_id)) {
                             // BUG(original): arm_val takes an armor id but is passed unit ids.
+                            COMPAT_ORIGINAL(arm_val_unit_ids);
                             int32_t own = arm_val(unit_id, faction_id);
                             if (own < arm_val(u, faction_id)) better = true;
                         }
@@ -2154,6 +2161,7 @@ void enemy_strategy_regions(int32_t faction_id, int32_t abandon, int32_t target_
             full |= (f.region_flags[r] & 8) | (my_bases > 19) | (free_tiles < 4);
             int32_t a = (pressure + (f.AI_growth - f.AI_wealth)) * my_bases * 2;
             // BUG(original): adds faction 0's good tiles of the region.
+            COMPAT_ORIGINAL(region_faction_0_tiles);
             int32_t b = game().factions[0].region_good_tiles[r] + f.region_good_tiles[r];
             uint32_t grow = (a > b && free_tiles / ((my_bases + 1) / 2) + unk6 < pressure * 2) ? 1 : 0;
             settle = full | grow;
@@ -2685,6 +2693,7 @@ int32_t GAMEAPI air_power(int32_t veh_id, int32_t dist_own, int32_t zoc, int32_t
                     return -3;
                 }
                 best = 9999;
+                COMPAT_ORIGINAL(ai_all_base_slots);
                 for (int32_t i = 0; i < 512; i++) {  // BUG(original): all base slots, not BaseCount
                     const BASE& b = game().bases[i];
                     if ((uint8_t)b.faction_id != faction_id) continue;
@@ -2731,6 +2740,7 @@ int32_t GAMEAPI air_power(int32_t veh_id, int32_t dist_own, int32_t zoc, int32_t
                 if (bx < 0) goto stockpile;
                 if (strike() < air_dist(*px, *py, bx, by)) {
                     best = 9999;
+                    COMPAT_ORIGINAL(ai_all_base_slots);
                     for (int32_t i = 0; i < 512; i++) {  // BUG(original): all base slots
                         const BASE& b = game().bases[i];
                         if ((uint8_t)b.faction_id != faction_id) continue;
@@ -2747,6 +2757,7 @@ int32_t GAMEAPI air_power(int32_t veh_id, int32_t dist_own, int32_t zoc, int32_t
             } else {
                 // Conventional missile: best enemy stack in reach.
                 int32_t pods = 0;  // param_3: drop-pod units / threat counter
+                COMPAT_ORIGINAL(drop_pod_unit_step);
                 for (int32_t k = 0, u = 64; k < 64; k++, u += faction_id) {  // BUG(original): steps by faction_id
                     if ((Units[u].unit_flags & UNIT_ACTIVE) && has_abil(u, ABL_DROP_POD)) pods += f.units_active[u];
                 }
@@ -2819,6 +2830,7 @@ int32_t GAMEAPI air_power(int32_t veh_id, int32_t dist_own, int32_t zoc, int32_t
                         threshold = odds / 2 * mult;
                         if (strike() < air_dist(*px, *py, t.x, t.y)) {
                             best = 9999;
+                            COMPAT_ORIGINAL(ai_all_base_slots);
                             for (int32_t i = 0; i < 512; i++) {  // BUG(original): all base slots
                                 const BASE& b = game().bases[i];
                                 if ((uint8_t)b.faction_id != faction_id) continue;

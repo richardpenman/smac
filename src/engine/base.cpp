@@ -5,6 +5,7 @@
 
 #include "engine/battle.h"
 #include "engine/clock.h"
+#include "engine/compat.h"
 #include "engine/crt.h"
 #include "engine/design.h"
 #include "engine/diplo_act.h"
@@ -296,6 +297,7 @@ void GAMEAPI base_mark(int32_t base_id) {
         }
     }
     // BUG(original): the sites are deleted around the last radius tile instead of the base.
+    COMPAT_ORIGINAL(del_site_last_radius_tile);
     for (int32_t f = 0; f < 8; f++) del_site(f, 8, x, y, 3);
 }
 
@@ -1957,6 +1959,7 @@ BASE_ENERGY_DEF {
     }
     // BUG(original): the alien bonus below starts from a local that only the commerce loop writes
     // (residue of base_minerals otherwise).
+    COMPAT_ORIGINAL(residue.alien_bonus_energy);
     int32_t value = ENERGY_RESIDUE_GET();
     for (int32_t i = 1; i < 8; i++) {
         BaseCommerceImport[i] = 0;
@@ -2136,6 +2139,7 @@ void GAMEAPI base_compute(int32_t force) {
 int32_t GAMEAPI base_rank(int32_t faction_id, int32_t position) {
     // One frame block as in the original (values below ids): a negative position reads values[]
     // (BUG(original); never passed by the game). Zeroed like the oracle's poisoned stack.
+    COMPAT_ORIGINAL(residue.base_list_frame);
     int32_t block[1024] = {};
     int32_t* values = block;
     int32_t* ids = block + 512;
@@ -2211,6 +2215,7 @@ int32_t GAMEAPI base_queue(int32_t base_id) {
     for (;;) {
         if (base.queue_items[0] >= 0) game().factions[faction_id].units_queue[base.queue_items[0]]--;
         // BUG(original): with a full queue the shift reads the word after queue_items (worked_tiles).
+        COMPAT_ORIGINAL(queue_shift_past_end);
         int32_t* items = base.queue_items;
         for (int32_t i = 0; i < base.queue_size; i++) items[i] = items[i + 1];
         base.queue_size--;
@@ -2495,6 +2500,7 @@ void GAMEAPI do_upgrade(int32_t faction_id, int32_t new_unit_id, int32_t old_uni
         BASE& base = game().bases[i];
         if ((uint8_t)base.faction_id != faction_id || base.queue_size < 0) continue;
         // BUG(original): also checks the slot after the queue (queue_items[queue_size]).
+        COMPAT_ORIGINAL(queue_scan_one_past);
         int32_t* items = base.queue_items;
         for (int32_t j = 0; j <= base.queue_size; j++)
             if (items[j] == old_unit_id) items[j] = new_unit_id;
@@ -2889,6 +2895,7 @@ void GAMEAPI drone_riot() {
             if ((uint8_t)game().bases[i].faction_id == faction_id) continue;
             int32_t dist = base_dist(game().bases[i].x, game().bases[i].y, cur_base());
             // BUG(original): the diplomatic weighting uses the best faction found so far (-1 at first).
+            COMPAT_ORIGINAL(revolt_weight_best_so_far);
             uint32_t status = diplo_status_raw(faction_id, target);
             if (status & 1) dist *= 2;
             if (status & 2) dist = dist * 3 / 2;
@@ -2902,6 +2909,7 @@ void GAMEAPI drone_riot() {
     // Factions with a REVOLT bonus attract the revolt.
     // BUG(original): the shares of factions without the bonus are never written (stack residue); the
     // oracle's poisoned stack makes them 0, which this emulates.
+    COMPAT_ORIGINAL(residue.revolt_shares);
     int32_t shares[8] = {};
     int32_t total = 0;
     for (int32_t i = 1; i < 8; i++) {
@@ -2944,6 +2952,7 @@ void GAMEAPI drone_riot() {
     cur_base().minerals_accumulated = 0;
     if (cur_base().queue_size >= 0) {
         int32_t* items = cur_base().queue_items;
+        COMPAT_ORIGINAL(queue_scan_one_past);
         for (int32_t j = 0; j <= cur_base().queue_size; j++)  // BUG(original): one past the queue
             if (items[j] >= 0) f.units_queue[items[j]]--;
     }
@@ -3002,6 +3011,7 @@ void GAMEAPI drone_riot() {
             game().vehs[veh_id].home_base_id == CurrentBaseID)
             kill(veh_id);
     // BUG(original): both passes test the bonus techs of the old faction.
+    COMPAT_ORIGINAL(capture_bonus_old_faction);
     for (int32_t pass = 0; pass < 2; pass++) {
         MFaction& mb = game().mfactions[pass == 0 ? faction_id : target];
         for (int32_t k = 0; k < mb.faction_bonus_count; k++) {
@@ -3077,6 +3087,7 @@ void GAMEAPI base_doctors() {
                 item == -FAC_RESEARCH_HOSPITAL || item == -FAC_NANOHOSPITAL)
                 return;
             // BUG(original): compares with unit 8 instead of the Network Node.
+            COMPAT_ORIGINAL(psych_request_unit_8);
             if (item == 8 && has_sp(FAC_VIRTUAL_WORLD - 70, faction_id)) return;
             if (game().mfactions[faction_id].rule_flags & RFLAG_ALIEN) popb("PSYCHREQUEST", 0, -1, "Alopdir.pcx", 0);
             else popb("PSYCHREQUEST", 0, -1, "talent_sm.pcx", 0);
@@ -3813,6 +3824,7 @@ void GAMEAPI base_hurry() {
             if (i == faction_id || !(f.diplo_status[i] & (DIPLO_VENDETTA | DIPLO_WANT_REVENGE | DIPLO_ATROCITY_VICTIM)))
                 continue;
             // BUG(original): the byte tested is region_total_bases[i] of faction i.
+            COMPAT_ORIGINAL(hurry_region_bases_index);
             if (game().factions[i].region_total_bases[i] || (FactionStatus[0] & (1u << i))) spend = credits / 10;
         }
     } else if (fac >= 70) {
@@ -3945,6 +3957,7 @@ void GAMEAPI base_ecology() {
         if (tile_is_base(sq) || (sq->landmarks & 0x80000002) == 2) continue;
         if (improvement < 0) {
             // BUG(original): this search reuses the loop counter, which ends the spreading loop.
+            COMPAT_ORIGINAL(fungus_spread_loop_counter);
             for (k = 0; k < 19; k++)
                 if (items & Terraform[k].bit & FungusClearItems) improvement = k;
         }

@@ -6,6 +6,7 @@
 #include <cstring>
 #include <string>
 
+#include "engine/compat.h"
 #include "engine/text.h"
 #include "engine/globals.h"
 #include "ui/vehdraw.h"
@@ -17,6 +18,7 @@ void GAMEAPI RGB_to_HSV(const uint8_t* rgb, Hsv* out) {
     if (b > mx) mx = b;
     double mn = g < r ? g : r;  // ties: r
     // BUG(original): blue is compared with the maximum instead of the minimum.
+    COMPAT_ORIGINAL(hsv_blue_minimum);
     if (b < mx) mn = b;
     out->v = mx;
     double s = mx == 0.0 ? 0.0 : (mx - mn) / mx;

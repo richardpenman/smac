@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "engine/base.h"
+#include "engine/compat.h"
 #include "engine/crt.h"
 #include "engine/diplomacy.h"
 #include "engine/game.h"
@@ -592,6 +593,7 @@ void THISCALL InfoWin_draw_text(uint8_t*, int32_t pane) {
     if (!c->data) return;
     Buffer_set_font(c, font(), nullptr, nullptr, nullptr);
     int32_t first = pane == -1 ? 0 : pane, end = pane == -1 ? 2 : pane + 1;
+    COMPAT_ORIGINAL(infowin_counter_per_pane);
     int32_t i = 0;  // BUG(original): not reset per pane (draw_text(-1)).
     for (int32_t p = first; p < end; p++) {
         UiRect pr = prect(p + 1);

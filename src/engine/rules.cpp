@@ -1,6 +1,7 @@
 // alpha(x).txt rule parsing (see rules.h).
 #include "engine/rules.h"
 
+#include "engine/compat.h"
 #include "engine/crt.h"
 #include "engine/game_state.h"
 #include "engine/parse.h"
@@ -498,6 +499,7 @@ void GAMEAPI read_faction(MFaction* faction, int32_t toggle) {
         crt_strcat(StrBuffer, text_item());
         for (int32_t i = 0; i < 11; i++) {
             if (!crt_stricmp(StrBuffer, SocialParam[i].set1)) {
+                COMPAT_ORIGINAL(social_effect_not_stored);
                 *effect = -1;  // BUG(original): the matching effect index is not stored
                 break;
             }

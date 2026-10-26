@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "engine/compat.h"
 #include "engine/diplo_act.h"
 #include "engine/game_state.h"
 #include "engine/heap.h"
@@ -357,6 +358,7 @@ int32_t PathSearch::ai_cost(int32_t x, int32_t y, const MAP*& sq, int32_t cost, 
         !((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8)) {
         // BUG(original): the scan reuses the direction loop counter (set to 25), so no further
         // neighbour of the expanded tile is examined.
+        COMPAT_ORIGINAL(path_scan_dir_counter);
         *dir = 25;
         for (int32_t i = 1; i < 25; i++) {
             int32_t x2 = map_wrap_x(x + TableOffsetX[i]);
@@ -516,6 +518,7 @@ int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y
                         if ((flags & 0x40) && faction_id > 0 && occupant < 0) {
                             // BUG(original): for the destination's neighbours s.zoc is the
                             // uninitialised start value.
+                            COMPAT_ORIGINAL(residue.path_start_zoc);
                             if ((s.zoc || !path_near(nx, ny, x2, y2)) && Path_zoc_path(self, nx, ny, faction_id)) {
                                 ncost += 1000;
                                 if (s.zoc) ncost += 2000;
@@ -672,6 +675,7 @@ int32_t THISCALL Path_move(Path* self, int32_t veh_id, int32_t faction_id) {
         if ((dx + std::abs(y - ty)) & ~1) {
             int32_t prev_dir = (veh.state & 0x10000) ? (int32_t)veh.rotate_angle : -1;
             // BUG(original): Path_find's start-ZOC flag is the dead stack value speed() leaves.
+            COMPAT_ORIGINAL(residue.path_start_zoc);
             int32_t dir = path_find_core(self, x, y, tx, ty, veh.unit_id, faction_id, (int32_t)flags, prev_dir,
                                          SpeedStackResidue != 0);
             if (dir >= 0) return dir;
@@ -711,6 +715,7 @@ int32_t THISCALL Path_move(Path* self, int32_t veh_id, int32_t faction_id) {
             if (((sq->climate & 0xE0) < 0x60) != (triad == 1)) continue;
             if (zoc_here && zoc_move(nx, ny, (int32_t)veh_faction)) {
                 // BUG(original): tests the tile at index x >> 1 (row 0) for a native base.
+                COMPAT_ORIGINAL(native_base_row_0);
                 const MAP* t = &game().map.tiles[nx >> 1];
                 if (!(t->items & BIT_BASE_IN_TILE) || (t->val2 & 0xF) >= 8 || (t->val2 & 0xF) != 0) continue;
             }
@@ -756,6 +761,7 @@ int32_t THISCALL Path_sensors(Path* self, int32_t faction_id, int32_t* x, int32_
             int32_t zoc = zoc_veh(tx, ty, faction_id);
             if (zoc == 1) continue;
             // BUG(original): zoc may be 8 (diplo_status[8] is the field after the array).
+            COMPAT_ORIGINAL(out_of_range_reads);
             if (zoc != 0 && (diplo_status_raw(faction_id, zoc) & 0x10)) continue;
             uint32_t items = sq->items;
             if ((items & 0x50) || (items & 0x1402000)) continue;

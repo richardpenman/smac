@@ -91,6 +91,7 @@
 #include "engine/action.h"
 #include "engine/base.h"
 #include "engine/clock.h"
+#include "engine/compat.h"
 #include "engine/council.h"
 #include "engine/crt.h"
 #include "engine/design.h"
@@ -189,6 +190,7 @@ int32_t GAMEAPI aah_ooga(int32_t faction_id, int32_t faction_id_vs) {
         if (i == faction_id_vs) continue;
         // BUG(original): with faction_id_vs == -1 this reads the word before diplo_status
         // (last_base_turn).
+        COMPAT_ORIGINAL(out_of_range_reads);
         const uint32_t* status =
             reinterpret_cast<const uint32_t*>(&game().factions[i]) + offsetof(Faction, diplo_status) / 4;
         if (faction_id_vs && (status[faction_id_vs] & DIPLO_PACT) &&
@@ -288,6 +290,7 @@ int32_t GAMEAPI pact_withdraw(int32_t faction_id, int32_t faction_id_with) {
             if (veh_triad(veh_id) == TRIAD_SEA) {
                 // BUG(original): is_coast is given the location of the base whose id is this
                 // base's x coordinate, and this base's y coordinate as the radius flag.
+                COMPAT_ORIGINAL(is_coast_base_x);
                 const BASE& odd = game().bases[base.x];
                 if (!is_coast(odd.x, odd.y, base.y)) continue;
             }
@@ -670,6 +673,7 @@ void GAMEAPI scan_prototypes(int32_t faction_id, int32_t faction_id_with) {
             int32_t weap_v = weap_strat(v.weapon_id, faction_id);
             int32_t weap_u = weap_strat(u.weapon_id, faction_id);
             // BUG(original): the armor values are arm_strat of the weapon ids.
+            COMPAT_ORIGINAL(armor_from_weapon_ids);
             int32_t arm_v = arm_strat(v.weapon_id, faction_id);
             int32_t arm_u = arm_strat(u.weapon_id, faction_id);
             if (Chassis[v.chassis_id].speed >= Chassis[u.chassis_id].speed && weap_v >= weap_u && arm_v >= arm_u &&
@@ -821,6 +825,7 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
                 if (!map_in_bounds(nx, ny)) continue;
                 int32_t veh_id = stack_fix(veh_at(nx, ny));
                 // BUG(original): with no unit there (-1) the owner is read from Vehs[-1].
+                COMPAT_ORIGINAL(out_of_range_reads);
                 if (veh_faction_or_oob(veh_id) == (uint32_t)r) {
                     int32_t a = stack_check(veh_id, 2, 1, -1, -1);
                     int32_t c = stack_check(veh_id, 2, 0, -1, -1);
@@ -990,6 +995,7 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
     if (!(R.diplo_status[p] & 0x60) && (!DiploGreatSatan || (R.diplo_status[p] & 0x4000000))) {
         energy_compute(p, 0);
         // BUG(original): divides by faction_id's ranking, which may be 0.
+        COMPAT_ORIGINAL(ranking_divide_zero);
         if (FactionCurrentNetIncome * 5 < DiploTributeDemand &&
             (int32_t)((uint32_t)credits << 1) / 3 * R.ranking / P.ranking <= R.energy_credits) {
             DiploTributeDemand = FactionCurrentNetIncome * 5 / 25 * 25;
@@ -1871,6 +1877,7 @@ namespace {
 // TechOwners[tech_id]. BUG(original): callers pass technology ids that may be -1 or prototype
 // ids (97 + unit_id), past the 89 entries of the table; those bytes are read from the memory image.
 uint8_t tech_owners(int32_t tech_id) {
+    COMPAT_ORIGINAL(out_of_range_reads);
     return (uint32_t)tech_id < 89 ? TechOwners[tech_id] : rules_orig_byte(0x9A6670 + (uint32_t)tech_id);
 }
 }  // namespace
@@ -1957,6 +1964,7 @@ int32_t GAMEAPI energy_trade(int32_t faction_id, int32_t faction_id_with) {
             int32_t gift = clamp(credits / 8, 1, 500);
             gift = (gift + 24) / 25 * 25;
             // BUG(original): max instead of min: the whole treasury is given.
+            COMPAT_ORIGINAL(gift_whole_treasury);
             if (gift < credits) gift = credits;
             net_energy(r, -gift, f, gift, 1);
             StrBuffer[0] = 0;
@@ -2477,6 +2485,7 @@ int32_t GAMEAPI propose_pact(int32_t faction_id, int32_t faction_id_with) {
                 parse_says(3, get_noun_phrase(r, 9), -1, -1);
                 if (DiploTradeWantTech2 >= 0) {
                     // BUG(original): the second technology's name is written and then discarded.
+                    COMPAT_ORIGINAL(trade_tech2_name_discarded);
                     StrBuffer[0] = 0;
                     say_tech_2(StrBuffer, DiploTradeWantTech2, 1);
                 }
@@ -2782,6 +2791,7 @@ int32_t GAMEAPI base_swap(int32_t faction_id, int32_t faction_id_with) {
         const Faction& P = game().factions[f];
         const Faction& R = game().factions[r];
         // BUG(original): divides by faction_id_with's ranking, which may be 0.
+        COMPAT_ORIGINAL(ranking_divide_zero);
         int32_t price = (P.ranking + R.ranking) * ask / (R.ranking * 2);
         if (FactionRankings[7] == f) price *= 2;
         if (DiploCounterProposal == 5 || DiploCounterProposal == 2) {
@@ -2974,6 +2984,7 @@ void GAMEAPI make_gift(int32_t faction_id, int32_t faction_id_with) {
     diplomacy_caption(f, r);
     // BUG(original): the label with the suffix is built in a local buffer that is never used; the
     // popup shows plain BASEGIFT.
+    COMPAT_ORIGINAL(basegift_label_unused);
     char label[80];
     label[0] = 0;
     crt_strcat(label, "BASEGIFT");
@@ -3185,6 +3196,7 @@ int32_t GAMEAPI propose_attack(int32_t faction_id, int32_t faction_id_with) {
             v3 *= 2;
         } else if (!std::strcmp(filename, "PEACE")) {
             // BUG(original): the partial sums all take 1.5 times the scaled total.
+            COMPAT_ORIGINAL(peace_partial_sums);
             v4 = v4 * 3 / 2;
             v1 = v2 = v3 = v4 * 3 / 2;
         } else if (!std::strcmp(filename, "MORGAN")) {
@@ -3447,6 +3459,7 @@ void GAMEAPI buy_council_vote(int32_t faction_id, int32_t faction_id_with, int32
         say_leader(2, f);
         // BUG(original): with a YEA/NAY/ABSTAIN vote (candidate < 0) the candidate's leader is
         // read from before MFactions (memory image).
+        COMPAT_ORIGINAL(out_of_range_reads);
         const MFaction& c = *reinterpret_cast<const MFaction*>(mem::host(0x946A50 + (uint32_t)candidate * 0x59C));
         PluralDefault = 0;
         GenderDefault = c.is_leader_female;
