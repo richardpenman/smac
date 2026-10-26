@@ -2,6 +2,7 @@
 #include "engine/prefs.h"
 
 #include "engine/crt.h"
+#include "engine/game_state.h"
 #include "engine/strings.h"
 #include "engine/text.h"
 #include "platform/win32.h"
@@ -84,7 +85,7 @@ int32_t GAMEAPI prefs_get_int(const char* key, int32_t def, int32_t use_default)
 void GAMEAPI prefs_fac_load() {
     char num[80];
     for (int32_t i = 1; i < 8; i++) {
-        char* name = MFactions[i].filename;
+        char* name = game().mfactions[i].filename;
         if (!ExpansionEnabled) continue;
         StrBuffer[0] = 0;
         crt_strcat(StrBuffer, "Faction");
@@ -97,7 +98,7 @@ void GAMEAPI prefs_fac_load() {
             crt_strcpy(TextBufferGetPtr, name);
         TextBuffer.position = TextBuffer.buffer;
         crt_strcpy(name, TextBufferGetPtr);
-        crt_strcpy(MFactions[i].search_key, TextBufferGetPtr);
+        crt_strcpy(game().mfactions[i].search_key, TextBufferGetPtr);
     }
 }
 
@@ -223,7 +224,7 @@ void GAMEAPI prefs_save(int32_t save_factions) {
             crt_strcat(StrBuffer, " ");
             crt_itoa(i, num, 10);
             crt_strcat(StrBuffer, num);
-            ini_put(StrBuffer, MFactions[i].filename);
+            ini_put(StrBuffer, game().mfactions[i].filename);
         }
     }
 }

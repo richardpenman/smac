@@ -2,6 +2,7 @@
 // Native builds only: hybrid builds call the original UI.
 #ifndef SMACX_HYBRID
 #include "engine/crt.h"
+#include "engine/game_state.h"
 #include "engine/parse.h"
 #include "engine/strings.h"
 #include "engine/ui_bridge.h"
@@ -9,7 +10,7 @@
 
 // The text effect (HisHerBuffer), as get_his_her: labels 209/210 by the leader's gender.
 char* GAMEAPI get_he_she(int32_t faction_id, int32_t mode) {
-    crt_strcpy(HisHerBuffer, label_get((MFactions[faction_id].is_leader_female != 0) + 209));
+    crt_strcpy(HisHerBuffer, label_get((game().mfactions[faction_id].is_leader_female != 0) + 209));
     if (mode == 1) {
         char first[2] = {HisHerBuffer[0], 0};
         win32::CharUpperA(first);
@@ -33,7 +34,7 @@ int32_t GAMEAPI commlink_attempter(int32_t, int32_t faction_id_with) {
     DiploSecondFaction = faction_id_with;
     if (!(faction_id_with & 0x10)) return 0;
     int32_t f = faction_id_with & ~0x10;
-    const MFaction& m = MFactions[f];
+    const MFaction& m = game().mfactions[f];
     PluralDefault = 0;
     GenderDefault = m.is_leader_female;
     parse_says(0, m.title_leader, -1, -1);

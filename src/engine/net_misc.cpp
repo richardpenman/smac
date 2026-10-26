@@ -4,6 +4,7 @@
 
 #include "engine/crt.h"
 #include "engine/diplomacy.h"
+#include "engine/game_state.h"
 #include "engine/log.h"
 #include "engine/net.h"
 #include "engine/parse.h"
@@ -104,7 +105,7 @@ void GAMEAPI do_checksums(int32_t stage) {
     say_checksum("Tech checksum = ", (int32_t)sums.tech);
     for (int32_t i = 1; i < 8; i++) {
         StrBuffer[0] = 0;
-        std::strcat(StrBuffer, MFactions[i].adj_name_faction);
+        std::strcat(StrBuffer, game().mfactions[i].adj_name_faction);
         std::strcat(StrBuffer, " checksum = ");
         say_checksum(StrBuffer, (int32_t)sums.faction[i - 1]);
     }
@@ -117,7 +118,7 @@ void GAMEAPI do_checksums(int32_t stage) {
     say_checksum("Params checksum = ", (int32_t)sums.params);
     for (int32_t i = 0; i < 8; i++) {
         StrBuffer[0] = 0;
-        std::strcat(StrBuffer, MFactions[i].adj_name_faction);
+        std::strcat(StrBuffer, game().mfactions[i].adj_name_faction);
         std::strcat(StrBuffer, " Vehicles checksum = ");
         say_checksum(StrBuffer, (int32_t)sums.faction_vehs[i]);
     }

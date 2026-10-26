@@ -2,6 +2,7 @@
 // UI calls, engine/ui_bridge.h; smacx replaces this area: src/ui/techwin.cpp). Native builds only:
 // hybrid builds call the original UI.
 #ifndef SMACX_HYBRID
+#include "engine/game_state.h"
 #include "engine/tech.h"
 #include "engine/ui_bridge.h"
 
@@ -21,7 +22,7 @@ int32_t GAMEAPI tech_pick(int32_t faction_id, int32_t is_free, int32_t from_fact
     bool human = (FactionStatus[0] & (1u << (faction_id & 31))) != 0;
     if (!is_free && (!CurrentTurn || !human || blind) && from_faction_id < 0) return tech_ai(faction_id);
     int32_t listed = 0, best = -1, best_value = -1;
-    int32_t ranking = Factions[faction_id].tech_ranking;
+    int32_t ranking = game().factions[faction_id].tech_ranking;
     for (int32_t category = 0; category < 4; category++) {
         for (int32_t t = 0; t < 89; t++) {
             if (from_faction_id >= 0) {

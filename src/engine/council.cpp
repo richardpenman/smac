@@ -5,6 +5,7 @@
 #include "engine/crt.h"
 #include "engine/diplo_act.h"
 #include "engine/diplomacy.h"
+#include "engine/game_state.h"
 #include "engine/net.h"
 #include "engine/parse.h"
 #include "engine/probe.h"
@@ -16,17 +17,17 @@
 namespace {
 inline bool is_human(int32_t faction_id) { return (FactionStatus[0] & (uint8_t)(1u << (faction_id & 31))) != 0; }
 inline bool is_alive(int32_t faction_id) { return (FactionStatus[1] & (uint8_t)(1u << (faction_id & 31))) != 0; }
-inline bool is_alien(int32_t faction_id) { return (MFactions[faction_id].rule_flags & RFLAG_ALIEN) != 0; }
+inline bool is_alien(int32_t faction_id) { return (game().mfactions[faction_id].rule_flags & RFLAG_ALIEN) != 0; }
 inline CouncilSession& session(uint8_t* self) { return *reinterpret_cast<CouncilSession*>(self + kCouncilWinSession); }
 
 // parse_says of faction_id's leader title (n) and name (n + 1).
 void say_leader(int32_t n, int32_t faction_id) {
     PluralDefault = 0;
-    GenderDefault = MFactions[faction_id].is_leader_female;
-    parse_says(n, MFactions[faction_id].title_leader, -1, -1);
-    GenderDefault = MFactions[faction_id].is_leader_female;
+    GenderDefault = game().mfactions[faction_id].is_leader_female;
+    parse_says(n, game().mfactions[faction_id].title_leader, -1, -1);
+    GenderDefault = game().mfactions[faction_id].is_leader_female;
     PluralDefault = 0;
-    parse_says(n + 1, MFactions[faction_id].name_leader, -1, -1);
+    parse_says(n + 1, game().mfactions[faction_id].name_leader, -1, -1);
 }
 }  // namespace
 
@@ -46,7 +47,7 @@ void GAMEAPI council(int32_t faction_id, int32_t proposal, int32_t candidate) {
     } else {
         // The caller's last call: for proposals other than elections, `candidate` is the caller
         // (call_council).
-        if (proposal != 0) Factions[candidate].council_call_turn = CurrentTurn;
+        if (proposal != 0) game().factions[candidate].council_call_turn = CurrentTurn;
         ProposalCallTurn[proposal] = CurrentTurn;
     }
     if (faction_id != CurrentPlayerFaction || !is_human(faction_id)) {
@@ -58,8 +59,8 @@ void GAMEAPI council(int32_t faction_id, int32_t proposal, int32_t candidate) {
     CouncilWin_session(&CouncilWin, proposal, candidate);
     if (proposal == 0 && GovernorFaction == CurrentPlayerFaction && governor != CurrentPlayerFaction &&
         !MultiplayerActive && (!PbemActive || !CouncilSessionPending) &&
-        !(Factions[CurrentPlayerFaction].player_flags & PFLAG_BEEN_ELECTED_GOVERNOR)) {
-        Factions[CurrentPlayerFaction].player_flags |= PFLAG_BEEN_ELECTED_GOVERNOR;
+        !(game().factions[CurrentPlayerFaction].player_flags & PFLAG_BEEN_ELECTED_GOVERNOR)) {
+        game().factions[CurrentPlayerFaction].player_flags |= PFLAG_BEEN_ELECTED_GOVERNOR;
         popp(ScriptFileName, "GOVERNOR", 0, "council_sm.pcx", 0);
     }
 }
@@ -103,7 +104,7 @@ void THISCALL CouncilWin_session(uint8_t* self, int32_t proposal, int32_t candid
     // (VOTEFORME) or technologies (VOTEFORMETECH). An observer (faction 0) never is: with no
     // votes of its own it never swings an election.
     if (!MultiplayerActive && s.proposal == 0 && !eligible(CurrentPlayerFaction) &&
-        Factions[CurrentPlayerFaction].diff_level) {
+        game().factions[CurrentPlayerFaction].diff_level) {
         int32_t viewer = CurrentPlayerFaction;
         int32_t backing[7];  // votes for candidate c + 1 among the living non-alien factions
         uint8_t alive = FactionStatus[1];
@@ -126,20 +127,20 @@ void THISCALL CouncilWin_session(uint8_t* self, int32_t proposal, int32_t candid
             diplomacy_check(viewer, f, 0);
             if (DiploFriction >= 15 || DiploHostility || traded) continue;
             // Pact, vendetta, revenge, betrayal, atrocities.
-            if (Factions[f].diplo_status[viewer] & 0x40C31) continue;
-            int32_t price = CurrentTurn + Factions[f].base_count * 5;
-            int32_t limit = Factions[f].energy_credits * 3 / 4;
+            if (game().factions[f].diplo_status[viewer] & 0x40C31) continue;
+            int32_t price = CurrentTurn + game().factions[f].base_count * 5;
+            int32_t limit = game().factions[f].energy_credits * 3 / 4;
             if (limit < price) price = limit;
             int32_t cost = price / 25 * 25;
-            if (cost && Factions[f].energy_credits >= cost) {
+            if (cost && game().factions[f].energy_credits >= cost) {
                 parse_num(0, cost);
                 diplomacy_caption(viewer, f);
                 say_leader(0, viewer);
                 say_leader(2, f);
                 clock_wait(500);
                 if (X_pops_11("VOTEFORME", 0, FactionPortraits[f], 0)) {
-                    Factions[f].energy_credits -= cost;
-                    Factions[viewer].energy_credits += cost;
+                    game().factions[f].energy_credits -= cost;
+                    game().factions[viewer].energy_credits += cost;
                     Console_update_data(&MainConsole, 0);
                     CouncilWin_vote(self, viewer, f);
                 }
@@ -257,8 +258,8 @@ int32_t THISCALL CouncilWin_tally(uint8_t* self, int32_t apply) {
     ui_councilwin_redraw(self);
     ProposalCallTurn[s.proposal] = CurrentTurn;
     for (int32_t i = 1; i < 8; i++) {
-        Factions[i].unk_29[s.proposal] = 0;
-        Factions[i].unk_30[s.proposal] = 0;
+        game().factions[i].unk_29[s.proposal] = 0;
+        game().factions[i].unk_30[s.proposal] = 0;
     }
     for (int32_t i = 0; i < 6; i++) {
         ui_councilwin_panel_draw(self, i);

@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "engine/diplo_act.h"
+#include "engine/game_state.h"
 #include "engine/heap.h"
 #include "engine/base.h"
 #include "engine/map.h"
@@ -22,10 +23,10 @@ void THISCALL Path_init(Path* self) {
     self->xTable = nullptr;
     self->xDst = -1;
     self->yDst = -1;
-    self->mapTable = static_cast<int32_t*>(mem_get((uint32_t)MapAreaTiles * 4));
-    self->xTable = static_cast<int16_t*>(mem_get((uint32_t)MapAreaTiles * 2));
-    self->yTable = static_cast<int16_t*>(mem_get((uint32_t)MapAreaTiles * 2));
-    std::memset(self->mapTable, 0, (size_t)MapAreaTiles * 4);
+    self->mapTable = static_cast<int32_t*>(mem_get((uint32_t)game().map.tile_count * 4));
+    self->xTable = static_cast<int16_t*>(mem_get((uint32_t)game().map.tile_count * 2));
+    self->yTable = static_cast<int16_t*>(mem_get((uint32_t)game().map.tile_count * 2));
+    std::memset(self->mapTable, 0, (size_t)game().map.tile_count * 4);
 }
 
 void THISCALL Path_make_abstract(Path* self) {
@@ -65,7 +66,7 @@ void THISCALL Path_continent(Path* self, int32_t x, int32_t y, int32_t region) {
             int32_t x2 = map_wrap_x(cx + NearOffsetX[i]);
             int32_t y2 = cy + NearOffsetY[i];
             // Tiles reached from the polar rows are not expanded.
-            if (!map_in_bounds(x2, y2) || cy == 0 || cy == MapAreaY - 1) continue;
+            if (!map_in_bounds(x2, y2) || cy == 0 || cy == game().map.y - 1) continue;
             MAP* sq = map_tile(x2, y2);
             if (((sq->climate & 0xE0) < 0x60) != ocean || sq->region != 0) continue;
             if (ocean && (sq->landmarks & LM_FRESH) && (sq->climate & 0xE0) < 0x60) fresh++;
@@ -78,8 +79,8 @@ void THISCALL Path_continent(Path* self, int32_t x, int32_t y, int32_t region) {
     if (fresh) {
         // The fresh-water flag sticks only if most of the sea is fresh water.
         int32_t tiles = cont.tile_count;
-        for (int32_t ty = 0; ty < MapAreaY; ty++) {
-            for (int32_t tx = ty & 1; tx < MapAreaX; tx += 2) {
+        for (int32_t ty = 0; ty < game().map.y; ty++) {
+            for (int32_t tx = ty & 1; tx < game().map.x; tx += 2) {
                 if (map_tile(tx, ty)->region == (uint32_t)region) bit2_set(tx, ty, LM_FRESH, (tiles * 3) / 4 <= fresh);
             }
         }
@@ -89,17 +90,17 @@ void THISCALL Path_continent(Path* self, int32_t x, int32_t y, int32_t region) {
 
 // Moves every tile of region `from` to region `to`.
 static void retag_region(uint32_t from, uint32_t to) {
-    for (int32_t i = 0; i < MapAreaTiles; i++) {
-        if (MapTiles[i].region == from) MapTiles[i].region = (uint8_t)to;
+    for (int32_t i = 0; i < game().map.tile_count; i++) {
+        if (game().map.tiles[i].region == from) game().map.tiles[i].region = (uint8_t)to;
     }
 }
 
 void THISCALL Path_continents(Path* self) {
     int32_t land_count = 0;
     int32_t sea_count = 0x40;
-    for (int32_t i = 0; i < MapAreaTiles; i++) MapTiles[i].region = 0;
-    for (int32_t y = 1; y < MapAreaY - 1; y++) {
-        for (int32_t x = y & 1; x < MapAreaX; x += 2) {
+    for (int32_t i = 0; i < game().map.tile_count; i++) game().map.tiles[i].region = 0;
+    for (int32_t y = 1; y < game().map.y - 1; y++) {
+        for (int32_t x = y & 1; x < game().map.x; x += 2) {
             if (map_tile(x, y)->region != 0) continue;
             int32_t first, last, region;
             if (map_is_ocean(x, y)) {
@@ -140,12 +141,12 @@ void THISCALL Path_continents(Path* self) {
         }
     }
     // Polar rows: regions 0x3F (land) and 0x7F (water).
-    for (int32_t x = 0; x < MapAreaX; x += 2) {
+    for (int32_t x = 0; x < game().map.x; x += 2) {
         int32_t region = map_is_ocean(x, 0) ? 0x7F : 0x3F;
         region_set(x, 0, region);
         Continents[region].tile_count++;
     }
-    for (int32_t x = (MapAreaY - 1) & 1, y = MapAreaY - 1; x < MapAreaX; x += 2) {
+    for (int32_t x = (game().map.y - 1) & 1, y = game().map.y - 1; x < game().map.x; x += 2) {
         int32_t region = map_is_ocean(x, y) ? 0x7F : 0x3F;
         region_set(x, y, region);
         Continents[region].tile_count++;
@@ -160,8 +161,8 @@ void THISCALL Path_continents(Path* self) {
     else
         GameState |= 0x100;  // one dominant landmass
     for (int32_t r = 0; r < 64; r++) std::memset(Continents[r].sea_coasts, 0, 8);
-    for (int32_t y = 0; y < MapAreaY; y++) {
-        for (int32_t x = y & 1; x < MapAreaX; x += 2) {
+    for (int32_t y = 0; y < game().map.y; y++) {
+        for (int32_t x = y & 1; x < game().map.x; x += 2) {
             uint32_t region = map_tile(x, y)->region;
             if (region >= 0x40) continue;
             for (int32_t i = 0; i < 8; i++) {
@@ -213,7 +214,7 @@ void THISCALL Path_territory(Path* self, int32_t x, int32_t y, int32_t unused, i
             int32_t x2 = map_wrap_x(cx + NearOffsetX[i]);
             int32_t y2 = cy + NearOffsetY[i];
             // Tiles reached from the polar rows are not expanded.
-            if (!map_in_bounds(x2, y2) || cy == 0 || cy == MapAreaY - 1) continue;
+            if (!map_in_bounds(x2, y2) || cy == 0 || cy == game().map.y - 1) continue;
             MAP* sq = map_tile(x2, y2);
             if ((sq->climate & 0xE0) < 0x60 || sq->unk_1 != 0 || sq->owner != owner) continue;
             sq->unk_1 = 1;
@@ -238,12 +239,12 @@ int32_t THISCALL Path_zoc_path(Path* self, int32_t x, int32_t y, int32_t faction
         if (!(nb->items & 2)) continue;
         int32_t owner = nb->val2 & 0xF;
         if (owner >= 8 || owner == faction_id || ((nb->climate & 0xE0) < 0x60) != ocean) continue;
-        if (Factions[faction_id].diplo_status[owner] & 0x11) continue;  // pact or vendetta: ignored
+        if (game().factions[faction_id].diplo_status[owner] & 0x11) continue;  // pact or vendetta: ignored
         uint8_t bit = (uint8_t)(1u << (faction_id & 31));
         if (!(FactionStatus[0] & bit)) return owner + 1;
         // Human players only know about units they can see.
-        for (int32_t veh_id = veh_at(x2, y2); veh_id >= 0; veh_id = Vehs[veh_id].next_veh_id_stack) {
-            const VEH& veh = Vehs[veh_id];
+        for (int32_t veh_id = veh_at(x2, y2); veh_id >= 0; veh_id = game().vehs[veh_id].next_veh_id_stack) {
+            const VEH& veh = game().vehs[veh_id];
             if ((veh.faction_id == (uint32_t)faction_id && (veh.flags & 0x440) != 0x440) || (veh.visibility & bit))
                 return owner + 1;
         }
@@ -255,13 +256,13 @@ namespace {
 // Unit table entry; Path_find reads it without checking unit_id.
 const UNIT& unit_raw(int32_t unit_id) { return (&Units[0])[unit_id]; }
 // Factions entry; callers pass faction_id -1 ("any") and the original still reads diplomacy flags.
-Faction& faction_raw(int32_t faction_id) { return (&Factions[0])[faction_id]; }
-inline int32_t path_index(int32_t x, int32_t y) { return (MapAreaX >> 1) * y + (x >> 1); }
+Faction& faction_raw(int32_t faction_id) { return (&game().factions[0])[faction_id]; }
+inline int32_t path_index(int32_t x, int32_t y) { return (game().map.x >> 1) * y + (x >> 1); }
 inline uint32_t owner_bit(const MAP* sq) { return 1u << ((uint8_t)sq->owner & 31); }
 // Distance test of the ZOC rule: true when (x, y) is within two steps of (x2, y2).
 bool path_near(int32_t x, int32_t y, int32_t x2, int32_t y2) {
     int32_t dx = std::abs(x - x2);
-    if (!(MapToggleFlat & 1) && dx > MapHalfX) dx = MapAreaX - dx;
+    if (!(game().map.flat & 1) && dx > game().map.half_x) dx = game().map.x - dx;
     int32_t dy = std::abs(y - y2);
     return ((dx + dy) & ~1) <= 2;
 }
@@ -359,8 +360,8 @@ int32_t PathSearch::ai_cost(int32_t x, int32_t y, const MAP*& sq, int32_t cost, 
             int32_t x2 = map_wrap_x(x + TableOffsetX[i]);
             int32_t y2 = y + TableOffsetY[i];
             if (!map_in_bounds(x2, y2)) continue;
-            for (int32_t veh_id = veh_at(x2, y2); veh_id >= 0; veh_id = Vehs[veh_id].next_veh_id_stack) {
-                const VEH& veh = Vehs[veh_id];
+            for (int32_t veh_id = veh_at(x2, y2); veh_id >= 0; veh_id = game().vehs[veh_id].next_veh_id_stack) {
+                const VEH& veh = game().vehs[veh_id];
                 if (veh.faction_id != (uint32_t)faction_id &&
                     (faction_raw(faction_id).diplo_status[veh.faction_id] & 0x10) && can_arty(veh.unit_id, 1))
                     cost += 100;
@@ -404,12 +405,12 @@ int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y
         s.dst_mask = owner_bit(dst);
         for (int32_t i = 1; i < 8; i++) {
             if (i == faction_id) continue;
-            uint32_t d = Factions[faction_id].diplo_status[i];
+            uint32_t d = game().factions[faction_id].diplo_status[i];
             if ((d & 2) && !(d & 0xC00)) {
                 if (!(d & 1)) s.treaty_mask |= 1u << i;
             } else if ((d & 4) && !(d & 0xC00)) {
                 s.truce_mask |= 1u << i;
-            } else if ((d & 0x10) && Factions[i].region_total_bases[dst->region]) {
+            } else if ((d & 0x10) && game().factions[i].region_total_bases[dst->region]) {
                 s.war_mask |= 1u << i;
             }
         }
@@ -424,7 +425,7 @@ int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y
         flags == self->field_20 && faction_id == self->faction_id2) {
         cached = self->mapTable[path_index(x1, y1)] != 0;
     } else {
-        std::memset(self->mapTable, 0, (size_t)MapAreaTiles * 4);
+        std::memset(self->mapTable, 0, (size_t)game().map.tile_count * 4);
         self->field_20 = flags;
         self->xDst = x2;
         self->yDst = y2;
@@ -444,7 +445,7 @@ int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y
             int32_t cx = self->xTable[i];
             int32_t cy = self->yTable[i];
             self->index2 = i + 1;
-            if (i + 1 == MapAreaTiles) self->index2 = 0;
+            if (i + 1 == game().map.tile_count) self->index2 = 0;
             if (MultiplayerActive && !(self->index2 & 0x3F)) do_all_non_input();
             int32_t cost = self->mapTable[path_index(cx, cy)];
             if (cost > best_cost) continue;
@@ -475,7 +476,7 @@ int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y
                         for (int32_t k = 0; k < 8 && !unknown; k++) {
                             int32_t mx = map_wrap_x(nx + NearOffsetX[k]);
                             int32_t my = ny + NearOffsetY[k];
-                            unknown = map_in_bounds(mx, my) && !(Factions[faction_id].player_flags & 0x200) &&
+                            unknown = map_in_bounds(mx, my) && !(game().factions[faction_id].player_flags & 0x200) &&
                                       !(map_tile(mx, my)->visibility & (uint8_t)(1u << (faction_id & 31)));
                         }
                         if (unknown) continue;
@@ -540,7 +541,7 @@ int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y
                     slot = ncost;
                     int32_t k = self->index2, n = self->index1;
                     while (k < n && !(self->xTable[k] == nx && self->yTable[k] == ny)) k++;
-                    if (k == n && n < MapAreaTiles) {
+                    if (k == n && n < game().map.tile_count) {
                         self->xTable[n] = (int16_t)nx;
                         self->yTable[self->index1] = (int16_t)ny;
                         self->index1++;
@@ -630,7 +631,7 @@ int32_t THISCALL Path_find(Path* self, int32_t x1, int32_t y1, int32_t x2, int32
 #endif
 
 int32_t THISCALL Path_move(Path* self, int32_t veh_id, int32_t faction_id) {
-    VEH& veh = Vehs[veh_id];
+    VEH& veh = game().vehs[veh_id];
     uint32_t flags = 0xC0;
     uint32_t veh_faction = veh.faction_id;
     if (veh_faction != (uint32_t)self->faction_id1) {
@@ -640,7 +641,7 @@ int32_t THISCALL Path_move(Path* self, int32_t veh_id, int32_t faction_id) {
     }
     int32_t x = veh.x, y = veh.y;
     int32_t tx = veh.waypoint_x[0], ty = veh.waypoint_y[0];
-    if (ty < 0 || ty >= MapAreaY || tx < 0 || tx >= MapAreaX) return -1;
+    if (ty < 0 || ty >= game().map.y || tx < 0 || tx >= game().map.x) return -1;
     if (x == tx && y == ty) return -1;
     uint8_t fbit = (uint8_t)(1u << (veh_faction & 31));
     if (!(FactionStatus[0] & fbit) && (veh.state & 0x60000) == 0x60000) flags = 0xE0;
@@ -658,12 +659,12 @@ int32_t THISCALL Path_move(Path* self, int32_t veh_id, int32_t faction_id) {
     }
     const UNIT& unit = Units[veh.unit_id];
     if (Weapon[unit.weapon_id].offense_value == 0 &&
-        (SecretProjects[8] < 0 || (uint8_t)Bases[SecretProjects[8]].faction_id != veh_faction))
+        (SecretProjects[8] < 0 || (uint8_t)game().bases[SecretProjects[8]].faction_id != veh_faction))
         flags |= 0x10;  // non-combat units avoid fungus (unless Xenoempathy Dome)
     int32_t triad = Chassis[unit.chassis_id].triad;
     if (triad != 2) {
         int32_t dx = std::abs(x - tx);
-        if (!(MapToggleFlat & 1) && dx > MapHalfX) dx = MapAreaX - dx;
+        if (!(game().map.flat & 1) && dx > game().map.half_x) dx = game().map.x - dx;
         if ((dx + std::abs(y - ty)) & ~1) {
             int32_t prev_dir = (veh.state & 0x10000) ? (int32_t)veh.rotate_angle : -1;
             // BUG(original): Path_find's start-ZOC flag is the dead stack value speed() leaves.
@@ -686,14 +687,14 @@ int32_t THISCALL Path_move(Path* self, int32_t veh_id, int32_t faction_id) {
         int32_t ny = y + NearOffsetY[dir];
         if (!map_in_bounds(nx, ny)) continue;
         int32_t dx = std::abs(nx - tx);
-        if (!(MapToggleFlat & 1) && dx > MapHalfX) dx = MapAreaX - dx;
+        if (!(game().map.flat & 1) && dx > game().map.half_x) dx = game().map.x - dx;
         int32_t dy = std::abs(ny - ty);
         int32_t dist = (dx + dy) >> 1;
         if (dist == 0) return dir;
         const MAP* sq = map_tile(nx, ny);
         if ((sq->items & 3) && (sq->val2 & 0xF) < 8) {
             uint32_t owner = sq->val2 & 0xF;
-            if (owner != veh_faction && !(Factions[veh_faction].diplo_status[owner] & 1)) continue;
+            if (owner != veh_faction && !(game().factions[veh_faction].diplo_status[owner] & 1)) continue;
         }
         int32_t value;
         if (triad == 2) {
@@ -706,7 +707,7 @@ int32_t THISCALL Path_move(Path* self, int32_t veh_id, int32_t faction_id) {
             if (((sq->climate & 0xE0) < 0x60) != (triad == 1)) continue;
             if (zoc_here && zoc_move(nx, ny, (int32_t)veh_faction)) {
                 // BUG(original): tests the tile at index x >> 1 (row 0) for a native base.
-                const MAP* t = &MapTiles[nx >> 1];
+                const MAP* t = &game().map.tiles[nx >> 1];
                 if (!(t->items & 1) || (t->val2 & 0xF) >= 8 || (t->val2 & 0xF) != 0) continue;
             }
             value = hex_cost(veh.unit_id, (int32_t)veh_faction, x, y, nx, ny, 0) + dist * 32;
@@ -732,21 +733,21 @@ int32_t THISCALL Path_move(Path* self, int32_t veh_id, int32_t faction_id) {
 
 int32_t THISCALL Path_sensors(Path* self, int32_t faction_id, int32_t* x, int32_t* y) {
     int32_t result = 1;
-    std::memset(self->mapTable, 0, (size_t)MapAreaTiles * 4);
+    std::memset(self->mapTable, 0, (size_t)game().map.tile_count * 4);
     self->xDst = -1;
     self->yDst = -1;
     int32_t x0 = *x, y0 = *y;
     int32_t best = 9999;
     uint8_t region = map_tile(x0, y0)->region;
-    for (int32_t ty = 0; ty < MapAreaY; ty++) {
-        for (int32_t tx = ty & 1; tx < MapAreaX; tx += 2) {
+    for (int32_t ty = 0; ty < game().map.y; ty++) {
+        for (int32_t tx = ty & 1; tx < game().map.x; tx += 2) {
             MAP* sq = map_tile(tx, ty);
             if (sq->region != region) continue;
             if (whose_territory(faction_id, tx, ty, nullptr, 0) != faction_id) continue;
             if ((sq->items & 1) && (sq->val2 & 0xF) < 8) continue;
             if ((sq->items & 2) && (sq->val2 & 0xF) < 8) {
                 int32_t owner = sq->val2 & 0xF;
-                if (owner != faction_id && !(Factions[faction_id].diplo_status[owner] & 1)) continue;
+                if (owner != faction_id && !(game().factions[faction_id].diplo_status[owner] & 1)) continue;
             }
             int32_t zoc = zoc_veh(tx, ty, faction_id);
             if (zoc == 1) continue;

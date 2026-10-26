@@ -2,6 +2,7 @@
 
 #include "engine/base.h"
 #include "engine/clock.h"
+#include "engine/game_state.h"
 #include "engine/log.h"
 #include "engine/map.h"
 #include "engine/net_misc.h"
@@ -36,8 +37,8 @@ static bool find_landmark_site(int32_t& x, int32_t& y, Draw draw, Accept accept)
 
 // Usual site draw: rows 8..MapAreaY-9, any column with the parity of the row.
 static void draw_site(int32_t& x, int32_t& y) {
-    y = map_rand_mod(MapAreaY - 16) + 8;
-    x = map_rand_mod(MapAreaX);
+    y = map_rand_mod(game().map.y - 16) + 8;
+    x = map_rand_mod(game().map.x);
     x ^= (x ^ y) & 1;
 }
 
@@ -46,9 +47,9 @@ static bool site_ocean(int32_t x, int32_t y) { return map_is_ocean(x, y); }
 
 // Random start tile of build_continent/build_hills (4 tiles away from the map edges).
 static void draw_seed(int32_t& x, int32_t& y) {
-    int32_t flat = MapToggleFlat & 1;
-    x = map_rand_mod(MapAreaX - flat * 8) + (MapToggleFlat & 1) * 4;
-    y = map_rand_mod(MapAreaY - 8) + 4;
+    int32_t flat = game().map.flat & 1;
+    x = map_rand_mod(game().map.x - flat * 8) + (game().map.flat & 1) * 4;
+    y = map_rand_mod(game().map.y - 8) + 4;
     if (x & 1) x--;
     if (y & 1) x++;
 }
@@ -240,7 +241,7 @@ void GAMEAPI paint_land(int32_t x, int32_t y, int32_t altitude, int32_t size) {
 }
 
 void GAMEAPI build_continent(int32_t count) {
-    for (int32_t i = 0; i < MapAreaTiles; i++) MapTiles[i].region = 0;
+    for (int32_t i = 0; i < game().map.tile_count; i++) game().map.tiles[i].region = 0;
     int32_t coverage = MapLandCoverage;
     if (coverage != 0 && BrushVal1 >= WorldBuildVal1) coverage--;
     int32_t size = WorldBuilder.continent_mod * coverage * coverage + WorldBuilder.continent_base;
@@ -251,7 +252,7 @@ void GAMEAPI build_continent(int32_t count) {
         tries++;
     } while (tries < 100 && !map_is_ocean(x, y));
     if (!map_is_ocean(x, y)) return;
-    int32_t ratio = (count * 3200) / MapAreaTiles;
+    int32_t ratio = (count * 3200) / game().map.tile_count;
     if (ratio > WorldBuilder.cont_size_ratio5 || BrushVal1 >= WorldBuildVal1) {
         size /= 4;
         if (BrushVal1 >= WorldBuildVal1) {
@@ -309,7 +310,7 @@ void GAMEAPI world_erosion() {
     int32_t root_std, root_map;
     if (MapLandCoverage == 1) {
         root_std = quick_root(3200);
-        root_map = quick_root(MapAreaTiles);
+        root_map = quick_root(game().map.tile_count);
     } else {
         root_map = 1;
         root_std = 1;
@@ -320,8 +321,8 @@ void GAMEAPI world_erosion() {
     for (int32_t pass = 0; pass < 2; pass++) {
         if (pass != 0) world_shorelines();
         Path_continents(&Paths);
-        for (int32_t y = 0; y < MapAreaY; y++) {
-            for (int32_t x = y & 1; x < MapAreaX; x += 2) {
+        for (int32_t y = 0; y < game().map.y; y++) {
+            for (int32_t x = y & 1; x < game().map.x; x += 2) {
                 MAP* sq = map_tile(x, y);
                 int32_t detail = sq->contour;
                 int32_t alt = tile_alt(sq);
@@ -360,7 +361,7 @@ void GAMEAPI world_erosion() {
                                 largest = region;
                             } else if (largest != region) {
                                 if (Continents[largest].tile_count + Continents[region].tile_count >=
-                                    (MapAreaTiles * 50) / 3200)
+                                    (game().map.tile_count * 50) / 3200)
                                     separated = 1;
                                 if (Continents[region].tile_count > Continents[largest].tile_count) largest = region;
                             }
@@ -405,8 +406,8 @@ void GAMEAPI world_erosion() {
 // ---- terrain features ---------------------------------------------------------------------------
 
 void GAMEAPI world_rocky() {
-    for (int32_t y = 0; y < MapAreaY; y++) {
-        for (int32_t x = y & 1; x < MapAreaX; x += 2) {
+    for (int32_t y = 0; y < game().map.y; y++) {
+        for (int32_t x = y & 1; x < game().map.x; x += 2) {
             uint32_t lm = map_tile(x, y)->landmarks;
             // Keep the crater bowl and the Unity wreck's shape as they are.
             if ((lm & 0x80000001) == 1 && (int32_t)(lm & 0xFF000000) < 0x15000000) continue;
@@ -439,8 +440,8 @@ void GAMEAPI world_fungus() {
     WorldFractal fractal;
     fractal_init(&fractal);
     int32_t spread = (MapNativeLifeForms - 1) * WorldBuilder.fungus;
-    for (int32_t y = 0; y < MapAreaY; y++) {
-        for (int32_t x = y & 1; x < MapAreaX; x += 2) {
+    for (int32_t y = 0; y < game().map.y; y++) {
+        for (int32_t x = y & 1; x < game().map.x; x += 2) {
             int32_t noise = fractal_value(&fractal, x, y, 8);
             uint32_t lm = map_tile(x, y)->landmarks;
             if ((lm & 0x80000002) == 2 && (int32_t)(lm & 0xFF000000) < 0x9000000) continue;  // volcano
@@ -448,7 +449,7 @@ void GAMEAPI world_fungus() {
                         (noise >= 40 - spread && noise <= spread * 2 + 45) ||
                         (noise >= 60 - spread && noise <= spread * 2 + 65);
             if (!band) {
-                if (y != 0 && y != MapAreaY - 1) continue;
+                if (y != 0 && y != game().map.y - 1) continue;
                 if ((game_rand() & 1) == 0) continue;
             }
             MAP* sq = map_tile(x, y);
@@ -462,14 +463,14 @@ void GAMEAPI world_fungus() {
 }
 
 void GAMEAPI world_riverbeds() {
-    for (int32_t i = 0; i < MapAreaTiles; i++) MapTiles[i].items &= ~0x100u;
+    for (int32_t i = 0; i < game().map.tile_count; i++) game().map.tiles[i].items &= ~0x100u;
     int32_t placed = 0;
     int32_t limit = (((WorldBuilder.rivers_rain_mod * MapCloudCover + WorldBuilder.rivers_base) *
-                      (4 - MapOceanCoverage)) / 3 * MapAreaTiles) / 3200;
+                      (4 - MapOceanCoverage)) / 3 * game().map.tile_count) / 3200;
     for (int32_t attempts = 0;;) {
         if (placed >= limit) return;
-        int32_t x = map_rand_mod(MapAreaX);
-        int32_t y = map_rand_mod(MapAreaY);
+        int32_t x = map_rand_mod(game().map.x);
+        int32_t y = map_rand_mod(game().map.y);
         if (x & 1) x--;
         if (y & 1) x++;
         MAP* sq = map_tile(x, y);
@@ -501,12 +502,12 @@ void GAMEAPI world_riverbeds() {
 }
 
 void GAMEAPI world_rivers() {
-    for (int32_t i = 0; i < MapAreaTiles; i++) MapTiles[i].items &= 0xFFFFFD7F;
-    for (int32_t sy = 0; sy < MapAreaY; sy++) {
-        for (int32_t sx = sy & 1; sx < MapAreaX; sx += 2) {
+    for (int32_t i = 0; i < game().map.tile_count; i++) game().map.tiles[i].items &= 0xFFFFFD7F;
+    for (int32_t sy = 0; sy < game().map.y; sy++) {
+        for (int32_t sx = sy & 1; sx < game().map.x; sx += 2) {
             MAP* src = map_tile(sx, sy);
             if (!(src->items & 0x100) || tile_ocean(src)) continue;
-            for (int32_t i = 0; i < MapAreaTiles; i++) MapTiles[i].landmarks &= 0xFF7FFFFF;
+            for (int32_t i = 0; i < game().map.tile_count; i++) game().map.tiles[i].landmarks &= 0xFF7FFFFF;
             game_reseed(sy * 47 + sx * 31);
             int32_t dir = game_random(0, 4);
             src = map_tile(sx, sy);
@@ -643,18 +644,18 @@ void GAMEAPI world_rivers() {
                 uint32_t items = sq->items;
                 if (!(items & 0x80) && mouth && ((items & 3) == 0 || (sq->val2 & 0xF) >= 8)) sq->items = items | 0x200;
             }
-            for (int32_t i = 0; i < MapAreaTiles; i++) {
-                if (MapTiles[i].landmarks & 0x800000) MapTiles[i].items |= 0x80;
+            for (int32_t i = 0; i < game().map.tile_count; i++) {
+                if (game().map.tiles[i].landmarks & 0x800000) game().map.tiles[i].items |= 0x80;
             }
         }
         do_all_non_input();
     }
-    for (int32_t i = 0; i < MapAreaTiles; i++) MapTiles[i].landmarks &= 0xFF7FFFFF;
+    for (int32_t i = 0; i < game().map.tile_count; i++) game().map.tiles[i].landmarks &= 0xFF7FFFFF;
 }
 
 void GAMEAPI world_shorelines() {
-    for (int32_t y = 0; y < MapAreaY; y++) {
-        for (int32_t x = y & 1; x < MapAreaX; x += 2) {
+    for (int32_t y = 0; y < game().map.y; y++) {
+        for (int32_t x = y & 1; x < game().map.x; x += 2) {
             int32_t alt = alt_natural(x, y);
             alt_set(x, y, alt);
             if ((GameState & 0x80) && WorldAddTemperature) {
@@ -665,8 +666,8 @@ void GAMEAPI world_shorelines() {
         do_all_non_input();
     }
     for (int32_t alt = 6; alt >= 2; alt--) {
-        for (int32_t y = 0; y < MapAreaY; y++) {
-            for (int32_t x = y & 1; x < MapAreaX; x += 2) {
+        for (int32_t y = 0; y < game().map.y; y++) {
+            for (int32_t x = y & 1; x < game().map.x; x += 2) {
                 if (map_alt(x, y) == alt) world_alt_set(x, y, alt, 1);
             }
             do_all_non_input();
@@ -697,17 +698,17 @@ int32_t GAMEAPI world_validate() {
 
 void GAMEAPI world_temperature() {
     game_reseed(MapRandomSeed + 17);
-    int32_t solar = MapAreaY / WorldBuilder.solar_energy;
-    int32_t band = MapAreaY / WorldBuilder.thermal_band;
-    int32_t deviance = MapAreaY / WorldBuilder.thermal_deviance;
-    int32_t warming = MapAreaY / WorldBuilder.global_warming;
-    for (int32_t y = 0; y < MapAreaY; y++) {
-        for (int32_t x = y & 1; x < MapAreaX; x += 2) {
+    int32_t solar = game().map.y / WorldBuilder.solar_energy;
+    int32_t band = game().map.y / WorldBuilder.thermal_band;
+    int32_t deviance = game().map.y / WorldBuilder.thermal_deviance;
+    int32_t warming = game().map.y / WorldBuilder.global_warming;
+    for (int32_t y = 0; y < game().map.y; y++) {
+        for (int32_t x = y & 1; x < game().map.x; x += 2) {
             uint32_t lm = map_tile(x, y)->landmarks;
             if ((lm & 0x80000001) == 1 && (int32_t)(lm & 0xFF000000) < 0x15000000) continue;  // crater bowl
             int32_t jitter = game_random(0, deviance * 2);
             int32_t orbit_roll = game_random(0, MapPlanetaryOrbit + 1);
-            int32_t half = MapAreaY / 2;
+            int32_t half = game().map.y / 2;
             int32_t dist = half - jitter - y + deviance;  // distance from the equator
             if (dist < 0) dist = jitter - half - deviance + y;
             dist = dist - (MapPlanetaryOrbit - 1) * solar - MapSeaLevelCouncil * warming;
@@ -749,9 +750,9 @@ void GAMEAPI world_rainfall() {
     // Pass 1: mark moisture sources in the per-tile scratch byte (MAP::unk_1):
     // 0x01/0x04 near condensers, 0x80 downwind of the sea, 0x40 near cloud-trapping hills,
     // 0x20/0x10 west/east rain shadow of mountains.
-    for (int32_t i = 0; i < MapAreaTiles; i++) MapTiles[i].unk_1 = 0;
-    for (int32_t y = 0; y < MapAreaY; y++) {
-        for (int32_t x = y & 1; x < MapAreaX; x += 2) {
+    for (int32_t i = 0; i < game().map.tile_count; i++) game().map.tiles[i].unk_1 = 0;
+    for (int32_t y = 0; y < game().map.y; y++) {
+        for (int32_t x = y & 1; x < game().map.x; x += 2) {
             if (map_tile(x, y)->items & 0x400000) {
                 for (int32_t i = 0; i < 9; i++) {
                     int32_t x2 = map_wrap_x(x + TableOffsetX[i]);
@@ -765,8 +766,8 @@ void GAMEAPI world_rainfall() {
                 for (int32_t k = 0, cx = x; k < 3; k++, cx -= 2) {
                     int32_t left = map_wrap_x(cx - 2);
                     int32_t cur = map_wrap_x(cx);
-                    if (y >= 0 && y < MapAreaY && left >= 0 && left < MapAreaX && cur >= 0 && cur < MapAreaX &&
-                        map_alt(cur, y) <= map_alt(left, y) && k <= MapCloudCover)
+                    if (y >= 0 && y < game().map.y && left >= 0 && left < game().map.x && cur >= 0 &&
+                        cur < game().map.x && map_alt(cur, y) <= map_alt(left, y) && k <= MapCloudCover)
                         map_tile(left, y)->unk_1 &= 0xEF;
                 }
                 int32_t x2 = map_wrap_x(x + 2);
@@ -779,7 +780,7 @@ void GAMEAPI world_rainfall() {
                             sq->unk_1 |= 0x80;
                             if (MapCloudCover > 1) {
                                 int32_t x6 = map_wrap_x(x + 6);
-                                if (y < MapAreaY && x6 >= 0 && x6 < MapAreaX && (map_tile(x6, y)->climate & 7))
+                                if (y < game().map.y && x6 >= 0 && x6 < game().map.x && (map_tile(x6, y)->climate & 7))
                                     map_tile(x6, y)->unk_1 |= 0x80;
                             }
                         }
@@ -825,10 +826,10 @@ void GAMEAPI world_rainfall() {
     int32_t moist = 0;  // carried moisture
     int32_t belt = 0;   // flat land crossed while moist
     int32_t run = 0;    // high land crossed
-    MAP* walk = MapTiles;
-    for (int32_t y = 0; y < MapAreaY; y++) {
-        for (int32_t x = y & 1; x < MapAreaX; x += 2, walk++) {
-            if (y < 1 || y >= MapAreaY - 1) {
+    MAP* walk = game().map.tiles;
+    for (int32_t y = 0; y < game().map.y; y++) {
+        for (int32_t x = y & 1; x < game().map.x; x += 2, walk++) {
+            if (y < 1 || y >= game().map.y - 1) {
                 walk->climate &= 0xE7;
                 continue;
             }
@@ -930,7 +931,7 @@ void GAMEAPI world_rainfall() {
                     if (old > rain && (RainfallBaseFaction < 0 ||
                                        !((uint8_t)(1 << (RainfallBaseFaction & 31)) & FactionStatus[0]))) {
                         int32_t base_id = base_find(x, y);
-                        if (base_id >= 0) RainfallBaseFaction = (uint8_t)Bases[base_id].faction_id;
+                        if (base_id >= 0) RainfallBaseFaction = (uint8_t)game().bases[base_id].faction_id;
                     }
                     int32_t base_id = base_find_faction(x, y, viewer);
                     if (base_id >= 0 && BaseFindDist <= 2) RainfallViewerBaseID = base_id;
@@ -941,8 +942,8 @@ void GAMEAPI world_rainfall() {
         do_all_non_input();
     }
     // Pass 3: arid tiles next to rainy land become moist.
-    for (int32_t y = 0; y < MapAreaY; y++) {
-        for (int32_t x = y & 1; x < MapAreaX; x += 2) {
+    for (int32_t y = 0; y < game().map.y; y++) {
+        for (int32_t x = y & 1; x < game().map.x; x += 2) {
             if (map_tile(x, y)->climate & 0x18) continue;
             for (int32_t i = 0; i < 8; i++) {
                 int32_t x2 = map_wrap_x(x + NearOffsetX[i]);
@@ -1052,9 +1053,9 @@ int32_t GAMEAPI world_site(int32_t x, int32_t y, int32_t sea) {
 
 void GAMEAPI world_analysis() {
     for (int32_t i = 0; i < 128; i++) Continents[i].open_terrain = 0;
-    MAP* walk = MapTiles;
-    for (int32_t y = 0; y < MapAreaY; y++) {
-        for (int32_t x = y & 1; x < MapAreaX; x += 2, walk++) {
+    MAP* walk = game().map.tiles;
+    for (int32_t y = 0; y < game().map.y; y++) {
+        for (int32_t x = y & 1; x < game().map.x; x += 2, walk++) {
             MAP* sq = map_tile(x, y);
             uint32_t region = sq->region;
             uint8_t alt_bits = sq->climate & 0xE0;
@@ -1081,7 +1082,7 @@ void GAMEAPI world_analysis() {
                         outer_changes++;
                         prev = water;
                     }
-                    if (y2 > 4 && y2 < MapAreaY - 4 && nb->region < 0x40 && nb->region != region &&
+                    if (y2 > 4 && y2 < game().map.y - 4 && nb->region < 0x40 && nb->region != region &&
                         Continents[nb->region].tile_count >= 40 && Continents[region].tile_count >= 40)
                         walk->items |= 0x4000;
                 }
@@ -1090,21 +1091,21 @@ void GAMEAPI world_analysis() {
         }
         do_all_non_input();
     }
-    for (int32_t i = 0; i < MapAreaTiles; i++) MapTiles[i].val2 &= 0xF;
+    for (int32_t i = 0; i < game().map.tile_count; i++) game().map.tiles[i].val2 &= 0xF;
 }
 
 void GAMEAPI world_alt_put_detail(int32_t x, int32_t y) { alt_put_detail(x, y, AltNatural[3]); }
 
 void GAMEAPI world_polar_caps() {
-    for (int32_t x = 0; x < MapAreaX; x += 2) {
+    for (int32_t x = 0; x < game().map.x; x += 2) {
         alt_put_detail(x, 0, AltNatural[3]);
-        alt_put_detail(x + 1, MapAreaY - 1, AltNatural[3]);
+        alt_put_detail(x + 1, game().map.y - 1, AltNatural[3]);
     }
-    for (int32_t i = 0; i < MapAreaX / 16; i++) {
-        alt_put_detail(map_rand_mod(MapAreaX / 2) * 2, 0, AltNatural[3]);
-        alt_put_detail(map_rand_mod(MapAreaX / 2) * 2 + 1, 1, AltNatural[3]);
-        alt_put_detail(map_rand_mod(MapAreaX / 2) * 2 + 1, MapAreaY - 1, AltNatural[3]);
-        alt_put_detail(map_rand_mod(MapAreaX / 2) * 2, MapAreaY - 2, AltNatural[3]);
+    for (int32_t i = 0; i < game().map.x / 16; i++) {
+        alt_put_detail(map_rand_mod(game().map.x / 2) * 2, 0, AltNatural[3]);
+        alt_put_detail(map_rand_mod(game().map.x / 2) * 2 + 1, 1, AltNatural[3]);
+        alt_put_detail(map_rand_mod(game().map.x / 2) * 2 + 1, game().map.y - 1, AltNatural[3]);
+        alt_put_detail(map_rand_mod(game().map.x / 2) * 2, game().map.y - 2, AltNatural[3]);
     }
 }
 
@@ -1125,8 +1126,8 @@ void GAMEAPI world_climate() {
 }
 
 void GAMEAPI world_linearize_contours() {
-    for (int32_t y = 0; y < MapAreaY; y++) {
-        for (int32_t x = y & 1; x < MapAreaX; x += 2) {
+    for (int32_t y = 0; y < game().map.y; y++) {
+        for (int32_t x = y & 1; x < game().map.x; x += 2) {
             int32_t alt = alt_natural(x, y);
             // BUG(original): for altitude 6 the upper bound is entry 10, not 7.
             int32_t upper = alt < 6 ? AltNaturalLinear[alt + 1] : AltNaturalLinear[alt + 4];
@@ -1179,8 +1180,8 @@ void GAMEAPI world_monsoon(int32_t x, int32_t y) {
     world_rainfall();
     if (!map_in_bounds(x, y)) {
         auto draw = [](int32_t& sx, int32_t& sy) {
-            sy = (game_rand() & 3) + MapAreaY / 2 - 2;
-            sx = map_rand_mod(MapAreaX);
+            sy = (game_rand() & 3) + game().map.y / 2 - 2;
+            sx = map_rand_mod(game().map.x);
             sx ^= (sx ^ sy) & 1;
         };
         auto accept = [](int32_t sx, int32_t sy) {
@@ -1253,9 +1254,9 @@ void GAMEAPI world_dune(int32_t x, int32_t y) {
     world_rainfall();
     if (!map_in_bounds(x, y)) {
         auto draw = [](int32_t& sx, int32_t& sy) {
-            int32_t r = map_rand_mod(MapAreaY / 2);
-            sy = MapAreaY / 2 - MapAreaY / 4 + r;
-            sx = map_rand_mod(MapAreaX);
+            int32_t r = map_rand_mod(game().map.y / 2);
+            sy = game().map.y / 2 - game().map.y / 4 + r;
+            sx = map_rand_mod(game().map.x);
             sx ^= (sx ^ sy) & 1;
         };
         auto accept = [](int32_t sx, int32_t sy) {
@@ -1314,8 +1315,8 @@ void GAMEAPI world_fresh(int32_t x, int32_t y) {
     }
     uint32_t first = 0xFFFFFFFF;  // column of the first tile of the region found
     bool named = false;
-    for (int32_t row = MapAreaY - 1; row >= 0; row--) {
-        for (int32_t col = row & 1; col < MapAreaX; col += 2) {
+    for (int32_t row = game().map.y - 1; row >= 0; row--) {
+        for (int32_t col = row & 1; col < game().map.x; col += 2) {
             if (map_tile(col, row)->region == region) {
                 bit2_set(col, row, LM_FRESH, 1);
                 if ((int32_t)first < 0) first = col;
@@ -1559,9 +1560,10 @@ void GAMEAPI world_build() {
             if (params[i] < 0) params[i] = game_rand() % 3;
         }
         map_wipe();
-        MapToggleFlat = 0;
-        int32_t islands = (WorldBuilder.islands * MapAreaTiles) / 3200;
-        WorldBuildVal1 = (((2 - MapOceanCoverage) * WorldBuilder.land_mod + WorldBuilder.land_base) * MapAreaTiles) / 3200;
+        game().map.flat = 0;
+        int32_t islands = (WorldBuilder.islands * game().map.tile_count) / 3200;
+        WorldBuildVal1 =
+            (((2 - MapOceanCoverage) * WorldBuilder.land_mod + WorldBuilder.land_base) * game().map.tile_count) / 3200;
         BrushVal1 = 0;
         if (GameState & 0x80) {
             MapWin_clear_terrain(MapWins[0]);
@@ -1571,12 +1573,14 @@ void GAMEAPI world_build() {
             build_continent(++continents);
         }
         if (MapErosiveForces >= 1) {
-            int32_t hills = (((MapErosiveForces - 1) * WorldBuilder.hills_mod + WorldBuilder.hills_base) * MapAreaTiles) / 3200;
+            int32_t hills =
+                (((MapErosiveForces - 1) * WorldBuilder.hills_mod + WorldBuilder.hills_base) * game().map.tile_count) /
+                3200;
             if (MapOceanCoverage == 2) hills /= 2;
             for (; hills > 0; hills--) build_hills(4);
         }
         world_erosion();
-        if (!(MapToggleFlat & 1) && MapOceanCoverage < 2 && (MapOceanCoverage == 0 || game_rand() % 3 == 0))
+        if (!(game().map.flat & 1) && MapOceanCoverage < 2 && (MapOceanCoverage == 0 || game_rand() % 3 == 0))
             world_polar_caps();
         world_shorelines();
         if ((GameState & 0x80) || !world_validate() || ++attempt >= 4) break;

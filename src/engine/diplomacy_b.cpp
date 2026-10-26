@@ -11,6 +11,7 @@
 #include "engine/crt.h"
 #include "engine/diplo_act.h"
 #include "engine/diplomacy.h"
+#include "engine/game_state.h"
 #include "engine/map.h"
 #include "engine/parse.h"
 #include "engine/path.h"
@@ -30,16 +31,16 @@
 
 namespace {
 
-bool is_alien(int32_t faction_id) { return (MFactions[faction_id].rule_flags & 0x80) != 0; }
+bool is_alien(int32_t faction_id) { return (game().mfactions[faction_id].rule_flags & 0x80) != 0; }
 bool is_human(int32_t faction_id) { return (FactionStatus[0] & (1 << faction_id)) != 0; }
 uint32_t& status(int32_t faction_id, int32_t faction_id_with) {
-    return Factions[faction_id].diplo_status[faction_id_with];
+    return game().factions[faction_id].diplo_status[faction_id_with];
 }
 
 // The parse_says blocks the original repeats inline: leader title and name ($n, $n+1), faction
 // noun ($n).
 void say_leader(int32_t n, int32_t faction_id) {
-    const MFaction& m = MFactions[faction_id];
+    const MFaction& m = game().mfactions[faction_id];
     GenderDefault = m.is_leader_female;
     PluralDefault = 0;
     parse_says(n, m.title_leader, -1, -1);
@@ -48,7 +49,7 @@ void say_leader(int32_t n, int32_t faction_id) {
     parse_says(n + 1, m.name_leader, -1, -1);
 }
 void say_noun(int32_t n, int32_t faction_id) {
-    const MFaction& m = MFactions[faction_id];
+    const MFaction& m = game().mfactions[faction_id];
     GenderDefault = m.noun_gender;
     PluralDefault = m.is_noun_plural;
     parse_says(n, m.noun_faction, -1, -1);
@@ -70,7 +71,7 @@ bool viewer_learns(int32_t faction_id, int32_t faction_id_with) {
 
 // The viewer owns the Empath Guild (enemies_unpact, enemies_treaty test the project's base).
 bool viewer_has_empath_guild() {
-    return SecretProjects[4] >= 0 && Bases[SecretProjects[4]].faction_id == CurrentPlayerFaction;
+    return SecretProjects[4] >= 0 && game().bases[SecretProjects[4]].faction_id == CurrentPlayerFaction;
 }
 
 }  // namespace
@@ -88,8 +89,8 @@ int32_t WantsToAttackResidue[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 static int32_t wants_to_attack_core(int32_t faction_id, int32_t faction_id_tgt, int32_t odds_override,
                                     int32_t* slots) {
     if (is_alien(faction_id) && is_alien(faction_id_tgt)) return 1;
-    Faction& f1 = Factions[faction_id];
-    Faction& f2 = Factions[faction_id_tgt];
+    Faction& f1 = game().factions[faction_id];
+    Faction& f2 = game().factions[faction_id_tgt];
     uint32_t s = f1.diplo_status[faction_id_tgt];
     if (s & 0x40060) return 1;
     if (f2.major_atrocities != 0 && f1.major_atrocities == 0) return 1;
@@ -105,7 +106,7 @@ static int32_t wants_to_attack_core(int32_t faction_id, int32_t faction_id_tgt, 
         if ((u & 0x2000000) && (u & 1)) surrendered_to = i;
         if ((u & 0x10) && !(f2.diplo_status[i] & 1)) {
             score++;
-            if (Factions[i].mil_strength_1 > f2.mil_strength_1 * 3 / 2) score++;
+            if (game().factions[i].mil_strength_1 > f2.mil_strength_1 * 3 / 2) score++;
         }
         if (great_beelzebub(i, 0) && (CurrentTurn >= 100 || (GameRules & 0x40))) {
             uint32_t t = f2.diplo_status[i];
@@ -117,7 +118,7 @@ static int32_t wants_to_attack_core(int32_t faction_id, int32_t faction_id_tgt, 
             uint32_t c = f2.diplo_status[i];
             if (c & 1) score += 2;
             uint32_t surr = a & 0x2000000;
-            if (surr && (Factions[i].diplo_status[faction_id_tgt] & 3)) return 0;
+            if (surr && (game().factions[i].diplo_status[faction_id_tgt] & 3)) return 0;
             if (c & 0x10) {
                 ally_at_war = 1;
                 score -= surr ? 4 : 2;
@@ -134,21 +135,21 @@ static int32_t wants_to_attack_core(int32_t faction_id, int32_t faction_id_tgt, 
     // stack slots (known uninitialised read #4).
     for (int32_t r = 1; r < 64; r++) {
         for (int32_t k = 1; k < 8; k++) {
-            int32_t v = Factions[k].region_total_bases[r];
+            int32_t v = game().factions[k].region_total_bases[r];
             if (slots[k] > v) v = slots[k];
             slots[k] = v;
         }
     }
     for (int32_t k = 1; k < 8; k++) slots[k] -= slots[k] / 4;
     int32_t hq_region = -1, hq_region_tgt = -1;
-    for (int32_t i = 0; i < BaseCount; i++) {
+    for (int32_t i = 0; i < game().base_count; i++) {
         int32_t offset, mask;
         bitmask(1, &offset, &mask);
-        if (!(Bases[i].facilities_built[offset] & (uint8_t)mask)) continue;
-        if (Bases[i].faction_id == faction_id)
-            hq_region = map_tile(Bases[i].x, Bases[i].y)->region;
-        else if (Bases[i].faction_id == faction_id_tgt)
-            hq_region_tgt = map_tile(Bases[i].x, Bases[i].y)->region;
+        if (!(game().bases[i].facilities_built[offset] & (uint8_t)mask)) continue;
+        if (game().bases[i].faction_id == faction_id)
+            hq_region = map_tile(game().bases[i].x, game().bases[i].y)->region;
+        else if (game().bases[i].faction_id == faction_id_tgt)
+            hq_region_tgt = map_tile(game().bases[i].x, game().bases[i].y)->region;
     }
     int32_t attack = 0, defense = 1, regions = 0;
     for (int32_t r = 1; r < 64; r++) {
@@ -157,16 +158,16 @@ static int32_t wants_to_attack_core(int32_t faction_id, int32_t faction_id_tgt, 
         uint16_t units_tgt = f2.region_total_combat_units[r];
         if (!units_tgt && !f2.region_total_bases[r]) continue;
         if (f1.region_total_bases[r] >= slots[faction_id] * 3 / 4 || r == hq_region) {
-            uint32_t extra = odds_override > 0 ? Factions[odds_override].region_force_rating[r] >> 2 : 0;
+            uint32_t extra = odds_override > 0 ? game().factions[odds_override].region_force_rating[r] >> 2 : 0;
             if ((int32_t)f2.region_force_rating[r] > (int32_t)(force + extra + f1.region_total_combat_units[r]))
                 return 0;
         }
         if (f2.region_total_bases[r]) {
-            uint32_t extra = odds_override > 0 ? Factions[odds_override].region_force_rating[r] >> 1 : 0;
+            uint32_t extra = odds_override > 0 ? game().factions[odds_override].region_force_rating[r] >> 1 : 0;
             attack += force + extra;
         }
         if ((f2.region_total_bases[r] >= slots[faction_id_tgt] * 3 / 4 || r == hq_region_tgt) && force > units_tgt) {
-            uint32_t extra = odds_override > 0 ? Factions[odds_override].region_force_rating[r] >> 1 : 0;
+            uint32_t extra = odds_override > 0 ? game().factions[odds_override].region_force_rating[r] >> 1 : 0;
             attack += force + extra;
         }
         uint8_t own_bases = f1.region_total_bases[r];
@@ -190,10 +191,10 @@ static int32_t wants_to_attack_core(int32_t faction_id, int32_t faction_id_tgt, 
     score -= integrity;
     int32_t morale = f1.SE_morale_pending;
     morale = morale < -4 ? -4 : (morale > 4 ? 4 : morale);
-    int32_t mine = MFactions[faction_id].rule_morale + morale + 16;
+    int32_t mine = game().mfactions[faction_id].rule_morale + morale + 16;
     morale = f2.SE_morale_pending;
     morale = morale < -4 ? -4 : (morale > 4 ? 4 : morale);
-    int32_t theirs = MFactions[faction_id_tgt].rule_morale + morale + 16;
+    int32_t theirs = game().mfactions[faction_id_tgt].rule_morale + morale + 16;
     if (regions == 0 && score <= 0 && !(f1.diplo_status[faction_id_tgt] & 0x20000000)) return 1;
     if (mine * attack * 6 / (theirs * defense) < score + 6) return 0;
     return 1;
@@ -230,8 +231,8 @@ int32_t GAMEAPI great_beelzebub(int32_t faction_id, int32_t is_aggressive) {
     if (!is_human(faction_id) || FactionRankings[7] != faction_id) return 0;
     int32_t min_bases = (CurrentTurn + 25) / 50;
     if (min_bases < 4) min_bases = 4;
-    if (Factions[faction_id].base_count > min_bases &&
-        (Factions[faction_id].diff_level > 1 || (GameRules & 0x40) || is_aggressive))
+    if (game().factions[faction_id].base_count > min_bases &&
+        (game().factions[faction_id].diff_level > 1 || (GameRules & 0x40) || is_aggressive))
         return 1;
     return 0;
 }
@@ -243,7 +244,7 @@ void GAMEAPI comm_check(int32_t faction_id, int32_t faction_id_with) {
     if (!(humans & (1u << faction_id))) return;
     uint32_t s = status(faction_id, faction_id_with);
     uint32_t commlink = s & 8;
-    int32_t spoke = Factions[faction_id].diplo_spoke[faction_id_with];
+    int32_t spoke = game().factions[faction_id].diplo_spoke[faction_id_with];
     if (commlink && !(s & 0x2000) && spoke >= 0 && CurrentTurn - spoke < 16) return;
     bool with_human = (humans & (1u << faction_id_with)) != 0;
     if (!MultiplayerActive) {
@@ -296,7 +297,7 @@ void GAMEAPI pact_attacks(int32_t faction_id, int32_t faction_id_tgt) {
 }
 
 void GAMEAPI enemies_war(int32_t faction_id, int32_t faction_id_with) {
-    Faction& f1 = Factions[faction_id];
+    Faction& f1 = game().factions[faction_id];
     if (f1.diplo_status[faction_id_with] & 0x10) return;
     int32_t v = CurrentPlayerFaction;
     const char* label = nullptr;
@@ -323,7 +324,7 @@ void GAMEAPI enemies_war(int32_t faction_id, int32_t faction_id_with) {
     treaty_on(faction_id, faction_id_with, 0x10);
     uint32_t& mine = f1.diplo_status[faction_id_with];
     if (!(mine & 0x40000000)) trade_maps(faction_id, faction_id_with);
-    Faction& f2 = Factions[faction_id_with];
+    Faction& f2 = game().factions[faction_id_with];
     uint32_t& theirs = f2.diplo_status[faction_id];
     if ((mine & 0x20) && !(mine & 0x40000) && DiffLevel > 1 && game_rand() % DiffLevel != 0) {
         f1.diplo_agenda[faction_id_with] &= 0xFFFFF3FF;
@@ -405,8 +406,8 @@ void GAMEAPI enemies_team_up(int32_t faction_id, int32_t faction_id_with, int32_
             say_noun(0, faction_id);
             NetMsg_pop(&NetMsg, "TEAM", 5000, 0, nullptr);
         }
-        Factions[faction_id_tgt].diplo_spoke[faction_id_with] = CurrentTurn;
-        Factions[faction_id_tgt].diplo_spoke[faction_id] = CurrentTurn;
+        game().factions[faction_id_tgt].diplo_spoke[faction_id_with] = CurrentTurn;
+        game().factions[faction_id_tgt].diplo_spoke[faction_id] = CurrentTurn;
         treaty_on(faction_id, faction_id_tgt, 0x10);
         return;
     }
@@ -421,15 +422,15 @@ void GAMEAPI enemies_team_up(int32_t faction_id, int32_t faction_id_with, int32_
 // got the tech from) is a pact partner, nor a treaty partner it has little friction with.
 // friction_of is the faction whose friction (and source) the original reads.
 static bool tech_tradeable(int32_t owner, int32_t tech_id, uint32_t pact_status, int32_t friction_of) {
-    int32_t src = Factions[owner].tech_trade_source[tech_id];
+    int32_t src = game().factions[owner].tech_trade_source[tech_id];
     if (src != 0 && (diplo_status_raw(owner, src) & 1)) return false;
     if (!(diplo_status_raw(owner, src) & 2)) return true;
     // BUG(original): when faction_id gives a tech, the friction is read with faction_id_with's
     // source of the tech (friction_of is the receiver in both directions).
-    int32_t src2 = Factions[friction_of].tech_trade_source[tech_id];
+    int32_t src2 = game().factions[friction_of].tech_trade_source[tech_id];
     const int32_t* friction = reinterpret_cast<const int32_t*>(
-        reinterpret_cast<const uint8_t*>(&Factions[0].diplo_friction[0]) + friction_of * (int32_t)sizeof(Faction) +
-        (owner == friction_of ? src : src2) * 4);
+        reinterpret_cast<const uint8_t*>(&game().factions[0].diplo_friction[0]) +
+        friction_of * (int32_t)sizeof(Faction) + (owner == friction_of ? src : src2) * 4);
     return *friction >= ((pact_status & 1) ? 6 : 16);
 }
 
@@ -464,9 +465,11 @@ void GAMEAPI enemies_trade_tech(int32_t faction_id, int32_t faction_id_with) {
         return;
     }
     if (!(status(faction_id, faction_id_with) & 1) || !great_satan(FactionRankings[7], 0)) return;
-    if (tech_for_1 >= 0 && Factions[RankingFactionIDUnk1].tech_ranking >= Factions[faction_id_with].tech_ranking)
+    if (tech_for_1 >= 0 &&
+        game().factions[RankingFactionIDUnk1].tech_ranking >= game().factions[faction_id_with].tech_ranking)
         tech_achieved(faction_id, tech_for_1, faction_id_with, 0);
-    if (tech_for_2 >= 0 && Factions[RankingFactionIDUnk1].tech_ranking >= Factions[faction_id].tech_ranking)
+    if (tech_for_2 >= 0 &&
+        game().factions[RankingFactionIDUnk1].tech_ranking >= game().factions[faction_id].tech_ranking)
         tech_achieved(faction_id_with, tech_for_2, faction_id, 0);
 }
 
@@ -478,10 +481,11 @@ void GAMEAPI enemies_treaty(int32_t faction_id, int32_t faction_id_with, int32_t
     bool truce = false;
     if (!(s & 2) && (s & 0x14)) {
         truce = true;
-        if (!(s & 0x60) && !(status(p2, p1) & 0x60) && (Factions[p2].ranking < 6 || Factions[p1].ranking < 6)) {
+        if (!(s & 0x60) && !(status(p2, p1) & 0x60) &&
+            (game().factions[p2].ranking < 6 || game().factions[p1].ranking < 6)) {
             int32_t level = (GameRules & 0x40) ? 5 : DiffLevel;
             int32_t r = game_rand() % 16;
-            if (Factions[p1].AI_fight + Factions[p2].AI_fight - level + 8 <= r) truce = false;
+            if (game().factions[p1].AI_fight + game().factions[p2].AI_fight - level + 8 <= r) truce = false;
         }
     }
     if (truce) {
@@ -538,9 +542,10 @@ void GAMEAPI enemies_treaty(int32_t faction_id, int32_t faction_id_with, int32_t
     }
     // A treaty: a pact against a common enemy (an aggressive leader, or a vendetta with a faction
     // ranked above one of them), unless pacts with others outnumber the enemy's blemishes.
-    if ((FactionRankings[7] != p1 || Factions[p2].ranking < 5) && (FactionRankings[7] != p2 || Factions[p1].ranking < 5) &&
-        !(s & 0x40020) && !(status(p2, p1) & 0x40020) && Factions[p1].major_atrocities == 0 &&
-        Factions[p2].major_atrocities == 0) {
+    if ((FactionRankings[7] != p1 || game().factions[p2].ranking < 5) &&
+        (FactionRankings[7] != p2 || game().factions[p1].ranking < 5) && !(s & 0x40020) &&
+        !(status(p2, p1) & 0x40020) && game().factions[p1].major_atrocities == 0 &&
+        game().factions[p2].major_atrocities == 0) {
         int32_t pacts = 0;
         for (int32_t i = 1; i < 8; i++) {
             if (i == p1 || i == p2) continue;
@@ -548,11 +553,11 @@ void GAMEAPI enemies_treaty(int32_t faction_id, int32_t faction_id_with, int32_t
             if (!a8 && !(status(p2, i) & 8)) continue;
             if (!(a8 && (status(p2, i) & 8)) && !great_satan(i, 0)) continue;
             if ((status(p1, i) & 1) || (status(p2, i) & 1)) {
-                int32_t rank = Factions[i].ranking;
-                if (rank >= Factions[p1].ranking || rank >= Factions[p2].ranking) pacts++;
+                int32_t rank = game().factions[i].ranking;
+                if (rank >= game().factions[p1].ranking || rank >= game().factions[p2].ranking) pacts++;
                 continue;
             }
-            if (Factions[i].diff_level == 0) continue;
+            if (game().factions[i].diff_level == 0) continue;
             bool common_enemy = false;
             if (great_satan(i, 0)) {
                 common_enemy = true;
@@ -561,13 +566,13 @@ void GAMEAPI enemies_treaty(int32_t faction_id, int32_t faction_id_with, int32_t
                 if ((a & 7) || (status(p2, i) & 7)) continue;
                 if (status(p1, p2) & 1)
                     common_enemy = true;
-                else if ((a & 0x10) &&
-                         (Factions[p1].ranking < Factions[i].ranking || Factions[p2].ranking < Factions[i].ranking))
+                else if ((a & 0x10) && (game().factions[p1].ranking < game().factions[i].ranking ||
+                                        game().factions[p2].ranking < game().factions[i].ranking))
                     common_enemy = true;
                 if (!common_enemy) continue;
             }
             if (status(p1, p2) & 1) return;
-            int32_t limit = great_satan(i, 0) ? Factions[i].integrity_blemishes : 0;
+            int32_t limit = great_satan(i, 0) ? game().factions[i].integrity_blemishes : 0;
             if (pacts > limit) break;
             treaty_on(p1, p2, 1);
             enemies_team_up(p1, p2, i);
@@ -605,13 +610,13 @@ void GAMEAPI encounter(int32_t faction_id, int32_t faction_id_with, int32_t x, i
         if (is_native) interlude(0x2B, 0, 1, 0);
         return;
     }
-    bool on_map = y >= 0 && y < MapAreaY && x >= 0 && x < MapAreaX;
+    bool on_map = y >= 0 && y < game().map.y && x >= 0 && x < game().map.x;
     int32_t v = CurrentPlayerFaction;
     if (is_alien(p1) && is_alien(p2)) {
         treaty_on(p1, p2, 0x80000008);
         if (on_map) treaty_on(p1, p2, 0x40000000);
         StrBuffer[0] = 0;
-        crt_strcat(StrBuffer, MFactions[p1].search_key);
+        crt_strcat(StrBuffer, game().mfactions[p1].search_key);
         win32::CharUpperA(StrBuffer);
         if (!crt_strcmp(StrBuffer, "CARETAKE")) {
             if (p1 == v) interlude(0x27, 0, 1, 0);
@@ -683,7 +688,7 @@ void GAMEAPI encounter(int32_t faction_id, int32_t faction_id_with, int32_t x, i
     if (on_map) treaty_on(p1, p2, 0x40000000);
     if (!is_human(p1) && !is_human(p2) && (((CurrentTurn + p1 + p2) & 3) == 0 || !(s & 8)) &&
         (!is_alien(p1) || !is_alien(p2))) {
-        if ((Factions[p1].diplo_agenda[p2] & 0x2000) && (!is_alien(p1) || !is_alien(p2))) {
+        if ((game().factions[p1].diplo_agenda[p2] & 0x2000) && (!is_alien(p1) || !is_alien(p2))) {
             enemies_trade_tech(p1, p2);
             return;
         }
@@ -708,19 +713,19 @@ int32_t GAMEAPI territory(int32_t faction_id, int32_t faction_id_with, int32_t f
     int32_t tolerated[64];
     for (int32_t r = 0; r < 64; r++) {
         tolerated[r] = 0;
-        if (base_id == 0 && Factions[faction_id_with].integrity_blemishes < 5) {
+        if (base_id == 0 && game().factions[faction_id_with].integrity_blemishes < 5) {
             for (int32_t i = 1; i < 8; i++) {
                 if (i != faction_id && i != faction_id_with && (status(faction_id, i) & 0x10) &&
-                    (status(faction_id_with, i) & 0x10) && Factions[i].region_total_bases[r]) {
+                    (status(faction_id_with, i) & 0x10) && game().factions[i].region_total_bases[r]) {
                     tolerated[r] = 1;
                     break;
                 }
             }
         }
     }
-    if (VehCount <= 0) return count;
-    for (int32_t i = 0; i < VehCount; i++) {
-        VEH& veh = Vehs[i];
+    if (game().veh_count <= 0) return count;
+    for (int32_t i = 0; i < game().veh_count; i++) {
+        VEH& veh = game().vehs[i];
         veh.state &= ~0x400u;
         if (veh.faction_id != faction_id_with) continue;
         uint8_t plan = (uint8_t)Units[veh.unit_id].plan;
@@ -735,9 +740,9 @@ int32_t GAMEAPI territory(int32_t faction_id, int32_t faction_id_with, int32_t f
         veh.state |= 0x400;
         if (map_tile(veh.x, veh.y)->items & 0x81608850) count++;
         if (!(flags & 1)) continue;
-        int32_t dx = std::abs(Bases[base_id].x - veh.x);
-        if (!(MapToggleFlat & 1) && dx > MapHalfX) dx = MapAreaX - dx;
-        int32_t dist = (std::abs(Bases[base_id].y - veh.y) + dx) & ~1;
+        int32_t dx = std::abs(game().bases[base_id].x - veh.x);
+        if (!(game().map.flat & 1) && dx > game().map.half_x) dx = game().map.x - dx;
+        int32_t dist = (std::abs(game().bases[base_id].y - veh.y) + dx) & ~1;
         if (dist <= 4 || (status(faction_id, faction_id_with) & 0xC20) || DiploFriction > 12) {
             if (count_out && (veh.flags & 1)) (*count_out)++;
             veh.flags |= 3;
@@ -747,7 +752,7 @@ int32_t GAMEAPI territory(int32_t faction_id, int32_t faction_id_with, int32_t f
                 count += ((status(faction_id, faction_id_with) & 2) << 1) | 1;
         }
     }
-    if (count) Factions[faction_id].player_flags |= 0x10000;
+    if (count) game().factions[faction_id].player_flags |= 0x10000;
     return count;
 }
 
@@ -758,7 +763,7 @@ void GAMEAPI atrocity(int32_t faction_id, int32_t faction_id_vs, int32_t count_i
     uint32_t& victim = status(faction_id_vs, f);
     uint32_t was_victim = victim & 0x40000;
     victim |= 0x40020;
-    Factions[faction_id_vs].diplo_agenda[f] |= 4;
+    game().factions[faction_id_vs].diplo_agenda[f] |= 4;
     if (ProposalPassCount[9] < ProposalPassCount[8]) return;  // atrocity prohibitions repealed
     if (SunspotDuration > 0) {
         if (f == CurrentPlayerFaction) NetMsg_pop(&NetMsg, "ATROCITYSPOTS", 5000, 0, nullptr);
@@ -780,7 +785,7 @@ void GAMEAPI atrocity(int32_t faction_id, int32_t faction_id_vs, int32_t count_i
                 if (!(theirs & 0x20)) {
                     if (great_satan(f, 0)) {
                         int32_t r = game_rand() % 16;
-                        declare = r - Factions[f].atrocities <= 8;
+                        declare = r - game().factions[f].atrocities <= 8;
                     } else {
                         int32_t m = (8 - ((GameRules & 0x40) ? 5 : DiffLevel)) * 2;
                         int32_t r = m - 1 > 0 ? game_rand() % m : 0;
@@ -795,13 +800,13 @@ void GAMEAPI atrocity(int32_t faction_id, int32_t faction_id_vs, int32_t count_i
                     }
                     treaty_on(f, i, 0x10);
                     theirs |= 0x40;
-                    Factions[i].diplo_merc[f] = 50;
+                    game().factions[i].diplo_merc[f] = 50;
                 }
             }
         }
         if (!(theirs & 0x10)) treaty_on(i, f, 0x400000);
     }
-    Faction& fac = Factions[f];
+    Faction& fac = game().factions[f];
     if (count_it || fac.atrocities == 0) {
         fac.atrocities++;
         if (!(status(f, faction_id_vs) & 0x40000)) fac.integrity_blemishes++;
@@ -814,7 +819,7 @@ void GAMEAPI atrocity(int32_t faction_id, int32_t faction_id_vs, int32_t count_i
     // BUG(original): the "victim is an AI" test uses the loop counter (8) instead of the victim:
     // always true.
     if (is_human(f) && !(FactionStatus[0] & (1u << i)) && !was_victim && atrocities >= 5)
-        Factions[faction_id_vs].player_flags |= 0x1000000;
+        game().factions[faction_id_vs].player_flags |= 0x1000000;
     say_leader(0, f);
     say_leader(2, faction_id_vs);
     parse_num(0, fac.atrocities * 10);
@@ -833,10 +838,10 @@ void GAMEAPI major_atrocity(int32_t faction_id, int32_t faction_id_vs) {
     const int32_t f = faction_id;
     if (faction_id_vs >= 0) {
         status(faction_id_vs, f) |= 0xC0020;
-        Factions[faction_id_vs].diplo_agenda[f] |= 4;
+        game().factions[faction_id_vs].diplo_agenda[f] |= 4;
     }
     if (ProposalPassCount[9] < ProposalPassCount[8]) return;
-    Faction& fac = Factions[f];
+    Faction& fac = game().factions[f];
     if (faction_id_vs < 0) {
         fac.integrity_blemishes += 2;
     } else if (!(status(f, faction_id_vs) & 0x80000)) {
@@ -852,7 +857,7 @@ void GAMEAPI major_atrocity(int32_t faction_id, int32_t faction_id_vs) {
         if (status(f, i) & 1) pact_ends(f, i);
         treaty_on(i, f, 0x18);
         status(i, f) |= 0x40;
-        Factions[i].diplo_merc[f] = 50;
+        game().factions[i].diplo_merc[f] = 50;
         fac.diplo_spoke[i] = CurrentTurn;
         say_leader(0, i);
         say_noun(2, i);
@@ -873,7 +878,7 @@ int32_t GAMEAPI break_treaty(int32_t faction_id, int32_t faction_id_with, int32_
     say_leader(0, faction_id_with);
     say_noun(2, faction_id_with);
     parse_says(3, get_pact_hood(faction_id, faction_id_with), -1, -1);
-    parse_says(4, MFactions[faction_id_with].adj_name_faction, -1, -1);
+    parse_says(4, game().mfactions[faction_id_with].adj_name_faction, -1, -1);
     s = status(faction_id, faction_id_with);
     if (s & 1) {
         NetMsg_pop(&NetMsg, "BREAKINGPACT", -5000, 0, "break_sm.pcx");
@@ -889,12 +894,13 @@ int32_t GAMEAPI break_treaty(int32_t faction_id, int32_t faction_id_with, int32_
 
 void GAMEAPI trade_maps(int32_t faction_id, int32_t faction_id_with) {
     DiploMapMsg = 0;
-    uint32_t a = Factions[faction_id].traded_maps | (1u << faction_id_with) | Factions[faction_id_with].traded_maps;
-    Factions[faction_id].traded_maps = a;
-    Factions[faction_id_with].traded_maps |= (1u << faction_id) | a;
+    uint32_t a = game().factions[faction_id].traded_maps | (1u << faction_id_with) |
+                 game().factions[faction_id_with].traded_maps;
+    game().factions[faction_id].traded_maps = a;
+    game().factions[faction_id_with].traded_maps |= (1u << faction_id) | a;
     uint8_t bit1 = (uint8_t)(1 << faction_id), bit2 = (uint8_t)(1 << faction_id_with);
-    for (int32_t i = 0; i < MapAreaTiles; i++) {
-        MAP& sq = MapTiles[i];
+    for (int32_t i = 0; i < game().map.tile_count; i++) {
+        MAP& sq = game().map.tiles[i];
         uint8_t vis = sq.visibility;
         if (vis & bit1) {
             sq.visibility = vis | bit2;
@@ -907,10 +913,10 @@ void GAMEAPI trade_maps(int32_t faction_id, int32_t faction_id_with) {
                 sq.visible_items[faction_id - 1] |= sq.visible_items[faction_id_with - 1] & sq.items;
         }
     }
-    for (int32_t i = 0; i < BaseCount; i++) {
-        if ((Bases[i].visibility & bit1) || Bases[i].faction_id == faction_id)
+    for (int32_t i = 0; i < game().base_count; i++) {
+        if ((game().bases[i].visibility & bit1) || game().bases[i].faction_id == faction_id)
             spot_base(i, faction_id_with);
-        else if ((Bases[i].visibility & bit2) || Bases[i].faction_id == faction_id_with)
+        else if ((game().bases[i].visibility & bit2) || game().bases[i].faction_id == faction_id_with)
             spot_base(i, faction_id);
     }
     if (faction_id == CurrentPlayerFaction || faction_id_with == CurrentPlayerFaction) {
@@ -923,35 +929,35 @@ void GAMEAPI trade_maps(int32_t faction_id, int32_t faction_id_with) {
 int32_t GAMEAPI value_of_base(int32_t base_id, int32_t faction_id, int32_t faction_id_with, int32_t is_threat,
                               int32_t is_gift) {
     if (base_id < 0) return -1;
-    BASE& base = Bases[base_id];
+    BASE& base = game().bases[base_id];
     int32_t dist = vulnerable(faction_id, base.x, base.y);
     if (dist < 1) return -1;
     int32_t region = map_tile(base.x, base.y)->region;
     for (int32_t k = 1; k < 169; k++) {
         int32_t x = map_wrap_x(TableOffsetX[k] + base.x);
         int32_t y = TableOffsetY[k] + base.y;
-        if (y < 0 || y >= MapAreaY || x < 0 || x >= MapAreaX) continue;
+        if (y < 0 || y >= game().map.y || x < 0 || x >= game().map.x) continue;
         int32_t b = base_at(x, y);
         if (b < 0) continue;
-        if (Bases[b].faction_id == faction_id) {
+        if (game().bases[b].faction_id == faction_id) {
             if (map_tile(x, y)->region == region) dist--;
             break;
         }
         if (map_tile(x, y)->region == region) {
-            if (Bases[b].faction_id != faction_id_with) break;
+            if (game().bases[b].faction_id != faction_id_with) break;
             dist++;
         }
     }
     int32_t veh_id = stack_fix(veh_at(base.x, base.y));
-    int32_t credits = Factions[faction_id_with].energy_credits;
-    if (Factions[faction_id].energy_credits > credits) credits = Factions[faction_id].energy_credits;
+    int32_t credits = game().factions[faction_id_with].energy_credits;
+    if (game().factions[faction_id].energy_credits > credits) credits = game().factions[faction_id].energy_credits;
     int32_t pop = base.pop_size < 3 ? 3 : base.pop_size;
     int32_t value = (credits + 1000) / (dist + 4) * pop;
     if (value < 100) value = 100;
     MAP* sq = map_tile(base.x, base.y);
     if (!(sq->items & 2) || (sq->val2 & 0xF) >= 8) value /= 2;
-    uint8_t bases_with = Factions[faction_id_with].region_total_bases[region];
-    uint8_t bases_own = Factions[faction_id].region_total_bases[region];
+    uint8_t bases_with = game().factions[faction_id_with].region_total_bases[region];
+    uint8_t bases_own = game().factions[faction_id].region_total_bases[region];
     if (!bases_with) value *= 2;
     if (bases_own == 1) {
         if (!bases_with) value *= 2;
@@ -974,29 +980,29 @@ int32_t GAMEAPI value_of_base(int32_t base_id, int32_t faction_id, int32_t facti
     }
     for (int32_t i = 0; i < 64; i++)
         if (SecretProjects[i] == base_id) value += Facility[70 + i].cost * 25;
-    for (int32_t i = stack_top(veh_id); i >= 0; i = Vehs[i].next_veh_id_stack)
-        if (Vehs[i].faction_id == faction_id) value += Units[Vehs[i].unit_id].cost * 2;
-    if (!crt_strcmp(MFactions[faction_id].filename, "BELIEVE")) value *= 2;
+    for (int32_t i = stack_top(veh_id); i >= 0; i = game().vehs[i].next_veh_id_stack)
+        if (game().vehs[i].faction_id == faction_id) value += Units[game().vehs[i].unit_id].cost * 2;
+    if (!crt_strcmp(game().mfactions[faction_id].filename, "BELIEVE")) value *= 2;
     if (is_objective(base_id)) value <<= 2;
     return value;
 }
 
 void GAMEAPI give_a_base(int32_t base_id, int32_t faction_id) {
-    BASE& base = Bases[base_id];
+    BASE& base = game().bases[base_id];
     int32_t bx = base.x, by = base.y;
     uint8_t old = base.faction_id;
     for (int32_t k = 0; k < 21; k++) {
         int32_t x = map_wrap_x(TableOffsetX[k] + bx);
         int32_t y = TableOffsetY[k] + by;
-        if (y < 0 || y >= MapAreaY || x < 0 || x >= MapAreaX) continue;
+        if (y < 0 || y >= game().map.y || x < 0 || x >= game().map.x) continue;
         map_tile(x, y)->visibility |= (uint8_t)(1 << faction_id);
         synch_bit(x, y, faction_id);
     }
-    for (int32_t i = VehCount - 1; i >= 0; i--) {
-        VEH& veh = Vehs[i];
+    for (int32_t i = game().veh_count - 1; i >= 0; i--) {
+        VEH& veh = game().vehs[i];
         if (veh.faction_id != old) continue;
         int32_t dx = std::abs(veh.x - bx);
-        if (!(MapToggleFlat & 1) && dx > MapHalfX) dx = MapAreaX - dx;
+        if (!(game().map.flat & 1) && dx > game().map.half_x) dx = game().map.x - dx;
         int32_t dy = std::abs(veh.y - by);
         dx = std::abs(dx);
         dy = std::abs(dy);
@@ -1012,19 +1018,19 @@ void GAMEAPI give_a_base(int32_t base_id, int32_t faction_id) {
             int32_t nb = base_find_faction(bx, by, old);
             base.faction_id = old;
             if (nb >= 0) {
-                int32_t ndx = std::abs(Bases[nb].x - bx);
-                if (!(MapToggleFlat & 1) && ndx > MapHalfX) ndx = MapAreaX - ndx;
-                if ((std::abs(Bases[nb].y - by) + ndx) & ~1) {
-                    stack_put(stack_veh(i, 1), Bases[nb].x, Bases[nb].y);
+                int32_t ndx = std::abs(game().bases[nb].x - bx);
+                if (!(game().map.flat & 1) && ndx > game().map.half_x) ndx = game().map.x - ndx;
+                if ((std::abs(game().bases[nb].y - by) + ndx) & ~1) {
+                    stack_put(stack_veh(i, 1), game().bases[nb].x, game().bases[nb].y);
                     veh.order = 0;
                     if (veh.home_base_id == base_id) veh.home_base_id = (int16_t)nb;
                     continue;
                 }
             }
         }
-        Factions[old].units_active[veh.unit_id]--;
+        game().factions[old].units_active[veh.unit_id]--;
         veh.faction_id = (uint8_t)faction_id;
-        Factions[faction_id].units_active[veh.unit_id]++;
+        game().factions[faction_id].units_active[veh.unit_id]++;
         veh.home_base_id = (int16_t)base_id;
         veh.moves_spent = 0;
         if (veh.order != 2) veh.order = 0;
@@ -1034,7 +1040,7 @@ void GAMEAPI give_a_base(int32_t base_id, int32_t faction_id) {
     base.minerals_accumulated_2 = 0;
     base.minerals_accumulated = 0;
     for (int32_t k = 0; k <= base.queue_size; k++)
-        if (base.queue_items[k] >= 0) Factions[old].units_queue[base.queue_items[k]]--;
+        if (base.queue_items[k] >= 0) game().factions[old].units_queue[base.queue_items[k]]--;
     base.queue_size = 0;
     base.production_id_last = -0x45;
     base.queue_items[0] = -0x45;
@@ -1054,8 +1060,8 @@ void GAMEAPI give_a_base(int32_t base_id, int32_t faction_id) {
     }
     spot_base(base_id, old);
     reset_territory();
-    for (int32_t i = VehCount - 1; i >= 0; i--)
-        if (i < VehCount && Vehs[i].faction_id == old && Vehs[i].home_base_id == base_id) kill(i);
+    for (int32_t i = game().veh_count - 1; i >= 0; i--)
+        if (i < game().veh_count && game().vehs[i].faction_id == old && game().vehs[i].home_base_id == base_id) kill(i);
     owner_set(bx, by, faction_id);
     draw_tile_fixup(bx, by, 1, 2);
     set_base(base_id);
@@ -1064,46 +1070,46 @@ void GAMEAPI give_a_base(int32_t base_id, int32_t faction_id) {
 
 // ---- small text helpers of the diplomacy dialogs ------------------------------------------------
 
-const char* GAMEAPI get_adjective_leader(int32_t faction_id) { return MFactions[faction_id].adj_leader; }
+const char* GAMEAPI get_adjective_leader(int32_t faction_id) { return game().mfactions[faction_id].adj_leader; }
 const char* GAMEAPI get_adjective_insult_leader(int32_t faction_id) {
-    return MFactions[faction_id].adj_insult_leader;
+    return game().mfactions[faction_id].adj_insult_leader;
 }
-const char* GAMEAPI get_adjective_faction(int32_t faction_id) { return MFactions[faction_id].adj_faction; }
+const char* GAMEAPI get_adjective_faction(int32_t faction_id) { return game().mfactions[faction_id].adj_faction; }
 const char* GAMEAPI get_adjective_insult_faction(int32_t faction_id) {
-    return MFactions[faction_id].adj_insult_faction;
+    return game().mfactions[faction_id].adj_insult_faction;
 }
 const char* GAMEAPI get_insult_leader(int32_t faction_id) {
     PluralDefault = 0;
-    GenderDefault = MFactions[faction_id].is_leader_female;
-    return MFactions[faction_id].insult_leader;
+    GenderDefault = game().mfactions[faction_id].is_leader_female;
+    return game().mfactions[faction_id].insult_leader;
 }
 int32_t GAMEAPI bad_reg(int32_t region) { return (region & 0x3F) == 0x3F || (region & 0x3F) == 0; }
 uint32_t GAMEAPI has_agenda(int32_t faction_id, int32_t faction_id_with, uint32_t agenda) {
-    return Factions[faction_id].diplo_agenda[faction_id_with] & agenda;
+    return game().factions[faction_id].diplo_agenda[faction_id_with] & agenda;
 }
 int32_t GAMEAPI round_down(int32_t value, int32_t step) { return value / step * step; }
 
 // ---- first-half callee (0x53A780), needed by the AI strategy ----------------------------------
 
 int32_t GAMEAPI contiguous(int32_t faction_id, int32_t faction_id_with, int32_t region, int32_t a4) {
-    if (region != 0 &&
-        (!Factions[faction_id].region_total_bases[region] || !Factions[faction_id_with].region_total_bases[region]))
+    if (region != 0 && (!game().factions[faction_id].region_total_bases[region] ||
+                        !game().factions[faction_id_with].region_total_bases[region]))
         return 0;
-    for (int32_t i = 0; i < MapAreaTiles; i++) MapTiles[i].unk_1 = 0;
-    for (int32_t i = 0; i < BaseCount; i++) {
-        if (Bases[i].faction_id != faction_id) continue;
-        MAP* sq = map_tile(Bases[i].x, Bases[i].y);
+    for (int32_t i = 0; i < game().map.tile_count; i++) game().map.tiles[i].unk_1 = 0;
+    for (int32_t i = 0; i < game().base_count; i++) {
+        if (game().bases[i].faction_id != faction_id) continue;
+        MAP* sq = map_tile(game().bases[i].x, game().bases[i].y);
         int32_t r = sq->region;
         if ((region != 0 && r != region) || sq->unk_1) continue;
-        Path_territory(&Paths, Bases[i].x, Bases[i].y, r, faction_id);
-        for (int32_t j = 0; j < BaseCount; j++) {
-            if (Bases[j].faction_id != faction_id_with) continue;
-            MAP* sq2 = map_tile(Bases[j].x, Bases[j].y);
+        Path_territory(&Paths, game().bases[i].x, game().bases[i].y, r, faction_id);
+        for (int32_t j = 0; j < game().base_count; j++) {
+            if (game().bases[j].faction_id != faction_id_with) continue;
+            MAP* sq2 = map_tile(game().bases[j].x, game().bases[j].y);
             if (sq2->region != r || sq2->unk_1) continue;
-            Path_territory(&Paths, Bases[j].x, Bases[j].y, r, faction_id_with);
+            Path_territory(&Paths, game().bases[j].x, game().bases[j].y, r, faction_id_with);
             // BUG(original)? faction_id is passed as the unit id.
-            if (Path_find(&Paths, Bases[i].x, Bases[i].y, Bases[j].x, Bases[j].y, faction_id, faction_id_with,
-                          (a4 ? 0xC00 : 0) | 0x201, -1) >= 0)
+            if (Path_find(&Paths, game().bases[i].x, game().bases[i].y, game().bases[j].x, game().bases[j].y,
+                          faction_id, faction_id_with, (a4 ? 0xC00 : 0) | 0x201, -1) >= 0)
                 return 1;
         }
     }
@@ -1115,14 +1121,14 @@ int32_t GAMEAPI at_climax(int32_t faction_id) {
     if (is_human(faction_id) || (GameState & 1) || DiffLevel == 0 || !climactic_battle()) return 0;
     if (aah_ooga(faction_id, faction_id)) return 1;
     for (int32_t i = 1; i < 8; i++) {
-        if (i == faction_id || Factions[i].corner_market_turn <= CurrentTurn) continue;
+        if (i == faction_id || game().factions[i].corner_market_turn <= CurrentTurn) continue;
         if (!(status(faction_id, i) & 1) || !(GameRules & 0x1000)) return 1;
     }
     int32_t mine = 0, theirs = 0;
-    for (int32_t i = 0; i < BaseCount; i++) {
-        if (Bases[i].queue_items[0] != -FAC_ASCENT_TO_TRANSCENDENCE) continue;
-        int32_t minerals = Bases[i].minerals_accumulated;
-        if (Bases[i].faction_id == faction_id) {
+    for (int32_t i = 0; i < game().base_count; i++) {
+        if (game().bases[i].queue_items[0] != -FAC_ASCENT_TO_TRANSCENDENCE) continue;
+        int32_t minerals = game().bases[i].minerals_accumulated;
+        if (game().bases[i].faction_id == faction_id) {
             if (mine <= minerals) mine = minerals;
         } else if (theirs <= minerals) {
             theirs = minerals;

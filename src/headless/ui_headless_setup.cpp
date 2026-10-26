@@ -3,6 +3,7 @@
 // data (diplomacy and council state, monuments, a text buffer); that part is reproduced exactly.
 #ifndef SMACX_HYBRID
 #include "engine/crt.h"
+#include "engine/game_state.h"
 #include "engine/strings.h"
 #include "engine/ui_bridge.h"
 #include "engine/zoc.h"
@@ -45,11 +46,11 @@ void GAMEAPI mon_killed_faction(int32_t faction_id, int32_t killed_id) {
     e.achieved = 1;
     e.faction_id = faction_id;
     m.latest_event_id = slot;
-    if (!(MFactions[faction_id].rule_flags & 0x80) && faction_id == CurrentPlayerFaction) monument(1);
+    if (!(game().mfactions[faction_id].rule_flags & 0x80) && faction_id == CurrentPlayerFaction) monument(1);
 }
 
 char* GAMEAPI get_his_her(int32_t faction_id, int32_t mode) {
-    crt_strcpy(HisHerBuffer, label_get((MFactions[faction_id].is_leader_female != 0) + 207));
+    crt_strcpy(HisHerBuffer, label_get((game().mfactions[faction_id].is_leader_female != 0) + 207));
     if (mode == 1) {
         char first[2] = {HisHerBuffer[0], 0};
         win32::CharUpperA(first);

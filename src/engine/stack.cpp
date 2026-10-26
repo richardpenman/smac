@@ -6,6 +6,7 @@
 #include "engine/base.h"
 #include "engine/design.h"
 #include "engine/diplomacy.h"
+#include "engine/game_state.h"
 #include "engine/goals.h"
 #include "engine/map.h"
 #include "engine/turn.h"
@@ -13,7 +14,7 @@
 #include "engine/veh.h"
 
 namespace {
-bool in_map(int32_t x, int32_t y) { return y >= 0 && y < MapAreaY && x >= 0 && x < MapAreaX; }
+bool in_map(int32_t x, int32_t y) { return y >= 0 && y < game().map.y && x >= 0 && x < game().map.x; }
 
 // The faction's view of the tile items: visible_items[faction_id - 1]. The original also reads it
 // for faction 0, which aliases the landmarks field.
@@ -24,7 +25,8 @@ uint32_t& tile_view(MAP* sq, int32_t faction_id) {
 // Whether newly seen tiles of faction_id are highlighted (the viewer, not in the scenario editor
 // or omniscient view).
 bool marks_discovery(int32_t faction_id) {
-    return faction_id == CurrentPlayerFaction && !(GameState & 0x80) && !(Factions[faction_id].player_flags & 0x200);
+    return faction_id == CurrentPlayerFaction && !(GameState & 0x80) &&
+           !(game().factions[faction_id].player_flags & 0x200);
 }
 
 // Body of spot_tile for a tile on the map (inlined in many places of the original).
@@ -32,7 +34,7 @@ void spot_tile_in_map(int32_t x, int32_t y, int32_t faction_id) {
     MAP* sq = map_tile(x, y);
     uint8_t bit = (uint8_t)(1 << (faction_id & 31));
     if (faction_id == CurrentPlayerFaction && !(sq->visibility & bit) && !(GameState & 0x80) &&
-        !(Factions[faction_id].player_flags & 0x200)) {
+        !(game().factions[faction_id].player_flags & 0x200)) {
         sq->landmarks |= 0x400000;
         GameDrawState |= 1;
     }
@@ -42,23 +44,23 @@ void spot_tile_in_map(int32_t x, int32_t y, int32_t faction_id) {
 
 // faction_id sees every vehicle of the stack (bottom loop of spot_stack, inlined in the original).
 void spot_stack_vehs(int32_t veh_id, int32_t faction_id) {
-    for (int32_t v = stack_top(veh_id); v >= 0; v = Vehs[v].next_veh_id_stack) {
-        Vehs[v].visibility |= (uint8_t)(1 << (faction_id & 31));
-        if (faction_id) Vehs[v].flags &= 0xFBBF;
+    for (int32_t v = stack_top(veh_id); v >= 0; v = game().vehs[v].next_veh_id_stack) {
+        game().vehs[v].visibility |= (uint8_t)(1 << (faction_id & 31));
+        if (faction_id) game().vehs[v].flags &= 0xFBBF;
     }
 }
 
 // Same, starting from veh_top() (spot_all calls the goals helper there).
 void spot_stack_vehs_top(int32_t veh_id, int32_t faction_id) {
-    for (int32_t v = veh_top(veh_id); v >= 0; v = Vehs[v].next_veh_id_stack) {
-        Vehs[v].visibility |= (uint8_t)(1 << (faction_id & 31));
-        if (faction_id) Vehs[v].flags &= 0xFBBF;
+    for (int32_t v = veh_top(veh_id); v >= 0; v = game().vehs[v].next_veh_id_stack) {
+        game().vehs[v].visibility |= (uint8_t)(1 << (faction_id & 31));
+        if (faction_id) game().vehs[v].flags &= 0xFBBF;
     }
 }
 
 // spot_base body (inlined by the original).
 void spot_base_body(int32_t base_id, int32_t faction_id, bool call_on_map) {
-    BASE& base = Bases[base_id];
+    BASE& base = game().bases[base_id];
     base.visibility |= (uint8_t)(1 << (faction_id & 31));
     base.factions_pop_size_intel[faction_id] = base.pop_size;
     int32_t x = base.x, y = base.y;
@@ -73,13 +75,13 @@ void GAMEAPI spot_tile(int32_t x, int32_t y, int32_t faction_id) {
 void GAMEAPI spot_base(int32_t base_id, int32_t faction_id) { spot_base_body(base_id, faction_id, false); }
 
 void GAMEAPI spot_stack(int32_t veh_id, int32_t faction_id) {
-    if (veh_id >= 0) spot_tile(Vehs[veh_id].x, Vehs[veh_id].y, faction_id);
+    if (veh_id >= 0) spot_tile(game().vehs[veh_id].x, game().vehs[veh_id].y, faction_id);
     if (veh_id >= 0) spot_stack_vehs(veh_id, faction_id);
 }
 
 void GAMEAPI unspot_stack(int32_t veh_id) {
     if (veh_id < 0) return;
-    for (int32_t v = stack_top(veh_id); v >= 0; v = Vehs[v].next_veh_id_stack) Vehs[v].visibility = 0;
+    for (int32_t v = stack_top(veh_id); v >= 0; v = game().vehs[v].next_veh_id_stack) game().vehs[v].visibility = 0;
 }
 
 void GAMEAPI spot_loc(int32_t x, int32_t y, int32_t faction_id) {
@@ -87,7 +89,7 @@ void GAMEAPI spot_loc(int32_t x, int32_t y, int32_t faction_id) {
     int32_t base_id = base_at(x, y);
     if (base_id < 0) {
         int32_t veh_id = veh_at(x, y);
-        if (veh_id >= 0) spot_tile(Vehs[veh_id].x, Vehs[veh_id].y, faction_id);
+        if (veh_id >= 0) spot_tile(game().vehs[veh_id].x, game().vehs[veh_id].y, faction_id);
         if (veh_id >= 0) spot_stack_vehs(veh_id, faction_id);
     } else {
         spot_base_body(base_id, faction_id, false);
@@ -95,7 +97,7 @@ void GAMEAPI spot_loc(int32_t x, int32_t y, int32_t faction_id) {
 }
 
 void GAMEAPI veh_alert_wake(int32_t veh_id) {
-    VEH& veh = Vehs[veh_id];
+    VEH& veh = game().vehs[veh_id];
     if ((veh.state & 0x2000200) == 0x2000200 && veh.patrol_current_point < veh.waypoint_count) veh.state &= 0xFDFFFDFF;
     if ((veh.state & 0x1000200) == 0x1000200) veh.state &= 0xFEFFFDFF;
     veh.state &= 0xFFFFBFFF;
@@ -103,15 +105,16 @@ void GAMEAPI veh_alert_wake(int32_t veh_id) {
 }
 
 uint32_t GAMEAPI want_to_wake(int32_t faction_id, int32_t veh_id, int32_t spotted_veh_id) {
-    VEH& veh = Vehs[veh_id];
+    VEH& veh = game().vehs[veh_id];
     if (veh_triad(veh_id) == 2 && veh.movement_turns && veh.order == 24) {
         // aircraft flying to a friendly base
         MAP* sq = map_tile(veh.waypoint_x[0], veh.waypoint_y[0]);
         uint32_t owner = sq->val2 & 0xF;
-        if ((sq->items & 1) && owner < 8 && (owner == veh.faction_id || (Factions[veh.faction_id].diplo_status[owner] & 1)))
+        if ((sq->items & 1) && owner < 8 &&
+            (owner == veh.faction_id || (game().factions[veh.faction_id].diplo_status[owner] & 1)))
             return 0;
     }
-    uint32_t status = Factions[veh.faction_id].diplo_status[faction_id];
+    uint32_t status = game().factions[veh.faction_id].diplo_status[faction_id];
     uint32_t wake;
     if (status & 1) {  // pact
         if (MultiplayerActive) {
@@ -148,8 +151,8 @@ check_triad:
 
 void GAMEAPI wake_stack(int32_t veh_id) {
     if (veh_id < 0) return;
-    for (int32_t v = stack_top(veh_id); v >= 0; v = Vehs[v].next_veh_id_stack) {
-        VEH& veh = Vehs[v];
+    for (int32_t v = stack_top(veh_id); v >= 0; v = game().vehs[v].next_veh_id_stack) {
+        VEH& veh = game().vehs[v];
         if (veh.order != 1) continue;
         bool wake = veh_triad(v) != 0;
         if (!wake) {
@@ -168,11 +171,11 @@ void GAMEAPI wake_stack(int32_t veh_id) {
 }
 
 int32_t GAMEAPI veh_stealth(int32_t veh_id) {
-    if (has_abil(Vehs[veh_id].unit_id, 0x40)) return 1;
-    if (has_abil(Vehs[veh_id].unit_id, 4)) return 1;
-    if (Vehs[veh_id].flags & 0x400) return 1;
-    MAP* sq = map_tile(Vehs[veh_id].x, Vehs[veh_id].y);
-    if ((sq->items & 0x20) && (sq->climate & 0xE0) >= 0x40 && Vehs[veh_id].unit_id != 19) return 2;
+    if (has_abil(game().vehs[veh_id].unit_id, 0x40)) return 1;
+    if (has_abil(game().vehs[veh_id].unit_id, 4)) return 1;
+    if (game().vehs[veh_id].flags & 0x400) return 1;
+    MAP* sq = map_tile(game().vehs[veh_id].x, game().vehs[veh_id].y);
+    if ((sq->items & 0x20) && (sq->climate & 0xE0) >= 0x40 && game().vehs[veh_id].unit_id != 19) return 2;
     return 0;
 }
 
@@ -181,7 +184,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
     int32_t saw_tower = 0;   // met natives: fungal tower
     int32_t saw_native = 0;  // met natives: other native units
     if (!MultiplayerActive) flag = 1;
-    VEH& veh = Vehs[veh_id];
+    VEH& veh = game().vehs[veh_id];
     const int32_t y = veh.y;
     const int32_t x = veh.x;
     const int32_t triad = veh_triad(veh_id);
@@ -225,8 +228,8 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                         }
                         if (diplo_status_raw(faction_id, owner) & 1) {
                             bool own = false;
-                            for (int32_t v = veh_at(x3, y3); v >= 0; v = Vehs[v].next_veh_id_stack) {
-                                if (Vehs[v].faction_id == faction_id) {
+                            for (int32_t v = veh_at(x3, y3); v >= 0; v = game().vehs[v].next_veh_id_stack) {
+                                if (game().vehs[v].faction_id == faction_id) {
                                     own = true;
                                     break;
                                 }
@@ -246,9 +249,9 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                         // BUG(original): tests the base nearest to the unit, not to the sensor tile
                         int32_t base_id = base_find(x, y);
                         if (base_id != -1) {
-                            BASE& base = Bases[base_id];
+                            BASE& base = game().bases[base_id];
                             int32_t dx = std::abs(x - base.x);
-                            if (!(MapToggleFlat & 1) && dx > MapHalfX) dx = MapAreaX - dx;
+                            if (!(game().map.flat & 1) && dx > game().map.half_x) dx = game().map.x - dx;
                             int32_t dy = y - base.y;
                             if (dy < 0) dy = base.y - y;
                             if ((dx == 0 || dx == 2) && (dy == 0 || dy == 2) && base_has_fac(base_id, 0x29)) {
@@ -267,8 +270,8 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                     if (veh_owner == faction_id || (diplo_status_raw(veh_owner, faction_id) & 1)) {
                         int32_t v = veh_at(x3, y3);
                         if (v >= 0) {
-                            for (v = stack_top(v); v >= 0; v = Vehs[v].next_veh_id_stack) {
-                                if (Vehs[v].faction_id == faction_id && has_abil(Vehs[v].unit_id, 2)) {
+                            for (v = stack_top(v); v >= 0; v = game().vehs[v].next_veh_id_stack) {
+                                if (game().vehs[v].faction_id == faction_id && has_abil(game().vehs[v].unit_id, 2)) {
                                     int32_t t = veh_triad(v);
                                     if (t == 2 || map_is_ocean(x2, y2) == (t == 1)) {
                                         seen = 1;  // deep radar (the search goes on)
@@ -345,10 +348,10 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
 
     // Others in the unit's own stack see it.
     if (veh_id >= 0) {
-        for (int32_t v = stack_top(veh_id); v >= 0; v = Vehs[v].next_veh_id_stack) {
-            int32_t other = Vehs[v].faction_id;
+        for (int32_t v = stack_top(veh_id); v >= 0; v = game().vehs[v].next_veh_id_stack) {
+            int32_t other = game().vehs[v].faction_id;
             if (other == faction_id) continue;
-            if (in_map(Vehs[v].x, Vehs[v].y)) spot_tile(Vehs[v].x, Vehs[v].y, other);
+            if (in_map(game().vehs[v].x, game().vehs[v].y)) spot_tile(game().vehs[v].x, game().vehs[v].y, other);
             spot_stack_vehs(v, other);
         }
     }
@@ -365,7 +368,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                 // an enemy sensor sees the unit
                 if (veh_id >= 0 && in_map(veh.x, veh.y)) spot_tile(veh.x, veh.y, owner);
                 if (veh_id >= 0) spot_stack_vehs(veh_id, owner);
-                if (!(Factions[faction_id].diplo_status[owner] & 7) && flag) {
+                if (!(game().factions[faction_id].diplo_status[owner] & 7) && flag) {
                     if (triad == 0) {
                         add_goal(owner, 0, 2, x2, y2, -1);
                         add_goal(owner, 2, 1, x2, y2, -1);
@@ -378,12 +381,13 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
         if (i == 0) continue;
         int32_t base_id = base_at(x2, y2);
         if (base_id >= 0) {
-            BASE& base = Bases[base_id];
+            BASE& base = game().bases[base_id];
             uint8_t base_faction = (uint8_t)base.faction_id;
             if (faction_id != base_faction) {
                 if (triad != 2 || Chassis[Units[veh.unit_id].chassis_id].range == 0) {
                     if (!at_sea && !stealth) met |= 1u << (base_faction & 31);
-                    else if (!(Factions[faction_id].diplo_status[base_faction] & 8)) met |= 1u << (base_faction & 31);
+                    else if (!(game().factions[faction_id].diplo_status[base_faction] & 8))
+                        met |= 1u << (base_faction & 31);
                 }
                 if (faction_id == CurrentPlayerFaction && !(GameState & 0x80)) {
                     if (!(fbit & base.visibility)) {
@@ -393,13 +397,13 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                     }
                 }
                 spot_base_body(base_id, faction_id, true);
-                if (!stealth || !(Factions[faction_id].diplo_status[(uint8_t)base.faction_id] & 8)) {
+                if (!stealth || !(game().factions[faction_id].diplo_status[(uint8_t)base.faction_id] & 8)) {
                     // the base sees the unit
                     int32_t owner = (uint8_t)base.faction_id;
                     if (veh_id >= 0 && in_map(veh.x, veh.y)) spot_tile(veh.x, veh.y, owner);
                     if (veh_id >= 0) spot_stack_vehs(veh_id, owner);
                 }
-                if (triad == 0 && !(Factions[(uint8_t)base.faction_id].diplo_status[faction_id] & 7) && flag) {
+                if (triad == 0 && !(game().factions[(uint8_t)base.faction_id].diplo_status[faction_id] & 7) && flag) {
                     add_goal((uint8_t)base.faction_id, 0, 2, x2, y2, -1);
                     add_goal((uint8_t)base.faction_id, 2, 1, x2, y2, -1);
                 }
@@ -409,17 +413,18 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
         if (has_abil(veh.unit_id, 0x40) && !dest_sea) continue;  // submerged units only meet sea units
         int32_t top = stack_fix(veh_at(x2, y2));
         if (top < 0) continue;
-        VEH& other = Vehs[top];
+        VEH& other = game().vehs[top];
         int32_t other_id = other.faction_id;
         if (other_id == faction_id) continue;
-        if (!stealth || has_abil(other.unit_id, 2) || !(Factions[faction_id].diplo_status[other.faction_id] & 8)) {
+        if (!stealth || has_abil(other.unit_id, 2) ||
+            !(game().factions[faction_id].diplo_status[other.faction_id] & 8)) {
             // they see the unit
             if (base_id < 0) {
                 if (veh_id >= 0 && in_map(veh.x, veh.y) && on_map(veh.x, veh.y))
                     spot_tile_in_map(veh.x, veh.y, other_id);
                 spot_stack_vehs_top(veh_id, other_id);
             }
-            uint32_t status = Factions[faction_id].diplo_status[other_id];
+            uint32_t status = game().factions[faction_id].diplo_status[other_id];
             if (!(status & 1) && flag) {
                 wake_stack(top);
                 if (!((1 << (other_id & 31)) & FactionStatus[0])) {
@@ -437,7 +442,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
             visible = false;
         }
         if (visible || sensor || stack_check(top, 1, -1, -1, -1) != 1 ||
-            !(Factions[faction_id].diplo_status[other.faction_id] & 8)) {
+            !(game().factions[faction_id].diplo_status[other.faction_id] & 8)) {
             // the unit sees them
             if (base_id < 0) {
                 if (faction_id == CurrentPlayerFaction && !(GameState & 0x80) && !(fbit & other.visibility) && redraw < 2)
@@ -446,7 +451,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                 if (in_map(tx, ty) && on_map(tx, ty)) spot_tile_in_map(tx, ty, faction_id);
                 spot_stack_vehs_top(top, faction_id);
             }
-            uint32_t status = Factions[faction_id].diplo_status[other_id];
+            uint32_t status = game().factions[faction_id].diplo_status[other_id];
             if (!(fbit & FactionStatus[0])) {
                 if (!(status & 7) && (at_sea || !dest_sea || triad == 2)) veh_alert_wake(veh_id);
             } else if ((at_sea == dest_sea || triad == 2) && want_to_wake(other_id, veh_id, top)) {
@@ -487,7 +492,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                 // an enemy sensor sees the unit
                 if (veh_id >= 0 && in_map(veh.x, veh.y) && on_map(veh.x, veh.y)) spot_tile_in_map(veh.x, veh.y, owner);
                 if (veh_id >= 0) spot_stack_vehs(veh_id, owner);
-                if (!(Factions[faction_id].diplo_status[owner] & 7) && flag) {
+                if (!(game().factions[faction_id].diplo_status[owner] & 7) && flag) {
                     if (triad == 0) {
                         add_goal(owner, 0, 2, x2, y2, -1);
                         add_goal(owner, 2, 1, x2, y2, -1);
@@ -505,7 +510,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
         bool sensor_view = sensor && (triad == 2 || map_is_ocean(x2, y2) == (triad == 1));
         if (sensor_view) {
             if (base_id >= 0) {
-                BASE& base = Bases[base_id];
+                BASE& base = game().bases[base_id];
                 if (faction_id == CurrentPlayerFaction && !(GameState & 0x80)) {
                     if (!(base.visibility & fbit)) {
                         if (redraw < 4) redraw = 3;
@@ -517,7 +522,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
             }
         }
         if (sensor_view && top >= 0 && base_id < 0) {
-            VEH& other = Vehs[top];
+            VEH& other = game().vehs[top];
             if (!has_abil(other.unit_id, 0x40) && !has_abil(other.unit_id, 4) && !(other.flags & 0x400)) {
                 MAP* osq = map_tile(other.x, other.y);
                 if (!(osq->items & 0x20) || (osq->climate & 0xE0) < 0x40 || other.unit_id == 19) {
@@ -534,7 +539,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
         }
         if (!sensor_view || top >= 0) {
             // their deep radar sees the unit
-            if (top >= 0 && !stealth && has_abil(Vehs[top].unit_id, 2) &&
+            if (top >= 0 && !stealth && has_abil(game().vehs[top].unit_id, 2) &&
                 (veh_triad(top) == 2 || at_sea == (veh_triad(top) == 1))) {
                 if (!(diplo_status_raw(faction_id, owner) & 1) && flag) wake_stack(top);
                 MAP* hsq = map_tile(x, y);
@@ -548,7 +553,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
         }
         if (base_id >= 0) {
             // the base sees the unit
-            uint32_t owner_hidden = Factions[owner].player_flags & 0x200;
+            uint32_t owner_hidden = game().factions[owner].player_flags & 0x200;
             uint8_t obit = (uint8_t)(1 << (owner & 31));
             MAP* hsq = map_tile(x, y);
             MAP* bsq = map_tile(x2, y2);
@@ -564,15 +569,15 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                     synch_bit(veh.x, veh.y, owner);
                 }
                 if (veh_id >= 0) spot_stack_vehs(veh_id, owner);
-                Faction& f = Factions[owner];
+                Faction& f = game().factions[owner];
                 if (triad == 0 && hsq->region == bsq->region && x2 == f.target_x && y2 == f.target_y) {
                     f.target_y = -1;
                     f.target_x = -1;
-                    for (int32_t v = veh_at(x2, y2); v >= 0; v = Vehs[v].next_veh_id_stack) {
-                        if (Vehs[v].state & 0x40000) Vehs[v].state |= 0x60000;
+                    for (int32_t v = veh_at(x2, y2); v >= 0; v = game().vehs[v].next_veh_id_stack) {
+                        if (game().vehs[v].state & 0x40000) game().vehs[v].state |= 0x60000;
                     }
                 }
-                if (Units[veh.unit_id].plan == 11 && !(Factions[faction_id].diplo_status[owner] & 1)) {
+                if (Units[veh.unit_id].plan == 11 && !(game().factions[faction_id].diplo_status[owner] & 1)) {
                     add_goal(owner, 0, 2, x, y, -1);
                     add_goal(owner, 2, 1, x, y, -1);
                     add_goal(owner, 3, 1, x, y, -1);
@@ -584,7 +589,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
     if (CurrentTurn) {
         draw_radius(x, y, faction_id == CurrentPlayerFaction ? redraw : 0, 2);
         if (faction_id == CurrentPlayerFaction && redraw) GraphicWin_redraw(&WorldWin);
-        if (temples > 8 && faction_id == CurrentPlayerFaction && (MFactions[faction_id].rule_flags & 0x80))
+        if (temples > 8 && faction_id == CurrentPlayerFaction && (game().mfactions[faction_id].rule_flags & 0x80))
             interlude(0x29, 0, 1, 0);
         if (met & 1) encounter(faction_id, 0, x, y, saw_tower, saw_native);
         if (faction_id && flag) {
@@ -598,7 +603,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
 void GAMEAPI stack_put(int32_t veh_id, int32_t x, int32_t y) {
     if (veh_id < 0) return;
     for (int32_t v = stack_top(veh_id); v >= 0;) {
-        int32_t next = Vehs[v].next_veh_id_stack;
+        int32_t next = game().vehs[v].next_veh_id_stack;
         veh_drop(veh_lift(v), x, y);
         v = next;
     }
@@ -606,12 +611,12 @@ void GAMEAPI stack_put(int32_t veh_id, int32_t x, int32_t y) {
 
 void GAMEAPI stack_sort(int32_t veh_id) {
     int32_t moved = -1;
-    int32_t x = Vehs[veh_id].x;
-    int32_t y = Vehs[veh_id].y;
+    int32_t x = game().vehs[veh_id].x;
+    int32_t y = game().vehs[veh_id].y;
     if (veh_id < 0) return;
     for (int32_t v = stack_top(veh_id); v >= 0;) {
-        int32_t next = Vehs[v].next_veh_id_stack;
-        if (veh_cargo(v) || has_abil(Vehs[v].unit_id, 0x80)) {
+        int32_t next = game().vehs[v].next_veh_id_stack;
+        if (veh_cargo(v) || has_abil(game().vehs[v].unit_id, 0x80)) {
             veh_drop(veh_lift(v), -3, -3);
             moved = v;
         }
@@ -619,7 +624,7 @@ void GAMEAPI stack_sort(int32_t veh_id) {
     }
     if (moved < 0) return;
     for (int32_t v = stack_top(moved); v >= 0;) {
-        int32_t next = Vehs[v].next_veh_id_stack;
+        int32_t next = game().vehs[v].next_veh_id_stack;
         veh_drop(veh_lift(v), x, y);
         v = next;
     }
@@ -627,12 +632,12 @@ void GAMEAPI stack_sort(int32_t veh_id) {
 
 void GAMEAPI stack_sort_2(int32_t veh_id) {
     int32_t moved = -1;
-    int32_t x = Vehs[veh_id].x;
-    int32_t y = Vehs[veh_id].y;
+    int32_t x = game().vehs[veh_id].x;
+    int32_t y = game().vehs[veh_id].y;
     if (veh_id >= 0) {
         for (int32_t v = stack_top(veh_id); v >= 0;) {
-            int32_t next = Vehs[v].next_veh_id_stack;
-            if (Units[Vehs[v].unit_id].plan == 8) {  // colony pods
+            int32_t next = game().vehs[v].next_veh_id_stack;
+            if (Units[game().vehs[v].unit_id].plan == 8) {  // colony pods
                 veh_drop(veh_lift(v), -3, -3);
                 moved = v;
             }
@@ -640,8 +645,8 @@ void GAMEAPI stack_sort_2(int32_t veh_id) {
         }
     }
     for (int32_t v = veh_at(x, y); v >= 0;) {
-        int32_t next = Vehs[v].next_veh_id_stack;
-        if ((uint8_t)Units[Vehs[v].unit_id].plan < 2) {  // combat units
+        int32_t next = game().vehs[v].next_veh_id_stack;
+        if ((uint8_t)Units[game().vehs[v].unit_id].plan < 2) {  // combat units
             veh_drop(veh_lift(v), -3, -3);
             moved = v;
         }
@@ -649,7 +654,7 @@ void GAMEAPI stack_sort_2(int32_t veh_id) {
     }
     if (moved < 0) return;
     for (int32_t v = stack_top(moved); v >= 0;) {
-        int32_t next = Vehs[v].next_veh_id_stack;
+        int32_t next = game().vehs[v].next_veh_id_stack;
         veh_drop(veh_lift(v), x, y);
         v = next;
     }
@@ -657,12 +662,12 @@ void GAMEAPI stack_sort_2(int32_t veh_id) {
 
 int32_t GAMEAPI stack_fix(int32_t veh_id) {
     if (veh_id < 0 || !MultiplayerActive) return veh_id;
-    if (Vehs[veh_id].next_veh_id_stack < 0 && Vehs[veh_id].prev_veh_id_stack < 0) return veh_id;
-    int32_t x = Vehs[veh_id].x;
-    int32_t y = Vehs[veh_id].y;
-    for (int32_t i = 0; i < VehCount; i++) {
+    if (game().vehs[veh_id].next_veh_id_stack < 0 && game().vehs[veh_id].prev_veh_id_stack < 0) return veh_id;
+    int32_t x = game().vehs[veh_id].x;
+    int32_t y = game().vehs[veh_id].y;
+    for (int32_t i = 0; i < game().veh_count; i++) {
         // BUG(original): tests the position of veh_id instead of vehicle i
-        if (Vehs[veh_id].x == x && Vehs[veh_id].y == y) {
+        if (game().vehs[veh_id].x == x && game().vehs[veh_id].y == y) {
             veh_promote(i);
             stack_sort(veh_id);
         }
@@ -672,14 +677,15 @@ int32_t GAMEAPI stack_fix(int32_t veh_id) {
 
 int32_t GAMEAPI stack_veh(int32_t veh_id, int32_t mode) {
     if (veh_id < 0) return mode ? veh_id : 0;
-    VEH& veh = Vehs[veh_id];
+    VEH& veh = game().vehs[veh_id];
     if (!veh_cargo(veh_id) && !has_abil(veh.unit_id, 0x80)) {
         if (!mode) return 0;
         return veh_drop(veh_lift(veh_id), -2, -2);
     }
     if (MultiplayerActive) stack_fix(veh_id);
     if (mode == 0) {
-        for (int32_t v = stack_top(veh_id); v >= 0; v = Vehs[v].next_veh_id_stack) Vehs[v].state &= 0xFFFFFFFE;
+        for (int32_t v = stack_top(veh_id); v >= 0; v = game().vehs[v].next_veh_id_stack)
+            game().vehs[v].state &= 0xFFFFFFFE;
     } else {
         if (mode > 1) {
             // BUG(original): no map bounds check
@@ -709,8 +715,8 @@ int32_t GAMEAPI stack_veh(int32_t veh_id, int32_t mode) {
         if (mode == 0) v = stack_top(veh_id);
         while (v >= 0) {
             if (!capacity && !air_capacity) break;
-            int32_t next = Vehs[v].next_veh_id_stack;
-            VEH& cargo = Vehs[v];
+            int32_t next = game().vehs[v].next_veh_id_stack;
+            VEH& cargo = game().vehs[v];
             bool load = false;
             if (cargo.faction_id == faction_id) {
                 bool fits = (capacity && veh_triad(v) == 0 && veh_cargo(v) == 0) ||
@@ -736,7 +742,9 @@ int32_t GAMEAPI stack_veh(int32_t veh_id, int32_t mode) {
                             } else if (cargo.state & 0x40000) {
                                 if (cargo.state & 0x20000) {
                                     // BUG(original): no map bounds check
-                                    load = Factions[cargo_faction].region_base_plan[map_tile(cargo.x, cargo.y)->region] == 7;
+                                    load = game()
+                                               .factions[cargo_faction]
+                                               .region_base_plan[map_tile(cargo.x, cargo.y)->region] == 7;
                                 }
                             } else {
                                 uint8_t plan = (uint8_t)Units[cargo.unit_id].plan;
@@ -746,7 +754,8 @@ int32_t GAMEAPI stack_veh(int32_t veh_id, int32_t mode) {
                                     load = true;
                                 } else {
                                     load = !(in_map(cargo.x, cargo.y) &&
-                                             Factions[cargo_faction].region_base_plan[map_tile(cargo.x, cargo.y)->region] == 2 &&
+                                             game().factions[cargo_faction]
+                                                     .region_base_plan[map_tile(cargo.x, cargo.y)->region] == 2 &&
                                              plan < 8);
                                 }
                             }
@@ -776,7 +785,7 @@ int32_t GAMEAPI stack_veh(int32_t veh_id, int32_t mode) {
 void GAMEAPI stack_kill(int32_t veh_id) {
     if (veh_id < 0) return;
     for (int32_t v = stack_top(veh_id); v >= 0;) {
-        int32_t next = Vehs[v].next_veh_id_stack;
+        int32_t next = game().vehs[v].next_veh_id_stack;
         veh_kill(v);
         if (v < next) next--;
         v = next;
@@ -786,8 +795,8 @@ void GAMEAPI stack_kill(int32_t veh_id) {
 int32_t GAMEAPI stack_check(int32_t veh_id, int32_t type, int32_t cond1, int32_t cond2, int32_t cond3) {
     int32_t count = 0;
     if (veh_id < 0) return 0;
-    for (int32_t v = stack_top(veh_id); v >= 0; v = Vehs[v].next_veh_id_stack) {
-        VEH& veh = Vehs[v];
+    for (int32_t v = stack_top(veh_id); v >= 0; v = game().vehs[v].next_veh_id_stack) {
+        VEH& veh = game().vehs[v];
         int32_t unit_id = veh.unit_id;
         UNIT& u = Units[unit_id];
         int32_t faction_id = veh.faction_id;

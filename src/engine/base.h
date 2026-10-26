@@ -5,6 +5,7 @@
 // derived values of a base (support, yields, nutrients, minerals, energy, psych) into the BASE
 // fields and the Base* globals.
 #pragma once
+#include "engine/game_state.h"
 #include "engine/globals.h"
 #include "engine/base_misc.h"
 
@@ -28,17 +29,17 @@ constexpr uint32_t kBasesAddr = 0x97D040;  // address of Bases[0] in the origina
 inline BASE& cur_base() { return *reinterpret_cast<BASE*>(mem::host(CurrentBasePtr)); }
 // Whether a base has a facility (bit test; facility_id < 96).
 inline bool base_fac(int32_t base_id, int32_t facility_id) {
-    return (Bases[base_id].facilities_built[facility_id >> 3] & (1 << (facility_id & 7))) != 0;
+    return (game().bases[base_id].facilities_built[facility_id >> 3] & (1 << (facility_id & 7))) != 0;
 }
 // Owner of a secret project (-1 none or destroyed).
 inline int32_t project_owner(int32_t project_id) {
     int32_t base_id = SecretProjects[project_id];
-    return base_id < 0 ? -1 : (uint8_t)Bases[base_id].faction_id;
+    return base_id < 0 ? -1 : (uint8_t)game().bases[base_id].faction_id;
 }
 // Whether faction_id owns secret project project_id (index into SecretProjects).
 inline bool has_sp(int32_t project_id, int32_t faction_id) {
     int32_t base_id = SecretProjects[project_id];
-    return base_id >= 0 && (uint8_t)Bases[base_id].faction_id == (uint32_t)faction_id;
+    return base_id >= 0 && (uint8_t)game().bases[base_id].faction_id == (uint32_t)faction_id;
 }
 
 // ---- base module --------------------------------------------------------------------------------

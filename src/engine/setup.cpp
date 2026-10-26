@@ -10,6 +10,7 @@
 #include "engine/design.h"
 #include "engine/diplo_act.h"
 #include "engine/diplomacy.h"
+#include "engine/game_state.h"
 #include "engine/goals.h"
 #include "engine/map.h"
 #include "engine/net.h"
@@ -34,14 +35,16 @@
 
 static inline int32_t clamp(int32_t v, int32_t lo, int32_t hi) { return v < lo ? lo : (v > hi ? hi : v); }
 static inline bool is_human(int32_t faction_id) { return (FactionStatus[0] & (1 << faction_id)) != 0; }
-static inline bool is_alien(int32_t faction_id) { return (MFactions[faction_id].rule_flags & RFLAG_ALIEN) != 0; }
-static inline bool is_aquatic(int32_t faction_id) { return (MFactions[faction_id].rule_flags & RFLAG_AQUATIC) != 0; }
+static inline bool is_alien(int32_t faction_id) { return (game().mfactions[faction_id].rule_flags & RFLAG_ALIEN) != 0; }
+static inline bool is_aquatic(int32_t faction_id) {
+    return (game().mfactions[faction_id].rule_flags & RFLAG_AQUATIC) != 0;
+}
 
 // The faction's file name upper-cased in StrBuffer, as the original builds it before comparing it
 // with a faction key ("FUNGBOY", "ANGELS", ...). Returns StrBuffer.
 static char* faction_key_upper(int32_t faction_id) {
     StrBuffer[0] = 0;
-    crt_strcat(StrBuffer, MFactions[faction_id].filename);
+    crt_strcat(StrBuffer, game().mfactions[faction_id].filename);
     win32::CharUpperA(StrBuffer);
     return StrBuffer;
 }
@@ -50,10 +53,10 @@ static char* faction_key_upper(int32_t faction_id) {
 template <size_t N>
 static void unique_faction_name(int32_t faction_id, char (MFaction::*field)[N], int32_t cut) {
     if (faction_id <= 1) return;
-    char* name = MFactions[faction_id].*field;
+    char* name = game().mfactions[faction_id].*field;
     int32_t dupes = 0;
     for (int32_t i = 1; i < faction_id; i++) {
-        if (!crt_strcmp(MFactions[i].*field, name)) dupes++;
+        if (!crt_strcmp(game().mfactions[i].*field, name)) dupes++;
     }
     if (!dupes) return;
     char num[80];
@@ -70,18 +73,20 @@ constexpr int32_t kSetupArrival = -282;
 
 int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t force) {
     const int32_t f = faction_id;
-    Faction& F = Factions[f];
-    MFaction& M = MFactions[f];
+    Faction& F = game().factions[f];
+    MFaction& M = game().mfactions[f];
     bool gave_up = false;
 
     unique_faction_name(f, &MFaction::name_leader, 21);
     unique_faction_name(f, &MFaction::noun_faction, 21);
     unique_faction_name(f, &MFaction::formal_name_faction, 37);
-    for (int32_t i = BaseCount - 1; i >= 0; i--) {
-        if (Bases[i].faction_id == f) base_kill(i);
+    for (int32_t i = game().base_count - 1; i >= 0; i--) {
+        if (game().bases[i].faction_id == f) base_kill(i);
     }
-    for (int32_t i = VehCount - 1; i >= 0; i--) {
-        if (i < VehCount && Vehs[i].faction_id == f && (Vehs[i].unit_id != BSC_FUNGAL_TOWER || f != 0)) kill(i);
+    for (int32_t i = game().veh_count - 1; i >= 0; i--) {
+        if (i < game().veh_count && game().vehs[i].faction_id == f &&
+            (game().vehs[i].unit_id != BSC_FUNGAL_TOWER || f != 0))
+            kill(i);
     }
     F.target_y = -1;
     F.target_x = -1;
@@ -261,11 +266,11 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
     // ---- landing site: random draws, the area shrinking towards the map centre ----
     int32_t x = 0, y = 0, region = 0, others = 0, near_base = -1, attempts = 0;
     for (;;) {
-        const int32_t flat = MapToggleFlat & 1;
-        int32_t margin_x = clamp((0x400 - attempts) * MapAreaX / 8192, 0, 9999);
-        x = map_rand_mod(MapAreaX - (flat ? margin_x * 2 : 0)) + (flat ? margin_x : 0);
-        int32_t margin_y = clamp((0x400 - attempts) * MapAreaY / 8192, 0, 9999);
-        y = map_rand_mod(MapAreaY - margin_y * 2) + margin_y;
+        const int32_t flat = game().map.flat & 1;
+        int32_t margin_x = clamp((0x400 - attempts) * game().map.x / 8192, 0, 9999);
+        x = map_rand_mod(game().map.x - (flat ? margin_x * 2 : 0)) + (flat ? margin_x : 0);
+        int32_t margin_y = clamp((0x400 - attempts) * game().map.y / 8192, 0, 9999);
+        y = map_rand_mod(game().map.y - margin_y * 2) + margin_y;
         if (x & 1) x--;
         if (y & 1) x++;
         // Nearest ring (0..7) with a landmark tile, 32 if none.
@@ -305,7 +310,7 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
         region = map_tile(x, y)->region;
         others = 0;
         for (int32_t i = 1; i < 8; i++) {
-            if (Factions[i].region_total_bases[region]) others |= 1 << i;
+            if (game().factions[i].region_total_bases[region]) others |= 1 << i;
         }
         if (!aquatic && killer_id != kSetupArrival)
             near_base = base_find_filtered(x, y, -1, region, -1, -1);
@@ -313,10 +318,10 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
             near_base = base_find(x, y);
         if (near_base < 0) BaseFindDist = 32;
         if (CurrentTurn == 0 || killer_id == kSetupArrival) {
-            for (int32_t v = 0; v < VehCount; v++) {
-                if (map_tile(Vehs[v].x, Vehs[v].y)->region != region) continue;
-                others |= 1 << Vehs[v].faction_id;
-                int32_t dist = veh_vector_dist(x, y, Vehs[v].x, Vehs[v].y);
+            for (int32_t v = 0; v < game().veh_count; v++) {
+                if (map_tile(game().vehs[v].x, game().vehs[v].y)->region != region) continue;
+                others |= 1 << game().vehs[v].faction_id;
+                int32_t dist = veh_vector_dist(x, y, game().vehs[v].x, game().vehs[v].y);
                 if (dist < BaseFindDist) BaseFindDist = dist;
             }
         }
@@ -332,13 +337,13 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
         if ((sq->items & BIT_FUNGUS) && alt >= 0x40) continue;
         if (!aquatic && (sq->val3 & 0xC0) > 0x40) continue;
         int32_t spacing = (CurrentTurn == 0 || killer_id == kSetupArrival) ? 6 : 12;
-        if (BaseFindDist < spacing * MapAreaSqRoot / 56) continue;
+        if (BaseFindDist < spacing * game().map.sq_root / 56) continue;
         if (alt >= 0xA0) continue;
         if ((sq->items & 3) && (sq->val2 & 0xF) < 8) continue;
-        if (y < 2 || y >= MapAreaY - 2) continue;
+        if (y < 2 || y >= game().map.y - 2) continue;
         if (quality < 12 - attempts / 80) continue;
         int32_t relax = attempts / 64;
-        if (BaseFindDist < (16 - relax) * MapAreaSqRoot / 56) continue;
+        if (BaseFindDist < (16 - relax) * game().map.sq_root / 56) continue;
         if ((CurrentTurn == 0 || killer_id == kSetupArrival) && attempts < 900 &&
             Continents[region].tile_count < 36 - relax)
             continue;
@@ -364,8 +369,8 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
         if (site < 15 - relax && CurrentTurn == 0 && !(GameRules & RULES_LOOK_FIRST)) continue;
         if (!is_aquatic(f) && (landmark_ring < (0x400 - attempts) / 128 || landmark_ring == 0)) continue;
         if (CurrentTurn != 0 && killer_id != kSetupArrival && sq->owner > 0) continue;
-        if (near_base >= 0 && Bases[near_base].faction_id == killer_id &&
-            map_tile(Bases[near_base].x, Bases[near_base].y)->region == region)
+        if (near_base >= 0 && game().bases[near_base].faction_id == killer_id &&
+            map_tile(game().bases[near_base].x, game().bases[near_base].y)->region == region)
             continue;
         break;
     }
@@ -384,9 +389,9 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
                 if ((sq->items & BIT_FUNGUS) && alt >= 0x40) continue;
                 if ((sq->items & 3) && (sq->val2 & 0xF) < 8) continue;
                 base_find(x2, y2);
-                for (int32_t v = 0; v < VehCount; v++) {
+                for (int32_t v = 0; v < game().veh_count; v++) {
                     // BUG(original): the distance is measured from (x, y), not from the candidate.
-                    int32_t dist = veh_vector_dist(x, y, Vehs[v].x, Vehs[v].y);
+                    int32_t dist = veh_vector_dist(x, y, game().vehs[v].x, game().vehs[v].y);
                     if (dist < BaseFindDist) BaseFindDist = dist;
                 }
                 if (BaseFindDist < 6) continue;
@@ -441,19 +446,19 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
         for (int32_t i = 1; i < 8; i++) {
             if (!(alive_mask & (1 << i))) continue;
             alive++;
-            uint32_t to_viewer = Factions[i].diplo_status[CurrentPlayerFaction];
+            uint32_t to_viewer = game().factions[i].diplo_status[CurrentPlayerFaction];
             if (!MultiplayerActive && (to_viewer & DIPLO_PACT) && (to_viewer & 0x2000000)) {
                 alive--;
-            } else if (i != leader && (Factions[i].diplo_status[leader] & DIPLO_PACT) &&
+            } else if (i != leader && (game().factions[i].diplo_status[leader] & DIPLO_PACT) &&
                        (GameRules & RULES_VICTORY_COOPERATIVE) && allies < 2) {
                 allies++;
             }
         }
         if (f == CurrentPlayerFaction) {
             int32_t k = killer_id < 0 ? 0 : killer_id;
-            GenderDefault = MFactions[k].noun_gender;
-            PluralDefault = MFactions[k].is_noun_plural;
-            parse_says(0, MFactions[k].noun_faction, -1, -1);
+            GenderDefault = game().mfactions[k].noun_gender;
+            PluralDefault = game().mfactions[k].is_noun_plural;
+            parse_says(0, game().mfactions[k].noun_faction, -1, -1);
             if (MultiplayerActive) {
                 NetDaemon_hang_up(&NetState);
                 static const uint8_t kCleared[] = {0,  1,  2,  3,  12, 11, 15, 14, 19, 30, 28, 29, 39, 38,
@@ -573,8 +578,9 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
     } else {
         if ((!MultiplayerActive && !(GameRules & RULES_LOOK_FIRST)) || (GameRules & RULES_TIME_WARP)) {
             int32_t base_id = base_init(f, x, y);
-            if (!crt_strcmp(faction_key_upper(f), "FUNGBOY") && killer_id == kSetupArrival) Bases[base_id].pop_size = 3;
-            if (is_alien(f) && killer_id == kSetupArrival) Bases[base_id].pop_size = 3;
+            if (!crt_strcmp(faction_key_upper(f), "FUNGBOY") && killer_id == kSetupArrival)
+                game().bases[base_id].pop_size = 3;
+            if (is_alien(f) && killer_id == kSetupArrival) game().bases[base_id].pop_size = 3;
         } else if (is_aquatic(f)) {
             veh_init(BSC_SEA_ESCAPE_POD, f, x, y);
         } else {
@@ -582,15 +588,15 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
         }
         if (!is_aquatic(f)) {
             int32_t veh_id = veh_init(scout_unit, f, x, y);
-            Vehs[veh_id].home_base_id = -1;
+            game().vehs[veh_id].home_base_id = -1;
             veh_demote(veh_id);
         }
         if (MultiplayerActive && !is_aquatic(f)) {
             int32_t veh_id = veh_init(BSC_UNITY_ROVER, f, x, y);
-            Vehs[veh_id].home_base_id = -1;
+            game().vehs[veh_id].home_base_id = -1;
             veh_demote(veh_id);
             veh_id = veh_init(BSC_FORMERS, f, x, y);
-            Vehs[veh_id].home_base_id = -1;
+            game().vehs[veh_id].home_base_id = -1;
             veh_demote(veh_id);
         }
         int32_t coast = is_coast(x, y, 0);
@@ -599,15 +605,15 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
             // Unity foils on a crowded continent, one tile off the coast.
             if (MultiplayerActive && Continents[region].tile_count / (bit_count(others) + 1) <= 75 && is_human(f)) {
                 int32_t veh_id = veh_init(BSC_UNITY_FOIL, f, map_wrap_x(x + TableOffsetX[coast]), y + TableOffsetY[coast]);
-                Vehs[veh_id].morale = MORALE_DISCIPLINED;
+                game().vehs[veh_id].morale = MORALE_DISCIPLINED;
                 veh_demote(veh_id);
-                Vehs[veh_id].home_base_id = -1;
+                game().vehs[veh_id].home_base_id = -1;
             }
             if (Continents[region].tile_count / (bit_count(others) + 1) <= 50) {
                 int32_t veh_id = veh_init(BSC_UNITY_FOIL, f, map_wrap_x(x + TableOffsetX[coast]), y + TableOffsetY[coast]);
-                Vehs[veh_id].morale = MORALE_DISCIPLINED;
+                game().vehs[veh_id].morale = MORALE_DISCIPLINED;
                 veh_demote(veh_id);
-                Vehs[veh_id].home_base_id = -1;
+                game().vehs[veh_id].home_base_id = -1;
             }
         }
     }
@@ -621,16 +627,16 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
         for (int32_t i = 0; i < M.faction_bonus_count; i++) {
             if (M.faction_bonus_id[i] != RULE_UNIT) continue;
             int32_t veh_id = veh_init(M.faction_bonus_val1[i], f, x, y);
-            Vehs[veh_id].home_base_id = -1;
+            game().vehs[veh_id].home_base_id = -1;
             veh_demote(veh_id);
             if (M.faction_bonus_val1[i] == BSC_COLONY_POD) F.player_flags |= PFLAG_UNK_100;
         }
         if (ExpansionEnabled && is_alien(f)) {
             int32_t veh_id = veh_init(BSC_BATTLE_OGRE_MK1, f, x, y);
-            Vehs[veh_id].home_base_id = -1;
+            game().vehs[veh_id].home_base_id = -1;
             veh_demote(veh_id);
             veh_id = veh_init(BSC_COLONY_POD, f, x, y);
-            Vehs[veh_id].home_base_id = -1;
+            game().vehs[veh_id].home_base_id = -1;
             veh_demote(veh_id);
         }
         if (is_aquatic(f)) {
@@ -653,10 +659,10 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
                 crt_strcpy(Units[unit_id].name, name);
             }
             int32_t veh_id = veh_init(BSC_SEA_ESCAPE_POD, f, x, y);
-            Vehs[veh_id].home_base_id = -1;
+            game().vehs[veh_id].home_base_id = -1;
             veh_demote(veh_id);
             veh_id = veh_init(BSC_UNITY_GUNSHIP, f, x, y);
-            Vehs[veh_id].home_base_id = -1;
+            game().vehs[veh_id].home_base_id = -1;
             veh_demote(veh_id);
         }
     }
@@ -726,9 +732,9 @@ void GAMEAPI clear_scenario() {
 }
 
 void GAMEAPI compute_faction_modifiers(int32_t faction_id) {
-    int32_t* modifiers = &Factions[faction_id].SE_economy_base;
+    int32_t* modifiers = &game().factions[faction_id].SE_economy_base;
     for (int32_t i = 0; i < 11; i++) modifiers[i] = 0;
-    MFaction& m = MFactions[faction_id];
+    MFaction& m = game().mfactions[faction_id];
     for (int32_t i = 0; i < m.faction_bonus_count; i++)
         if (m.faction_bonus_id[i] == RULE_SOCIAL) modifiers[m.faction_bonus_val1[i]] += m.faction_bonus_val2[i];
 }
@@ -753,22 +759,23 @@ void GAMEAPI balance() {
     for (int32_t f = 1; f < 8; f++) {
         int32_t veh_id = veh_find(0, 0, f, -1);
         start[f - 1] = veh_id;
-        if (veh_id >= 0 && map_tile(Vehs[veh_id].x, Vehs[veh_id].y)->region >= 0x40)
-            start[f - 1] = veh_find(Vehs[veh_id].x, Vehs[veh_id].y, f, veh_id);
+        if (veh_id >= 0 && map_tile(game().vehs[veh_id].x, game().vehs[veh_id].y)->region >= 0x40)
+            start[f - 1] = veh_find(game().vehs[veh_id].x, game().vehs[veh_id].y, f, veh_id);
     }
     int32_t best_score = 0;
     for (int32_t f = 1; f < 8; f++) {
         int32_t veh_id = start[f - 1];
         if (veh_id < 0) continue;
-        int32_t x = Vehs[veh_id].x, y = Vehs[veh_id].y;
+        int32_t x = game().vehs[veh_id].x, y = game().vehs[veh_id].y;
         uint32_t region = map_tile(x, y)->region;
         // Room: distance to the nearest rival on the same landmass, else the landmass size.
         int32_t room = 9999;
         for (int32_t g = 1; g < 8; g++) {
             int32_t other = start[g - 1];
             if (f == g || other < 0) continue;
-            if (map_tile(Vehs[other].x, Vehs[other].y)->region != region) continue;
-            int32_t dist = veh_vector_dist(x, y, Vehs[other].x, Vehs[other].y) * 3200 / MapAreaTiles;
+            if (map_tile(game().vehs[other].x, game().vehs[other].y)->region != region) continue;
+            int32_t dist =
+                veh_vector_dist(x, y, game().vehs[other].x, game().vehs[other].y) * 3200 / game().map.tile_count;
             if (dist < room) room = dist;
         }
         if (room < 1000)
@@ -795,8 +802,8 @@ void GAMEAPI balance() {
     for (int32_t f = 1; f < 8; f++) {
         int32_t veh_id = start[f - 1];
         if (veh_id < 0) continue;
-        MFaction& m = MFactions[f];
-        int32_t x = Vehs[veh_id].x, y = Vehs[veh_id].y;
+        MFaction& m = game().mfactions[f];
+        int32_t x = game().vehs[veh_id].x, y = game().vehs[veh_id].y;
         int32_t spiral = game_rand() % 16;
         int32_t deficit = best_score - score[f - 1];
         for (int32_t i = 0; i < m.faction_bonus_count; i++) {
@@ -805,7 +812,7 @@ void GAMEAPI balance() {
         if (DiffLevel > 1 && (deficit >= 3 || DiffLevel >= (is_human(f) ? 4 : 5))) {
             deficit -= 3;
             if (!(m.rule_flags & RFLAG_AQUATIC)) veh_id = veh_init(BSC_COLONY_POD, f, x, y);
-            Vehs[veh_id].home_base_id = -1;
+            game().vehs[veh_id].home_base_id = -1;
         }
         if (DiffLevel < 2) deficit = (deficit + 1) / 2;
         // Supply pods (or unity pods, at most two) on the radius-2 ring.
@@ -868,7 +875,7 @@ void GAMEAPI setup_game(int32_t reload) {
     cs.dword_9A64BC = 0;
     CurrentTurn = 0;
     FactionStatus[1] = 0xFF;
-    BaseCount = 0;
+    game().base_count = 0;
     cs.dword_9A64D0 = 0;
     clear_all_offers();
     clear_hotseat_chat();
@@ -904,7 +911,7 @@ void GAMEAPI setup_game(int32_t reload) {
         int32_t taken[12] = {};
         int32_t tries_max = 1;
         for (int32_t f = 1; f < 8;) {
-            MFaction& m = MFactions[f];
+            MFaction& m = game().mfactions[f];
             int32_t tries = 0, category, model;
             m.soc_priority_category = -1;
             m.soc_priority_model = 0;
@@ -944,9 +951,9 @@ void GAMEAPI setup_game(int32_t reload) {
         }
     }
     std::memset(DiploStateB, 0, sizeof(DiploStateB));
-    crt_strcpy(MFactions[0].formal_name_faction, label_get(245));
-    crt_strcpy(MFactions[0].noun_faction, label_get(245));
-    crt_strcpy(MFactions[0].adj_name_faction, label_get(244));
+    crt_strcpy(game().mfactions[0].formal_name_faction, label_get(245));
+    crt_strcpy(game().mfactions[0].noun_faction, label_get(245));
+    crt_strcpy(game().mfactions[0].adj_name_faction, label_get(244));
     if (reload) return;
     // Random pairings of the factions (draws only: the pairs are not used).
     for (int32_t i = 1; i < 8; i++) {
@@ -958,7 +965,7 @@ void GAMEAPI setup_game(int32_t reload) {
                 tries++;
             } while (j == i);
             if (pairs[j] != 0 &&
-                (tries < 200 || (tries < 400 && !(MFactions[j].rule_flags & RFLAG_COMMFREQ))))
+                (tries < 200 || (tries < 400 && !(game().mfactions[j].rule_flags & RFLAG_COMMFREQ))))
                 continue;
             if (is_human(i) && is_human(j) && tries < 100) continue;
             break;
@@ -967,7 +974,7 @@ void GAMEAPI setup_game(int32_t reload) {
         pairs[j]++;
     }
     for (int32_t i = 1; i < 8; i++) {
-        if (pairs[i] > 1 || !(MFactions[i].rule_flags & RFLAG_COMMFREQ)) continue;
+        if (pairs[i] > 1 || !(game().mfactions[i].rule_flags & RFLAG_COMMFREQ)) continue;
         int32_t tries = 0, j;
         for (;;) {
             do {
@@ -987,8 +994,8 @@ void GAMEAPI setup_game(int32_t reload) {
                     char key_i[24], key_j[24];
                     key_i[0] = 0;
                     key_j[0] = 0;
-                    crt_strcat(key_i, MFactions[i].search_key);
-                    crt_strcat(key_j, MFactions[j].search_key);
+                    crt_strcat(key_i, game().mfactions[i].search_key);
+                    crt_strcat(key_j, game().mfactions[j].search_key);
                     win32::CharUpperA(key_i);
                     win32::CharUpperA(key_j);
                     bool rivals = false;
@@ -1010,12 +1017,13 @@ void GAMEAPI setup_game(int32_t reload) {
             // more at diff_level 3+.
             for (int32_t i = 1; i < 8; i++) {
                 if (!(FactionStatus[0] & (1 << i))) continue;
-                for (int32_t n = 0; n < (int32_t)(((uint32_t)GameRules >> 6 & 1) + (Factions[i].diff_level >= 3)); n++) {
+                for (int32_t n = 0;
+                     n < (int32_t)(((uint32_t)GameRules >> 6 & 1) + (game().factions[i].diff_level >= 3)); n++) {
                     int32_t tries = 0, j;
                     for (;;) {
                         j = game_rand() % 7 + 1;
                         if (++tries >= 100) break;
-                        if (Factions[j].diplo_agenda[i] & 0x200) continue;
+                        if (game().factions[j].diplo_agenda[i] & 0x200) continue;
                         uint8_t bit = (uint8_t)(1 << j);
                         if (!(FactionStatus[1] & bit) || (FactionStatus[0] & bit)) continue;
                         break;
@@ -1037,16 +1045,17 @@ void GAMEAPI setup_game(int32_t reload) {
 int32_t GAMEAPI eliminate_player(int32_t faction_id, int32_t killer_id) {
     const int32_t f = faction_id;
     if (f == 0) return 0;
-    for (int32_t i = 0; i < BaseCount; i++) {
-        if (Bases[i].faction_id == f) return 0;
+    for (int32_t i = 0; i < game().base_count; i++) {
+        if (game().bases[i].faction_id == f) return 0;
     }
-    for (int32_t i = VehCount - 1; i >= 0; i--) {
-        if (i < VehCount && Vehs[i].faction_id == f) veh_kill(i);
+    for (int32_t i = game().veh_count - 1; i >= 0; i--) {
+        if (i < game().veh_count && game().vehs[i].faction_id == f) veh_kill(i);
     }
-    Factions[f].base_count = 0;
+    game().factions[f].base_count = 0;
     int32_t respawned = setup_player(f, killer_id, 0);
     if (!respawned) {
-        if (killer_id > 0 && !(GameState & (STATE_GAME_DONE | STATE_FINAL_SCORE_DONE))) Factions[killer_id].eliminated_count++;
+        if (killer_id > 0 && !(GameState & (STATE_GAME_DONE | STATE_FINAL_SCORE_DONE)))
+            game().factions[killer_id].eliminated_count++;
         if (f == CurrentPlayerFaction) return 1;
     }
     if (killer_id < 0)
@@ -1054,13 +1063,13 @@ int32_t GAMEAPI eliminate_player(int32_t faction_id, int32_t killer_id) {
     else if (killer_id > 0)
         set_treaty(f, killer_id, 0x2030, 1);
     draw_map(1);
-    MFaction& m = MFactions[f];
+    MFaction& m = game().mfactions[f];
     GenderDefault = m.noun_gender;
     PluralDefault = m.is_noun_plural;
     parse_says(0, m.noun_faction, -1, -1);
-    GenderDefault = MFactions[killer_id].noun_gender;
-    PluralDefault = MFactions[killer_id].is_noun_plural;
-    parse_says(1, MFactions[killer_id].noun_faction, -1, -1);
+    GenderDefault = game().mfactions[killer_id].noun_gender;
+    PluralDefault = game().mfactions[killer_id].is_noun_plural;
+    parse_says(1, game().mfactions[killer_id].noun_faction, -1, -1);
     GenderDefault = m.is_leader_female;
     PluralDefault = 0;
     parse_says(2, m.title_leader, -1, -1);
@@ -1094,23 +1103,23 @@ int32_t GAMEAPI eliminate_player(int32_t faction_id, int32_t killer_id) {
     }
     if (track && killer_id == CurrentPlayerFaction) {
         // The viewer's intelligence tracks the escaping colonists.
-        int32_t n = (Factions[CurrentPlayerFaction].diplo_status[f] & 0x1000) ? 2 : 4;
+        int32_t n = (game().factions[CurrentPlayerFaction].diplo_status[f] & 0x1000) ? 2 : 4;
         int32_t veh_id;
         if ((n - 1 <= 0 || game_rand() % n == 0) && (veh_id = veh_find(0, 0, f, -1)) >= 0) {
             int32_t x2 = 0, y2 = 0;
             for (int32_t i = 0; i < 9; i++) {
-                x2 = map_wrap_x(Vehs[veh_id].x + TableOffsetX[i]);
-                y2 = Vehs[veh_id].y + TableOffsetY[i];
+                x2 = map_wrap_x(game().vehs[veh_id].x + TableOffsetX[i]);
+                y2 = game().vehs[veh_id].y + TableOffsetY[i];
                 if (map_in_bounds(x2, y2)) spot_loc(x2, y2, killer_id);
             }
             int32_t top = veh_id;
-            while (Vehs[top].prev_veh_id_stack >= 0) top = Vehs[top].prev_veh_id_stack;
+            while (game().vehs[top].prev_veh_id_stack >= 0) top = game().vehs[top].prev_veh_id_stack;
             bool shown = false;
-            for (int32_t v = top; v >= 0; v = Vehs[v].next_veh_id_stack) {
-                Vehs[v].visibility = 0;
-                if (Units[Vehs[v].unit_id].plan == PLAN_COLONY && !shown) {
+            for (int32_t v = top; v >= 0; v = game().vehs[v].next_veh_id_stack) {
+                game().vehs[v].visibility = 0;
+                if (Units[game().vehs[v].unit_id].plan == PLAN_COLONY && !shown) {
                     shown = true;
-                    Vehs[v].visibility = (uint8_t)(1 << killer_id);
+                    game().vehs[v].visibility = (uint8_t)(1 << killer_id);
                 }
             }
             draw_tiles(x2, y2, 2);
@@ -1126,37 +1135,37 @@ int32_t GAMEAPI eliminate_player(int32_t faction_id, int32_t killer_id) {
 // ---- scenario_setup -----------------------------------------------------------------------------
 
 void GAMEAPI scenario_setup() {
-    for (int32_t v = VehCount - 1; v >= 0; v--) {
-        if (!(Vehs[v].flags & (VFLAG_START_RAND_LOCATION | VFLAG_START_RAND_MONOLITH | VFLAG_START_RAND_FUNGUS)))
+    for (int32_t v = game().veh_count - 1; v >= 0; v--) {
+        if (!(game().vehs[v].flags & (VFLAG_START_RAND_LOCATION | VFLAG_START_RAND_MONOLITH | VFLAG_START_RAND_FUNGUS)))
             continue;
         veh_lift(v);
         int32_t tries, x = 0, y = 0;
         for (tries = 0; tries < 10000; tries++) {
-            int32_t flat = (int8_t)MapToggleFlat & 1;
-            x = map_rand_mod(MapAreaX - flat * 4) + (MapToggleFlat & 1) * 2;
-            y = map_rand_mod(MapAreaY - 4) + 2;
+            int32_t flat = (int8_t)game().map.flat & 1;
+            x = map_rand_mod(game().map.x - flat * 4) + (game().map.flat & 1) * 2;
+            y = map_rand_mod(game().map.y - 4) + 2;
             if (x & 1) x--;
             if (y & 1) x++;
-            uint8_t triad = Chassis[Units[Vehs[v].unit_id].chassis_id].triad;
+            uint8_t triad = Chassis[Units[game().vehs[v].unit_id].chassis_id].triad;
             if (triad != TRIAD_AIR && map_is_ocean(x, y) != (triad == TRIAD_SEA) && tries < 9950) continue;
             MAP* sq = map_tile(x, y);
-            uint16_t flags = Vehs[v].flags;
+            uint16_t flags = game().vehs[v].flags;
             if ((flags & VFLAG_START_RAND_MONOLITH) && !(sq->items & BIT_MONOLITH) && tries < 9900) continue;
             if ((flags & VFLAG_START_RAND_FUNGUS) && !((sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40) &&
                 tries < 9900)
                 continue;
             int32_t other = veh_at(x, y);
             if (other >= 0) {
-                if (Vehs[other].faction_id != Vehs[v].faction_id) continue;
+                if (game().vehs[other].faction_id != game().vehs[v].faction_id) continue;
                 if (tries < (stack_check(other, 1, -1, -1, -1) + 10) * 500) continue;
             }
             // Distance to the nearest other vehicle or base (an approximate measure).
             int32_t nearest = 9999;
-            for (int32_t i = 0; i < VehCount; i++) {
+            for (int32_t i = 0; i < game().veh_count; i++) {
                 if (i == v) continue;
-                int32_t dx = std::abs(x - Vehs[i].x);
-                if (!(MapToggleFlat & 1) && dx > MapHalfX) dx = MapAreaX - dx;
-                int32_t dist = (std::abs(y - Vehs[i].y) + dx) >> 1;
+                int32_t dx = std::abs(x - game().vehs[i].x);
+                if (!(game().map.flat & 1) && dx > game().map.half_x) dx = game().map.x - dx;
+                int32_t dist = (std::abs(y - game().vehs[i].y) + dx) >> 1;
                 if (dist < nearest) nearest = dist;
             }
             base_find(x, y);
@@ -1192,9 +1201,9 @@ void GAMEAPI time_warp() {
         if (!(FactionStatus[1] & bit)) continue;
         int32_t first = base_find_faction(0, 0, f);
         if (first < 0) continue;
-        MFaction& m = MFactions[f];
-        Faction& F = Factions[f];
-        BASE& fb = Bases[first];
+        MFaction& m = game().mfactions[f];
+        Faction& F = game().factions[f];
+        BASE& fb = game().bases[first];
         fb.pop_size = (int8_t)first_pop;
         if (m.rule_talent) fb.pop_size = (int8_t)(first_pop + 1);
         if (m.rule_drone || m.rule_population) fb.pop_size--;
@@ -1234,10 +1243,10 @@ void GAMEAPI time_warp() {
         }
         Units[defender].unit_flags |= UNIT_PROTOTYPED;
         int32_t veh_id = veh_init(defender, f, fb.x, fb.y);
-        Vehs[veh_id].order = ORDER_HOLD;
-        Vehs[veh_id].morale++;
+        game().vehs[veh_id].order = ORDER_HOLD;
+        game().vehs[veh_id].morale++;
         veh_id = veh_init(defender, f, fb.x, fb.y);
-        Vehs[veh_id].order = ORDER_HOLD;
+        game().vehs[veh_id].order = ORDER_HOLD;
         // last_veh: the vehicle the original keeps in a local (see the fallback below).
         int32_t last_veh =
             veh_init(ExpansionEnabled && is_aquatic(f) ? BSC_SEA_FORMERS : BSC_FORMERS, f, fb.x, fb.y);
@@ -1245,8 +1254,8 @@ void GAMEAPI time_warp() {
         if (unit_id >= 0) {
             Units[unit_id].unit_flags |= UNIT_PROTOTYPED;
             last_veh = veh_init(unit_id, f, fb.x, fb.y);
-            Vehs[last_veh].morale++;
-            if (unit_id == BSC_MIND_WORMS) Vehs[last_veh].morale = MORALE_DISCIPLINED;
+            game().vehs[last_veh].morale++;
+            if (unit_id == BSC_MIND_WORMS) game().vehs[last_veh].morale = MORALE_DISCIPLINED;
         }
         unit_id = get_plan(f, PLAN_OFFENSE);
         if (unit_id >= 0) {
@@ -1255,11 +1264,11 @@ void GAMEAPI time_warp() {
                 int32_t combat = get_plan(f, PLAN_COMBAT);
                 if (combat >= 0) {
                     last_veh = veh_init(combat, f, fb.x, fb.y);
-                    if (combat == BSC_MIND_WORMS) Vehs[last_veh].morale = MORALE_DISCIPLINED;
+                    if (combat == BSC_MIND_WORMS) game().vehs[last_veh].morale = MORALE_DISCIPLINED;
                 }
             } else {
                 last_veh = veh_init(unit_id, f, fb.x, fb.y);
-                Vehs[last_veh].morale++;
+                game().vehs[last_veh].morale++;
                 if (F.AI_fight > 0) last_veh = veh_init(unit_id, f, fb.x, fb.y);
             }
         }
@@ -1276,9 +1285,9 @@ void GAMEAPI time_warp() {
         int32_t last_x = 0, last_y = 0;  // the last own base visited by the site search
         for (int32_t k = 0; k < bases_target - 1; k++) {
             int32_t best = 0, best_x = 0, best_y = 0;
-            for (int32_t i = 0; i < BaseCount; i++) {
-                if (Bases[i].faction_id != f) continue;
-                int32_t bx = Bases[i].x, by = Bases[i].y;
+            for (int32_t i = 0; i < game().base_count; i++) {
+                if (game().bases[i].faction_id != f) continue;
+                int32_t bx = game().bases[i].x, by = game().bases[i].y;
                 uint32_t base_region = map_tile(bx, by)->region;
                 last_x = bx;
                 last_y = by;
@@ -1300,7 +1309,7 @@ void GAMEAPI time_warp() {
                             site_set(x2, y2, site);
                         }
                     }
-                    int32_t value = (Bases[i].pop_size + site) * 32;
+                    int32_t value = (game().bases[i].pop_size + site) * 32;
                     if (base_region != region) value /= 2;
                     int32_t ring = j - 25;  // index in the radius 3-8 part of the table
                     if (ring >= 56 && ring < 144) value = value * 3 / 2;
@@ -1308,11 +1317,11 @@ void GAMEAPI time_warp() {
                     if (ring < 24) value /= 2;
                     int32_t near_base = base_find(x2, y2);
                     if (i != near_base) {
-                        int32_t dx = std::abs(x2 - Bases[near_base].x);
-                        if (!(MapToggleFlat & 1) && dx > MapHalfX) dx = MapAreaX - dx;
-                        if (((std::abs(y2 - Bases[near_base].y) + dx) & ~1) < 8) continue;
+                        int32_t dx = std::abs(x2 - game().bases[near_base].x);
+                        if (!(game().map.flat & 1) && dx > game().map.half_x) dx = game().map.x - dx;
+                        if (((std::abs(y2 - game().bases[near_base].y) + dx) & ~1) < 8) continue;
                     }
-                    if (Bases[near_base].faction_id != f) {
+                    if (game().bases[near_base].faction_id != f) {
                         // BUG(original): compares the tile's region with itself: always skipped.
                         if (map_tile(x2, y2)->region == region) continue;
                         value /= 2;
@@ -1326,7 +1335,7 @@ void GAMEAPI time_warp() {
             }
             if (best) {
                 int32_t base_id = base_init(f, best_x, best_y);
-                BASE& b = Bases[base_id];
+                BASE& b = game().bases[base_id];
                 int8_t pop = (int8_t)(bases_target - k);
                 b.pop_size = pop;
                 if (pop > 2) set_fac(FAC_RECREATION_COMMONS, base_id, 1);
@@ -1338,12 +1347,12 @@ void GAMEAPI time_warp() {
                     if (guard < 0) guard = BSC_SCOUT_PATROL;
                 }
                 last_veh = veh_init(guard, f, best_x, best_y);
-                if (guard == BSC_MIND_WORMS) Vehs[last_veh].morale = MORALE_DISCIPLINED;
-                Vehs[last_veh].order = ORDER_HOLD;
+                if (guard == BSC_MIND_WORMS) game().vehs[last_veh].morale = MORALE_DISCIPLINED;
+                game().vehs[last_veh].order = ORDER_HOLD;
                 if (b.pop_size > 2) {
                     last_veh = veh_init(guard, f, best_x, best_y);
-                    if (guard == BSC_MIND_WORMS) Vehs[last_veh].morale = MORALE_DISCIPLINED;
-                    Vehs[last_veh].order = ORDER_HOLD;
+                    if (guard == BSC_MIND_WORMS) game().vehs[last_veh].morale = MORALE_DISCIPLINED;
+                    game().vehs[last_veh].order = ORDER_HOLD;
                 }
                 if (F.AI_growth || b.pop_size > 3)
                     last_veh = veh_init(is_aquatic(f) ? BSC_SEA_FORMERS : BSC_FORMERS, f, best_x, best_y);
@@ -1356,7 +1365,7 @@ void GAMEAPI time_warp() {
                         if (sea_unit >= 0) {
                             Units[sea_unit].unit_flags |= UNIT_PROTOTYPED;
                             veh_id = veh_init(sea_unit, f, x2, y2);
-                            Vehs[veh_id].morale++;
+                            game().vehs[veh_id].morale++;
                         }
                         veh_init(transport, f, x2, y2);
                         last_veh = veh_init(BSC_UNITY_ROVER, f, x2, y2);
@@ -1368,14 +1377,14 @@ void GAMEAPI time_warp() {
             } else {
                 // No site: the smallest own base grows instead.
                 int32_t small = -1, min_pop = 999;
-                for (int32_t i = 0; i < BaseCount; i++) {
-                    if (Bases[i].faction_id == f && Bases[i].pop_size < min_pop) {
-                        min_pop = Bases[i].pop_size;
+                for (int32_t i = 0; i < game().base_count; i++) {
+                    if (game().bases[i].faction_id == f && game().bases[i].pop_size < min_pop) {
+                        min_pop = game().bases[i].pop_size;
                         small = i;
                     }
                 }
                 if (small < 0) continue;
-                BASE& b = Bases[small];
+                BASE& b = game().bases[small];
                 if (b.pop_size < 6) b.pop_size += 2;
                 set_fac(FAC_RECREATION_COMMONS, small, 1);
                 set_fac(FAC_RECYCLING_TANKS, small, 1);
@@ -1384,7 +1393,7 @@ void GAMEAPI time_warp() {
                 if (combat >= 0) {
                     veh_init(combat, f, b.x, b.y);
                     // BUG(original): the morale goes to the vehicle created last before, not this one.
-                    if (combat == BSC_MIND_WORMS) Vehs[last_veh].morale = MORALE_DISCIPLINED;
+                    if (combat == BSC_MIND_WORMS) game().vehs[last_veh].morale = MORALE_DISCIPLINED;
                 }
                 if (is_aquatic(f))
                     last_veh = veh_init(BSC_SEA_ESCAPE_POD, f, last_x, last_y);  // BUG(original): stale location
@@ -1396,8 +1405,8 @@ void GAMEAPI time_warp() {
         SkipTechScreenB = 1;
         reset_territory();
         enemy_strategy(f);
-        for (int32_t i = 0; i < BaseCount; i++) {
-            BASE& b = Bases[i];
+        for (int32_t i = 0; i < game().base_count; i++) {
+            BASE& b = game().bases[i];
             if (b.faction_id != f) continue;
             for (int32_t j = 0; j < 81; j++) {
                 int32_t x2 = map_wrap_x(b.x + TableOffsetX[j]);
@@ -1419,10 +1428,10 @@ void GAMEAPI time_warp() {
                 if (map_in_bounds(x2, y2)) synch_bit(x2, y2, f);
             }
             // Roads to the other own bases of the landmass (at most 50 steps each).
-            for (int32_t o = 0; o < BaseCount; o++) {
-                if (o == i || Bases[o].faction_id != f) continue;
-                if (map_tile(b.x, b.y)->region != map_tile(Bases[o].x, Bases[o].y)->region) continue;
-                int32_t x = Bases[o].x, y = Bases[o].y;
+            for (int32_t o = 0; o < game().base_count; o++) {
+                if (o == i || game().bases[o].faction_id != f) continue;
+                if (map_tile(b.x, b.y)->region != map_tile(game().bases[o].x, game().bases[o].y)->region) continue;
+                int32_t x = game().bases[o].x, y = game().bases[o].y;
                 int32_t to_x = b.x, to_y = b.y;
                 int32_t steps = 0;
                 int32_t flags = has_tech(Rules.tech_preq_build_road_fungus, f) ? 0 : 4;
@@ -1445,16 +1454,16 @@ void GAMEAPI time_warp() {
         }
         SkipTechScreenB = 0;
         // Formers move next to their start onto the best tile around.
-        for (int32_t v = 0; v < VehCount; v++) {
-            if (Vehs[v].faction_id != f) continue;
-            const UNIT& u = Units[Vehs[v].unit_id];
+        for (int32_t v = 0; v < game().veh_count; v++) {
+            if (game().vehs[v].faction_id != f) continue;
+            const UNIT& u = Units[game().vehs[v].unit_id];
             if (u.plan != PLAN_TERRAFORM) continue;
             uint8_t triad = Chassis[u.chassis_id].triad;
             if (is_aquatic(f) ? triad != TRIAD_SEA : triad != TRIAD_LAND) continue;
             int32_t best = 0;
             for (int32_t k = 0; k < 8; k++) {
-                int32_t x2 = map_wrap_x(Vehs[v].x + NearOffsetX[k]);
-                int32_t y2 = Vehs[v].y + NearOffsetY[k];
+                int32_t x2 = map_wrap_x(game().vehs[v].x + NearOffsetX[k]);
+                int32_t y2 = game().vehs[v].y + NearOffsetY[k];
                 if (!map_in_bounds(x2, y2)) continue;
                 MAP* sq = map_tile(x2, y2);
                 uint32_t alt = sq->climate & 0xE0;
@@ -1477,26 +1486,26 @@ void GAMEAPI time_warp() {
 
 void GAMEAPI crash_landing(int32_t faction_id) {
     int32_t base_id = -1, x, y;
-    for (int32_t i = 0; i < BaseCount; i++) {
-        if (Bases[i].faction_id == faction_id) {
+    for (int32_t i = 0; i < game().base_count; i++) {
+        if (game().bases[i].faction_id == faction_id) {
             base_id = i;
             break;
         }
     }
     if (base_id >= 0) {
-        x = Bases[base_id].x;
-        y = Bases[base_id].y;
+        x = game().bases[base_id].x;
+        y = game().bases[base_id].y;
     } else {
         int32_t veh_id = -1;
-        for (int32_t i = 0; i < VehCount; i++) {
-            if (Vehs[i].faction_id == faction_id) {
+        for (int32_t i = 0; i < game().veh_count; i++) {
+            if (game().vehs[i].faction_id == faction_id) {
                 veh_id = i;
                 break;
             }
         }
         if (veh_id < 0) return;
-        x = Vehs[veh_id].x;
-        y = Vehs[veh_id].y;
+        x = game().vehs[veh_id].x;
+        y = game().vehs[veh_id].y;
     }
     bool alien = is_alien(CurrentPlayerFaction);
     faction_key_upper(CurrentPlayerFaction);
@@ -1516,9 +1525,9 @@ void GAMEAPI crash_landing(int32_t faction_id) {
     BlitSourceScale = 1;
     if (base_id >= 0) {
         char name[80];
-        crt_strcpy(name, Bases[base_id].name);
+        crt_strcpy(name, game().bases[base_id].name);
         ui_first_base_name(name);
-        crt_strcpy(Bases[base_id].name, ParseStrBuffer[0]);
+        crt_strcpy(game().bases[base_id].name, ParseStrBuffer[0]);
         make_base_unique(base_id);
     }
     mapwin_field(MapWins[0], 0x1DD70) |= 0x8C0;

@@ -4,12 +4,13 @@
 // returns its top (no previous vehicle). The X_pop* popup wrappers in this address range are UI
 // (see ui_bridge.h); fractal_init/fractal_at at its end belong to world generation (world.h).
 #pragma once
+#include "engine/game_state.h"
 #include "engine/globals.h"
 
 // ---- helpers (not original functions) -----------------------------------------------------------
 
 inline int32_t unit_triad(int32_t unit_id) { return Chassis[Units[unit_id].chassis_id].triad; }
-inline int32_t veh_triad(int32_t veh_id) { return unit_triad(Vehs[veh_id].unit_id); }
+inline int32_t veh_triad(int32_t veh_id) { return unit_triad(game().vehs[veh_id].unit_id); }
 // Psi weapon (negative offense value).
 inline bool unit_psi_weapon(int32_t unit_id) { return Weapon[Units[unit_id].weapon_id].offense_value < 0; }
 inline bool unit_psi_armor(int32_t unit_id) { return Armor[Units[unit_id].armor_id].defense_value < 0; }
@@ -17,21 +18,21 @@ inline bool unit_psi_armor(int32_t unit_id) { return Armor[Units[unit_id].armor_
 inline bool unit_is_native(int32_t unit_id) { return unit_id < 64 && (unit_psi_weapon(unit_id) || unit_id == 15); }
 // Whether a base (any id: the original indexes Bases[] without a range check) has a facility.
 inline bool base_has_fac(int32_t base_id, int32_t facility_id) {
-    const uint8_t* built = reinterpret_cast<const uint8_t*>(&Bases[0]) + base_id * (int32_t)sizeof(BASE) +
+    const uint8_t* built = reinterpret_cast<const uint8_t*>(&game().bases[0]) + base_id * (int32_t)sizeof(BASE) +
                            offsetof(BASE, facilities_built);
     return (built[facility_id / 8] & (1 << (facility_id & 7))) != 0;
 }
 // Faction's diplomatic status with another faction. The original indexes the table without a range
 // check (other_id -1 reads the preceding field, faction_id -1 the memory before Factions[0]).
 inline uint32_t diplo_status_raw(int32_t faction_id, int32_t other_id) {
-    const uint8_t* p = reinterpret_cast<const uint8_t*>(&Factions[0].diplo_status[0]) +
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(&game().factions[0].diplo_status[0]) +
                        faction_id * (int32_t)sizeof(Faction) + other_id * 4;
     return *reinterpret_cast<const uint32_t*>(p);
 }
 // Top of the stack containing veh_id (inline copy of veh_top); -1 for -1.
 inline int32_t stack_top(int32_t veh_id) {
     if (veh_id < 0) return veh_id;
-    while (Vehs[veh_id].prev_veh_id_stack >= 0) veh_id = Vehs[veh_id].prev_veh_id_stack;
+    while (game().vehs[veh_id].prev_veh_id_stack >= 0) veh_id = game().vehs[veh_id].prev_veh_id_stack;
     return veh_id;
 }
 // Not an original function: the distance measure the original inlines (vector_dist, 0x4F8090 is the

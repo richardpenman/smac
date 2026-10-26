@@ -6,6 +6,7 @@
 #include "engine/base.h"
 #include "engine/crt.h"
 #include "engine/diplo_act.h"
+#include "engine/game_state.h"
 #include "engine/heap.h"
 #include "engine/parse.h"
 #include "engine/random.h"
@@ -29,9 +30,9 @@ static int32_t natural_altitude(int32_t detail) {
 }
 
 void GAMEAPI map_shutdown() {
-    if (MapTiles) mem_free(MapTiles);
+    if (game().map.tiles) mem_free(game().map.tiles);
     if (MapAbstract) mem_free(MapAbstract);
-    MapTiles = nullptr;
+    game().map.tiles = nullptr;
     MapAbstract = nullptr;
 }
 
@@ -42,29 +43,29 @@ int32_t GAMEAPI map_init() {
     std::strcat(StrBuffer, ".");
     std::strcpy(MapFilePath, StrBuffer);
     std::strcat(MapFilePath, "MP");
-    MapHalfX = MapAreaX / 2;
-    MapAreaTiles = MapHalfX * MapAreaY;
-    MapAreaSqRoot = quick_root(MapAreaTiles);
-    MapTiles = nullptr;
-    MapTiles = static_cast<MAP*>(mem_get((uint32_t)MapAreaTiles * sizeof(MAP)));
-    if (MapTiles) {
-        MapAbstractX = (MapAreaX + 4) / 5;
-        MapAbstractY = (MapAreaY + 4) / 5;
+    game().map.half_x = game().map.x / 2;
+    game().map.tile_count = game().map.half_x * game().map.y;
+    game().map.sq_root = quick_root(game().map.tile_count);
+    game().map.tiles = nullptr;
+    game().map.tiles = static_cast<MAP*>(mem_get((uint32_t)game().map.tile_count * sizeof(MAP)));
+    if (game().map.tiles) {
+        MapAbstractX = (game().map.x + 4) / 5;
+        MapAbstractY = (game().map.y + 4) / 5;
         MapAbstractCount = ((MapAbstractX + 1) / 2) * MapAbstractY;
         MapAbstract = static_cast<uint8_t*>(mem_get((uint32_t)MapAbstractCount));
         if (MapAbstract) {
             mapwin_terrain_fixup();
             return 0;
         }
-        if (!MapTiles) {
-            MapTiles = nullptr;
+        if (!game().map.tiles) {
+            game().map.tiles = nullptr;
             MapAbstract = nullptr;
             return 1;
         }
-        mem_free(MapTiles);
+        mem_free(game().map.tiles);
     }
     if (MapAbstract) mem_free(MapAbstract);
-    MapTiles = nullptr;
+    game().map.tiles = nullptr;
     MapAbstract = nullptr;
     return 1;
 }
@@ -75,8 +76,8 @@ static void wipe_tiles() {
     MapLandmarkCount = 0;
     MapSeaLevel = 0;
     MapRandomSeed = game_random(0, 0x7FFF) + 1;
-    MAP* sq = MapTiles;
-    for (int32_t i = 0; i < MapAreaTiles; i++, sq++) {
+    MAP* sq = game().map.tiles;
+    for (int32_t i = 0; i < game().map.tile_count; i++, sq++) {
         sq->climate = 0x20;
         sq->contour = 0x14;
         sq->val2 = 0xF;
@@ -94,21 +95,21 @@ void GAMEAPI map_wipe() { wipe_tiles(); }
 // The header block starts at MapAreaX (0x949870) and runs 0xAA4 bytes (to MapFilePath's end);
 // it includes the MapTiles/MapAbstract pointer slots, written as they are in the image.
 int32_t GAMEAPI map_write(CrtFile* file) {
-    if (crt_fwrite(&MapAreaX, 0xAA4, 1, file) == 0) return 1;
-    if (crt_fwrite(MapTiles, (uint32_t)MapAreaTiles * sizeof(MAP), 1, file) == 0) return 1;
+    if (crt_fwrite(&game().map.x, 0xAA4, 1, file) == 0) return 1;
+    if (crt_fwrite(game().map.tiles, (uint32_t)game().map.tile_count * sizeof(MAP), 1, file) == 0) return 1;
     return crt_fwrite(MapAbstract, (uint32_t)MapAbstractCount, 1, file) == 0;
 }
 
 int32_t GAMEAPI map_read(CrtFile* file) {
-    if (MapTiles) mem_free(MapTiles);
+    if (game().map.tiles) mem_free(game().map.tiles);
     if (MapAbstract) mem_free(MapAbstract);
-    MapTiles = nullptr;
+    game().map.tiles = nullptr;
     MapAbstract = nullptr;
-    if (crt_fread(&MapAreaX, 0xAA4, 1, file) == 0) return 1;
-    MapTiles = nullptr;
+    if (crt_fread(&game().map.x, 0xAA4, 1, file) == 0) return 1;
+    game().map.tiles = nullptr;
     MapAbstract = nullptr;
     if (map_init() != 0) return 1;
-    if (crt_fread(MapTiles, (uint32_t)MapAreaTiles * sizeof(MAP), 1, file) == 0) return 1;
+    if (crt_fread(game().map.tiles, (uint32_t)game().map.tile_count * sizeof(MAP), 1, file) == 0) return 1;
     if (crt_fread(MapAbstract, (uint32_t)MapAbstractCount, 1, file) == 0) return 1;
     fixup_landmarks();
     return 0;
@@ -125,7 +126,7 @@ void GAMEAPI alt_put_detail(int32_t x, int32_t y, int32_t detail) { map_tile(x, 
 // Shows the "base submerged" messages to the viewing faction. Uses popp when the base survives
 // (pop restored to 1 is not the case here) and X_pop_2 when it is saved at size 1.
 static void base_submerged_popup(int32_t base_id, bool saved) {
-    BASE& base = Bases[base_id];
+    BASE& base = game().bases[base_id];
     int32_t viewer = CurrentPlayerFaction;
     if ((uint8_t)base.faction_id == (uint32_t)viewer) {
         Console_focus(&MainConsole, base.x, base.y, viewer);
@@ -137,7 +138,7 @@ static void base_submerged_popup(int32_t base_id, bool saved) {
     } else if ((uint8_t)base.faction_id == (uint32_t)viewer || ((uint8_t)(1 << (viewer & 31)) & base.visibility)) {
         Console_focus(&MainConsole, base.x, base.y, viewer);
         parse_says(0, base.name, -1, -1);
-        parse_says(1, MFactions[(uint8_t)base.faction_id].adj_name_faction, -1, -1);
+        parse_says(1, game().mfactions[(uint8_t)base.faction_id].adj_name_faction, -1, -1);
         if (saved)
             X_pop_2("BASESUBMERGED2", "subbase_sm.pcx", 0);
         else
@@ -181,7 +182,7 @@ void GAMEAPI alt_set(int32_t x, int32_t y, int32_t altitude) {
                     if (!to_ocean) goto done;
                     int32_t offset, mask;
                     bitmask(FAC_PRESSURE_DOME, &offset, &mask);
-                    BASE& base = Bases[base_id];
+                    BASE& base = game().bases[base_id];
                     if (base.facilities_built[offset] & (uint8_t)mask) goto done;
                     int32_t loss = game_rand() % 3 + 2;
                     int32_t half = base.pop_size / 2;
@@ -189,11 +190,11 @@ void GAMEAPI alt_set(int32_t x, int32_t y, int32_t altitude) {
                     base.pop_size = (int8_t)(base.pop_size - loss);
                     set_fac(FAC_PRESSURE_DOME, base_id, 1);
                     uint32_t faction = (uint8_t)base.faction_id;
-                    Factions[faction].player_flags |= 0x80000;
+                    game().factions[faction].player_flags |= 0x80000;
                     MapBaseSubmergedCount[faction]++;
                     if (is_objective(base_id)) base.pop_size = base.pop_size < 1 ? 1 : base.pop_size;
                     if (base.pop_size > 0) goto done;
-                    if (Factions[faction].base_count < 2 || (MultiplayerActive && !ControlTurnC)) {
+                    if (game().factions[faction].base_count < 2 || (MultiplayerActive && !ControlTurnC)) {
                         // The faction's last base (or a network game outside the control turn) survives.
                         base.pop_size = 1;
                         if (!VehBattleState[0]) base_submerged_popup(base_id, true);
@@ -205,7 +206,7 @@ void GAMEAPI alt_set(int32_t x, int32_t y, int32_t altitude) {
                 // Units on the wrong side of the new shoreline drown (air units and units with
                 // flag 0x20 excepted).
                 for (int32_t veh_id = stack_fix(veh_at(x, y)); veh_id >= 0;) {
-                    VEH& veh = Vehs[veh_id];
+                    VEH& veh = game().vehs[veh_id];
                     int32_t next = veh.next_veh_id_stack;
                     int32_t triad = Chassis[Units[veh.unit_id].chassis_id].triad;
                     if (triad != TRIAD_AIR && !(veh.flags & 0x20) && (triad == TRIAD_SEA) != (bool)to_ocean) {
@@ -341,13 +342,13 @@ int32_t GAMEAPI treaty_user_at(int32_t x, int32_t y, int32_t faction_id) {
     if ((sq->climate & 0xE0) < 0x60) return -1;
     uint32_t user = sq->val3 & 7;
     if (user == 0 || user == (uint32_t)faction_id) return -1;
-    uint32_t status = Factions[faction_id].diplo_status[user];
+    uint32_t status = game().factions[faction_id].diplo_status[user];
     if ((status & DIPLO_PACT) || !(status & DIPLO_TREATY)) return -1;
     return (int32_t)user;
 }
 
 int32_t GAMEAPI minerals_at(int32_t x, int32_t y) {
-    if (y == 0 || y == MapAreaY - 1) return 2;
+    if (y == 0 || y == game().map.y - 1) return 2;
     int32_t s = (x + y) / 2;
     int32_t a = (x - s) / 2;
     int32_t v = a * 3 + MapRandomSeed + (s / 2) * 2;
@@ -428,7 +429,7 @@ void GAMEAPI say_loc(char* buffer, int32_t x, int32_t y, int32_t near_base, int3
             std::strcat(buffer, label_get(0x20 / 4));
             std::strcat(buffer, " ");
         }
-        std::strcat(buffer, Bases[base_id].name);
+        std::strcat(buffer, game().bases[base_id].name);
         if (coords) std::strcat(buffer, " ");
     }
     if (coords == 1 || (coords == 2 && base_id < 0)) {
@@ -492,7 +493,7 @@ int32_t GAMEAPI valid_landmark(int32_t x, int32_t y, int32_t faction_id) {
     if (owner > 0) return 0;
     int32_t base_id = base_find(x, y);
     if (base_id < 0) return 1;
-    return (uint8_t)Bases[base_id].faction_id == (uint32_t)faction_id;
+    return (uint8_t)game().bases[base_id].faction_id == (uint32_t)faction_id;
 }
 
 void GAMEAPI kill_landmark(int32_t x, int32_t y) {
@@ -539,9 +540,9 @@ void GAMEAPI fixup_landmarks() {
     std::memcpy(LandmarkOverlayVolcano, LandmarkOverlayVolcanoInit, 113);
     std::memcpy(LandmarkOverlayCrater, LandmarkOverlayCraterInit, 113);
     int32_t row = 0;
-    for (int32_t y = 0; y < MapAreaY; y++, row += MapHalfX) {
-        for (int32_t x = y & 1; x < MapAreaX; x += 2) {
-            MAP* sq = &MapTiles[(x >> 1) + row];
+    for (int32_t y = 0; y < game().map.y; y++, row += game().map.half_x) {
+        for (int32_t x = y & 1; x < game().map.x; x += 2) {
+            MAP* sq = &game().map.tiles[(x >> 1) + row];
             uint32_t lm = sq->landmarks;
             int32_t code = (int32_t)lm >> 24;
             if (lm != 0 && code < 0) {
@@ -555,9 +556,9 @@ void GAMEAPI fixup_landmarks() {
 
 // Walks the tiles in storage order the way set_dirty/clear_dirty do.
 static void mark_all_dirty() {
-    MAP* sq = MapTiles;
-    for (int32_t y = 0; y < MapAreaY; y++) {
-        for (int32_t x = y & 1; x < MapAreaX; x += 2, sq++) sq->landmarks |= 0x400000;
+    MAP* sq = game().map.tiles;
+    for (int32_t y = 0; y < game().map.y; y++) {
+        for (int32_t x = y & 1; x < game().map.x; x += 2, sq++) sq->landmarks |= 0x400000;
     }
 }
 
@@ -570,19 +571,19 @@ void GAMEAPI set_dirty() {
 void GAMEAPI clear_dirty() { mark_all_dirty(); }
 
 void GAMEAPI map_resize(int32_t width, int32_t height) {
-    MapResizeOldX = MapAreaX;
-    MapResizeOldY = MapAreaY;
-    if (width >= MapAreaX || height >= MapAreaY) return;
-    MapResizeOldTiles = MapTiles;
-    MapTiles = nullptr;
-    MapAreaX = width;
-    MapAreaY = height;
+    MapResizeOldX = game().map.x;
+    MapResizeOldY = game().map.y;
+    if (width >= game().map.x || height >= game().map.y) return;
+    MapResizeOldTiles = game().map.tiles;
+    game().map.tiles = nullptr;
+    game().map.x = width;
+    game().map.y = height;
     map_init();  // BUG(original): the previous MapAbstract array is not freed.
     wipe_tiles();
-    for (int32_t y = 0; y < MapAreaY; y++) {
-        for (int32_t x = y & 1; x < MapAreaX; x += 2) {
-            int32_t old_y = (MapResizeOldY * y) / MapAreaY;
-            int32_t old_x = ((MapResizeOldX * x) / MapAreaX) >> 1;
+    for (int32_t y = 0; y < game().map.y; y++) {
+        for (int32_t x = y & 1; x < game().map.x; x += 2) {
+            int32_t old_y = (MapResizeOldY * y) / game().map.y;
+            int32_t old_x = ((MapResizeOldX * x) / game().map.x) >> 1;
             MAP* src = &MapResizeOldTiles[(MapResizeOldX >> 1) * old_y + old_x];
             MAP* dst = map_tile(x, y);
             dst->contour = src->contour;

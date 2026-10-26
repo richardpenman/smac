@@ -6,6 +6,7 @@
 #include "engine/base_misc.h"
 #include "engine/clock.h"
 #include "engine/design.h"
+#include "engine/game_state.h"
 #include "engine/goals.h"
 #include "engine/map.h"
 #include "engine/proto.h"
@@ -17,7 +18,7 @@ namespace {
 // The distance measure the original inlines (see veh_vector_dist) from (x, y) to the current base.
 int32_t dist_to_base(int32_t x, int32_t y) {
     int32_t dx = std::abs(x - cur_base().x);
-    if (!(MapToggleFlat & 1) && dx > MapHalfX) dx = MapAreaX - dx;
+    if (!(game().map.flat & 1) && dx > game().map.half_x) dx = game().map.x - dx;
     int32_t dy = std::abs(y - cur_base().y);
     int32_t a = std::abs(dx), b = std::abs(dy);
     int32_t big = a > b ? a : b;
@@ -46,9 +47,9 @@ void GAMEAPI base_terraform(int32_t flag) {
     int32_t bore_seen = 0, cond_seen = 0;
     int32_t tech = 0, wealth = 0, power = 0;
     if (!human) {
-        tech = Factions[faction_id].AI_tech;
-        wealth = Factions[faction_id].AI_wealth;
-        power = Factions[faction_id].AI_power;
+        tech = game().factions[faction_id].AI_tech;
+        wealth = game().factions[faction_id].AI_wealth;
+        power = game().factions[faction_id].AI_power;
     } else {
         uint32_t gov = base.governor_flags;
         if (gov & 0x1000000) {
@@ -102,11 +103,11 @@ void GAMEAPI base_terraform(int32_t flag) {
         if (!(base.worked_tiles & (1 << i))) {
             if (((sq->climate & 0x18) >> 3) + ((items >> 15) & 1) < 2) continue;
             bool free = true;
-            for (int32_t b = 0; b < BaseCount; b++) {
-                BASE& other = Bases[b];
+            for (int32_t b = 0; b < game().base_count; b++) {
+                BASE& other = game().bases[b];
                 if ((uint8_t)other.faction_id != faction_id) continue;
                 int32_t dx = std::abs(x - other.x);
-                if (!(MapToggleFlat & 1) && dx > MapHalfX) dx = MapAreaX - dx;
+                if (!(game().map.flat & 1) && dx > game().map.half_x) dx = game().map.x - dx;
                 if (vector_dist(dx, std::abs(y - other.y)) > 2) continue;
                 int32_t idx = radius_move_tiles(other.x, other.y, x, y, 21);
                 if ((1u << (idx & 31)) & (uint32_t)other.worked_tiles) free = false;
@@ -166,7 +167,7 @@ void GAMEAPI base_terraform(int32_t flag) {
     int32_t rough_tiles = 0;
     base.unk_y = -1;
     int32_t improved = 0, worked_rough = 0, worked_improved = 0, specials = 0;
-    Faction& f = Factions[faction_id];
+    Faction& f = game().factions[faction_id];
     int32_t fungus_yield = f.tech_fungus_energy + f.tech_fungus_mineral + f.tech_fungus_nutrient;
     for (int32_t i = 0; i < 21; i++) {
         int32_t x = map_wrap_x(base.x + TableOffsetX[i]);
@@ -177,7 +178,7 @@ void GAMEAPI base_terraform(int32_t flag) {
         }
         MAP* sq = map_tile(x, y);
         uint32_t alt = sq->climate & 0xE0;
-        if (alt < 0x60 && !(flag && (MFactions[faction_id].rule_flags & 0x100))) continue;
+        if (alt < 0x60 && !(flag && (game().mfactions[faction_id].rule_flags & 0x100))) continue;
         int32_t height = (sq->climate >> 5) - 2;
         int32_t rain = (sq->climate >> 3) & 3;
         int32_t rocky = sq->val3 >> 6;
@@ -225,7 +226,7 @@ void GAMEAPI base_terraform(int32_t flag) {
         if ((items & BIT_FUNGUS) && (map_tile(x, y)->climate & 0xE0) >= 0x40 &&
             !has_tech(Terraform[10].preq_tech, faction_id))
             continue;
-        if ((map_tile(x, y)->climate & 0xE0) < 0x60 && !(flag && (MFactions[faction_id].rule_flags & 0x100)))
+        if ((map_tile(x, y)->climate & 0xE0) < 0x60 && !(flag && (game().mfactions[faction_id].rule_flags & 0x100)))
             continue;
         if (map_tile(x, y)->region != home_region) continue;
         int32_t zoc = zoc_move(x, y, faction_id);
@@ -548,7 +549,7 @@ void GAMEAPI base_terraform(int32_t flag) {
             // Instant terraforming (time warp).
             map_tile(x, y)->items &= ~BIT_FUNGUS;
             int32_t order = can_terraform(faction_id, x, y, 1, CurrentBaseID);
-            if (ExpansionEnabled && (MFactions[faction_id].rule_flags & 0x100)) {
+            if (ExpansionEnabled && (game().mfactions[faction_id].rule_flags & 0x100)) {
                 uint32_t r = (engine_logic_time() + CurrentBaseID + y + x) & 3;
                 if (r) r++;
                 order = (int32_t)r + 4;

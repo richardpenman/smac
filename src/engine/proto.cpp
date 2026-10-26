@@ -2,6 +2,7 @@
 #include "engine/proto.h"
 
 #include "engine/design.h"
+#include "engine/game_state.h"
 #include "engine/map.h"
 #include "engine/social.h"
 #include "engine/tech.h"
@@ -189,7 +190,7 @@ void GAMEAPI make_proto(int32_t unit_id, int32_t chassis_id, int32_t weapon_id, 
 void GAMEAPI veh_put(int32_t veh_id, int32_t x, int32_t y) { veh_drop(veh_lift(veh_id), x, y); }
 
 int32_t GAMEAPI veh_health(int32_t veh_id) {
-    UNIT& u = Units[Vehs[veh_id].unit_id];
+    UNIT& u = Units[game().vehs[veh_id].unit_id];
     int32_t hp;
     if (u.plan == 12) {
         hp = 1;
@@ -197,7 +198,7 @@ int32_t GAMEAPI veh_health(int32_t veh_id) {
         int32_t reactor = u.reactor_id < 1 ? 1 : u.reactor_id > 100 ? 100 : u.reactor_id;
         hp = reactor * 10;
     }
-    hp -= Vehs[veh_id].damage_taken;
+    hp -= game().vehs[veh_id].damage_taken;
     return hp < 0 ? 0 : hp > 9999 ? 9999 : hp;
 }
 
@@ -265,7 +266,7 @@ void GAMEAPI proto_sort_design(int32_t faction_id) {
             value = unit_id + 0x2000;
             ProtoSortCount++;
         } else {
-            value = unit_id + (Factions[faction_id].units_active[unit_id] ? -0x800 : 0) + 0x1000;
+            value = unit_id + (game().factions[faction_id].units_active[unit_id] ? -0x800 : 0) + 0x1000;
             ProtoSortCount++;
         }
         values[i] = value;
@@ -278,8 +279,8 @@ int32_t sign(int32_t v) { return v > 0 ? 1 : v < 0 ? -1 : 0; }
 // Horizontal offset from x1 to x2, wrapped to the shorter way round.
 int32_t wrap_delta(int32_t x1, int32_t x2) {
     int32_t dx = x2 - x1;
-    if (dx < -(MapAreaX / 2)) dx += MapAreaX;
-    if (MapAreaX / 2 < dx) dx -= MapAreaX;
+    if (dx < -(game().map.x / 2)) dx += game().map.x;
+    if (game().map.x / 2 < dx) dx -= game().map.x;
     return dx;
 }
 }  // namespace

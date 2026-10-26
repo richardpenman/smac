@@ -220,7 +220,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 4 | `.editorconfig`, target clang-format style (not applied) | XS | done |
 | 5 | Rename remaining weak names: `_2`/`_3` suffixes where a better name is clear, 36 `dword_`/`DAT_` globals | M | done (see note 5) |
 | 6 | One-time reformat (if approved) | S (mechanical) | |
-| 7 | `GameState` view + `game()`; migrate module by module (map, factions, bases, vehs) | M ×4 | |
+| 7 | `GameState` view + `game()`; migrate module by module (map, factions, bases, vehs) | M ×4 | done (see note 7) |
 | 8 | Magic numbers → named constants/enums, module by module | M | |
 | 9 | `compat.h`: name and isolate all 173 `BUG(original)` sites | M | |
 | 10 | Split `base_production` / yields + unit tests | M | |
@@ -258,3 +258,15 @@ Notes on the increments:
    `say_orders_2`, `get_pacts_2`, `stack_sort_2`, and the methods of the UI classes (`Buffer_*`,
    `Sprite_*`, `Texture_*`, `Font_*`, `Palette_*`, `Wave_*`, `Sound_*`, `Console_*`, `MapWin_*`,
    `GraphicWin_*`), which get their names with the class (section 7.3).
+
+7. The view is `GameStateView` (engine/game_state.h), not `GameState`: that name is taken by the
+   original's game state flags word (`GameState`, 0x9A64C0, a Thinker name used all over the
+   engine). `game()` returns the one instance, `g_game_state`, whose members are references onto
+   the globals: `map` (`x`, `y`, `half_x`, `tile_count`, `sq_root`, `flat`, `tiles`), `factions`,
+   `mfactions`, `bases`, `base_count`, `vehs`, `veh_count`, `rules`, `turn`. The engine (src/engine,
+   src/headless) uses `game()` for the map, factions, bases and vehicles; comments and strings
+   still name the globals (they document the original). The globals stay declared: the UI
+   (src/ui, src/app) keeps using them until its own phase (section 7), and `rules`/`turn` are in
+   the view but their uses are not migrated yet (they were not among the four modules).
+   Lines that grew over 120 columns were wrapped with the target clang-format style
+   (`--lines`, those lines only). tests/unit/test_game_state.cpp pins the aliasing.

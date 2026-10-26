@@ -2,6 +2,7 @@
 #include "engine/rules.h"
 
 #include "engine/crt.h"
+#include "engine/game_state.h"
 #include "engine/parse.h"
 #include "engine/prefs.h"
 #include "engine/proto.h"
@@ -274,7 +275,7 @@ void GAMEAPI clear_faction(MFaction* faction) {
 
 void GAMEAPI read_faction2(int32_t faction_id) {
     if (faction_id) {
-        read_faction(&MFactions[faction_id], 0);
+        read_faction(&game().mfactions[faction_id], 0);
         load_faction_art(faction_id);
     }
 }
@@ -531,8 +532,8 @@ int32_t GAMEAPI read_factions() {
     if (text_open(AlphaxFileName, ExpansionEnabled ? "NEWFACTIONS" : "FACTIONS")) return 1;
     for (int32_t i = 1; i < 8; i++) {
         text_get();
-        crt_strcpy(MFactions[i].filename, text_item());
-        crt_strcpy(MFactions[i].search_key, text_item());
+        crt_strcpy(game().mfactions[i].filename, text_item());
+        crt_strcpy(game().mfactions[i].search_key, text_item());
     }
     if (ExpansionEnabled) prefs_fac_load();
     int32_t choices = 14;  // 7 original + 7 expansion factions, then the custom ones
@@ -544,7 +545,7 @@ int32_t GAMEAPI read_factions() {
         }
     }
     for (int32_t i = 1; i < 8; i++) {
-        char* filename = MFactions[i].filename;
+        char* filename = game().mfactions[i].filename;
         if (crt_strcmp(filename, "JENN282")) continue;
         int32_t pick;
         do {
@@ -561,21 +562,21 @@ int32_t GAMEAPI read_factions() {
             text_get();
             for (int32_t n = pick; n > 0; n--) text_get();
             crt_strcpy(filename, text_item());
-            crt_strcpy(MFactions[i].search_key, filename);
+            crt_strcpy(game().mfactions[i].search_key, filename);
             for (int32_t j = 1; j < 8; j++) {
-                if (i != j && !crt_strcmp(filename, MFactions[j].filename)) {
+                if (i != j && !crt_strcmp(filename, game().mfactions[j].filename)) {
                     pick = -1;
                     break;
                 }
             }
             if (pick != -1) {
-                read_faction(&MFactions[i], 0);
+                read_faction(&game().mfactions[i], 0);
                 load_faction_art(i);
             }
         } while (pick == -1);
     }
     for (int32_t i = 1; i < 8; i++) {
-        read_faction(&MFactions[i], 0);
+        read_faction(&game().mfactions[i], 0);
         load_faction_art(i);
     }
     return 0;

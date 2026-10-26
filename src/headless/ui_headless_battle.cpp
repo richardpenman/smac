@@ -2,6 +2,7 @@
 // boom in engine/battle.h). Native builds only: hybrid builds call the original UI.
 #ifndef SMACX_HYBRID
 #include "engine/battle.h"
+#include "engine/game_state.h"
 #include "engine/ui_bridge.h"
 
 void THISCALL SubInterface_set_iface_mode(uint8_t*) {}
@@ -17,7 +18,7 @@ int32_t GAMEAPI tut_check2(int32_t bit) {
     if (MultiplayerActive) return 0;
     if (!(GamePreferences & 0x20)) return 0;
     if (bit & TutorialHintsShown) return 0;
-    if (MFactions[CurrentPlayerFaction].rule_flags & 0x80) return 0;
+    if (game().mfactions[CurrentPlayerFaction].rule_flags & 0x80) return 0;
     TutorialHintsShown |= bit;
     return 1;
 }

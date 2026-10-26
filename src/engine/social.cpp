@@ -3,6 +3,7 @@
 #include "engine/base.h"
 #include "engine/design.h"
 #include "engine/diplomacy.h"
+#include "engine/game_state.h"
 #include "engine/net.h"
 #include "engine/tech.h"
 #include "engine/ui_bridge.h"
@@ -22,7 +23,7 @@ bool is_human(int32_t faction_id) { return (FactionStatus[0] & (uint8_t)(1 << (f
 // Inline project ownership test of the original (SecretProjects index = facility id - 70).
 bool owns_project(int32_t project, int32_t faction_id) {
     int32_t base_id = SecretProjects[project];
-    return base_id >= 0 && (uint8_t)Bases[base_id].faction_id == (uint32_t)faction_id;
+    return base_id >= 0 && (uint8_t)game().bases[base_id].faction_id == (uint32_t)faction_id;
 }
 constexpr int32_t kNetworkBackbone = 21;  // FAC_NETWORK_BACKBONE - 70
 constexpr int32_t kCloningVats = 24;      // FAC_CLONING_VATS - 70
@@ -33,16 +34,16 @@ constexpr int32_t kLivingRefinery = 23;   // FAC_LIVING_REFINERY - 70
 int32_t upheaval_cost(int32_t faction_id, int32_t changes) {
     if (!changes) return 0;
     changes++;
-    int32_t diff = is_human(faction_id) ? Factions[faction_id].diff_level : 3;
+    int32_t diff = is_human(faction_id) ? game().factions[faction_id].diff_level : 3;
     int32_t cost = changes * changes * changes * diff;
-    if (MFactions[faction_id].rule_flags & 0x80) cost += cost / 2;
+    if (game().mfactions[faction_id].rule_flags & 0x80) cost += cost / 2;
     return cost;
 }
 }  // namespace
 
 void GAMEAPI social_calc(const int32_t* choices, int32_t* effects, int32_t faction_id, int32_t, int32_t choices_only) {
     for (int32_t k = 0; k < 11; k++) effects[k] = 0;
-    MFaction& m = MFactions[faction_id];
+    MFaction& m = game().mfactions[faction_id];
     for (int32_t cat = 0; cat < 4; cat++) {
         int32_t model = choices[cat];
         const int32_t* eff = SocialField[cat].soc_effect[model].values;
@@ -75,7 +76,7 @@ void GAMEAPI social_calc(const int32_t* choices, int32_t* effects, int32_t facti
         effects[7]++;  // planet
         if (m.rule_flags & 0x80) effects[10]++;  // research
     }
-    const int32_t* base = eff_base(Factions[faction_id]);
+    const int32_t* base = eff_base(game().factions[faction_id]);
     for (int32_t k = 0; k < 11; k++) effects[k] += base[k];
     for (int32_t i = 0; i < m.faction_bonus_count; i++) {
         int32_t* e = &effects[m.faction_bonus_val1[i]];
@@ -89,7 +90,7 @@ void GAMEAPI social_calc(const int32_t* choices, int32_t* effects, int32_t facti
 }
 
 void GAMEAPI social_upkeep(int32_t faction_id) {
-    Faction& f = Factions[faction_id];
+    Faction& f = game().factions[faction_id];
     for (int32_t i = 0; i < 4; i++) soc_current(f)[i] = soc_pending(f)[i];
     social_calc(soc_pending(f), eff_pending(f), faction_id, 0, 0);
     social_calc(soc_pending(f), eff_current(f), faction_id, 0, 0);
@@ -99,19 +100,19 @@ void GAMEAPI social_upkeep(int32_t faction_id) {
 
 int32_t GAMEAPI social_upheaval(int32_t faction_id, const int32_t* choices) {
     int32_t changes = 0;
-    for (int32_t i = 0; i < 4; i++) changes += choices[i] != soc_current(Factions[faction_id])[i];
+    for (int32_t i = 0; i < 4; i++) changes += choices[i] != soc_current(game().factions[faction_id])[i];
     return upheaval_cost(faction_id, changes);
 }
 
 void GAMEAPI social_set(int32_t faction_id) {
     int32_t old_nutrient = cost_factor(faction_id, 0, -1);
     int32_t old_mineral = cost_factor(faction_id, 1, -1);
-    Faction& f = Factions[faction_id];
+    Faction& f = game().factions[faction_id];
     social_calc(soc_pending(f), eff_pending(f), faction_id, 0, 0);
     int32_t new_nutrient = cost_factor(faction_id, 0, -1);
     int32_t new_mineral = cost_factor(faction_id, 1, -1);
-    for (int32_t base_id = 0; base_id < BaseCount; base_id++) {
-        BASE& base = Bases[base_id];
+    for (int32_t base_id = 0; base_id < game().base_count; base_id++) {
+        BASE& base = game().bases[base_id];
         if ((uint8_t)base.faction_id != (uint32_t)faction_id) continue;
         if (new_nutrient != old_nutrient)
             base.nutrients_accumulated = (old_nutrient / 2 + new_nutrient * base.nutrients_accumulated) / old_nutrient;
@@ -129,14 +130,14 @@ void GAMEAPI social_set(int32_t faction_id) {
 }
 
 int32_t GAMEAPI society_avail(int32_t category, int32_t model, int32_t faction_id) {
-    MFaction& m = MFactions[faction_id];
+    MFaction& m = game().mfactions[faction_id];
     if (m.soc_opposition_category == category && m.soc_opposition_model == model) return 0;
     return has_tech(SocialField[category].soc_preq_tech[model], faction_id);
 }
 
 void GAMEAPI social_ai(int32_t faction_id, int32_t growth, int32_t tech, int32_t wealth, int32_t power, int32_t* out) {
-    Faction& f = Factions[faction_id];
-    MFaction& m = MFactions[faction_id];
+    Faction& f = game().factions[faction_id];
+    MFaction& m = game().mfactions[faction_id];
     int32_t effect_index = -1;  // effect weighted x1000 (growth > 100)
     int32_t fight;
     bool own_settings = false;
@@ -164,9 +165,9 @@ void GAMEAPI social_ai(int32_t faction_id, int32_t growth, int32_t tech, int32_t
 
     // Missing population relative to the bases' goals.
     int32_t pop_deficit = 0;
-    for (int32_t base_id = 0; base_id < BaseCount; base_id++)
-        if ((uint8_t)Bases[base_id].faction_id == (uint32_t)faction_id)
-            pop_deficit += pop_goal(base_id) - Bases[base_id].pop_size;
+    for (int32_t base_id = 0; base_id < game().base_count; base_id++)
+        if ((uint8_t)game().bases[base_id].faction_id == (uint32_t)faction_id)
+            pop_deficit += pop_goal(base_id) - game().bases[base_id].pop_size;
 
     // Military situation of the regions where the faction has bases.
     int32_t threat = 0;
@@ -192,7 +193,7 @@ void GAMEAPI social_ai(int32_t faction_id, int32_t growth, int32_t tech, int32_t
     // Tech race: behind the leader.
     int32_t behind = 1;
     if ((GameState & 0x200) && f.ranking < 6) {
-        int32_t gap = Factions[RankingFactionIDUnk1].tech_ranking / 2 - f.tech_ranking / 2;
+        int32_t gap = game().factions[RankingFactionIDUnk1].tech_ranking / 2 - f.tech_ranking / 2;
         if (gap > 5) behind = 2;
         if (gap > 10) behind++;
     }
@@ -354,11 +355,11 @@ void GAMEAPI social_ai(int32_t faction_id, int32_t growth, int32_t tech, int32_t
         police_clamped = police_clamped < -2 ? -2 : (police_clamped > 2 ? 2 : police_clamped);
         int32_t bases = f.base_count;
         int32_t talent = (peace_regions * 2 + 1) * bases * police_clamped;
-        if (f.tech_ranking < Factions[RankingFactionIDUnk2].tech_ranking &&
-            f.ranking < Factions[RankingFactionIDUnk2].ranking)
+        if (f.tech_ranking < game().factions[RankingFactionIDUnk2].tech_ranking &&
+            f.ranking < game().factions[RankingFactionIDUnk2].ranking)
             talent *= 2;
-        if (f.tech_ranking >= Factions[RankingFactionIDUnk1].tech_ranking &&
-            f.ranking > Factions[RankingFactionIDUnk1].ranking)
+        if (f.tech_ranking >= game().factions[RankingFactionIDUnk1].tech_ranking &&
+            f.ranking > game().factions[RankingFactionIDUnk1].ranking)
             talent /= 2;
         if (out && (power || growth)) talent *= 2;
         score += talent / (2 - fight);
@@ -435,7 +436,7 @@ void GAMEAPI social_ai(int32_t faction_id, int32_t growth, int32_t tech, int32_t
             for (int32_t other = 1; other < 8; other++) {
                 if (other == faction_id) continue;
                 uint32_t status = f.diplo_status[other];
-                int32_t threat_other = Factions[other].mind_control_total / 4 + 1;
+                int32_t threat_other = game().factions[other].mind_control_total / 4 + 1;
                 if (status & 1) threat_other /= 2;
                 if (!(status & 0x20)) {
                     if (status & 2) threat_other /= 2;
@@ -443,7 +444,7 @@ void GAMEAPI social_ai(int32_t faction_id, int32_t growth, int32_t tech, int32_t
                     if (!(status & 0x10)) threat_other /= 2;
                 }
                 int32_t probe = eff[8] < -2 ? -2 : (eff[8] > 3 ? 3 : eff[8]);
-                int32_t value = (Factions[other].base_count + bases) * probe * threat_other / 2;
+                int32_t value = (game().factions[other].base_count + bases) * probe * threat_other / 2;
                 if (tech || wealth) value *= 2;
                 score += value;
             }

@@ -3,6 +3,7 @@
 
 #include "engine/clock.h"
 #include "engine/crt.h"
+#include "engine/game_state.h"
 #include "engine/log.h"
 #include "engine/map.h"
 #include "engine/path.h"
@@ -125,30 +126,31 @@ int32_t GAMEAPI game_reload(int32_t close_windows, int32_t init_rules) {
 }
 
 void GAMEAPI alien_start() {
-    if (CurrentTurn != 0 || !ExpansionEnabled || (MFactions[CurrentPlayerFaction].rule_flags & RFLAG_ALIEN)) return;
+    if (CurrentTurn != 0 || !ExpansionEnabled || (game().mfactions[CurrentPlayerFaction].rule_flags & RFLAG_ALIEN))
+        return;
     StrBuffer[0] = 0;
-    crt_strcat(StrBuffer, MFactions[CurrentPlayerFaction].filename);
+    crt_strcat(StrBuffer, game().mfactions[CurrentPlayerFaction].filename);
     win32::CharUpperA(StrBuffer);
     if (!crt_strcmp(StrBuffer, "FUNGBOY")) return;
     // Not playing an alien or Cult faction: computer-controlled aliens and Cult are removed.
     for (int32_t f = 1; f < 8; f++) {
         if ((FactionStatus[0] & (1 << f)) || PbemActive || MultiplayerActive) continue;
         StrBuffer[0] = 0;
-        crt_strcat(StrBuffer, MFactions[f].filename);
+        crt_strcat(StrBuffer, game().mfactions[f].filename);
         win32::CharUpperA(StrBuffer);
-        if (!(MFactions[f].rule_flags & RFLAG_ALIEN) && crt_strcmp(StrBuffer, "FUNGBOY")) continue;
+        if (!(game().mfactions[f].rule_flags & RFLAG_ALIEN) && crt_strcmp(StrBuffer, "FUNGBOY")) continue;
         uint8_t mask = (uint8_t)~(1 << f);
         FactionStatus[0] &= mask;
         FactionStatus[1] &= mask;
-        for (int32_t i = BaseCount - 1; i >= 0; i--) {
-            if (Bases[i].faction_id == f) base_kill(i);
+        for (int32_t i = game().base_count - 1; i >= 0; i--) {
+            if (game().bases[i].faction_id == f) base_kill(i);
         }
-        for (int32_t i = VehCount - 1; i >= 0; i--) {
-            if (i < VehCount && Vehs[i].faction_id == f) veh_kill(i);
+        for (int32_t i = game().veh_count - 1; i >= 0; i--) {
+            if (i < game().veh_count && game().vehs[i].faction_id == f) veh_kill(i);
         }
-        Factions[f].base_count = 0;
-        Factions[f].player_flags = 0xFFFFFFFF;
-        Factions[f].diff_level = -1;
+        game().factions[f].base_count = 0;
+        game().factions[f].player_flags = 0xFFFFFFFF;
+        game().factions[f].diff_level = -1;
     }
 }
 

@@ -7,6 +7,7 @@
 #include "engine/crt.h"
 #include "engine/design.h"
 #include "engine/diplomacy.h"
+#include "engine/game_state.h"
 #include "engine/map.h"
 #include "engine/parse.h"
 #include "engine/prefs.h"
@@ -18,7 +19,7 @@
 #include "engine/world.h"
 
 void GAMEAPI init_goals(int32_t faction_id) {
-    Faction& f = Factions[faction_id];
+    Faction& f = game().factions[faction_id];
     for (Goal& g : f.goals) {
         g.type = -1;
         g.priority = 0;
@@ -36,7 +37,7 @@ void GAMEAPI init_goals(int32_t faction_id) {
 }
 
 void GAMEAPI del_site(int32_t faction_id, int32_t type, int32_t x, int32_t y, int32_t distance) {
-    Faction& f = Factions[faction_id];
+    Faction& f = game().factions[faction_id];
     for (Goal& site : f.sites) {
         if (site.type != type || veh_vector_dist(x, y, site.x, site.y) > distance) continue;
         site.type = -1;
@@ -49,8 +50,8 @@ void GAMEAPI del_site(int32_t faction_id, int32_t type, int32_t x, int32_t y, in
 }
 
 void GAMEAPI add_goal(int32_t faction_id, int32_t type, int32_t priority, int32_t x, int32_t y, int32_t base_id) {
-    if (y < 0 || y >= MapAreaY || x < 0 || x >= MapAreaX) return;
-    Faction& f = Factions[faction_id];
+    if (y < 0 || y >= game().map.y || x < 0 || x >= game().map.x) return;
+    Faction& f = game().factions[faction_id];
     for (Goal& g : f.goals) {
         if (g.x == x && g.y == y && g.type == type) {
             if (g.priority <= priority) g.priority = (int16_t)priority;
@@ -79,7 +80,7 @@ void GAMEAPI add_goal(int32_t faction_id, int32_t type, int32_t priority, int32_
 
 void GAMEAPI add_site(int32_t faction_id, int32_t type, int32_t priority, int32_t x, int32_t y) {
     if (((x ^ y) & 1) && (GameState & STATE_DEBUG_MODE)) danger("Bad SITE", DangerEmptyText, x, y, type);
-    Faction& f = Factions[faction_id];
+    Faction& f = game().factions[faction_id];
     for (Goal& s : f.sites) {
         if (s.x == x && s.y == y && s.type == type) {
             if (s.priority <= priority) s.priority = (int16_t)priority;
@@ -106,7 +107,7 @@ void GAMEAPI add_site(int32_t faction_id, int32_t type, int32_t priority, int32_
 }
 
 int32_t GAMEAPI at_site(int32_t faction_id, int32_t type, int32_t x, int32_t y) {
-    for (const Goal& s : Factions[faction_id].sites) {
+    for (const Goal& s : game().factions[faction_id].sites) {
         if (s.x == x && s.y == y && s.type == type) return 1;
     }
     return 0;
@@ -119,7 +120,7 @@ int32_t GAMEAPI rnd(int32_t n) {
 
 int32_t GAMEAPI x_dist(int32_t x1, int32_t x2) {
     int32_t dx = std::abs(x1 - x2);
-    if (!(MapToggleFlat & 1) && dx > MapHalfX) return MapAreaX - dx;
+    if (!(game().map.flat & 1) && dx > game().map.half_x) return game().map.x - dx;
     return dx;
 }
 
@@ -135,7 +136,7 @@ int32_t GAMEAPI site_at(int32_t x, int32_t y, int32_t sea) {
 }
 
 int32_t GAMEAPI is_known(int32_t x, int32_t y, int32_t faction_id) {
-    if (!(Factions[faction_id].player_flags & 0x200) &&
+    if (!(game().factions[faction_id].player_flags & 0x200) &&
         !(map_tile(x, y)->visibility & (uint8_t)(1u << (faction_id & 31))))
         return 0;
     return 1;
@@ -155,19 +156,19 @@ int32_t GAMEAPI anything_at(int32_t x, int32_t y) {
 
 int32_t GAMEAPI veh_top(int32_t veh_id) {
     if (veh_id < 0) return -1;
-    while (Vehs[veh_id].prev_veh_id_stack >= 0) veh_id = Vehs[veh_id].prev_veh_id_stack;
+    while (game().vehs[veh_id].prev_veh_id_stack >= 0) veh_id = game().vehs[veh_id].prev_veh_id_stack;
     return veh_id;
 }
 
 int32_t GAMEAPI veh_moves(int32_t veh_id) {
-    int32_t moves = speed(veh_id, 0) - Vehs[veh_id].moves_spent;
+    int32_t moves = speed(veh_id, 0) - game().vehs[veh_id].moves_spent;
     if (moves < 0) return 0;
     if (moves > 999) return 999;
     return moves;
 }
 
 int32_t GAMEAPI proto_power(int32_t veh_id) {
-    const UNIT& unit = Units[Vehs[veh_id].unit_id];
+    const UNIT& unit = Units[game().vehs[veh_id].unit_id];
     if (unit.plan == 12) return 1;
     int32_t reactor = unit.reactor_id;
     if (reactor < 1) reactor = 1;
@@ -176,18 +177,18 @@ int32_t GAMEAPI proto_power(int32_t veh_id) {
 }
 
 int32_t GAMEAPI is_port(int32_t base_id, int32_t is_base_radius) {
-    return is_coast(Bases[base_id].x, Bases[base_id].y, is_base_radius);
+    return is_coast(game().bases[base_id].x, game().bases[base_id].y, is_base_radius);
 }
 
 int32_t GAMEAPI at_goal(int32_t faction_id, int32_t type, int32_t x, int32_t y) {
-    for (const Goal& g : Factions[faction_id].goals) {
+    for (const Goal& g : game().factions[faction_id].goals) {
         if (g.x == x && g.y == y && g.type == type) return 1;
     }
     return 0;
 }
 
 void GAMEAPI wipe_goals(int32_t faction_id) {
-    Faction& f = Factions[faction_id];
+    Faction& f = game().factions[faction_id];
     // Goals age: positive priorities turn negative (kept for one more turn), negative ones expire.
     for (Goal& g : f.goals) {
         if (g.priority < 0)
@@ -224,7 +225,7 @@ int32_t GAMEAPI valid_tech_leap(int32_t tech_id, int32_t faction_id) {
     for (const CWeapon& weapon : Weapon) {
         if (weapon.preq_tech != tech_id) continue;
         // Weapons: only for weaker factions, and not far ahead of their arsenal.
-        if (Factions[faction_id].ranking <= 2 && weapon.offense_value <= weapon_budget(faction_id, 99, 0) + 2)
+        if (game().factions[faction_id].ranking <= 2 && weapon.offense_value <= weapon_budget(faction_id, 99, 0) + 2)
             return 1;
         return 0;
     }

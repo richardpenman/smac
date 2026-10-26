@@ -6,6 +6,7 @@
 #include "engine/design.h"
 #include "engine/diplo_act.h"
 #include "engine/diplomacy.h"
+#include "engine/game_state.h"
 #include "engine/log.h"
 #include "engine/net.h"
 #include "engine/parse.h"
@@ -38,16 +39,16 @@ bool leads_to(int32_t tech_id, int32_t target_id, int32_t depth) {
 }
 // Owner of a secret project (-1 if not built), as a faction id compared like the original (byte).
 inline bool project_owned_by(int32_t project, uint32_t faction_id) {
-    return SecretProjects[project] >= 0 && (uint8_t)Bases[SecretProjects[project]].faction_id == faction_id;
+    return SecretProjects[project] >= 0 && (uint8_t)game().bases[SecretProjects[project]].faction_id == faction_id;
 }
 // Facility built at the base or among its first queue_count queue entries (inlined in
 // facility_avail).
 bool built_or_queued(int32_t base_id, int32_t facility_id, int32_t queue_count) {
     int32_t offset, mask;
     bitmask(facility_id, &offset, &mask);
-    if (Bases[base_id].facilities_built[offset] & (uint8_t)mask) return true;
+    if (game().bases[base_id].facilities_built[offset] & (uint8_t)mask) return true;
     for (int32_t i = 0; i < queue_count; i++)
-        if (Bases[base_id].queue_items[i] == -facility_id) return true;
+        if (game().bases[base_id].queue_items[i] == -facility_id) return true;
     return false;
 }
 }  // namespace
@@ -89,13 +90,13 @@ void GAMEAPI say_tech_2(char* buffer, int32_t tech_id, int32_t with_category) {
             crt_strcat(buffer, label_get(487));
             crt_strcat(buffer, " ");
             crt_strcat(buffer, "(");
-            GenderDefault = MFactions[faction_id].noun_gender;
-            PluralDefault = MFactions[faction_id].is_noun_plural;
-            crt_strcat(buffer, MFactions[faction_id].noun_faction);
+            GenderDefault = game().mfactions[faction_id].noun_gender;
+            PluralDefault = game().mfactions[faction_id].is_noun_plural;
+            crt_strcat(buffer, game().mfactions[faction_id].noun_faction);
             crt_strcat(buffer, ")");
             return;
         }
-        crt_strcat(buffer, MFactions[faction_id].adj_name_faction);
+        crt_strcat(buffer, game().mfactions[faction_id].adj_name_faction);
         crt_strcat(buffer, " ");
         crt_strcat(buffer, label_get(487));
         return;
@@ -175,7 +176,7 @@ int32_t GAMEAPI facility_avail(int32_t facility_id, int32_t faction_id, int32_t 
     if (preq != -1 && !has_tech(preq, faction_id)) return 0;
     if (!ExpansionEnabled && facility_id >= 103 && facility_id <= 106) return 0;
     StrBuffer[0] = 0;
-    crt_strcat(StrBuffer, MFactions[faction_id].filename);
+    crt_strcat(StrBuffer, game().mfactions[faction_id].filename);
     win32::CharUpperA(StrBuffer);
     if (!crt_strcmp(StrBuffer, "CARETAKE") && (facility_id == 101 || facility_id == 102)) return 0;
     if (facility_id >= 70) return SecretProjects[facility_id - 70] == -1;
@@ -183,7 +184,7 @@ int32_t GAMEAPI facility_avail(int32_t facility_id, int32_t faction_id, int32_t 
     if (facility_id < 65 && built_or_queued(base_id, facility_id, queue_count)) return 0;
     if (facility_id == 28) {
         if (project_owned_by(10, (uint32_t)faction_id)) return 0;
-        if (!is_coast(Bases[base_id].x, Bases[base_id].y, 0)) return 0;
+        if (!is_coast(game().bases[base_id].x, game().bases[base_id].y, 0)) return 0;
     } else {
         int32_t project = -1;
         switch (facility_id) {
@@ -197,7 +198,7 @@ int32_t GAMEAPI facility_avail(int32_t facility_id, int32_t faction_id, int32_t 
         case 37:
         case 38:
             if (!ExpansionEnabled) return 0;
-            if (!is_coast(Bases[base_id].x, Bases[base_id].y, 0)) return 0;
+            if (!is_coast(game().bases[base_id].x, game().bases[base_id].y, 0)) return 0;
             break;
         }
         if (project >= 0 && has_project(project, faction_id)) return 0;
@@ -205,7 +206,7 @@ int32_t GAMEAPI facility_avail(int32_t facility_id, int32_t faction_id, int32_t 
     if (!ExpansionEnabled &&
         (facility_id == 41 || facility_id == 34 || facility_id == 35 || facility_id == 39 || facility_id == 40))
         return 0;
-    if (!(MFactions[faction_id].rule_flags & 0x80) && facility_id == 40) return 0;
+    if (!(game().mfactions[faction_id].rule_flags & 0x80) && facility_id == 40) return 0;
     switch (facility_id) {
     case 3:
         return !built_or_queued(base_id, 26, queue_count);
@@ -222,7 +223,7 @@ int32_t GAMEAPI facility_avail(int32_t facility_id, int32_t faction_id, int32_t 
     case 18:
         return built_or_queued(base_id, 17, queue_count);
     case 10:
-        return !(MFactions[faction_id].rule_flags & 0x200);
+        return !(game().mfactions[faction_id].rule_flags & 0x200);
     case 23:
         return !built_or_queued(base_id, 12, queue_count);
     case 25:
@@ -249,7 +250,8 @@ int32_t GAMEAPI veh_avail(int32_t unit_id, int32_t faction_id, int32_t base_id) 
     if (bit & u.obsolete_factions) return 0;
     if (unit_id < 64 && (faction_id <= 0 || !has_tech(u.preq_tech, faction_id))) return 0;
     if (u.plan == 8 && (GameRules & 0x400000)) return 0;
-    if (base_id >= 0 && Chassis[u.chassis_id].triad == 1 && !is_coast(Bases[base_id].x, Bases[base_id].y, 0))
+    if (base_id >= 0 && Chassis[u.chassis_id].triad == 1 &&
+        !is_coast(game().bases[base_id].x, game().bases[base_id].y, 0))
         return 0;
     if (!ExpansionEnabled) {
         if (u.armor_id > 9) return 0;
@@ -285,7 +287,7 @@ int32_t GAMEAPI tech_avail(int32_t tech_id, int32_t faction_id) {
 
 void GAMEAPI tech_secret(int32_t tech_id, int32_t faction_id) {
     parse_say(0, Tech[tech_id].name, -1, -1);
-    parse_says(1, MFactions[faction_id].adj_name_faction, -1, -1);
+    parse_says(1, game().mfactions[faction_id].adj_name_faction, -1, -1);
     StrBuffer[0] = 0;
     crt_strcat(StrBuffer, "THESECRET");
     char num[80];
@@ -295,8 +297,8 @@ void GAMEAPI tech_secret(int32_t tech_id, int32_t faction_id) {
 }
 
 void GAMEAPI tech_effects(int32_t faction_id) {
-    Faction& f = Factions[faction_id];
-    MFaction& m = MFactions[faction_id];
+    Faction& f = game().factions[faction_id];
+    MFaction& m = game().mfactions[faction_id];
     f.tech_commerce_bonus = m.rule_commerce;
     f.tech_fungus_nutrient = 0;
     f.tech_fungus_mineral = 0;
@@ -332,24 +334,25 @@ void GAMEAPI tech_effects(int32_t faction_id) {
 void GAMEAPI tech_achieved(int32_t faction_id, int32_t tech_id, int32_t from, int32_t is_shared) {
     // (The original constructs its announcement popup, a BasePop, on the stack here.)
     if (tech_id < 0) return;
-    MFaction& m = MFactions[faction_id];
+    MFaction& m = game().mfactions[faction_id];
     log_say("Gaining a TECH", m.name_leader, faction_id, tech_id, from);
     uint8_t bit = (uint8_t)(1u << (faction_id & 31));
     if (FactionStatus[0] & bit) ambience(0xC9);
     if (tech_id >= 9999) {
         // maps of faction `from`
         uint32_t from_bit = 1u << (from & 31);
-        Factions[faction_id].traded_maps |= Factions[from].traded_maps | from_bit;
-        for (int32_t i = 0; i < MapAreaTiles; i++) {
-            MAP* sq = &MapTiles[i];
+        game().factions[faction_id].traded_maps |= game().factions[from].traded_maps | from_bit;
+        for (int32_t i = 0; i < game().map.tile_count; i++) {
+            MAP* sq = &game().map.tiles[i];
             if ((uint8_t)from_bit & sq->visibility) {
                 sq->visibility |= bit;
                 if (faction_id && from)
                     sq->visible_items[faction_id - 1] |= sq->visible_items[from - 1] & sq->items;
             }
         }
-        for (int32_t i = 0; i < BaseCount; i++)
-            if ((Bases[i].visibility & (uint8_t)from_bit) || (uint8_t)Bases[i].faction_id == (uint32_t)from)
+        for (int32_t i = 0; i < game().base_count; i++)
+            if ((game().bases[i].visibility & (uint8_t)from_bit) ||
+                (uint8_t)game().bases[i].faction_id == (uint32_t)from)
                 spot_base(i, faction_id);
         if (faction_id == CurrentPlayerFaction) {
             draw_map(1);
@@ -376,7 +379,7 @@ void GAMEAPI tech_achieved(int32_t faction_id, int32_t tech_id, int32_t from, in
         }
         return;
     }
-    Faction& f = Factions[faction_id];
+    Faction& f = game().factions[faction_id];
     if (f.tech_research_id == tech_id) f.tech_research_id = -1;
     f.tech_trade_source[tech_id] = (int8_t)(from <= 0 ? 0 : from);
     bool first = !TechOwners[tech_id];
@@ -440,9 +443,9 @@ void GAMEAPI tech_achieved(int32_t faction_id, int32_t tech_id, int32_t from, in
         PluralDefault = m.is_noun_plural;
         parse_says(1, m.noun_faction, -1, -1);
         if (from > 0) {
-            GenderDefault = MFactions[from].noun_gender;
-            PluralDefault = MFactions[from].is_noun_plural;
-            parse_says(2, MFactions[from].noun_faction, -1, -1);
+            GenderDefault = game().mfactions[from].noun_gender;
+            PluralDefault = game().mfactions[from].is_noun_plural;
+            parse_says(2, game().mfactions[from].noun_faction, -1, -1);
         } else if (from < 0) {
             if (from == -1)
                 parse_say(2, Facility[81].name, -1, -1);
@@ -484,8 +487,8 @@ void GAMEAPI tech_achieved(int32_t faction_id, int32_t tech_id, int32_t from, in
     for (int32_t i = 0; i < m.faction_bonus_count; i++) {
         if (m.faction_bonus_id[i] != 12 || tech_id != Facility[m.faction_bonus_val1[i]].preq_tech) continue;
         free_facility = true;
-        for (int32_t b = 0; b < BaseCount; b++)
-            if ((uint8_t)Bases[b].faction_id == (uint32_t)faction_id) set_fac(m.faction_bonus_val1[i], b, 1);
+        for (int32_t b = 0; b < game().base_count; b++)
+            if ((uint8_t)game().bases[b].faction_id == (uint32_t)faction_id) set_fac(m.faction_bonus_val1[i], b, 1);
         if (faction_id == CurrentPlayerFaction) {
             parse_say(0, Tech[tech_id].name, -1, -1);
             parse_say(1, Facility[m.faction_bonus_val1[i]].name, -1, -1);
@@ -574,14 +577,14 @@ void GAMEAPI tech_achieved(int32_t faction_id, int32_t tech_id, int32_t from, in
     }
     if ((Tech[tech_id].flags & 8) && !(f.player_flags & 0x200)) {
         // reveals the map
-        for (int32_t i = 0; i < MapAreaTiles; i++) {
-            MAP* sq = &MapTiles[i];
+        for (int32_t i = 0; i < game().map.tile_count; i++) {
+            MAP* sq = &game().map.tiles[i];
             sq->visibility |= bit;
             if (faction_id) sq->visible_items[faction_id - 1] = sq->items;
         }
-        for (int32_t i = 0; i < BaseCount; i++) {
-            Bases[i].visibility |= bit;
-            Bases[i].factions_pop_size_intel[faction_id] = Bases[i].pop_size;
+        for (int32_t i = 0; i < game().base_count; i++) {
+            game().bases[i].visibility |= bit;
+            game().bases[i].factions_pop_size_intel[faction_id] = game().bases[i].pop_size;
         }
         f.player_flags |= 0x200;
         if (CurrentTurn && faction_id == CurrentPlayerFaction) {
@@ -602,14 +605,14 @@ void GAMEAPI tech_achieved(int32_t faction_id, int32_t tech_id, int32_t from, in
         }
         if (tech_id == 4 && (m.rule_flags & 0x80)) {
             for (int32_t i = 1; i < 8; i++)
-                if (faction_id != i && !(MFactions[i].rule_flags & 0x80) && (f.diplo_status[i] & 8))
+                if (faction_id != i && !(game().mfactions[i].rule_flags & 0x80) && (f.diplo_status[i] & 8))
                     interlude(0x24, 0, 1, 0);
         }
     }
     if (faction_id <= 0) goto secret;
     if (SecretProjects[11] >= 0) {
         // the project shares techs known to three factions with its owner
-        int32_t owner = (uint8_t)Bases[SecretProjects[11]].faction_id;
+        int32_t owner = (uint8_t)game().bases[SecretProjects[11]].faction_id;
         if (owner > 0 && has_tech(tech_id, faction_id) && !has_tech(tech_id, owner)) {
             int32_t known = 0;
             for (int32_t i = 1; i < 8; i++)
@@ -620,15 +623,15 @@ void GAMEAPI tech_achieved(int32_t faction_id, int32_t tech_id, int32_t from, in
     if (has_tech(tech_id, faction_id)) {
         // factions sharing the techs of their neighbours
         for (int32_t i = 1; i < 8; i++) {
-            int32_t needed = MFactions[i].rule_sharetech;
+            int32_t needed = game().mfactions[i].rule_sharetech;
             if (needed <= 0 || has_tech(tech_id, i)) continue;
             int32_t count = 0;
             for (int32_t j = 1; j < 8; j++) {
                 if (!has_tech(tech_id, j)) continue;
-                uint32_t status = Factions[i].diplo_status[j];
-                if (!ExpansionEnabled || !(MFactions[i].rule_flags & 0x20) || (status & 0x1000) || (status & 1) ||
-                    project_owned_by(4, (uint32_t)i) ||
-                    (i == GovernorFaction && !(MFactions[j].rule_flags & 0x80)))
+                uint32_t status = game().factions[i].diplo_status[j];
+                if (!ExpansionEnabled || !(game().mfactions[i].rule_flags & 0x20) || (status & 0x1000) ||
+                    (status & 1) || project_owned_by(4, (uint32_t)i) ||
+                    (i == GovernorFaction && !(game().mfactions[j].rule_flags & 0x80)))
                     count++;
             }
             if (count >= needed) tech_achieved(i, tech_id, -2, 1);
@@ -662,7 +665,7 @@ int32_t GAMEAPI tech_is_preq(int32_t preq_id, int32_t tech_id, int32_t depth) {
 
 int32_t GAMEAPI tech_val(int32_t tech_id, int32_t faction_id, int32_t is_simple) {
     if (tech_id == 9999) return 2;
-    Faction& f = Factions[faction_id];
+    Faction& f = game().factions[faction_id];
     int32_t vendettas = 0;
     for (int32_t i = 1; i < 8; i++)
         if (i != faction_id && (f.diplo_status[i] & 0x10)) vendettas++;
@@ -725,8 +728,8 @@ int32_t GAMEAPI tech_val(int32_t tech_id, int32_t faction_id, int32_t is_simple)
             } else {
                 for (int32_t i = 1; i < 8; i++) {
                     uint32_t status = f.diplo_status[i];
-                    if (i != faction_id && Factions[i].region_total_bases[region] && f.region_total_bases[region] &&
-                        (status & 8) && (!(status & 3) || (status & 0x20)))
+                    if (i != faction_id && game().factions[i].region_total_bases[region] &&
+                        f.region_total_bases[region] && (status & 8) && (!(status & 3) || (status & 0x20)))
                         value += f.region_total_bases[region] * t.AI_power / human_div;
                 }
             }
@@ -764,7 +767,7 @@ int32_t GAMEAPI tech_val(int32_t tech_id, int32_t faction_id, int32_t is_simple)
         value *= 2;
     if ((t.flags & 1) && !TechOwners[tech_id] && !(GameRules & 0x200)) value = (f.AI_power + 1) * value * 2;
     bool psi_doubled;
-    if (MFactions[faction_id].rule_psi < 1) {
+    if (game().mfactions[faction_id].rule_psi < 1) {
         int32_t reactor = Reactor[1].preq_tech;
         if (tech_id == reactor) value *= 2;
         if (tech_id == Reactor[2].preq_tech) value *= 2;
@@ -780,7 +783,7 @@ int32_t GAMEAPI tech_val(int32_t tech_id, int32_t faction_id, int32_t is_simple)
         (leads_to(tech_id, Facility[14].preq_tech, 9998) || leads_to(tech_id, Facility[13].preq_tech, 9998) ||
          leads_to(tech_id, Facility[31].preq_tech, 9998) || leads_to(tech_id, Facility[32].preq_tech, 9998)))
         value += per_base;
-    if (MFactions[faction_id].rule_population > 0) {
+    if (game().mfactions[faction_id].rule_population > 0) {
         if (leads_to(tech_id, Facility[24].preq_tech, 9998))
             value *= 2;
         else if (leads_to(tech_id, Facility[25].preq_tech, 9998) && CurrentTurn > 250)
@@ -814,7 +817,7 @@ int32_t GAMEAPI tech_val(int32_t tech_id, int32_t faction_id, int32_t is_simple)
         if (!f.region_total_bases[region]) continue;
         if (!contested) {
             for (int32_t i = 1; i < 8; i++) {
-                if (i != faction_id && !Factions[i].region_total_bases[region]) {
+                if (i != faction_id && !game().factions[i].region_total_bases[region]) {
                     contested = true;
                     break;
                 }
@@ -838,7 +841,7 @@ int32_t GAMEAPI tech_ai(int32_t faction_id) {
         if (!tech_avail(i, faction_id)) continue;
         int32_t value = tech_val(i, faction_id, 0);
         if (GameRules & 0x200) {  // blind research: favour the shallow techs
-            if (human && (Factions[faction_id].AI_growth || Factions[faction_id].AI_wealth) &&
+            if (human && (game().factions[faction_id].AI_growth || game().factions[faction_id].AI_wealth) &&
                 i == Units[1].preq_tech)
                 return i;
             value = (value << 8) / preq_depth(i);
@@ -896,7 +899,7 @@ int32_t GAMEAPI wants_prototype(int32_t unit_id, int32_t faction_id) {
 // ---- research -------------------------------------------------------------------------------------
 
 int32_t GAMEAPI tech_selection(int32_t faction_id) {
-    Faction& f = Factions[faction_id];
+    Faction& f = game().factions[faction_id];
     if (MultiplayerActive && is_human(faction_id) && faction_id != CurrentPlayerFaction) {
         bool shown = false;
         while (!ControlTurnA && f.tech_research_id < 0) {
@@ -904,11 +907,11 @@ int32_t GAMEAPI tech_selection(int32_t faction_id) {
             if (!shown) {
                 shown = true;
                 PluralDefault = 0;
-                GenderDefault = MFactions[faction_id].is_leader_female;
-                parse_says(0, MFactions[faction_id].title_leader, -1, -1);
-                GenderDefault = MFactions[faction_id].is_leader_female;
+                GenderDefault = game().mfactions[faction_id].is_leader_female;
+                parse_says(0, game().mfactions[faction_id].title_leader, -1, -1);
+                GenderDefault = game().mfactions[faction_id].is_leader_female;
                 PluralDefault = 0;
-                parse_says(1, MFactions[faction_id].name_leader, -1, -1);
+                parse_says(1, game().mfactions[faction_id].name_leader, -1, -1);
                 NetMsg_pop(&NetMsg, "PICKINGTECH", 0, 0, nullptr);
             }
         }
@@ -926,10 +929,10 @@ int32_t GAMEAPI tech_selection(int32_t faction_id) {
 }
 
 int32_t GAMEAPI tech_advance(int32_t faction_id) {
-    Faction& f = Factions[faction_id];
-    log_say("Earning a Tech", MFactions[faction_id].name_leader, f.tech_research_id, 0, 0);
+    Faction& f = game().factions[faction_id];
+    log_say("Earning a Tech", game().mfactions[faction_id].name_leader, f.tech_research_id, 0, 0);
     if (MultiplayerActive && NetUpkeepState == 1) {
-        log_say("Saving Earned Tech for Later", MFactions[faction_id].name_leader, faction_id, 0, 0);
+        log_say("Saving Earned Tech for Later", game().mfactions[faction_id].name_leader, faction_id, 0, 0);
     } else if (!PbemActive || !is_human(faction_id) || faction_id == CurrentPlayerFaction) {
         int32_t tech_id = f.tech_research_id;
         if (tech_id < 0 && (tech_id = tech_selection(faction_id)) < 0) return tech_id;
@@ -938,7 +941,7 @@ int32_t GAMEAPI tech_advance(int32_t faction_id) {
         int32_t base_id = CurrentBaseID;
         if (!is_human(faction_id)) {
             bases_reset(-1, faction_id, 0);
-            if (CurrentTurn && base_id >= 0 && base_id < BaseCount) {
+            if (CurrentTurn && base_id >= 0 && base_id < game().base_count) {
                 set_base(CurrentBaseID);
                 base_compute(0);
             }
@@ -953,14 +956,14 @@ int32_t GAMEAPI tech_advance(int32_t faction_id) {
 }
 
 int32_t GAMEAPI tech_rate(int32_t faction_id) {
-    Faction& f = Factions[faction_id];
+    Faction& f = game().factions[faction_id];
     if (f.tech_cost >= 0) return f.tech_cost;
     if (!Rules.tech_discovery_rate) return 999999999;
     int32_t level = f.earned_techs_saved * 2 - f.unk_27 + f.tech_ranking;
     level = level < 2 ? 2 : (level > 9999 ? 9999 : level);
     int32_t leader = 0;
     for (int32_t i = 1; i < 8; i++) {
-        int32_t v = Factions[i].tech_ranking + Factions[i].earned_techs_saved * 2;
+        int32_t v = game().factions[i].tech_ranking + game().factions[i].earned_techs_saved * 2;
         if (v >= leader) leader = v;
     }
     int32_t techs = level / 2;
@@ -996,8 +999,9 @@ int32_t GAMEAPI tech_rate(int32_t faction_id) {
     int32_t n = techs < 1 ? 1 : (techs > 99999 ? 99999 : techs);
     int32_t result = n * cost;
     if (Rules.tech_discovery_rate != 100) result = result * 100 / Rules.tech_discovery_rate;
-    if (MFactions[faction_id].rule_techcost != 100) result = MFactions[faction_id].rule_techcost * result / 100;
-    result = MapAreaSqRoot * result / 56;
+    if (game().mfactions[faction_id].rule_techcost != 100)
+        result = game().mfactions[faction_id].rule_techcost * result / 100;
+    result = game().map.sq_root * result / 56;
     if (GameRules & 0x20) result += result / 2;
     if (result < 1) return 1;
     if (result > 99999999) return 99999999;
@@ -1011,13 +1015,13 @@ void GAMEAPI tech_research(int32_t faction_id, int32_t labs) {
               has_tech(Facility[102].preq_tech, faction_id)))
             labs *= 2;
     }
-    Faction& f = Factions[faction_id];
+    Faction& f = game().factions[faction_id];
     f.tech_accumulated += labs;
     if (MultiplayerActive || f.tech_research_id >= 0) {
         int32_t cost = tech_rate(faction_id);
         if (f.tech_research_id > 88) f.tech_accumulated += labs;
         if (cost <= f.tech_accumulated) {
-            log_say("Researched Advance", MFactions[faction_id].name_leader, faction_id, 0, 0);
+            log_say("Researched Advance", game().mfactions[faction_id].name_leader, faction_id, 0, 0);
             int32_t tech_id = tech_advance(faction_id);
             if (tech_id >= 0) mon_tech_discovered(faction_id, tech_id);
             f.tech_accumulated = 0;
@@ -1025,7 +1029,7 @@ void GAMEAPI tech_research(int32_t faction_id, int32_t labs) {
             f.tech_cost = tech_rate(faction_id);
         }
         if (f.player_flags & 0x40) {
-            log_say("Secret Advance", MFactions[faction_id].name_leader, faction_id, 0, 0);
+            log_say("Secret Advance", game().mfactions[faction_id].name_leader, faction_id, 0, 0);
             f.player_flags &= ~0x40u;
             int32_t tech_id = tech_advance(faction_id);
             if (tech_id >= 0) mon_tech_discovered(faction_id, tech_id);
@@ -1038,7 +1042,7 @@ void GAMEAPI tech_research(int32_t faction_id, int32_t labs) {
 
 int32_t GAMEAPI X_text_open(const char* filename, const char* section) {
     if (crt_strcmp(filename, "SCRIPT")) return text_open(filename, section);
-    if ((MFactions[CurrentPlayerFaction].rule_flags & 0x80) && ExpansionEnabled &&
+    if ((game().mfactions[CurrentPlayerFaction].rule_flags & 0x80) && ExpansionEnabled &&
         !text_open("alienIscript", section))
         return 0;
     return text_open(filename, section);
@@ -1047,7 +1051,7 @@ int32_t GAMEAPI X_text_open(const char* filename, const char* section) {
 void GAMEAPI mon_tech_discovered(int32_t faction_id, int32_t tech_id) {
     int32_t year = game_year(CurrentTurn);
     MonumentEvent& e = Monuments[faction_id].events[MON_TECH_DISCOVERED];
-    if ((MFactions[faction_id].rule_flags & 0x80) || e.achieved) return;
+    if ((game().mfactions[faction_id].rule_flags & 0x80) || e.achieved) return;
     e.prev_count = 0;
     for (int32_t i = 0; i < 8; i++)
         if (i != faction_id && Monuments[i].events[MON_TECH_DISCOVERED].achieved) e.prev_count++;
@@ -1072,7 +1076,7 @@ void GAMEAPI mon_tech_discovered(int32_t faction_id, int32_t tech_id) {
 void GAMEAPI mon_secrets_of_tech(int32_t faction_id) {
     int32_t year = game_year(CurrentTurn);
     MonumentEvent& e = Monuments[faction_id].events[MON_SECRETS_OF_TECH];
-    if (MFactions[faction_id].rule_flags & 0x80) return;
+    if (game().mfactions[faction_id].rule_flags & 0x80) return;
     if (!e.achieved) {
         e.prev_count = 0;
         for (int32_t i = 0; i < 8; i++)

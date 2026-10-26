@@ -7,6 +7,7 @@
 #include "engine/clock.h"
 #include "engine/design.h"
 #include "engine/diplo_act.h"
+#include "engine/game_state.h"
 #include "engine/heap.h"
 #include "engine/map.h"
 #include "engine/net.h"
@@ -313,12 +314,13 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
     }
     if (SaveFileVersion < 0xB) {
         if (SaveFileVersion > 2 && !save_io(factions10, sizeof(LegacyFactionV10) * 8, file)) return 1;
-        for (int32_t i = 0; i < 8; i++) convert_faction_v10(&Factions[i], factions10 + i * sizeof(LegacyFactionV10));
-    } else if (!save_io(Factions, 0x10660, file)) {
+        for (int32_t i = 0; i < 8; i++)
+            convert_faction_v10(&game().factions[i], factions10 + i * sizeof(LegacyFactionV10));
+    } else if (!save_io(game().factions, 0x10660, file)) {
         return 1;
     }
     if (factions10) mem_free(factions10);
-    if (!save_io(MFactions, 0x2CE0, file)) return 1;
+    if (!save_io(game().mfactions, 0x2CE0, file)) return 1;
     if (!save_io(FactionRankingsUnk, 0x20, file)) return 1;
 
     int32_t map_result;
@@ -329,7 +331,7 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
             if (bit_count(humans) > 1) {
                 for (int32_t i = 1; i < 8; i++) {
                     uint8_t bit = (uint8_t)(1 << i);
-                    if ((FactionStatus[1] & bit) && (FactionStatus[0] & bit) && Factions[i].unk_102) {
+                    if ((FactionStatus[1] & bit) && (FactionStatus[0] & bit) && game().factions[i].unk_102) {
                         SaveFileStatus = 1;
                         return 1;
                     }
@@ -370,14 +372,14 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
             if (Units[i].weapon_id >= 0xC) Units[i].weapon_id += 3;  // three weapons inserted
         }
     }
-    if (VehCount) {
+    if (game().veh_count) {
         if (version < 3) {
-            uint32_t size = (uint32_t)VehCount * sizeof(LegacyVehV2);
+            uint32_t size = (uint32_t)game().veh_count * sizeof(LegacyVehV2);
             LegacyVehV2* old = (LegacyVehV2*)mem_get(size);
             if (!save_io(old, size, file)) return 1;
-            for (int32_t i = 0; i < VehCount; i++) convert_veh_v2(&Vehs[i], &old[i]);
+            for (int32_t i = 0; i < game().veh_count; i++) convert_veh_v2(&game().vehs[i], &old[i]);
             if (old) mem_free(old);
-        } else if (!save_io(Vehs, (uint32_t)VehCount * sizeof(VEH), file)) {
+        } else if (!save_io(game().vehs, (uint32_t)game().veh_count * sizeof(VEH), file)) {
             return 1;
         }
     }
@@ -386,21 +388,22 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
         Units[7].icon_offset = 2;
     }
     if (SaveFileVersion < 0xB) {
-        if (BaseCount) {
-            uint32_t size = (uint32_t)BaseCount * 0x130;
+        if (game().base_count) {
+            uint32_t size = (uint32_t)game().base_count * 0x130;
             uint8_t* old = (uint8_t*)mem_get(size);
             if (!save_io(old, size, file)) return 1;
-            for (int32_t i = 0; i < BaseCount; i++) convert_base_v10(&Bases[i], old + i * 0x130);
+            for (int32_t i = 0; i < game().base_count; i++) convert_base_v10(&game().bases[i], old + i * 0x130);
             if (old) mem_free(old);
         }
-    } else if (BaseCount && !save_io(Bases, (uint32_t)BaseCount * sizeof(BASE), file)) {
+    } else if (game().base_count && !save_io(game().bases, (uint32_t)game().base_count * sizeof(BASE), file)) {
         return 1;
     }
     if (SaveFileVersion < 3) {
-        for (int32_t i = 0; i < VehCount; i++) Vehs[i].unit_id = (int16_t)convert_unit_id_v2(Vehs[i].unit_id);
-        for (int32_t i = 0; i < BaseCount; i++) {
+        for (int32_t i = 0; i < game().veh_count; i++)
+            game().vehs[i].unit_id = (int16_t)convert_unit_id_v2(game().vehs[i].unit_id);
+        for (int32_t i = 0; i < game().base_count; i++) {
             // BUG(original): items 0..queue_size (one more than the queue holds) are converted.
-            int32_t* queue = &Bases[i].queue_size;
+            int32_t* queue = &game().bases[i].queue_size;
             for (int32_t k = 0; k <= queue[0]; k++) {
                 if (queue[1 + k] >= 0) queue[1 + k] = convert_unit_id_v2(queue[1 + k]);
             }
@@ -545,7 +548,7 @@ int32_t GAMEAPI save_daemon(const char* filename) {
 
 void GAMEAPI see_map_check() {
     for (int32_t i = 1; i < 8; i++) {
-        Faction& faction = Factions[i];
+        Faction& faction = game().factions[i];
         faction.player_flags &= ~0x200u;  // PFLAG_MAP_REVEALED
         const int32_t* satellites = &faction.satellites_nutrient;
         for (int32_t k = 0; k < 4; k++) {
@@ -593,15 +596,15 @@ int32_t GAMEAPI load_daemon(const char* filename, int32_t relinearize) {
                 // Alive factions: those with a base or a colony pod.
                 for (int32_t f = 1; f < 8; f++) {
                     bool alive = false;
-                    for (int32_t i = 0; i < BaseCount; i++) {
-                        if ((uint8_t)Bases[i].faction_id == f) {
+                    for (int32_t i = 0; i < game().base_count; i++) {
+                        if ((uint8_t)game().bases[i].faction_id == f) {
                             alive = true;
                             break;
                         }
                     }
                     if (!alive) {
-                        for (int32_t i = 0; i < VehCount; i++) {
-                            if (Vehs[i].faction_id == f && Units[Vehs[i].unit_id].plan == 8) alive = true;
+                        for (int32_t i = 0; i < game().veh_count; i++) {
+                            if (game().vehs[i].faction_id == f && Units[game().vehs[i].unit_id].plan == 8) alive = true;
                         }
                     }
                     if (alive) {
@@ -690,12 +693,12 @@ int32_t GAMEAPI load_map_daemon(const char* filename) {
             MapWinField23BE4 = 0;
             result = 4;
             if (!map_data(file, 0, is_save)) {
-                BaseCount = 0;
-                VehCount = 0;
+                game().base_count = 0;
+                game().veh_count = 0;
                 MapWinInVehMode = 0;
                 MapWinVehA = -1;
-                MAP* sq = MapTiles;
-                for (int32_t i = 0; i < MapAreaTiles; i++, sq++) {
+                MAP* sq = game().map.tiles;
+                for (int32_t i = 0; i < game().map.tile_count; i++, sq++) {
                     sq->visibility = 0;
                     sq->items &= ~3u;  // no bases or vehicles
                 }
@@ -849,7 +852,7 @@ int32_t GAMEAPI save_game(int32_t scenario) {
     FileBox_ctor(d.box);
     if (Win_is_visible(ui_console_vbase()) && !GameNotStarted) FileBox_init(d.box);
     // Default name: "<dir><leader> <label 180> <faction>, <year>"
-    const MFaction& m = MFactions[CurrentPlayerFaction];
+    const MFaction& m = game().mfactions[CurrentPlayerFaction];
     StrBuffer[0] = 0;
     crt_strcat(StrBuffer, scenario ? "scenarios\\" : "saves\\");
     PluralDefault = 0;
@@ -902,7 +905,7 @@ int32_t GAMEAPI save_game(int32_t scenario) {
     if (scenario) {
         crt_strcpy(ScenarioFileName, renamed ? base : EmptyPathB);
         GameState |= 0x10;
-        for (int32_t i = 0; i < 8; i++) Factions[i].unk_101 = 0;
+        for (int32_t i = 0; i < 8; i++) game().factions[i].unk_101 = 0;
     } else {
         crt_strcpy(LastSavePath, renamed ? base : EmptyPathC);
         prefs_put("Latest Save", base);
@@ -1004,7 +1007,7 @@ int32_t GAMEAPI load_game(int32_t scenario, int32_t relinearize) {
         scenario |= GameState & 0x10;
         if (!MultiplayerActive && !PbemActive) {
             int32_t i = 1;
-            while (i < 8 && !Factions[i].unk_102) i++;
+            while (i < 8 && !game().factions[i].unk_102) i++;
             if (i < 8) {  // a hotseat/PBEM game with a password
                 X_pop_2("SCRIPT", "PASSWORDEDLOADATTEMPT", 0);
                 if (!GameNotStarted) ControlTurnA = 1;
@@ -1024,7 +1027,7 @@ int32_t GAMEAPI load_game(int32_t scenario, int32_t relinearize) {
         } else if (!scenario) {
             for (int32_t i = 1; i < 8; i++) load_faction_art(i);
             load_flags();
-            const MFaction& m = MFactions[CurrentPlayerFaction];
+            const MFaction& m = game().mfactions[CurrentPlayerFaction];
             parse_say(0, Difficulty[DiffLevel], -1, -1);
             PluralDefault = 0;
             GenderDefault = m.is_leader_female;

@@ -10,6 +10,7 @@
 #include "engine/design.h"
 #include "engine/diplo_act.h"
 #include "engine/diplomacy.h"
+#include "engine/game_state.h"
 #include "engine/goals.h"
 #include "engine/map.h"
 #include "engine/parse.h"
@@ -29,7 +30,7 @@ int32_t GAMEAPI vector_dist(int32_t dx, int32_t dy) {
 int32_t GAMEAPI has_project(int32_t project_id, int32_t faction_id) {
     int32_t base_id = SecretProjects[project_id];
     if (base_id < 0) return 0;
-    return (uint8_t)Bases[base_id].faction_id == (uint32_t)faction_id;
+    return (uint8_t)game().bases[base_id].faction_id == (uint32_t)faction_id;
 }
 
 int32_t GAMEAPI base_claimed(int32_t item_id, int32_t score, int32_t skip_0, int32_t skip_1, int32_t skip_2,
@@ -49,7 +50,7 @@ inline int32_t pt(int32_t triad, int32_t plan) { return triad + plan * 3; }
 // Wrapped horizontal distance |x1 - x2| as the original computes it.
 int32_t wrap_dx(int32_t x1, int32_t x2) {
     int32_t dx = std::abs(x1 - x2);
-    if (!(MapToggleFlat & 1) && dx > MapHalfX) dx = MapAreaX - dx;
+    if (!(game().map.flat & 1) && dx > game().map.half_x) dx = game().map.x - dx;
     return dx;
 }
 
@@ -57,7 +58,7 @@ int32_t wrap_dx(int32_t x1, int32_t x2) {
 // notes at the call sites). Hybrid builds read the original memory; native builds read the
 // memory image (tables with pointers live outside it, so out-of-range reads there differ).
 int16_t raw_veh_unit_id(int32_t veh_id) {
-    const uint8_t* p = reinterpret_cast<const uint8_t*>(&Vehs[0]) + veh_id * (int32_t)sizeof(VEH);
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(&game().vehs[0]) + veh_id * (int32_t)sizeof(VEH);
     return *reinterpret_cast<const int16_t*>(p + offsetof(VEH, unit_id));
 }
 uint8_t raw_unit_chassis(int32_t unit_id) {
@@ -84,11 +85,11 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
     int32_t base_id = base_param < 0 ? -1 - base_param : base_param;
     set_base(base_id);
     base_compute(1);
-    const int32_t bx = Bases[base_id].x;
-    const int32_t by = Bases[base_id].y;
-    const int32_t faction_id = (uint8_t)Bases[base_id].faction_id;
-    Faction& f = Factions[faction_id];
-    MFaction& m = MFactions[faction_id];
+    const int32_t bx = game().bases[base_id].x;
+    const int32_t by = game().bases[base_id].y;
+    const int32_t faction_id = (uint8_t)game().bases[base_id].faction_id;
+    Faction& f = game().factions[faction_id];
+    MFaction& m = game().mfactions[faction_id];
     const int32_t is_sea = (map_tile(bx, by)->climate & 0xE0) < 0x60;
     const int32_t region = map_tile(bx, by)->region;
     const int32_t plan_region = f.region_base_plan[region];
@@ -176,9 +177,9 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
         uint32_t st = f.diplo_status[i];
         uint32_t vendetta = st & 0x10;
         if (vendetta || (human(i) && (st & 8) && !(st & 1))) {
-            for (int32_t b = 0; b < BaseCount; b++) {
-                int32_t owner = (uint8_t)Bases[b].faction_id;
-                if (owner == faction_id && (owner == i || (Bases[b].visibility & (uint8_t)(1 << i)))) {
+            for (int32_t b = 0; b < game().base_count; b++) {
+                int32_t owner = (uint8_t)game().bases[b].faction_id;
+                if (owner == faction_id && (owner == i || (game().bases[b].visibility & (uint8_t)(1 << i)))) {
                     seen_by_enemy = 1;
                     break;
                 }
@@ -186,11 +187,11 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
         }
         if (!vendetta) continue;
         if (plan_region == 7) vendetta_plan7 = 1;
-        if ((pact_faction >= 0 && (Factions[pact_faction].diplo_status[i] & 0x10)) ||
-            (human(i) && (GameRules & 0x40)) || ((st & 0x20) && Factions[i].diff_level >= 3) || (st & 0x40) ||
-            (Factions[i].ranking > f.ranking && ai_fight >= 0)) {
+        if ((pact_faction >= 0 && (game().factions[pact_faction].diplo_status[i] & 0x10)) ||
+            (human(i) && (GameRules & 0x40)) || ((st & 0x20) && game().factions[i].diff_level >= 3) || (st & 0x40) ||
+            (game().factions[i].ranking > f.ranking && ai_fight >= 0)) {
             if (plan_region == 7) threat = 1;
-            if (Factions[i].region_total_bases[region]) enemy_region = i;
+            if (game().factions[i].region_total_bases[region]) enemy_region = i;
             else if (plan_region == 7) enemy_elsewhere = i;
         }
     }
@@ -233,7 +234,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
     for (int32_t i = 0; i < 64; i++) {
         int32_t b = SecretProjects[i];
         if (b == CurrentBaseID) projects_here++;
-        if (b >= 0 && (uint8_t)Bases[b].faction_id == (uint32_t)faction_id) projects_by_group[i / 8]++;
+        if (b >= 0 && (uint8_t)game().bases[b].faction_id == (uint32_t)faction_id) projects_by_group[i / 8]++;
     }
     if (building_project && cur_base().nutrient_surplus > 0 && mineral_surplus > 0 &&
         cur_base().specialist_total - cur_base().specialist_adjust <= cur_base().pop_size / 4 + 1)
@@ -245,8 +246,8 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
     int32_t undergarrisoned = 0;    // [ebp-0x160]
     int32_t home_defenders = 0;     // [ebp-0xC4] (base loop)
     int32_t max_pop = 0;            // [ebp-0xD8]
-    for (int32_t i = 0; i < BaseCount; i++) {
-        BASE& base = Bases[i];
+    for (int32_t i = 0; i < game().base_count; i++) {
+        BASE& base = game().bases[i];
         int32_t owner = (uint8_t)base.faction_id;
         if (faction_id != owner) {
             if (f.base_id_attack_target == i && (f.diplo_status[owner] & 0x10)) {
@@ -272,7 +273,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
         if (base_fac(i, FAC_NAVAL_YARD) && dist < naval_yard_dist) naval_yard_dist = dist;
         if ((base_fac(i, FAC_AEROSPACE_COMPLEX) ||
              (SecretProjects[FAC_CLOUDBASE_ACADEMY - 70] >= 0 &&
-              Bases[SecretProjects[FAC_CLOUDBASE_ACADEMY - 70]].faction_id == base.faction_id)) &&
+              game().bases[SecretProjects[FAC_CLOUDBASE_ACADEMY - 70]].faction_id == base.faction_id)) &&
             dist < aerospace_dist)
             aerospace_dist = dist;
         if (base_fac(i, FAC_PSI_GATE)) psigate_count++;
@@ -344,8 +345,8 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
         if (f.best_armor_value < 2) count += stack_check(stack, 2, 3, -1, -1);
         else if (!count) count = stack_check(stack, 2, 3, -1, -1) != 0;
         int32_t own_home = 0;
-        for (int32_t v = 0; v < VehCount; v++) {
-            VEH& veh = Vehs[v];
+        for (int32_t v = 0; v < game().veh_count; v++) {
+            VEH& veh = game().vehs[v];
             if (veh.faction_id != faction_id) continue;
             if (Units[veh.unit_id].plan != 2 && !(veh.state & 0x10000000)) continue;
             MAP* sq = map_tile(veh.x, veh.y);
@@ -373,8 +374,8 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
     int32_t own_vehs = 0;      // [ebp-0x68]
     int32_t probes_home = 0;   // [ebp-0xE4]: plan 3 units with ability 0x40000 supported here
     int32_t free_units = 0;    // [ebp-0xE8]: own units of plans 0-3 in the region outside bases
-    for (int32_t v = 0; v < VehCount; v++) {
-        VEH& veh = Vehs[v];
+    for (int32_t v = 0; v < game().veh_count; v++) {
+        VEH& veh = game().vehs[v];
         if (veh.faction_id != faction_id) continue;
         own_vehs++;
         int32_t u = veh.unit_id;
@@ -418,11 +419,11 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
     for (int32_t i = 0; i < 21; i++) {
         int32_t x = map_wrap_x(bx + TableOffsetX[i]);
         int32_t y = by + TableOffsetY[i];
-        if (y < 0 || y >= MapAreaY || x < 0 || x >= MapAreaX) continue;
+        if (y < 0 || y >= game().map.y || x < 0 || x >= game().map.x) continue;
         if (map_tile(x, y)->items & 0x200000) farm_tiles += (cur_base().worked_tiles & (1 << i)) ? 2 : 1;
         int32_t v = veh_at(x, y);
         if (v >= 0) {
-            int32_t owner = Vehs[v].faction_id;
+            int32_t owner = game().vehs[v].faction_id;
             if (owner != faction_id && (f.diplo_status[owner] & 0x30)) enemy_near += stack_check(v, 1, -1, -1, -1);
         }
     }
@@ -486,12 +487,14 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             int32_t safe = 1;  // [ebp-0x34]: no (possibly) hostile units or bases in the region
             for (int32_t i = 1; i < 8; i++) {
                 if (faction_id == i) continue;
-                if (!Factions[i].region_total_combat_units[region] && !Factions[i].region_total_bases[region]) continue;
+                if (!game().factions[i].region_total_combat_units[region] &&
+                    !game().factions[i].region_total_bases[region])
+                    continue;
                 uint32_t st = f.diplo_status[i];
                 if (st & 0x30) {
                     safe = 0;
-                } else if (human(i) && (Factions[i].diplo_status[faction_id] & 8)) {
-                    if (!(st & 2) || Factions[i].integrity_blemishes) safe = 0;
+                } else if (human(i) && (game().factions[i].diplo_status[faction_id] & 8)) {
+                    if (!(st & 2) || game().factions[i].integrity_blemishes) safe = 0;
                 }
             }
             if (need && safe) {
@@ -507,7 +510,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                     for (int32_t i = 0; i < 121; i++) {
                         int32_t x = map_wrap_x(cx + TableOffsetX[i]);
                         int32_t y = cy + TableOffsetY[i];
-                        if (y < 0 || y >= MapAreaY || x < 0 || x >= MapAreaX) continue;
+                        if (y < 0 || y >= game().map.y || x < 0 || x >= game().map.x) continue;
                         MAP* sq = map_tile(x, y);
                         if (sq->region != region) continue;
                         if (!(f.player_flags & 0x200) && !(sq->visibility & (uint8_t)fbit)) continue;
@@ -528,7 +531,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
     for (int32_t i = 0; i < 49; i++) {
         int32_t x = map_wrap_x(cur_base().x + TableOffsetX[i]);
         int32_t y = cur_base().y + TableOffsetY[i];
-        if (y < 0 || y >= MapAreaY || x < 0 || x >= MapAreaX) continue;
+        if (y < 0 || y >= game().map.y || x < 0 || x >= game().map.x) continue;
         MAP* sq = map_tile(x, y);
         if (sq->region != region) continue;
         if (!(f.player_flags & 0x200) && !(sq->visibility & (uint8_t)fbit)) {
@@ -815,9 +818,9 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                 for (int32_t i = 1; i < 8; i++) {
                     if (i == faction_id) continue;
                     if (has_treaty(faction_id, i, 1) && !human(i)) continue;
-                    if (Factions[i].satellites_ODP >= max_odp) max_odp = Factions[i].satellites_ODP;
-                    if (!marked && (has_treaty(faction_id, i, 0x30) || Factions[i].major_atrocities) &&
-                        f.planet_busters < Factions[i].satellites_ODP + 1) {
+                    if (game().factions[i].satellites_ODP >= max_odp) max_odp = game().factions[i].satellites_ODP;
+                    if (!marked && (has_treaty(faction_id, i, 0x30) || game().factions[i].major_atrocities) &&
+                        f.planet_busters < game().factions[i].satellites_ODP + 1) {
                         marked = 1;
                         w /= 2;
                     }
@@ -837,7 +840,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                     skip = true;
                     break;
                 }
-                w = w * (threat != 1 ? 128 : 256) * 56 / MapAreaSqRoot;
+                w = w * (threat != 1 ? 128 : 256) * 56 / game().map.sq_root;
                 if (plan_region == 7) w = w * 2 / 3;
                 if (has_fac_built(FAC_NAVAL_YARD)) w = (navalyard_count + 2) * w / (navalyard_count + 3);
                 if (unit.group_id == 21) {
@@ -956,7 +959,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                 } else if (plan_region > 2 && !expanding) {
                     bool divide = true;
                     if (is_human) {
-                        if (plan_region == 7 && f.base_count >= BaseCount / 5 && f.base_count >= 10) {
+                        if (plan_region == 7 && f.base_count >= game().base_count / 5 && f.base_count >= 10) {
                             divide = false;
                         } else if (cb.governor_flags & GOV_ACTIVE) {
                             divide = false;
@@ -1121,8 +1124,8 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                     break;
                 }
                 int32_t left = 3;
-                for (int32_t v = 0; v < VehCount && !skip; v++) {
-                    VEH& veh = Vehs[v];
+                for (int32_t v = 0; v < game().veh_count && !skip; v++) {
+                    VEH& veh = game().vehs[v];
                     if (veh.faction_id != faction_id || Units[veh.unit_id].plan != 10) continue;
                     if (veh.home_base_id == CurrentBaseID) w *= 2;
                     if (veh.order != 3) {
@@ -1133,7 +1136,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                     w = w * 3 / 2;
                 }
                 if (skip) break;
-                if (VehCount > 0 && !left) {
+                if (game().veh_count > 0 && !left) {
                     skip = true;
                     break;
                 }
@@ -1163,7 +1166,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                     if (i == faction_id) continue;
                     mind += f.diplo_mind_control[i];
                     stolen += f.diplo_stolen_techs[i];
-                    if (!Factions[i].region_total_bases[region]) continue;
+                    if (!game().factions[i].region_total_bases[region]) continue;
                     if (has_project(FAC_HUNTER_SEEKER_ALGORITHM - 70, i)) continue;
                     if (!has_treaty(faction_id, i, 8)) continue;
                     contacts++;
@@ -1171,10 +1174,11 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                         if (!human(i) && !is_human) continue;
                         if (!peace) {
                             if (has_treaty(faction_id, i, 0x1000000)) {
-                                if (Factions[i].ranking < f.ranking) continue;
-                                int32_t d = (Factions[i].tech_ranking - f.tech_ranking) / 2;
-                                if (d < (Factions[i].ranking != 7 ? 3 : 6)) continue;
-                            } else if (Factions[i].ranking < f.ranking && Factions[i].tech_ranking < f.tech_ranking) {
+                                if (game().factions[i].ranking < f.ranking) continue;
+                                int32_t d = (game().factions[i].tech_ranking - f.tech_ranking) / 2;
+                                if (d < (game().factions[i].ranking != 7 ? 3 : 6)) continue;
+                            } else if (game().factions[i].ranking < f.ranking &&
+                                       game().factions[i].tech_ranking < f.tech_ranking) {
                                 continue;
                             }
                         }
@@ -1194,7 +1198,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                     skip = true;
                     break;
                 }
-                Faction& t = Factions[target];
+                Faction& t = game().factions[target];
                 int32_t credit_ratio = is_human ? 0 : f.energy_credits / range(t.energy_credits, 100, 999999);
                 int32_t mil_ratio =
                     is_human ? 0 : t.mil_strength_1 / range(f.mil_strength_1, f.base_count + 1, 999999);
@@ -1592,7 +1596,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
     // ---- facilities ----
     // BUG(original): a few cases read the population of Bases[BaseCount] (the base loop counter
     // left in the argument slot) instead of the current base.
-    const int32_t stale_base = BaseCount > 0 ? BaseCount : 0;
+    const int32_t stale_base = game().base_count > 0 ? game().base_count : 0;
     for (int32_t fac = 1; fac < 70; fac++) {
         if (!facility_avail(fac, faction_id, CurrentBaseID, 0)) continue;
         BASE& cb = cur_base();
@@ -1681,9 +1685,9 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                 for (int32_t i = 1; i < 8; i++) {
                     if (has_treaty(faction_id, i, 0x10)) continue;
                     uint32_t t = has_treaty(faction_id, i, 0x40020);
-                    uint32_t c = t | (Factions[i].integrity_blemishes >= 6);
+                    uint32_t c = t | (game().factions[i].integrity_blemishes >= 6);
                     if (!c) continue;
-                    b -= Factions[i].region_total_bases[region] ? bit_count(c) : 1;
+                    b -= game().factions[i].region_total_bases[region] ? bit_count(c) : 1;
                     if (f.region_total_bases[region] == 1) b--;
                 }
                 if (f.clean_minerals_modifier >= 4) b -= range(cb.eco_damage / 10, 1, 4);
@@ -1900,8 +1904,8 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             if (naval_base(CurrentBaseID)) {
                 req = 0x10400;
                 defensive_fac = 1;
-                int32_t c = (ai_tech - ai_fight - ai_power + ai_growth) * 2 + 24 - Bases[stale_base].pop_size / 3 -
-                            f.unk_65 - naval_yard_dist / 2 + navalyard_count;
+                int32_t c = (ai_tech - ai_fight - ai_power + ai_growth) * 2 + 24 -
+                            game().bases[stale_base].pop_size / 3 - f.unk_65 - naval_yard_dist / 2 + navalyard_count;
                 if (plan_region == 7) c /= 2;
                 value = range(c, 1, 24);
                 if (m.rule_flags & 0x100) value /= 3;
@@ -1913,8 +1917,8 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             req = 0x10800;
             defensive_fac = 1;
             threat_flag = 1;
-            int32_t c = (ai_tech - f.unk_66 - ai_fight + ai_growth) * 2 - Bases[stale_base].pop_size / 3 - f.unk_68 +
-                        (8 - ai_power) * 3 - aerospace_dist / 3 + aerospace_count;
+            int32_t c = (ai_tech - f.unk_66 - ai_fight + ai_growth) * 2 - game().bases[stale_base].pop_size / 3 -
+                        f.unk_68 + (8 - ai_power) * 3 - aerospace_dist / 3 + aerospace_count;
             if (plan_region == 7) c /= 2;
             if (cb.state_flags & 0x100000) c /= 2;
             if (best_reac < 2) c *= 2;
@@ -1947,7 +1951,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
         case FAC_SUBSPACE_GENERATOR: {
             if (!(m.rule_flags & 0x80)) break;
             if (generators(faction_id, nullptr) >= Rules.subspace_gen_req) break;
-            int32_t p = Bases[stale_base].pop_size;
+            int32_t p = game().bases[stale_base].pop_size;
             if (p >= Rules.base_size_subspace_gen) value = 1;
             else if (p >= Rules.base_size_subspace_gen * 4 / 5) value = 6;
             break;
@@ -1975,15 +1979,15 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             int32_t threat_pb = 1;
             for (int32_t i = 1; i < 8; i++) {
                 if (i == faction_id || has_treaty(faction_id, i, 1)) continue;
-                int32_t pb = Factions[i].planet_busters;
-                int32_t lim = Factions[i].major_atrocities ? pb : (pb + 1) / 2;
+                int32_t pb = game().factions[i].planet_busters;
+                int32_t lim = game().factions[i].major_atrocities ? pb : (pb + 1) / 2;
                 if (threat_pb <= lim) threat_pb = lim;
-                if ((has_treaty(faction_id, i, 0x30) || human(i)) && threat_pb <= Factions[i].satellites_ODP)
-                    threat_pb = Factions[i].satellites_ODP;
+                if ((has_treaty(faction_id, i, 0x30) || human(i)) && threat_pb <= game().factions[i].satellites_ODP)
+                    threat_pb = game().factions[i].satellites_ODP;
             }
             if (f.satellites_ODP < threat_pb + 2) {
                 value = range((f.satellites_ODP - threat_pb) * 2 + 12 - cb.pop_size, 1, 12);
-                Faction& r = Factions[RankingFactionIDUnk1];
+                Faction& r = game().factions[RankingFactionIDUnk1];
                 if (!r.planet_busters && !r.major_atrocities && r.satellites_ODP <= f.satellites_ODP) value *= 2;
             }
             threat_flag = 1;
@@ -2121,7 +2125,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
                 else if (rf & 0x20) w = w * 2 / 3;
             } else if (p == 11) {
                 for (int32_t i = 1; i < 8; i++)
-                    if (Factions[i].tech_ranking >= f.tech_ranking) w = w * 7 / 8;
+                    if (game().factions[i].tech_ranking >= f.tech_ranking) w = w * 7 / 8;
             } else if (p == 4) {
                 for (int32_t i = 1; i < 8; i++)
                     if (i != faction_id) w = (has_treaty(faction_id, i, 8) ? 9 : 7) * w / 8;
@@ -2140,7 +2144,7 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             w /= 2;
             if (F.preq_tech >= 0) {
                 for (int32_t i = 1; i < 8; i++) {
-                    if (i == faction_id || Factions[i].ranking <= f.ranking) continue;
+                    if (i == faction_id || game().factions[i].ranking <= f.ranking) continue;
                     if (has_tech(F.preq_tech, i)) w *= 2;
                     else w /= 2;
                 }
@@ -2180,11 +2184,11 @@ int32_t GAMEAPI base_build(int32_t base_param, int32_t* out_a2, int32_t* out_a3,
             }
         }
         bool elsewhere = false;
-        for (int32_t i = 0; i < BaseCount; i++) {
-            if ((uint8_t)Bases[i].faction_id != (uint32_t)faction_id || i == CurrentBaseID ||
-                Bases[i].queue_items[0] != -fac)
+        for (int32_t i = 0; i < game().base_count; i++) {
+            if ((uint8_t)game().bases[i].faction_id != (uint32_t)faction_id || i == CurrentBaseID ||
+                game().bases[i].queue_items[0] != -fac)
                 continue;
-            if (region_at(Bases[i].x, Bases[i].y) != region) {
+            if (region_at(game().bases[i].x, game().bases[i].y) != region) {
                 elsewhere = true;
                 break;
             }

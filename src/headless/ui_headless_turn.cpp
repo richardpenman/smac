@@ -1,6 +1,7 @@
 // Headless implementations of the UI-layer functions used by the turn module (engine/ui_bridge.h).
 // Native builds only: hybrid builds call the original UI.
 #ifndef SMACX_HYBRID
+#include "engine/game_state.h"
 #include "engine/ui_bridge.h"
 
 #include "engine/crt.h"
@@ -12,7 +13,7 @@
 // viewer's "no interludes" preference does); its text and movie are not shown.
 void GAMEAPI interlude(int32_t id, int32_t, int32_t, int32_t) {
     if (MultiplayerActive || DiploWinState) return;
-    bool alien_viewer = (MFactions[CurrentPlayerFaction].rule_flags & 0x80) != 0;
+    bool alien_viewer = (game().mfactions[CurrentPlayerFaction].rule_flags & 0x80) != 0;
     if (id < 0x20) {
         if ((GameInterludeState & (1 << id)) || alien_viewer) return;
     } else {
@@ -20,7 +21,7 @@ void GAMEAPI interlude(int32_t id, int32_t, int32_t, int32_t) {
     }
     if ((GameState & 0x10) || (GameRules & 0x200000)) return;
     StrBuffer[0] = 0;
-    crt_strcat(StrBuffer, MFactions[CurrentPlayerFaction].filename);
+    crt_strcat(StrBuffer, game().mfactions[CurrentPlayerFaction].filename);
     win32::CharUpperA(StrBuffer);
     if (!crt_strcmp(StrBuffer, "FUNGBOY")) return;
     if (id < 0x20) GameInterludeState |= 1 << id;

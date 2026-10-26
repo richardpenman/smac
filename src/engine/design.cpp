@@ -8,6 +8,7 @@
 #include "engine/crt.h"
 #include "engine/diplo_act.h"
 #include "engine/diplomacy.h"
+#include "engine/game_state.h"
 #include "engine/map.h"
 #include "engine/net.h"
 #include "engine/parse.h"
@@ -60,7 +61,7 @@ int32_t GAMEAPI transport_val(int32_t chassis_id, uint32_t ability_flags, int32_
 int32_t GAMEAPI arm_strat(int32_t armor_id, int32_t faction_id) {
     if (!ExpansionEnabled && armor_id > 9) return 1;
     if (arm_def(armor_id) < 0)
-        return psi_factor(Factions[faction_id].enemy_best_weapon_value * Rules.psi_combat_ratio_def[0] /
+        return psi_factor(game().factions[faction_id].enemy_best_weapon_value * Rules.psi_combat_ratio_def[0] /
                               Rules.psi_combat_ratio_atk[0],
                           faction_id, 0, 0);
     return arm_def(armor_id);
@@ -69,7 +70,7 @@ int32_t GAMEAPI arm_strat(int32_t armor_id, int32_t faction_id) {
 int32_t GAMEAPI weap_strat(int32_t weapon_id, int32_t faction_id) {
     if (!ExpansionEnabled && (weapon_id == 12 || weapon_id == 13 || weapon_id == 14)) return 1;
     if (weap_off(weapon_id) < 0)
-        return psi_factor(Factions[faction_id].enemy_best_armor_value * Rules.psi_combat_ratio_atk[0] /
+        return psi_factor(game().factions[faction_id].enemy_best_armor_value * Rules.psi_combat_ratio_atk[0] /
                               Rules.psi_combat_ratio_def[0],
                           faction_id, 1, 0);
     return weap_off(weapon_id);
@@ -83,7 +84,7 @@ int32_t GAMEAPI arm_val(int32_t armor_id, int32_t faction_id) {
     if (faction_id < 0) return arm_def(armor_id) * 2;
     if (!ExpansionEnabled && armor_id > 9) return 2;
     if (arm_def(armor_id) < 0)
-        return psi_factor(Factions[faction_id].enemy_best_weapon_value * Rules.psi_combat_ratio_def[0] /
+        return psi_factor(game().factions[faction_id].enemy_best_weapon_value * Rules.psi_combat_ratio_def[0] /
                               Rules.psi_combat_ratio_atk[0],
                           faction_id, 0, 0) *
                2;
@@ -295,8 +296,8 @@ void GAMEAPI clear_bunglist(int32_t faction_id) {
 }
 
 void GAMEAPI bung_add(int32_t faction_id, int32_t unit_id) {
-    int32_t index = Factions[faction_id].bunglist_next;
-    Factions[faction_id].bunglist_next = (index + 1) % 64;
+    int32_t index = game().factions[faction_id].bunglist_next;
+    game().factions[faction_id].bunglist_next = (index + 1) % 64;
     // The stored index is not range checked.
     uint8_t* entry = &BungList[0][0][0] + (faction_id * 64 + index) * 8;
     const UNIT& unit = Units[unit_id];
@@ -642,10 +643,10 @@ void GAMEAPI retire_proto(int32_t unit_id, int32_t faction_id) {
             }
         }
     }
-    Faction& f = Factions[faction_id];
-    for (int32_t v = VehCount - 1; v >= 0; v--) {
-        if (v >= VehCount || Vehs[v].unit_id != unit_id) continue;
-        VEH& veh = Vehs[v];
+    Faction& f = game().factions[faction_id];
+    for (int32_t v = game().veh_count - 1; v >= 0; v--) {
+        if (v >= game().veh_count || game().vehs[v].unit_id != unit_id) continue;
+        VEH& veh = game().vehs[v];
         if (!is_human(faction_id)) {
             if (best >= 0) {
                 bool unseen = !(veh.visibility & FactionStatus[0]);
@@ -669,7 +670,7 @@ void GAMEAPI retire_proto(int32_t unit_id, int32_t faction_id) {
                     f.units_active[2]++;
                     continue;
                 }
-                BASE& base = Bases[base_id];
+                BASE& base = game().bases[base_id];
                 int32_t minerals = base.minerals_accumulated + (Units[veh.unit_id].cost >> 1);
                 base.minerals_accumulated = minerals;
                 base.minerals_accumulated_2 = minerals;
@@ -679,8 +680,8 @@ void GAMEAPI retire_proto(int32_t unit_id, int32_t faction_id) {
         kill(v);
     }
     if (unit_id >= 64) {
-        for (int32_t b = 0; b < BaseCount; b++) {
-            BASE& base = Bases[b];
+        for (int32_t b = 0; b < game().base_count; b++) {
+            BASE& base = game().bases[b];
             if (base.queue_size < 0) continue;
             int32_t j = 0;
             do {
@@ -787,7 +788,7 @@ void GAMEAPI prune_protos(int32_t faction_id, int32_t unit_id, int32_t net_synch
                       Chassis[v.chassis_id].speed <= Chassis[u.chassis_id].speed))
                     continue;
                 uint32_t va = v.ability_flags, ua = u.ability_flags;
-                const Faction& fac = Factions[faction_id];
+                const Faction& fac = game().factions[faction_id];
                 bool abil_ok =
                     va == ua ||
                     (((ua ^ va) & 0xFFFBD5FC) == 0 &&
@@ -809,18 +810,18 @@ void GAMEAPI prune_protos(int32_t faction_id, int32_t unit_id, int32_t net_synch
                 bool declined = false;  // bVar5
                 if (v_id >= 64 || has_tech(v.preq_tech, faction_id)) {
                     bool queued = false;
-                    for (int32_t b = 0; b < BaseCount && !queued; b++) {
-                        if ((uint8_t)Bases[b].faction_id != faction_id) continue;
-                        for (int32_t q = 0; q <= Bases[b].queue_size; q++)
-                            if (Bases[b].queue_items[q] == v_id) {
+                    for (int32_t b = 0; b < game().base_count && !queued; b++) {
+                        if ((uint8_t)game().bases[b].faction_id != faction_id) continue;
+                        for (int32_t q = 0; q <= game().bases[b].queue_size; q++)
+                            if (game().bases[b].queue_items[q] == v_id) {
                                 queued = true;
                                 break;
                             }
                     }
                     bool replaced = false;  // bVar7
                     bool next_k = false;
-                    for (int32_t b = 0; b < BaseCount; b++) {
-                        if ((uint8_t)Bases[b].faction_id != faction_id) continue;
+                    for (int32_t b = 0; b < game().base_count; b++) {
+                        if ((uint8_t)game().bases[b].faction_id != faction_id) continue;
                         bool ask;  // reached the question (LAB_0058038f)
                         if (!MultiplayerActive && faction_id == CurrentPlayerFaction) {
                             if (!queued) continue;
@@ -864,18 +865,18 @@ void GAMEAPI prune_protos(int32_t faction_id, int32_t unit_id, int32_t net_synch
                             }
                         }
                         replaced = true;
-                        BASE& base = Bases[b];
+                        BASE& base = game().bases[b];
                         for (int32_t q = 0; q <= base.queue_size; q++)
                             if (base.queue_items[q] == v_id) base.queue_items[q] = u_id;
                         if (MultiplayerActive && net_synch) NetDaemon_unlock_base(b);
                     }
                     if (next_k) continue;
-                    if (BaseCount > 0 && replaced && MultiplayerActive && faction_id == CurrentPlayerFaction) {
+                    if (game().base_count > 0 && replaced && MultiplayerActive && faction_id == CurrentPlayerFaction) {
                         prune_say_design(v_id);
                         parse_says(0, StrBuffer, -1, -1);
                         prune_say_design(u_id);
                         parse_says(1, StrBuffer, -1, -1);
-                        if (MFactions[faction_id].rule_flags & 0x80)
+                        if (game().mfactions[faction_id].rule_flags & 0x80)
                             popp(ScriptFileName, "PRODUPGRADE", 0, "alunit_sm.pcx", 0);
                         else
                             popp(ScriptFileName, "PRODUPGRADE", 0, "unit_sm.pcx", 0);
@@ -959,7 +960,7 @@ void GAMEAPI prune_protos(int32_t faction_id, int32_t unit_id, int32_t net_synch
 int32_t GAMEAPI propose_proto(int32_t faction_id, int32_t chassis_id, int32_t weapon_id, int32_t armor_id,
                               uint32_t ability_flags, int32_t reactor_id, int32_t plan, const char* name) {
     uint8_t mask = faction_bit(faction_id);
-    Faction& fac = Factions[faction_id];
+    Faction& fac = game().factions[faction_id];
     if (!DesignSuggestMode) {
         if (is_bunged(faction_id, chassis_id, weapon_id, armor_id, ability_flags, reactor_id)) return -1;
     } else if (DesignSuggestPlan >= 0 && DesignSuggestPlan != plan) {
@@ -1026,7 +1027,7 @@ int32_t GAMEAPI propose_proto(int32_t faction_id, int32_t chassis_id, int32_t we
                             if (d_def < 0) d_def = u_def - def_value;
                             // a similar design that is better at its role exists
                             if (d_def < 2 && !(mask & FactionStatus[0]) &&
-                                std::strcmp(MFactions[faction_id].filename, "UNIV") != 0)
+                                std::strcmp(game().mfactions[faction_id].filename, "UNIV") != 0)
                                 return u_id;
                         }
                     }
@@ -1086,8 +1087,8 @@ int32_t GAMEAPI propose_proto(int32_t faction_id, int32_t chassis_id, int32_t we
     }
     prune_protos(faction_id, best, 0);
     // replace obsolete designs of the same group in the faction's build queues
-    for (int32_t b = 0; b < BaseCount; b++) {
-        BASE& base = Bases[b];
+    for (int32_t b = 0; b < game().base_count; b++) {
+        BASE& base = game().bases[b];
         if ((uint8_t)base.faction_id != faction_id) continue;
         if (base.queue_size < 0) continue;
         int32_t q = 0;
@@ -1112,7 +1113,7 @@ void GAMEAPI add_abil(uint32_t* ability_flags, uint32_t ability_flag, int32_t fa
     if (*ability_flags) return;
     int32_t index = abil_index(ability_flag);
     if (!has_tech(abil_preq(index), faction_id)) return;
-    const MFaction& m = MFactions[faction_id];
+    const MFaction& m = game().mfactions[faction_id];
     for (int32_t k = 0; k < m.faction_bonus_count; k++) {
         // the faction gets it for free
         if (m.faction_bonus_id[k] == 15 && has_tech(abil_preq(m.faction_bonus_val1[k]), faction_id) &&
@@ -1124,8 +1125,8 @@ void GAMEAPI add_abil(uint32_t* ability_flags, uint32_t ability_flag, int32_t fa
 
 void GAMEAPI consider_designs(int32_t faction_id) {
     const int32_t f = faction_id;
-    Faction& fac = Factions[f];
-    const MFaction& mf = MFactions[f];
+    Faction& fac = game().factions[f];
+    const MFaction& mf = game().mfactions[f];
     const bool human = is_human(f);
     NewDesignUnitID = -1;
     // hostility (war_score): vendettas and atrocity victims
@@ -1135,13 +1136,13 @@ void GAMEAPI consider_designs(int32_t faction_id) {
         uint32_t status = fac.diplo_status[i];
         if (!(status & 0x40000)) {
             if (status & 0x20) {
-                if (is_human(i) &&
-                    (fac.ranking < Factions[i].ranking || fac.diplo_combat_count[i] < Factions[i].diplo_combat_count[f]))
+                if (is_human(i) && (fac.ranking < game().factions[i].ranking ||
+                                    fac.diplo_combat_count[i] < game().factions[i].diplo_combat_count[f]))
                     war_score += (GameRules >> 6) & 1;
-                war_score += (Factions[i].integrity_blemishes - 1) / 4;
+                war_score += (game().factions[i].integrity_blemishes - 1) / 4;
             }
         } else {
-            war_score += (Factions[i].atrocities + 2) / 3;
+            war_score += (game().factions[i].atrocities + 2) / 3;
         }
     }
     enemy_capabilities(f);
@@ -1259,11 +1260,11 @@ void GAMEAPI consider_designs(int32_t faction_id) {
                 uint32_t war = (fac.diff_level < 4 && !(GameRules & 0x40)) ? 0 : 0x10;
                 if (!(fac.diplo_status[i] & (war | 0x20))) continue;
             }
-            if (MFactions[i].rule_psi > 0 ||
-                (SecretProjects[19] >= 0 && (uint8_t)Bases[SecretProjects[19]].faction_id == i))
+            if (game().mfactions[i].rule_psi > 0 ||
+                (SecretProjects[19] >= 0 && (uint8_t)game().bases[SecretProjects[19]].faction_id == i))
                 threats |= 1;
-            if (MFactions[i].rule_psi > 0 ||
-                (SecretProjects[9] >= 0 && (uint8_t)Bases[SecretProjects[9]].faction_id == i))
+            if (game().mfactions[i].rule_psi > 0 ||
+                (SecretProjects[9] >= 0 && (uint8_t)game().bases[SecretProjects[9]].faction_id == i))
                 threats |= 2;
         }
     }

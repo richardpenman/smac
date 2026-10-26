@@ -5,6 +5,7 @@
 // belongs to the multiplayer module and is not part of this file.
 #pragma once
 #include <cstdio>
+#include "engine/game_state.h"
 #include "engine/globals.h"
 #include "engine/crt.h"
 
@@ -50,18 +51,18 @@ GLOBAL(uint8_t[113], LandmarkOverlayCrater, 0x7F65D0);
 
 // ---- tile helpers (not original functions) ------------------------------------------------------
 
-inline MAP* map_tile(int32_t x, int32_t y) { return &MapTiles[MapHalfX * y + (x >> 1)]; }
+inline MAP* map_tile(int32_t x, int32_t y) { return &game().map.tiles[game().map.half_x * y + (x >> 1)]; }
 inline int32_t map_alt(int32_t x, int32_t y) { return map_tile(x, y)->climate >> 5; }
 inline bool map_is_ocean(int32_t x, int32_t y) { return (map_tile(x, y)->climate & 0xE0) < 0x60; }
 // Horizontal wrap of the original (a single correction; flat maps do not wrap).
 inline int32_t map_wrap_x(int32_t x) {
-    if ((MapToggleFlat & 1) == 0) {
-        if (x < 0) x += MapAreaX;
-        else if (x >= MapAreaX) x -= MapAreaX;
+    if ((game().map.flat & 1) == 0) {
+        if (x < 0) x += game().map.x;
+        else if (x >= game().map.x) x -= game().map.x;
     }
     return x;
 }
-inline bool map_in_bounds(int32_t x, int32_t y) { return y >= 0 && y < MapAreaY && x >= 0 && x < MapAreaX; }
+inline bool map_in_bounds(int32_t x, int32_t y) { return y >= 0 && y < game().map.y && x >= 0 && x < game().map.x; }
 // Common draw pattern: n > 1 ? game_rand() % n : 0.
 int32_t map_rand_mod(int32_t n);
 

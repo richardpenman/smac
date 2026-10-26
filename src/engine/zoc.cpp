@@ -2,6 +2,7 @@
 #include "engine/zoc.h"
 
 #include "engine/crt.h"
+#include "engine/game_state.h"
 #include "engine/map.h"
 #include "engine/veh.h"
 
@@ -20,7 +21,7 @@ int32_t zoc_owner(int32_t x, int32_t y, uint32_t items, int32_t faction_id) {
     MAP* sq = map_tile(x, y);
     if (!(sq->items & items)) return -1;
     uint32_t owner = sq->val2 & 0xF;
-    if (owner >= 8 || owner == (uint32_t)faction_id || (Factions[faction_id].diplo_status[owner] & 1)) return -1;
+    if (owner >= 8 || owner == (uint32_t)faction_id || (game().factions[faction_id].diplo_status[owner] & 1)) return -1;
     return (int32_t)owner;
 }
 }  // namespace
@@ -52,10 +53,10 @@ int32_t GAMEAPI zoc_sea(int32_t x, int32_t y, int32_t faction_id) {
         if (!(sq->items & 2)) continue;
         uint32_t owner = sq->val2 & 0xF;
         if (owner >= 8 || owner == (uint32_t)faction_id || map_is_ocean(x2, y2) != ocean ||
-            (Factions[faction_id].diplo_status[owner] & 1))
+            (game().factions[faction_id].diplo_status[owner] & 1))
             continue;
-        for (int32_t v = veh_at(x2, y2); v >= 0; v = Vehs[v].next_veh_id_stack) {
-            VEH& veh = Vehs[v];
+        for (int32_t v = veh_at(x2, y2); v >= 0; v = game().vehs[v].next_veh_id_stack) {
+            VEH& veh = game().vehs[v];
             if (veh.faction_id != faction_id &&
                 ((veh.visibility & (uint8_t)(1 << (faction_id & 31))) || (!MultiplayerActive && !(veh.flags & 0x400))))
                 return (int32_t)owner + 1;
