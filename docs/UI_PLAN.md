@@ -736,9 +736,9 @@ tests/placeholders/compare.sh (orig_rmenu.steps; orig_basewin.steps by eye).
 | Energy report's two columns | ReportWin_draw_energy, ReportIf_draw_energy | approximated | M |
 | Base locator map, report pictures, satellite FLC, hover help | ReportWin_draw_ops / sat, ReportIf_* | approximated | L |
 | Scroll bars | Scroll (ctor, init, on_redraw, compute_thumb_rect, mouse / keys) and its users (picker, list popups, base window panes, reports) | not reconstructed (keys and positions work) | M |
-| Combat animation | boom, BattleWin_* (battle report in the status pane), XI.PCX / XF.PCX frames | not reconstructed (sounds only) | L |
-| Move / turn animations | vehdraw_turn*, veh_scoot (sliding) | not reconstructed (facing set) | M |
-| Interface arms, slide sounds | slide_show, slide_hide, scroll_show / hide | not reconstructed | M |
+| Combat animation | boom, BattleWin_* (battle report in the status pane), XI.PCX / XF.PCX frames | done (boom.cpp: shots, explosions, the planet buster; battlewin.cpp: the report, interface mode 10, its 5 s timer. Approximated: a destroyed unit's tile drawn again by a full redraw, the buster's scaling; native life's pictures in the report not drawn) | — |
+| Move / turn animations | vehdraw_turn*, veh_scoot (sliding) | done (scoot.cpp, vehdraw.cpp. Approximated: the saved background (MapWin_compute_clip), the slide's terrain tilt through the tiles' mean) | — |
+| Interface arms, slide sounds | slide_show, slide_hide, scroll_show / hide | slide_show / slide_hide done for the base window and the console's slide (battle); not for the other windows (design workshop, reports, diplomacy); scroll_show / scroll_hide (the popups' and reports' scrolling in) not reconstructed | M |
 | Tutorial windows and hints | TutWin_tour, TutWin_tut_win, Console_give_hints, TutWin_draw_arrow | not reconstructed (hints marked shown) | L |
 | Time controls | Console_time_controls, Console_use_time_bonus (multiplayer), time_controls_dialog | not reconstructed | M |
 | Assemble | Console_assemble | not reconstructed | S |

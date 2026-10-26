@@ -656,7 +656,7 @@ void GAMEAPI Sprite_fill_scaling_table() {
 
 namespace {
 
-enum SpriteOp { SPR_COPY, SPR_SHADOW, SPR_TRANSLATE, SPR_MONO };
+enum SpriteOp { SPR_COPY, SPR_SHADOW, SPR_TRANSLATE, SPR_MONO, SPR_MULTI };
 
 uint8_t g_mono_color = 0;  // DAT_009B53E0
 
@@ -664,6 +664,7 @@ inline void sprite_put(uint8_t* d, uint8_t p, SpriteOp op, const uint8_t* table)
     if (op == SPR_MONO) *d = g_mono_color;
     else if (op == SPR_SHADOW && p == 0) *d = table[*d];
     else if (op == SPR_TRANSLATE) *d = table[p];
+    else if (op == SPR_MULTI) *d = table[(uint32_t)p << 8 | *d];
     else *d = p;
 }
 
@@ -826,6 +827,30 @@ int32_t THISCALL Sprite_draw_mono_2(Sprite* self, Buffer* dest, int32_t key, int
 
 int32_t THISCALL Sprite_draw_4(Sprite* self, Buffer* dest, int32_t key, int32_t x, int32_t y, const uint8_t* table) {
     return sprite_blit(self, dest, key, x, y, SPR_TRANSLATE, table);
+}
+
+int32_t THISCALL Sprite_draw_multi_table_dest_2(Sprite* self, Buffer* dest, int32_t key, int32_t x, int32_t y,
+                                                const uint8_t* table) {
+    return sprite_blit(self, dest, key, x, y, SPR_MULTI, table);
+}
+
+int32_t THISCALL Buffer_draw_multi_table_dest_2(Buffer* self, Buffer* dest, int32_t key, int32_t x, int32_t y,
+                                                int32_t dest_scale, int32_t source_scale, const uint8_t* table) {
+    if (!self->data) return 3;
+    // The whole buffer as an untrimmed sprite, through the sprite blitter's scaling.
+    Sprite s;
+    s.pixels.assign(self->data, self->data + (size_t)self->stride * self->height);
+    s.stride = self->stride;
+    s.width = s.full_width = self->width;
+    s.height = s.full_height = self->height;
+    s.key = key;
+    int32_t keep_d = BlitDestScale, keep_s = BlitSourceScale;
+    BlitDestScale = dest_scale;
+    BlitSourceScale = source_scale;
+    int32_t r = sprite_blit(&s, dest, key, x, y, SPR_MULTI, table);
+    BlitDestScale = keep_d;
+    BlitSourceScale = keep_s;
+    return r;
 }
 
 // ---- Texture ------------------------------------------------------------------------------------

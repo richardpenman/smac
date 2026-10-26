@@ -28,6 +28,8 @@ Buffer* ui_screen_canvas();
 // The map view must be redrawn (draw_map, draw_tile, ...) / the screen must be presented again.
 void ui_invalidate_map();
 void ui_invalidate();
+// A full redraw of the main view is pending (the next ui_present does it).
+bool ui_map_dirty();
 // Redraws what is invalid and presents the screen.
 void ui_present();
 bool ui_screenshot(const std::string& path);

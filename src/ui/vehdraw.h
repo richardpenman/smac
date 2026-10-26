@@ -20,6 +20,9 @@
 // variant), set by load_vehicles from marker pixels in UNITS.PCX. The chassis table has 9
 // entries; the original writes entries 9..18 past its end.
 GLOBAL(int32_t, VehMovingID, 0x689F30);  // unit being animated (-1: none)
+GLOBAL(int32_t, VehScootX, 0x68E564);    // veh_scoot: where the unit being moved is drawn (-1: none)
+GLOBAL(int32_t, VehScootY, 0x68E568);
+GLOBAL(int32_t, VehScootID, 0x68E56C);
 
 extern int8_t VehSpriteOffsets[19][8][8];
 constexpr uint32_t kSprUnits = 0x7777A0;  // [19 * 8] UNITS.PCX unit sprites [index * 8 + variant]
@@ -42,6 +45,13 @@ ADDR_NATIVE(0x5594F0) int32_t GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int
 // (tilted with the terrain when a7), turned to the unit's direction, scaled by the zoom.
 ADDR_NATIVE(0x4C12A0) void GAMEAPI vehdraw_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t mode,
                                                int32_t zoom, int32_t a7);
+// The turning and sliding animations of veh_scoot (veh_draw modes 0x10 / 0x20 with the frame in
+// a7): vehdraw_turn_start sets the unit's facing to dir and returns the frames of the turn
+// (per_turn for a whole turn); vehdraw_scoot_start prepares `frames` frames of the slide.
+ADDR_NATIVE(0x4BF8D0) int32_t GAMEAPI vehdraw_turn_start(int32_t veh_id, int32_t dir, int32_t per_turn, uint32_t flags);
+ADDR_NATIVE(0x4BFC70) void GAMEAPI vehdraw_turn(Buffer* dest, int32_t px, int32_t py, int32_t frame, int32_t zoom);
+ADDR_NATIVE(0x4BFE00) void GAMEAPI vehdraw_scoot_start(int32_t veh_id, int32_t dir, int32_t frames, uint32_t flags);
+ADDR_NATIVE(0x4C0F50) void GAMEAPI vehdraw_scoot(Buffer* dest, int32_t px, int32_t py, int32_t frame, int32_t zoom);
 
 struct VoxelScene;
 // The unit models (*.cvr) and the renderer (load_fixed_sprites); before colortables_init.

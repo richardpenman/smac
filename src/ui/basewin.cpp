@@ -3,6 +3,7 @@
 // FlatButton), the clickable spots, input (mouse, the console's base window keys) and the
 // composition of its canvases on the screen. The panes are drawn by basewin_draw.cpp, the commands
 // that change the base are in basewin_cmd.cpp.
+#include "ui/slide.h"
 #include "ui/basewin.h"
 #include "ui/sound.h"
 
@@ -578,7 +579,7 @@ void THISCALL BaseWin_init(uint8_t* self) {
 // ==== window ======================================================================================
 
 // BaseWin_on_status (0x41DAD0, the SubInterface's status): shows or hides the buttons and the
-// window (sounds, the console slide and the world map windows are not reconstructed).
+// window, sliding it in / out (slide.cpp; the world map windows are not reconstructed).
 void bw_status(int32_t on) {
     for (int32_t i = 0; i < 22; i++) g_bw.buttons[i].shown = false;
     g_bw.staple2.shown = false;
@@ -588,6 +589,7 @@ void bw_status(int32_t on) {
         Wave_play_2(WaveMenuDown());
         g_bw.visible = false;
         ui_invalidate_map();
+        slide_hide_window(&g_bw.canvas, g_bw.x, g_bw.y);  // slide_hide(win, 0)
         return;
     }
     for (int32_t i = 0; i < 22; i++) {
@@ -603,6 +605,7 @@ void bw_status(int32_t on) {
     ambience(0xCD);
     g_bw.visible = true;
     ui_invalidate();
+    slide_show_window(&g_bw.canvas, g_bw.x, g_bw.y, &g_bw.back);  // slide_show(win, 0): the arms
     if (GamePreferences & 0x400) Sound_fade(menu2);
 }
 

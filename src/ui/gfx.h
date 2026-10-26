@@ -139,6 +139,15 @@ struct Sprite {
 };
 // Copies the w x h rectangle at (x, y) of a canvas into the sprite, trimmed to the pixels that
 // are not `key` (0: ok; 3: bad arguments or the rectangle leaves the canvas; 9: all transparent).
+// Sprite_draw_multi_table_dest_2 (0x5E8FF5): the sprite blended into dest through a group of 16
+// colour tables (dest = table[pixel * 256 + dest]), scaled by BlitDestScale / BlitSourceScale.
+ADDR_NATIVE(0x5E8FF5) int32_t THISCALL Sprite_draw_multi_table_dest_2(Sprite* self, Buffer* dest, int32_t key,
+                                                                    int32_t x, int32_t y, const uint8_t* table);
+// Buffer_draw_multi_table_dest_2 (0x5D94B0): the same for a whole buffer at dest_scale / source_scale
+// (approximated with the sprite blitter's scaling).
+ADDR_NATIVE(0x5D94B0) int32_t THISCALL Buffer_draw_multi_table_dest_2(Buffer* self, Buffer* dest, int32_t key,
+                                                                    int32_t x, int32_t y, int32_t dest_scale,
+                                                                    int32_t source_scale, const uint8_t* table);
 ADDR_NATIVE(0x5E39A0) int32_t THISCALL pfncSpriteFromCanvasRectTrans(Sprite* self, Buffer* canvas, int32_t key,
                                                                     int32_t x, int32_t y, int32_t w, int32_t h,
                                                                     int32_t flags);

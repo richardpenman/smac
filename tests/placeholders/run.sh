@@ -121,4 +121,21 @@ check infopane "M: the message list" "infostate mode 1000 .* hover -1/-1"
 check infopane "I: the info pane" "infostate mode 1001 .* hover -1/-1"
 nocrash infopane
 
+# 8. The animations (boom.cpp, scoot.cpp, battlewin.cpp, slide.cpp): a turn of the late save with
+#    the computer players' attacks and moves in view, drawn (SMACX_ANIM=1: the frames without
+#    waiting) and not (the unattended default): the combat explosions (16 frames), the units'
+#    turns and slides, the battle report in the console; the two games end identical (the saves
+#    compared byte by byte). The base window opens with its arms (slide_show).
+if [ -f "$ROOT/work/saves_late/turn_200.sav" ]; then
+    TURN="C-ENTER,DOWN,ENTER,ENTER,ENTER,ENTER"
+    run anim_off --save work/saves_late/turn_200.sav --human 1 --keys "${TURN},SAVE:end.sav"
+    SMACX_ANIM=1 SMACX_BATTLE_SHOT=battle.bmp run anim_on --save work/saves_late/turn_200.sav --human 1 --keys "${TURN},SAVE:end.sav,BASE:0,SHOT:base.bmp"
+    check anim_on "explosions drawn" "boom anim: flags 0 frames 16"
+    check anim_on "units turned and slid" "scoot anim: veh [0-9]+ dir [0-7] turn [0-9]+ slide 6"
+    check anim_on "battle report" "battle report: [0-9]+ \\(.*\\) vs [0-9]+ \\(.*\\) strength"
+    if cmp -s "$OUT/anim_off/end.sav" "$OUT/anim_on/end.sav"; then echo "PASS anim: same game with and without the frames"; else echo "FAIL anim: the saves differ"; FAIL=1; fi
+    nocrash anim_on
+    nocrash anim_off
+fi
+
 exit $FAIL

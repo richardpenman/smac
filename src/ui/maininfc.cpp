@@ -55,10 +55,7 @@
 #include "ui/win.h"
 
 // ---- the battle area's other functions (as src/headless/ui_headless_battle.cpp) ----
-void THISCALL SubInterface_set_iface_mode(uint8_t*) {}
-void THISCALL BattleWin_clear(uint8_t*) {}
-void THISCALL BattleWin_pulse_timer(uint8_t*) {}
-void THISCALL BattleWin_stop_timer(uint8_t*) {}
+// (SubInterface_set_iface_mode, BattleWin_clear / pulse_timer / stop_timer: battlewin.cpp)
 int32_t GAMEAPI tut_check2(int32_t bit) {
     if (MultiplayerActive) return 0;
     if (!(GamePreferences & 0x20)) return 0;
@@ -577,7 +574,10 @@ void THISCALL StatusWin_draw_active(uint8_t* self, int32_t veh_id, int32_t base_
 // tile's base and units with their statistics or terraforming turns).
 void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int32_t a3, int32_t a4, int32_t a5) {
     sw(0x15DC) = 0;
-    if (atk >= 0 && def >= 0) return;  // BattleWin_battle_report: not reconstructed
+    if (atk >= 0 && def >= 0) {
+        BattleWin_battle_report(&BattleWin, atk, def, a3, a4, (uint32_t)a5);
+        return;
+    }
     if (InfcList[InfcUsed] != 0) return;
     if (!ui_screen_canvas() || !ui_screen_canvas()->data) return;  // (no screen yet)
     maininfc_geometry();
@@ -1401,3 +1401,5 @@ void statuswin_hover() {
     sw(0x15C4) = v;
     sw(0x15C8) = b;
 }
+
+void statuswin_say_morale(char* out, int32_t veh_id, int32_t faction_id) { say_morale(out, veh_id, faction_id); }

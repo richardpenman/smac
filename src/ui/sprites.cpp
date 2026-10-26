@@ -202,4 +202,13 @@ void GAMEAPI load_faction_art(int32_t faction_id) {
                                               kArtKey, x, y, 100, 0x4B, 0);
         }
     }
+    // The faction's other pictures (24..36): the emblems, the leader, the logos.
+    static const int16_t kPic[13][4] = {{1, 0x1C9, 0x56, 0x48},     {1, 0x212, 0x56, 0x48},     {0x58, 0x1C9, 0x60, 0x73},
+                                        {0xB9, 0x1C9, 0x76, 0x90},  {0x130, 0x1C9, 0x83, 0x9D}, {0x1B4, 0x1C9, 0x41, 0x32},
+                                        {0x1F6, 0x1C9, 0xE9, 0x7C}, {0x213, 1, 0xA4, 0xC6},     {0x2BD, 1, 0x46, 0x46},
+                                        {0x2BD, 0x48, 0x46, 0x46},  {0x304, 1, 0x25, 0x1D},     {0x304, 0x1F, 0x25, 0x1D},
+                                        {0x304, 0x3D, 0x25, 0x1D}};
+    for (int32_t i = 0; i < 13; i++)
+        pfncSpriteFromCanvasRectTrans(&BaseSprites[faction_id][24 + i], &LoadingCanvas, kArtKey, kPic[i][0], kPic[i][1],
+                                      kPic[i][2], kPic[i][3], 0);
 }

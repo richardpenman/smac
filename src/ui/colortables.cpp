@@ -1,10 +1,12 @@
 // Colour tables (see colortables.h).
+#include <cstdio>
 #include "ui/colortables.h"
 
 #include <cmath>
 #include <cstring>
 #include <string>
 
+#include "engine/text.h"
 #include "engine/globals.h"
 #include "ui/vehdraw.h"
 
@@ -101,13 +103,30 @@ int32_t THISCALL Palette_create_table_from_color(Palette* pal, int32_t color, ui
 }
 
 void GAMEAPI colortables_init() {
-    // Only the tables the map and the opening screens use so far; the others (0x6FEB7C, 0x6F0F7C,
-    // 0x6F127C.., 0x6F1B7C..) are not reconstructed yet. (The original first tries its cached
+    // The tables the map, the opening screens and boom use; the others (0x6FEB7C, 0x6F0F7C,
+    // 0x6F127C..) are not reconstructed yet. (The original first tries its cached
     // copies, shadow.tmp etc., which hold the same tables.)
     Palette_create_table(&GamePalette, ShadowTable, 0, 0x100, -0x2B);
     Palette_create_table_from_color(&GamePalette, 0x22, RedTintTable, 0, 0x100, 0x14, 0x50);
     Palette_create_table_from_color(&GamePalette, 0xB3, BlueTintTable, 0, 0x100, 0x14, 0x50);
     vehdraw_color_tables_init();
+    // The explosion tables (0x6F1B7C: 13 groups of 16 tables, system.txt #EXPLOSIONS0..12: a colour
+    // and its opacity per level), blended over the palette's colours 10..0xF5 (boom's sprites).
+    for (int32_t g = 0; g < 13; g++) {
+        int32_t color[16] = {}, pct[16] = {};
+        char section[32];
+        std::snprintf(section, sizeof(section), "explosions%d", g);
+        if (text_open("system", section) == 0) {
+            for (int32_t k = 0; k < 16; k++) {
+                text_get();
+                color[k] = text_item_number();
+                pct[k] = text_item_number();
+            }
+        }
+        for (int32_t k = 0; k < 16; k++)
+            Palette_create_table_from_color(&GamePalette, color[k] + 10, mem::host(0x6F1B7Cu + (uint32_t)(g * 16 + k) * 0x100),
+                                            10, 0xEC, 100 - pct[k], pct[k]);
+    }
 }
 
 void GAMEAPI colortables_init_faction(int32_t faction_id) {

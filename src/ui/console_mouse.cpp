@@ -27,6 +27,7 @@
 #include "engine/world.h"
 #include "platform/ui_platform.h"
 #include "ui/infowin.h"
+#include "ui/statuswin.h"
 #include "ui/console.h"
 #include "ui/mapwin.h"
 #include "ui/font_text.h"
@@ -239,6 +240,7 @@ void console_ui_tick() {
         last_info = now;
         infowin_tick();
     }
+    battlewin_tick();
 }
 
 // ---- MapWin handlers -------------------------------------------------------------------------------

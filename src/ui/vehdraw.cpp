@@ -5,6 +5,7 @@
 #include <cstring>
 #include <string>
 
+#include "engine/map.h"
 #include "engine/battle.h"
 #include "engine/globals.h"
 #include "engine/stack.h"
@@ -52,8 +53,24 @@ GLOBAL(int32_t, MapWinField23C00, 0x9392B0);
 }  // namespace
 
 void GAMEAPI load_vehicles() {
-    // XI.PCX / XF.PCX (explosion and battle animation frames, 0x7A9B30..) are not loaded: the
-    // animations are not reconstructed.
+    // XI.PCX: the shots of the weapons (9 rows of 16 frames, 43 x 47, 0x7A9B30..); XF.PCX: the
+    // explosions (4 kinds of 16 frames, 100 x 150: the first 8 above, the last 8 below,
+    // 0x7AB460..). Their pixels are levels of the explosion tables (boom.cpp); 0xFD is transparent.
+    Buffer_load_pcx(&g_canvas, "XI.PCX", nullptr, 0, 0x12);
+    Buffer_change_color(&g_canvas, 0xFD, 0xFF);
+    for (int32_t r = 0, y = 2; r < 9; r++, y += 0x31)
+        for (int32_t k = 0, x = 2; k < 16; k++, x += 0x2D)
+            pfncSpriteFromCanvasRectTrans(ArtSprite(0x7A9B30u + (uint32_t)(r * 16 + k) * 0x2C), &g_canvas, 0xFF, x, y, 0x2B,
+                                          0x2F, 0);
+    Buffer_load_pcx(&g_canvas, "XF.PCX", nullptr, 0, 0x12);
+    Buffer_change_color(&g_canvas, 0xFD, 0xFF);
+    for (int32_t t = 0, y = 2; t < 4; t++, y += 0x130)
+        for (int32_t c = 0, x = 2; c < 8; c++, x += 0x66) {
+            uint32_t base = 0x7AB460u + (uint32_t)(t * 16) * 0x2C;
+            pfncSpriteFromCanvasRectTrans(ArtSprite(base + (uint32_t)c * 0x2C), &g_canvas, 0xFF, x, y, 100, 0x96, 0);
+            pfncSpriteFromCanvasRectTrans(ArtSprite(base + (uint32_t)(c + 8) * 0x2C), &g_canvas, 0xFF, x, y + 0x98, 100,
+                                          0x96, 0);
+        }
     // Faction 0 (native life) takes its colours from PALETTE.PCX.
     Buffer_load_pcx(&g_canvas, "PALETTE.PCX", nullptr, 10, 0xEC);
     FactionColorFill[0] = Buffer_get_pixel(&g_canvas, 0x244, 0x17);
@@ -169,9 +186,6 @@ GLOBAL(float[3], VehLightDir, 0x687AD8);    // VEH_LIGHT_DIR_MAP, normalised
 GLOBAL(float[3], VehModelOffset, 0x687AE8);  // offset of the infantry parts (-400, 200, 0)
 GLOBAL(float, CameraYaw, 0x8E9F40);          // compute_camera
 GLOBAL(int32_t, VehAnimFrame, 0x8E9F50);     // animation frame of the animated parts
-GLOBAL(int32_t, VehScootX, 0x68E564);        // position of the unit being moved (-1: none)
-GLOBAL(int32_t, VehScootY, 0x68E568);
-GLOBAL(int32_t, VehScootID, 0x68E56C);
 
 float fbits(uint32_t u) {
     float f;
@@ -934,41 +948,43 @@ void GAMEAPI vehdraw_construct_reactor(int32_t, int32_t chassis, int32_t weapon,
     if (abil & 0x8000) add(sc, 0x779560);
 }
 
-void GAMEAPI vehdraw_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t mode, int32_t zoom, int32_t a7) {
-    const float light[3] = {fbits(0xBF13CD36), fbits(0x3F13CD36), fbits(0x3F13CD36)};
-    if (!dest) return;
-    const float ldir[3] = {VehLightDir[0], VehLightDir[1], VehLightDir[2]};
-    if (mode & 1) veh_id = pick_top_veh(veh_id);
-    int32_t x, y;
-    if (VehScootX == -1 || VehScootID != veh_id) {
-        x = Vehs[veh_id].x;
-        y = Vehs[veh_id].y;
-    } else {
-        x = VehScootX;
-        y = VehScootY;
-    }
-    int32_t rot = Vehs[veh_id].rotate_angle;
-    if (rot == -1) rot = 0;
+namespace {
+
+// The unit's tilt on its tile (vehdraw_draw's a7, vehdraw_turn_start / vehdraw_scoot_start): the
+// sum of the tile's four facet normals when the tile is rolling or rocky and the unit is not
+// infantry with a hand weapon; else straight up.
+void tile_up(int32_t veh_id, int32_t x, int32_t y, bool tilt, float* up) {
+    up[0] = 0.0f;
+    up[1] = 0.0f;
+    up[2] = 1.0f;
     const UNIT& u = Units[Vehs[veh_id].unit_id];
-    float up[3] = {0.0f, 0.0f, 1.0f};
-    if (a7 && (MapTiles[MapHalfX * y + (x >> 1)].climate & 0xE0) >= 0x60 &&
-        (u.chassis_id != 0 || Weapon[u.weapon_id].mode >= 3)) {
-        // Tilted with the terrain: the sum of the tile's four facet normals.
-        uint8_t* win = &MainConsole;
-        int32_t r[4];
-        for (int32_t c = 1; c <= 4; c++) {
-            pfncMapGetCornerYOffset(win, x, y, c);
-            const uint8_t* e = ui_mapwin_cache_entry(win, x, y);
-            r[c - 1] = e ? ((e[10] | e[11] << 8) >> ((c - 1) * 4)) & 0xF : 0;
-        }
-        const int32_t k = r[3] + ((r[0] * 7 + r[1]) * 7 + r[2]) * 7 - 400;
-        const float* t = fptr(0x8CDD10) + k * 3;
-        const uint32_t stride = 0x1C23;
-        vec3_add(t, t + stride, up);
-        vec3_add(up, t + 2 * stride, up);
-        vec3_add(up, t + 3 * stride, up);
-        vec3_normalize(up, up);
+    if (!tilt || (MapTiles[MapHalfX * y + (x >> 1)].climate & 0xE0) < 0x60 || (u.chassis_id == 0 && Weapon[u.weapon_id].mode < 3))
+        return;
+    uint8_t* win = &MainConsole;
+    int32_t r[4];
+    for (int32_t c = 1; c <= 4; c++) {
+        pfncMapGetCornerYOffset(win, x, y, c);
+        const uint8_t* e = ui_mapwin_cache_entry(win, x, y);
+        r[c - 1] = e ? ((e[10] | e[11] << 8) >> ((c - 1) * 4)) & 0xF : 0;
     }
+    const int32_t k = r[3] + ((r[0] * 7 + r[1]) * 7 + r[2]) * 7 - 400;
+    const float* t = fptr(0x8CDD10) + k * 3;
+    const uint32_t stride = 0x1C23;
+    vec3_add(t, t + stride, up);
+    vec3_add(up, t + 2 * stride, up);
+    vec3_add(up, t + 3 * stride, up);
+    vec3_normalize(up, up);
+}
+
+// The model of veh_id at (px, py) with the camera tilted by `up`, turned by `angle` (radians,
+// before the camera's yaw); the shield of armour 5 over it (vehdraw_draw, vehdraw_turn,
+// vehdraw_scoot).
+void render_vehicle(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t mode, int32_t zoom, const float* up_in,
+                    float angle) {
+    const float light[3] = {fbits(0xBF13CD36), fbits(0x3F13CD36), fbits(0x3F13CD36)};
+    const float ldir[3] = {VehLightDir[0], VehLightDir[1], VehLightDir[2]};
+    const UNIT& u = Units[Vehs[veh_id].unit_id];
+    float up[3] = {up_in[0], up_in[1], up_in[2]};
     float cam[9], inv[9];
     compute_camera(up, cam);
     VoxelScene* sc = &VehScene;
@@ -988,7 +1004,7 @@ void GAMEAPI vehdraw_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, 
     Scene_set_scale(sc, scale);
     Scene_set_camera(sc, pos, cam);
     vehdraw_construct_vehicle(veh_id, sc);
-    Scene_set_rotation(sc, (float)((double)((rot - 3) & 7) * fbits(0x3F490E56) - CameraYaw), 0.0f, 0.0f);
+    Scene_set_rotation(sc, angle, 0.0f, 0.0f);
     const int32_t ox = ZoomNum > 0 ? ZoomNum * 0x32 / ZoomDenom : trunc_div16((zoom * 5 + 0x50) * 10);
     const int32_t oy = ox;
     Scene_render(sc, dest, px + ox, py + oy, (uint32_t)((mode & 0x2000) | 0x1000) >> 12);
@@ -1000,6 +1016,112 @@ void GAMEAPI vehdraw_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, 
         return;
     }
     Scene_clear(sc, 0);
+}
+
+float facing_angle(int32_t dir) { return (float)((double)((dir - 3) & 7) * fbits(0x3F490E56)); }
+
+// vehdraw_turn_start / vehdraw_scoot_start's state (0x8CC258.., 0x8CC820, 0x8CDCF8).
+struct TurnAnim {
+    int32_t veh = -1;
+    float start = 0.0f, step = 0.0f;  // 0x8CC260, 0x8CC258
+    float up[3] = {0.0f, 0.0f, 1.0f};
+} g_turn;
+struct ScootAnim {
+    int32_t veh = -1, frames = 0, dir = 0;  // 0x8CC820, 0x8CDCF8, 0x8CC25C
+    float up_src[3] = {0, 0, 1}, up_mid[3] = {0, 0, 1}, up_dst[3] = {0, 0, 1};
+} g_scoot;
+
+}  // namespace
+
+void GAMEAPI vehdraw_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t mode, int32_t zoom, int32_t a7) {
+    if (!dest) return;
+    if (mode & 1) veh_id = pick_top_veh(veh_id);
+    int32_t x, y;
+    if (VehScootX == -1 || VehScootID != veh_id) {
+        x = Vehs[veh_id].x;
+        y = Vehs[veh_id].y;
+    } else {
+        x = VehScootX;
+        y = VehScootY;
+    }
+    int32_t rot = Vehs[veh_id].rotate_angle;
+    if (rot == -1) rot = 0;
+    float up[3];
+    tile_up(veh_id, x, y, a7 != 0, up);
+    render_vehicle(dest, veh_id, px, py, mode, zoom, up, (float)((double)((rot - 3) & 7) * fbits(0x3F490E56) - CameraYaw));
+}
+
+// vehdraw_turn_start (0x4BF8D0): the unit (the top of its stack for flags 1) turns from its facing
+// to `dir` (set at once) over `per_turn` frames for a whole turn; the frames of this turn (the
+// shorter way round). The tilt is the lifted unit's tile's.
+int32_t GAMEAPI vehdraw_turn_start(int32_t veh_id, int32_t dir, int32_t per_turn, uint32_t flags) {
+    if (flags & 1) veh_id = pick_top_veh(veh_id);
+    int32_t from = Vehs[veh_id].rotate_angle;
+    if (from == -1) from = 0;
+    g_turn.veh = veh_id;
+    Vehs[veh_id].rotate_angle = (int8_t)dir;
+    tile_up(veh_id, VehLiftX, VehLiftY, true, g_turn.up);
+    g_turn.start = facing_angle(from);
+    float to = facing_angle(dir), a, b;
+    const float two_pi = fbits(0x40C90E56);  // 6.283
+    if (g_turn.start <= to) {
+        a = g_turn.start + two_pi - to;
+        b = to - g_turn.start;
+    } else {
+        a = g_turn.start - to;
+        b = to + two_pi - g_turn.start;
+    }
+    // FP: ftol(per_turn * angle / (2 pi)).
+    if (a < b) {
+        int32_t n = (int32_t)((float)per_turn * a * fbits(0x3E22FABE));
+        g_turn.step = n ? -(a / (float)n) : 0.0f;
+        return n;
+    }
+    int32_t n = (int32_t)((float)per_turn * b * fbits(0x3E22FABE));
+    g_turn.step = n ? b / (float)n : 0.0f;
+    return n;
+}
+
+// vehdraw_turn (0x4BFC70): frame `frame` of the turn.
+void GAMEAPI vehdraw_turn(Buffer* dest, int32_t px, int32_t py, int32_t frame, int32_t zoom) {
+    if (g_turn.veh < 0) return;
+    render_vehicle(dest, g_turn.veh, px, py, 0, zoom, g_turn.up, ((float)frame * g_turn.step + g_turn.start) - CameraYaw);
+}
+
+// vehdraw_scoot_start (0x4BFE00): the unit's slide toward `dir` in `frames` frames, its tilt
+// going from its tile's to the next tile's (approximated: through their mean at the half way).
+void GAMEAPI vehdraw_scoot_start(int32_t veh_id, int32_t dir, int32_t frames, uint32_t flags) {
+    if (flags & 1) veh_id = pick_top_veh(veh_id);
+    g_scoot.frames = frames;
+    g_scoot.veh = veh_id;
+    g_scoot.dir = (dir - 3) & 7;
+    int32_t x2 = VehLiftX + NearOffsetX[dir & 7], y2 = VehLiftY + NearOffsetY[dir & 7];
+    if (!(MapToggleFlat & 1)) {
+        if (x2 < 0) x2 += MapAreaX;
+        else if (x2 >= MapAreaX) x2 -= MapAreaX;
+    }
+    tile_up(veh_id, VehLiftX, VehLiftY, true, g_scoot.up_src);
+    if (y2 >= 0 && y2 < MapAreaY && x2 >= 0 && x2 < MapAreaX) tile_up(veh_id, x2, y2, true, g_scoot.up_dst);
+    else std::memcpy(g_scoot.up_dst, g_scoot.up_src, 12);
+    vec3_add(g_scoot.up_src, g_scoot.up_dst, g_scoot.up_mid);
+    vec3_normalize(g_scoot.up_mid, g_scoot.up_mid);
+}
+
+// vehdraw_scoot (0x4C0F50): frame `frame` of the slide (the animated parts step on).
+void GAMEAPI vehdraw_scoot(Buffer* dest, int32_t px, int32_t py, int32_t frame, int32_t zoom) {
+    if (g_scoot.veh < 0) return;
+    int32_t half = g_scoot.frames >> 1;
+    const float *a = g_scoot.up_src, *b = g_scoot.up_mid;
+    if (half < frame) {
+        frame -= half;
+        a = g_scoot.up_mid;
+        b = g_scoot.up_dst;
+    }
+    float t = half > 0 ? (float)frame / (float)half : 1.0f;
+    float up[3] = {a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t};
+    vec3_normalize(up, up);
+    VehAnimFrame++;
+    render_vehicle(dest, g_scoot.veh, px, py, 0, zoom, up, (float)((double)g_scoot.dir * fbits(0x3F490E56)) - CameraYaw);
 }
 
 int32_t GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t zoom, int32_t mode, int32_t a7) {
@@ -1069,8 +1191,10 @@ int32_t GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, i
         BlitDestScale = 1;
         BlitSourceScale = 1;
         if (!(m & 0x80) && idx < 9) {
-            // (mode 0x10 / 0x20: the turning and moving animations, vehdraw_turn / _scoot)
-            vehdraw_draw(dest, veh_id, x0, y0, mode, zoom, a7);
+            // Modes 0x10 / 0x20: the turning and moving animations (a7: the frame).
+            if (m & 0x10) vehdraw_turn(dest, x0, y0, a7, zoom);
+            else if (m & 0x20) vehdraw_scoot(dest, x0, y0, a7, zoom);
+            else vehdraw_draw(dest, veh_id, x0, y0, mode, zoom, a7);
         }
     }
     if (ZoomNum < 1) {

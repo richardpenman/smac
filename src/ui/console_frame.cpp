@@ -169,6 +169,7 @@ void console_frame_draw(Buffer* s) {
     Buffer* mi = basewin_mi_canvas();
     const std::vector<uint8_t>& back = basewin_mi_back();
     if (mi->data && back.size() == (size_t)mi->stride * mi->height) std::memcpy(mi->data, back.data(), back.size());
+    mi_slide_draw(mi);  // the console slid down (the battle report)
     mi_restore_back(1);
     g_ox = 0;
     g_oy = 0;
@@ -178,15 +179,17 @@ void console_frame_draw(Buffer* s) {
         UiRect r{c.left + 4, c.top + 4, c.right - 4, c.bottom - 4};
         Buffer_box_sprite(mi, &r, box_def(3));  // MainInterface_on_redraw's box (button 0x3E9: info)
     }
-    if (!diplowin_draw_console(mi, 0, 0)) {
+    if (battlewin_shown()) {
+        battlewin_compose(mi);  // the battle report (interface mode 10)
+    } else if (!diplowin_draw_console(mi, 0, 0)) {
         int32_t hv = *reinterpret_cast<int32_t*>(&InfoWin + 0x15C4), hb = *reinterpret_cast<int32_t*>(&InfoWin + 0x15C8);
         StatusWin_redraw(&InfoWin);
         *reinterpret_cast<int32_t*>(&InfoWin + 0x15C4) = hv;
         *reinterpret_cast<int32_t*>(&InfoWin + 0x15C8) = hb;
         statuswin_hover();
     }
-    statuswin_compose(mi);  // the stack row's scroll arrows
-    infowin_compose(mi);  // the info pane (InfoWin) or the message list, the M / I buttons
+    if (!battlewin_shown()) statuswin_compose(mi);  // the stack row's scroll arrows
+    if (!battlewin_shown()) infowin_compose(mi);  // the info pane (InfoWin) or the message list, the M / I buttons
     worldwin_draw();
     maininfc_set_date();
     // The globe buttons (0x3EE pressed by ButtonGroup_set(0x3EE, 1), 0x3EF): their sprite centred.

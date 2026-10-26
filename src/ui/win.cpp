@@ -353,6 +353,7 @@ void ui_set_drag_target(int32_t x, int32_t y) {
 }
 void ui_invalidate_map() { g_map_dirty = g_dirty = true; }
 void ui_invalidate() { g_dirty = true; }
+bool ui_map_dirty() { return g_map_dirty; }
 void ui_set_message(const std::string& text) {
     g_message = text;
     g_dirty = true;
