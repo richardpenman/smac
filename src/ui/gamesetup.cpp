@@ -45,6 +45,7 @@
 #include "ui/basewin_internal.h"
 #include "ui/console.h"
 #include "ui/screenwin.h"
+#include "ui/sound.h"
 #include "ui/topmenu.h"
 #include "ui/win.h"
 
@@ -613,6 +614,13 @@ L_58a551:  // the factions
             goto L_58a551;
         }
     }
+    // The faction's voice (voices\<filename>.mp3 on FacilityVoice) while its leader is named.
+    if (GameMorePreferences & 0x4000) {
+        std::string voice = std::string("voices\\") + MFactions[pick].filename + ".mp3";
+        Wave_unload(&FacilityVoice);
+        Wave_load(&FacilityVoice, voice.c_str());
+        Wave_play_2(&FacilityVoice);
+    }
     // L_58a926: the leader's name (NAME, NAME2 female, NAME3 for a random faction).
     while (!is_random(pick)) {
         StrBuffer[0] = 0;
@@ -621,6 +629,7 @@ L_58a551:  // the factions
         if (action == 0x105) crt_strcat(StrBuffer, "3");
         int32_t r = X_pop_ask(StrBuffer, 0x17, action == 0x105 ? "" : MFactions[pick].name_leader, 0, 0);
         pick_close();
+        if (GameMorePreferences & 0x4000) Sound_fade_2(&FacilityVoice, 2000);
         if (r != 0) goto L_58a551;
         crt_strcpy(MFactions[pick].name_leader, ParseStrBuffer[0]);
         if (DialogToggle == 0) break;

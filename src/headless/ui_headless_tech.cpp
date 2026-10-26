@@ -4,8 +4,7 @@
 #ifndef SMACX_HYBRID
 #include "engine/ui_bridge.h"
 
-// No sound, no windows.
-int32_t GAMEAPI ambience(int32_t) { return 0; }
+// No windows.
 void GAMEAPI desktop_update() {}
 void THISCALL DesignWin_shutdown(uint8_t*) {}
 #endif

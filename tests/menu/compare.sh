@@ -12,6 +12,8 @@
 # matching fraction per screen. The credits (animated) and the multiplayer setup (a placeholder)
 # are taken but not scored.
 set -u
+# No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
+export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="$(realpath -m "$1")"
 ORIG="${2:-$OUT/orig}"

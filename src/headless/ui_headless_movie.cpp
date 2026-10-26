@@ -1,0 +1,10 @@
+// Headless implementations of the movie functions (engine/ui_bridge.h): secret project movies,
+// the opening, faction, defeat and victory movies (amovie_project_2). Native builds only: hybrid
+// builds call the original UI. smacx replaces this area (src/ui/movie.cpp).
+#ifndef SMACX_HYBRID
+#include "engine/ui_bridge.h"
+
+// Not shown (no game state).
+void GAMEAPI amovie_project(int32_t) {}
+void GAMEAPI amovie_project_2(const char*) {}
+#endif

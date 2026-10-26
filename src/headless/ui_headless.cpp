@@ -49,13 +49,11 @@ void THISCALL MultiDebug_close(uint8_t*) {}
 int32_t THISCALL MessageWin_init(uint8_t*) { return 0; }
 int32_t THISCALL Datalink_init(uint8_t*) { return 0; }
 void GAMEAPI bung_momma() {}
-void GAMEAPI release_sound() {}
 void THISCALL DesignWin_close(uint8_t*) {}
 void GAMEAPI mapwin_system_shutdown() {}
 void THISCALL StatusWin_close(uint8_t*) {}
 void THISCALL GraphicWin_close(uint8_t*) {}
 void THISCALL Win_hide(uint8_t*) {}
-int32_t GAMEAPI desktop_init(int32_t) { return 0; }
 void GAMEAPI start_timers() {}
 void GAMEAPI stop_timers() {}
 uint8_t* ui_console_vbase() { return &MainConsole; }
@@ -74,9 +72,7 @@ int32_t BasePop_choice(uint8_t* pop) { return *reinterpret_cast<int32_t*>(pop + 
 // ---- interface buttons, faction art ----
 void THISCALL BaseButton_set_bubble_text(uint8_t*, const char*) {}
 
-// ---- vehicles, spotting: no sound, messages or windows ----
-void THISCALL FX_play(uint8_t*, int32_t) {}
-void THISCALL FX_fade(uint8_t*, int32_t) {}
+// ---- vehicles, spotting: no messages or windows (sounds: ui_headless_sound.cpp) ----
 void THISCALL InfoWin_on_redraw(uint8_t*) {}
 // ---- save module: map windows, editor panel, PBEM message lists ----
 void THISCALL MapWin_close(uint8_t*) {}

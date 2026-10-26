@@ -11,6 +11,8 @@
 # the expected values; the game saved after the changes is loaded again to check that they stay.
 # Screenshots go to OUTDIR/<case>/. Exit status 0 when every check passes.
 set -u
+# No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
+export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SMACX="$(realpath "${SMACX:-$ROOT/build/bw-native/smacx}")"
 OUT="$(realpath -m "${1:-$ROOT/work/basewin_test}")"

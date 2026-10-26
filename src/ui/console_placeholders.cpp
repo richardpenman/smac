@@ -18,8 +18,6 @@ void THISCALL TutWin_tour(uint8_t*) { console_not_reconstructed("TutWin_tour"); 
 int32_t THISCALL TutWin_reset(uint8_t*) { return 0; }
 // Tutorial hints for the selected unit (game state: tut_check bits; only with tutorial hints on).
 void THISCALL Console_give_hints(uint8_t*) { console_not_reconstructed("Console_give_hints"); }
-// Unit sounds (the original also remembers the unit, 0x683BF4, for its sound loop).
-void GAMEAPI ambience_veh(int32_t) {}
 void THISCALL MapWin_draw_base_dest(uint8_t*, int32_t) { ui_invalidate_map(); }
 void THISCALL Console_assemble(uint8_t*) { console_not_reconstructed("Console_assemble"); }
 void THISCALL Console_survey(uint8_t*) { console_not_reconstructed("Console_survey"); }

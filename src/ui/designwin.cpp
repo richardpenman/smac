@@ -62,6 +62,7 @@
 #include "engine/text.h"
 #include "engine/ui_bridge.h"
 #include "engine/veh.h"
+#include "ui/sound.h"
 #include "ui/basewin.h"
 #include "ui/console.h"
 #include "ui/font_text.h"
@@ -1362,7 +1363,12 @@ int32_t THISCALL DesignWin_exec(uint8_t*, int32_t f, int32_t unit_id) {
     sw_button(&w, "<", 0x17, pb.left + 3, pb.top + 3, 0x14, pb.bottom - pb.top - 6, 1, bf);
     sw_button(&w, ">", 0x18, pb.right - 0x17, pb.top + 3, 0x14, pb.bottom - pb.top - 6, 1, bf);
     g_dw = &w;
+    // DesignWin_show (ambience 0xD3) and DesignWin_on_status (fx\menu up.wav as it slides in);
+    // DesignWin_hide: ambience 0xD4.
+    ambience(0xD3);
+    sound_menu_up();
     sw_run(&w);
+    ambience(0xD4);
     g_dw = nullptr;
     sw_clear_buttons(&w);
     if (w.scene_ready) Scene_clear(&w.scene, 0);

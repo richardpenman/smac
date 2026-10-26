@@ -12,10 +12,16 @@
 // (on OK) builds the three words from the boxes alone (bits no box stands for are dropped, as the
 // original), then PrefWin_destroy: AlphaIniPrefs, prefs_use, prefs_save(0) (Alpha Centauri.Ini).
 // Keys: Enter OK, Esc Cancel, Up / Down the page.
+// The audio page (PrefWin_init): its first three items (music, sound effects, voiceovers) are not
+// check boxes but the volume buttons Main / Voice / SFX / Music On|Off (ids 0x55, 0x57, 0x56,
+// 0x58, labels 1080..1087; PrefWin_change_volume_button_state / _text) with their sliders (0x50
+// master, 0x51 voices, 0x52 effects, 0x53 music, 0..127; PrefWin_on_scrolling sets the volumes at
+// once); the button states make GamePreferences 0x800 / 0x400 and GameMorePreferences 0x4000 on OK,
+// and PrefWin_destroy writes Main / Voice / Music / SFX Volume to the preferences.
 // Approximated: the layout (measured on the original's screen at 1024x768, not PrefWin_init's
-// rectangles), the audio page's volume buttons and sliders (here the music, sound effects and voice
-// switches are check boxes; the volumes are not written), the gamma correction dialog (not
+// rectangles; the volume rows below the page's check boxes), the gamma correction dialog (not
 // reconstructed), the sliding animation.
+#include <algorithm>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -33,6 +39,7 @@
 #include "ui/console.h"
 #include "ui/popup.h"
 #include "ui/screenwin.h"
+#include "ui/sound.h"
 #include "ui/win.h"
 
 namespace {
@@ -78,7 +85,7 @@ const Page kPages[6] = {
     {"BASEWARNINGS", 752,
      {0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c}},
     {"AUTOMATIONPREFS", 753, {0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x2a, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29}},
-    {"AUDIOVISUALPREFS", 754, {0x3d, 0x3e, 0x3f, 0x40, 0x41, 0x42, 0x47, 0x43, 0x44, 0x45, 0x16}},
+    {"AUDIOVISUALPREFS", 754, {0x40, 0x41, 0x42, 0x47, 0x43, 0x44, 0x45, 0x16}},
     {"MAPPREFS", 1077, {0x48, 0x49, 0x4e, 0x4a, 0x4b, 0x4c, 0x4d, 0x4f}},
 };
 
@@ -92,15 +99,82 @@ struct PrefWin : ScreenWin {
     Font font, small;
     UiRect panel{};
     int32_t rows_y = 0;
+    // The audio page: master / sfx / voice / music switches (+0x15820, +0x1636C, +0x16EB8, +0x17A04)
+    // and the four sliders' positions.
+    int32_t vol_on[4] = {1, 1, 1, 1};  // by button 0x55, 0x56, 0x57, 0x58
+    int32_t volume[4] = {};            // by slider 0x50..0x53
+    BaseButton* vol_button[4] = {};
+    UiRect slider[4] = {};
+    int32_t dragging = -1;
 
     uint32_t& word(char w) { return words[w == 'P' ? 0 : (w == 'M' ? 1 : 2)]; }
     void get_preferences() {
         for (const Bit& b : kBits) state[b.id] = ((word(b.word) & b.bit) != 0) != b.inverted;
+        vol_on[3] = state[0x3d];  // music: 0x58
+        vol_on[1] = state[0x3e];  // effects: 0x56
+        vol_on[2] = state[0x3f];  // voices: 0x57
+        button_texts();
     }
     void set_preferences() {
+        state[0x3d] = vol_on[3] != 0;
+        state[0x3e] = vol_on[1] != 0;
+        state[0x3f] = vol_on[2] != 0;
         words[0] = words[1] = words[2] = 0;
         for (const Bit& b : kBits)
             if (state[b.id] != b.inverted) word(b.word) |= b.bit;
+    }
+    // PrefWin_change_volume_button_text: "<name> Off" / "<name> On" (labels 1080..1087).
+    void button_texts() {
+        static const int32_t kOff[4] = {1080, 1084, 1082, 1086};
+        for (int32_t i = 0; i < 4; i++)
+            if (vol_button[i]) {
+                vol_button[i]->name = label_get(kOff[i] + (vol_on[i] ? 1 : 0));
+                vol_button[i]->has_name = true;
+            }
+    }
+    // PrefWin_change_volume_button_state (0x4919F0).
+    void volume_button(int32_t id) {
+        int32_t i = id - 0x55;
+        if (i == 0) {
+            if (!vol_on[0]) {
+                vol_on[0] = vol_on[3] = vol_on[2] = vol_on[1] = 1;
+                sound_enable_master(true);
+            } else {
+                vol_on[0] = vol_on[3] = vol_on[2] = vol_on[1] = 0;
+                sound_enable_master(false);
+                GamePreferences &= ~0xC00;
+                GameMorePreferences &= ~0x4000;
+            }
+        } else if (i == 1 || i == 2) {  // 0x56 effects (group 1), 0x57 voices (group 0)
+            int32_t group = i == 1 ? 1 : 0;
+            if (!vol_on[i]) {
+                vol_on[i] = 1;
+                vol_on[0] = 1;
+                sound_enable_group(group, true);
+            } else {
+                sound_enable_group(group, false);
+                vol_on[i] = 0;
+            }
+        } else if (i == 3) {
+            if (vol_on[3]) {
+                music_release();
+                vol_on[3] = 0;
+            } else {
+                vol_on[3] = 1;
+                vol_on[0] = 1;
+                GamePreferences |= 0x800;
+                load_music(CurrentPlayerFaction);
+            }
+        }
+        button_texts();
+    }
+    // PrefWin_on_scrolling (0x491380).
+    void scrolled(int32_t i, int32_t v) {
+        volume[i] = std::max(0, std::min(0x7F, v));
+        if (i == 0) sound_set_master_volume(volume[i]);
+        else if (i == 1) sound_set_group_volume(0, volume[i]);
+        else if (i == 2) sound_set_group_volume(1, volume[i]);
+        else music_set_volume(volume[i]);
     }
     void load() {
         for (int32_t p = 0; p < 6; p++) {
@@ -121,6 +195,8 @@ struct PrefWin : ScreenWin {
             }
             text_close();
         }
+        // The audio page's first three items are the volume buttons (PrefWin_init skips them).
+        if (items[4].size() >= 3) items[4].erase(items[4].begin(), items[4].begin() + 3);
     }
     void layout() {
         Font_ctor(&font);
@@ -136,6 +212,20 @@ struct PrefWin : ScreenWin {
         sw_button(this, label_get(1079), 0x5A, bx, h - 0x48, bw, bh, 0, &font);
         sw_button(this, sw_upper(label_get(101)).c_str(), 0x5C, bx, h - 0x31, bw, bh, 0, &font);
         sw_button(this, label_get(102), 0x5B, bx, h - 0x1A, bw, bh, 0, &font);
+        // The audio page's rows (order of PrefWin_init: master, voices, effects, music).
+        static const int32_t kRow[4] = {0x55, 0x57, 0x56, 0x58};
+        int32_t vy = h - 4 * 0x16 - 14;
+        for (int32_t r = 0; r < 4; r++) {
+            int32_t i = kRow[r] - 0x55;
+            vol_button[i] = sw_button(this, "", kRow[r], panel.left + 8, vy + r * 0x16, 0x6E, bh, 0, &font);
+            int32_t slider_id = r == 0 ? 0 : r == 1 ? 1 : r == 2 ? 2 : 3;  // 0x50 + slider_id
+            slider[slider_id] = UiRect{panel.left + 0x80, vy + r * 0x16 + 2, panel.right - 12, vy + r * 0x16 + bh - 2};
+        }
+        volume[0] = prefs_get_2("Main Volume", 0x7F, 0);
+        volume[1] = prefs_get_2("Voice Volume", 0x55, 0);
+        volume[2] = prefs_get_2("SFX Volume", 0x5F, 0);
+        volume[3] = music_loaded() ? prefs_get_2("Music Volume", 0x3F, 0) : 0;
+        vol_on[0] = 1;
     }
     void redraw() override {
         UiRect all{0, 0, canvas.width, canvas.height};
@@ -146,6 +236,8 @@ struct PrefWin : ScreenWin {
         Buffer_box_sprite(&canvas, &in, box_def(0));
         Buffer_box_sprite(&canvas, &panel, box_def(0));
         for (BaseButton* b : buttons) b->set_state = b->id == page ? 1 : 0;
+        for (BaseButton* b : vol_button)
+            if (b) b->shown = page == 4;
         spot_init(&spots[0], 0x20);
         int32_t y = panel.top + 10;
         sw_font(&canvas, &font, mem_i32(0x8C6C74), mem_i32(0x8C6C78));
@@ -162,6 +254,22 @@ struct PrefWin : ScreenWin {
             spot_add(&spots[0], id, 0, panel.left + 2, y - 4, panel.right - panel.left - 4, 24);
             y += 24;
         }
+        if (page == 4) {
+            for (int32_t i = 0; i < 4; i++) {  // the sliders (Scroll_init_horz): track and thumb
+                const UiRect& r = slider[i];
+                Buffer_box_sprite(&canvas, &r, box_def(0));
+                int32_t span = r.right - r.left - 10;
+                int32_t tx = r.left + 1 + span * volume[i] / 0x7F;
+                UiRect thumb{tx, r.top + 1, tx + 8, r.bottom - 1};
+                Buffer_fill_3(&canvas, &thumb, mem_i32(0x8C6C74));
+                spot_add(&spots[0], 0x50 + i, 1, r.left, r.top - 2, r.right - r.left, r.bottom - r.top + 4);
+            }
+        }
+    }
+    int32_t slider_value(int32_t i, int32_t x) const {
+        const UiRect& r = slider[i];
+        int32_t span = std::max(1, r.right - r.left - 10);
+        return (x - r.left - 5) * 0x7F / span;
     }
     void show_page(int32_t p) {
         page = (p + 6) % 6;
@@ -175,6 +283,10 @@ struct PrefWin : ScreenWin {
             AlphaIniPrefs.announce = (int32_t)words[2];
             prefs_use();
             prefs_save(0);
+            prefs_put_2("Main Volume", (uint32_t)volume[0], 0);
+            prefs_put_2("Voice Volume", (uint32_t)volume[1], 0);
+            prefs_put_2("Music Volume", (uint32_t)volume[3], 0);
+            prefs_put_2("SFX Volume", (uint32_t)volume[2], 0);
             std::fprintf(stderr, "prefs: preferences %08X more %08X warnings %08X saved\n", words[0], words[1],
                          words[2]);
         }
@@ -187,6 +299,8 @@ struct PrefWin : ScreenWin {
             show_page(id);
         } else if (id == 6) {
             console_not_reconstructed("PrefWin: gamma correction");
+        } else if (id >= 0x55 && id <= 0x58) {
+            volume_button(id);
         } else if (id == 0x5A) {  // Restore Defaults
             words[0] = default_prefs();
             words[1] = default_prefs2();
@@ -207,13 +321,20 @@ struct PrefWin : ScreenWin {
         default: break;
         }
     }
-    void on_click(int32_t parent, int32_t index, int32_t, int32_t, int32_t, bool right, bool) override {
+    void on_click(int32_t parent, int32_t index, int32_t, int32_t x, int32_t, bool right, bool) override {
         if (parent != 0 || right || index < 0 || index >= 0x60) return;
+        if (index >= 0x50 && index <= 0x53) {
+            scrolled(index - 0x50, slider_value(index - 0x50, x));
+            return;
+        }
         state[index] = !state[index];  // CheckBox_flip_state_id
     }
     void log_state() override {
         std::fprintf(stderr, "screenstate prefwin page=%d", page);
         for (int32_t id : kPages[page].ids) std::fprintf(stderr, " %x:%d", id, state[id] ? 1 : 0);
+        if (page == 4)
+            std::fprintf(stderr, " buttons %d%d%d%d volumes %d %d %d %d", vol_on[0], vol_on[1], vol_on[2], vol_on[3],
+                         volume[0], volume[1], volume[2], volume[3]);
         std::fprintf(stderr, "\n");
     }
 };

@@ -1,6 +1,7 @@
 // Window layer of smacx (see win.h): screen, message pump, keyboard, placeholder console panel.
 #include "ui/diplowin.h"
 #include "ui/win.h"
+#include "ui/sound.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -218,6 +219,29 @@ bool run_command(const std::string& cmd) {
         ControlTurnA = 1;
         return true;
     }
+    if (cmd.rfind("playsound", 0) == 0) {  // test aid: decodes and plays a sound file (sound.h)
+        auto pcm = sound_load_file(arg.c_str());
+        std::fprintf(stderr, "playsound %s: %s", arg.c_str(), pcm ? "" : "not decoded\n");
+        if (pcm) {
+            std::fprintf(stderr, "%d Hz, %d channels, %u ms\n", pcm->rate, pcm->channels, pcm->ms());
+            Wave_unload(&FacilityVoice);
+            Wave_load(&FacilityVoice, arg.c_str());
+            Wave_play_2(&FacilityVoice);
+        }
+        return true;
+    }
+    if (cmd.rfind("musicrender", 0) == 0) {  // test aid: the music's next seconds into a WAV (sound.h)
+        size_t c = arg.rfind(':');
+        std::string file = c == std::string::npos ? arg : arg.substr(0, c);
+        int32_t secs = c == std::string::npos ? 10 : std::atoi(arg.c_str() + c + 1);
+        if (file.find('/') != 0) file = g_ui_outdir + "/" + file;
+        if (!music_render(file.c_str(), secs)) std::fprintf(stderr, "musicrender: no music\n");
+        return true;
+    }
+    if (cmd.rfind("movie", 0) == 0) {  // test aid: a movie by name (movie.cpp)
+        amovie_project_2(arg.c_str());
+        return true;
+    }
     if (cmd.rfind("popup", 0) == 0) {  // test aid: a popup by label (win_popup.cpp)
         ui_popup_command(arg);
         return true;
@@ -237,8 +261,12 @@ bool pump_platform(int32_t timeout_ms) {
         else if (ev.type == platform::EV_EXPOSE) g_dirty = true;
         else if (ev.type == platform::EV_KEY_DOWN || ev.type == platform::EV_LBUTTON_DOWN ||
                  ev.type == platform::EV_LBUTTON_UP || ev.type == platform::EV_RBUTTON_DOWN ||
-                 ev.type == platform::EV_RBUTTON_UP)
+                 ev.type == platform::EV_RBUTTON_UP) {
+            // The window procedure's input_callback (Win_OnKey, Win_OnLButtonDown,
+            // Win_OnRButtonDown): the music hears every key and click.
+            if (ev.type != platform::EV_LBUTTON_UP && ev.type != platform::EV_RBUTTON_UP) input_callback();
             g_input.push_back(ev);
+        }
         else if (ev.type == platform::EV_MOUSE_MOVE) {  // the latest position only
             if (!g_input.empty() && g_input.back().type == platform::EV_MOUSE_MOVE) g_input.back() = ev;
             else g_input.push_back(ev);

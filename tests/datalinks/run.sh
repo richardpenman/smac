@@ -8,6 +8,8 @@
 # entry's "screentext title ...", "screentext text1/text2 ..." lines). Screenshots go to
 # OUTDIR/<case>/. Exit status 0 when every check passes.
 set -u
+# No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
+export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SMACX="$(realpath "${SMACX:-$ROOT/build/p7-native/smacx}")"
 OUT="$(realpath -m "${1:-$ROOT/work/datalinks_test}")"

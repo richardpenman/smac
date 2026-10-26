@@ -8,6 +8,8 @@
 # answers the popups log ("popup LABEL answer: N"). Screenshots of every popup go to
 # OUTDIR/<case>/pop_NNN_LABEL.bmp (SMACX_POPUP_SHOTS). Exit status 0 when every check passes.
 set -u
+# No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
+export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SMACX="$(realpath "${SMACX:-$ROOT/build/pp-native/smacx}")"
 OUT="$(realpath -m "${1:-$ROOT/work/popup_test}")"

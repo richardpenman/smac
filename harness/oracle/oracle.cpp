@@ -635,6 +635,59 @@ static void install_call_hooks() {
     }
 }
 
+/* logsound <turn>: log the calls of the sound layer (FX, voices, ambience, music, movies) from that
+ * turn on as "SOUND T<turn> <name> <args>" (tests/sound: compared with smacx's SMACX_SOUNDLOG).
+ * The thunks keep ECX (thiscall functions): push ecx; push idx; call log_sound; add esp,4; pop ecx;
+ * jmp trampoline (prologue copy). */
+struct SoundHook {
+    uint32_t addr, prologue;
+    const char *name;
+    int nargs; /* stack arguments logged; -1: popup_wave_callback (the block's wave id), -2: a string,
+                  -3: Wave_play_2 (the wave's address and file name) */
+};
+static const SoundHook kSoundHooks[] = {
+    {0x446A00, 8, "FX_play", 1},      {0x446960, 8, "FX_play_loc", 3}, {0x446AD0, 6, "FX_fade", 1},
+    {0x446A90, 6, "FX_stop", 1},      {0x4455F0, 8, "wave_it", 1},     {0x446B40, 8, "ambience", 1},
+    {0x446D10, 7, "ambience_veh", 1}, {0x504AA0, 9, "boom", 3},        {0x403BE0, 9, "movie", -2},
+    {0x4457E0, 9, "load_music", 1},   {0x4456B0, 8, "popup_wave", -1}, {0x4C6920, 6, "Wave_play_2", -3},
+};
+static int g_logsound_from_turn = 0x7FFFFFFF;
+static void __cdecl log_sound(int idx, uint32_t ecx, uint32_t ret, uint32_t a0, uint32_t a1, uint32_t a2) {
+    if (CurrentTurn < g_logsound_from_turn) return;
+    const SoundHook &h = kSoundHooks[idx];
+    if (h.nargs == -1) {
+        logf_("SOUND T%d %s %d from %08X\n", CurrentTurn, h.name, a0 ? *(int *)(a0 + 0x104) : -1, ret);
+    } else if (h.nargs == -2) {
+        logf_("SOUND T%d %s %s from %08X\n", CurrentTurn, h.name, a0 ? (const char *)a0 : "", ret);
+    } else if (h.nargs == -3) {
+        const char *file = *(const char **)(ecx + 0x4C);
+        logf_("SOUND T%d %s %08X %s from %08X\n", CurrentTurn, h.name, ecx, file ? file : "-", ret);
+    } else if (h.nargs == 3) {
+        logf_("SOUND T%d %s %d %d %d from %08X\n", CurrentTurn, h.name, a0, a1, a2, ret);
+    } else {
+        logf_("SOUND T%d %s %d from %08X\n", CurrentTurn, h.name, a0, ret);
+    }
+}
+static void install_sound_hooks() {
+    uint8_t *mem = (uint8_t *)VirtualAlloc(NULL, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    for (size_t i = 0; i < sizeof(kSoundHooks) / sizeof(kSoundHooks[0]); i++) {
+        const SoundHook &h = kSoundHooks[i];
+        uint8_t *tramp = mem + i * 64, *thunk = tramp + 24;
+        memcpy(tramp, (void *)h.addr, h.prologue);
+        tramp[h.prologue] = 0xE9;
+        int32_t rel = (int32_t)((h.addr + h.prologue) - ((uint32_t)(uintptr_t)tramp + h.prologue + 5));
+        memcpy(tramp + h.prologue + 1, &rel, 4);
+        uint8_t *t = thunk;
+        *t++ = 0x51;
+        *t++ = 0x68; uint32_t idx = (uint32_t)i; memcpy(t, &idx, 4); t += 4;
+        *t++ = 0xE8; rel = (int32_t)((uint32_t)(uintptr_t)log_sound - ((uint32_t)(uintptr_t)t + 4)); memcpy(t, &rel, 4); t += 4;
+        *t++ = 0x83; *t++ = 0xC4; *t++ = 0x04;
+        *t++ = 0x59;
+        *t++ = 0xE9; rel = (int32_t)((uint32_t)(uintptr_t)tramp - ((uint32_t)(uintptr_t)t + 4)); memcpy(t, &rel, 4); t += 4;
+        write_rel(h.addr, 0xE9, thunk, 5);
+    }
+}
+
 /* steptrace <turn> <veh|-1> [max]: single-step selected enemy_veh calls on that turn (all calls
  * of that vehicle, or every call with -1; at most max calls, default 1) and write the register
  * state before every executed terranx.exe instruction to step_TTT_cNNNNN_vehV.trc (records of
@@ -1508,6 +1561,9 @@ static int __cdecl oracle_top_menu() {
         } else if (!strcmp(cmd, "logcalls")) {
             g_logcalls_from_turn = atoi(args);
             install_call_hooks();
+        } else if (!strcmp(cmd, "logsound")) {
+            g_logsound_from_turn = atoi(args);
+            install_sound_hooks();
         } else if (!strcmp(cmd, "watch")) {
             sscanf(args, "%d %x", &g_watch_turn, &g_watch_addr);
         } else if (!strcmp(cmd, "poisonpump")) {

@@ -3,15 +3,7 @@
 #ifndef SMACX_HYBRID
 #include "engine/ui_bridge.h"
 
-// Tutorial hints, base window refresh, sounds, cursor and report window: nothing to show.
+// Tutorial hints, base window refresh, cursor and report window: nothing to show.
 void THISCALL TutWin_tut_map(uint8_t*, const char*, int32_t, int32_t, int32_t, uint8_t*, int32_t, int32_t, int32_t) {}
-void THISCALL FX_play_loc(uint8_t*, int32_t, int32_t, int32_t) {}
 void THISCALL ReportIf_on_redraw(uint8_t*) {}
-
-// The sliding animation is not shown; its game-state effect is the vehicle's facing, which the
-// original always sets (vehdraw_turn_start, or directly with flags 0x4000).
-void GAMEAPI veh_scoot(int32_t veh_id, int32_t, int32_t, int32_t dir, int32_t) {
-    if (dir > 7) dir %= 8;
-    Vehs[veh_id].rotate_angle = (int8_t)dir;
-}
 #endif

@@ -292,6 +292,31 @@ void video_present(const uint8_t* pixels, int32_t pitch, int32_t width, int32_t 
     SDL_RenderPresent(g_renderer);
 }
 
+void video_present_rgb(const uint32_t* pixels, int32_t width, int32_t height) {
+    static SDL_Texture* tex = nullptr;
+    static int32_t tw = 0, th = 0;
+    if (!g_renderer || width <= 0 || height <= 0) return;
+    if (!tex || tw != width || th != height) {
+        if (tex) SDL_DestroyTexture(tex);
+        tex = SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, width, height);
+        tw = width;
+        th = height;
+        if (!tex) return;
+    }
+    SDL_UpdateTexture(tex, nullptr, pixels, width * 4);
+    // Scaled to the window's width or height (whichever fits first), centred on black.
+    int32_t w = g_width, h = (int32_t)((int64_t)height * g_width / width);
+    if (h > g_height) {
+        h = g_height;
+        w = (int32_t)((int64_t)width * g_height / height);
+    }
+    SDL_Rect dst{(g_width - w) / 2, (g_height - h) / 2, w, h};
+    SDL_SetRenderDrawColor(g_renderer, 0, 0, 0, 255);
+    SDL_RenderClear(g_renderer);
+    SDL_RenderCopy(g_renderer, tex, nullptr, &dst);
+    SDL_RenderPresent(g_renderer);
+}
+
 void set_layer_palettes(const uint8_t* layers, int32_t pitch, const Rgb* const* palettes, int32_t count) {
     g_layers = layers;
     g_layer_pitch = pitch;

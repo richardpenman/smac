@@ -1,5 +1,6 @@
 // Script-driven popups of the original UI (see popup.h).
 #include "ui/popup.h"
+#include "ui/sound.h"
 #include "ui/sprites.h"
 
 #include <algorithm>
@@ -374,6 +375,7 @@ public:
     std::string edit_default;          // EditGroup_set_default
     uint32_t flags = 0;                // +0x30A8
     int32_t mode = 0;                  // +0x30AC: #extra + PopupDialogState * 10000
+    int32_t wave = -1, wave_vol = 0x7F;  // the show sound block (+0x2E64): #wave (+0x104), #vol (+0x108)
     int32_t item_type = 0x10;          // +0x2350: 1 check box, 2 list box, 4 edit group, 0x10 radio, -1 none
     int32_t active = -1;               // +0xA44: initial selection (edit groups: text limit)
     int32_t choice = 0;                // +0xA40
@@ -607,8 +609,15 @@ int32_t BasePop_start(BasePop* self, const char* file, const char* label, int32_
                 if (*s) self->buttons.push_back(self->keep(s));
             } else if (kw(a, "extra")) {
                 self->mode = atoi_s(arg(5));
+            } else if (kw(a, "wave") && a[4] != '2') {
+                // The show sound's CPU voice (popup_wave_callback when the popup is shown).
+                char* s = arg(4);
+                if (*s >= '0' && *s <= '9') self->wave = atoi_s(s);
+            } else if (kw(a, "vol") && a[3] != '2') {
+                self->wave_vol = atoi_s(arg(3));
             } else if (kw(a, "wave") || kw(a, "vol") || kw(a, "pitch") || kw(a, "fade") || kw(a, "pan")) {
-                // Sound of the popup (FX on show/close): sound is not reconstructed.
+                // The close sound and the pitch, fade and pan of the sound blocks: unused by the
+                // game's scripts with a voice.
             } else if (kw(a, "sprite")) {
                 BasePop_set_picture(self, arg(6));
             } else if (a[0] != '#') {
@@ -1265,6 +1274,8 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
     // The opening screens' dialogs (desktop mode, before a game) are always shown.
     if (!FactionStatus[0] && !ui_desktop()) no_display = 1;
     if (no_display || (p->flags & 0x8000)) return 0;
+    // BasePop_exec_3: the show sound block's callback (popup_wave_callback).
+    if (p->wave >= 0) sound_popup_wave(p->wave, p->wave_vol);
     // The window (GraphicWin_init) and its position (Popup_show / BasePop_exec_3).
     Buffer_init(&p->canvas, std::max(1, p->width), std::max(1, p->height), 8, 0);
     int32_t state = p->mode / 10000;

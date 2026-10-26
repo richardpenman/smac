@@ -34,9 +34,11 @@
 // ACQUIRED TECHNOLOGY!), the tech's name in its category colour and picture, the four sections of
 // help_tech_info (base facilities, technologies, unit advances, miscellaneous) with their links,
 // the BLURBSX quote and OK. A click on a link opens that datalinks page, then the window again.
-// Not reconstructed: the voice clip (voices\techNN.mp3), the two picture buttons beside the
-// quote (drawn, inactive), scroll bars of the sections.
+// The voice clip voices\techN.mp3 plays while the window is up (sound.cpp's Wave objects).
+// Not reconstructed: the two picture buttons beside the quote (drawn, inactive), scroll bars of the
+// sections.
 #include "ui/techwin.h"
+#include "ui/sound.h"
 
 #include <algorithm>
 #include <cctype>
@@ -579,12 +581,23 @@ int32_t THISCALL NewTechWin_exec(uint8_t*, int32_t tech_id, int32_t from) {
     sw_init(&w, (ScreenWidth - W) / 2, (ScreenHeight - H) / 2, W, H, false);
     w.ok_button = sw_button(&w, label_get(101), -1, w.ok.left, w.ok.top, w.ok.right - w.ok.left,
                             w.ok.bottom - w.ok.top, 0, find_font(0xE, 1));
+    // The voice clip (voices\techN.mp3 on FacilityVoice, at the voices group's volume) when the
+    // viewer is human and voiceovers are on (GameMorePreferences 0x4000).
+    std::string voice = "voices\\tech" + std::to_string(tech_id) + ".mp3";
+    if ((GameMorePreferences & 0x4000) && (FactionStatus[0] & (1 << (CurrentPlayerFaction & 31)))) {
+        Wave_unload(&FacilityVoice);
+        Wave_load(&FacilityVoice, voice.c_str());
+        Wave_set_volume(&FacilityVoice, (uint32_t)sound_group_volume(0));
+        Wave_play_2(&FacilityVoice);
+    }
     for (;;) {
         w.link = -1;
         sw_run(&w);
         if (w.link == -1 || ControlTurnA) break;
         Datalink_exec(&DatalinkWin, w.link / 10000, w.link % 10000);
     }
+    // Voiceovers stop when the window closes (GameMorePreferences 0x20000).
+    if ((GameMorePreferences & 0x4000) && (GameMorePreferences & 0x20000)) Sound_fade_2(&FacilityVoice, 2000);
     sw_clear_buttons(&w);
     return 0;
 }

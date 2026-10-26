@@ -4,6 +4,7 @@
 // composition of its canvases on the screen. The panes are drawn by basewin_draw.cpp, the commands
 // that change the base are in basewin_cmd.cpp.
 #include "ui/basewin.h"
+#include "ui/sound.h"
 
 #include <algorithm>
 #include <cctype>
@@ -336,6 +337,11 @@ void extract(uint32_t off, Buffer* canvas, int32_t x, int32_t y, int32_t w, int3
 
 void THISCALL BaseWin_init(uint8_t* self) {
     popup_art_init();  // interface art, box sprites, fonts (load_interface, config_popups)
+    // The window's sound (fx\menu2.wav at 0x6EEE68, effects group, volume 0x41, pitch 300).
+    Wave_load_3(mem::host(0x6EEE68), "fx\\menu2.wav", 0x10);
+    SoundSys_add_to_group(SoundSystem(), 1, mem::host(0x6EEE68));
+    Wave_set_volume(mem::host(0x6EEE68), 0x41);
+    Wave_set_pitch(mem::host(0x6EEE68), 300);
     textcolor_load();
     mi_init();
     bwf(0x40B00) = -1;
@@ -576,7 +582,10 @@ void THISCALL BaseWin_init(uint8_t* self) {
 void bw_status(int32_t on) {
     for (int32_t i = 0; i < 22; i++) g_bw.buttons[i].shown = false;
     g_bw.staple2.shown = false;
+    uint8_t* menu2 = mem::host(0x6EEE68);  // BaseWin_init's fx\menu2.wav
     if (!on) {
+        ambience(0xCE);
+        Wave_play_2(WaveMenuDown());
         g_bw.visible = false;
         ui_invalidate_map();
         return;
@@ -590,8 +599,11 @@ void bw_status(int32_t on) {
         if (g_bw.buttons[i].inited) g_bw.buttons[i].shown = true;
     }
     bwf(kBwDragState) = -1;
+    if ((GamePreferences & 0x400) && !Wave_is_playing(menu2)) Wave_play_2(menu2);
+    ambience(0xCD);
     g_bw.visible = true;
     ui_invalidate();
+    if (GamePreferences & 0x400) Sound_fade(menu2);
 }
 
 // BaseWin_show (0x41E890) / BaseWin_hide (0x41E8B0) through the iface mode stack.

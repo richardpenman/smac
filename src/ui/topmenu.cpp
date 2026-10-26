@@ -14,6 +14,7 @@
 // desktop is redrawn (change_opening at the next main menu).
 // Not reconstructed: the slide animations, the menu sounds (fx\menu out.wav, opening menu.wav).
 #include "ui/topmenu.h"
+#include "ui/sound.h"
 
 #include <algorithm>
 #include <cctype>
@@ -248,6 +249,10 @@ int32_t run_menu(std::vector<std::string> items, std::string caption, int32_t ac
     w.sel = active >= 0 && active < (int32_t)w.items.size() ? active : 0;
     g_menu = &w;
     std::fprintf(stderr, "menu %s: %d items, selected %d\n", caption.c_str(), (int32_t)w.items.size(), w.sel);
+    // The column's sound (a Wave of its own: fx\menu out.wav) as it slides in.
+    static uint8_t menu_out[0x6C];
+    Wave_load(menu_out, "fx\\menu out.wav");
+    if (GamePreferences & 0x400) Wave_play_2(menu_out);
     sw_run(&w);
     g_menu = nullptr;
     // No more input (a scripted run that ended): cancelled.
@@ -362,7 +367,19 @@ int32_t GAMEAPI top_menu(int32_t hotseat) {
     }
     prefs_load(0);
     prefs_use();
-    // (The opening menu's music, preference 0x800, is not played.)
+    // The opening menu's music (fx\opening menu.wav looping on 0x945780, music preference 0x800).
+    uint8_t* music = mem::host(0x945780);
+    if (!hotseat && (GamePreferences & 0x800)) {
+        Wave_load_3(music, "fx\\opening menu.wav", 2);
+        Wave_play_2(music);
+    }
+    // Leaving the menu fades it out over 3 seconds.
+    auto music_end = [&]() {
+        if ((hotseat || (GamePreferences & 0x800)) && Wave_is_playing(music)) {
+            Sound_fade_2(music, 3000);
+            Wave_unload(music);
+        }
+    };
     if (AlphaIniPrefs.preferences & 0x20000000) GameDialogFlags &= ~4;
     else GameDialogFlags |= 4;
     NetUpkeepState = 0;
@@ -406,6 +423,7 @@ int32_t GAMEAPI top_menu(int32_t hotseat) {
                     setup_game(1);
                     GameState |= 0x80000E0;
                     ControlTurnMove = CurrentPlayerFaction;
+                    music_end();
                     popup_delete(pop);
                     close_opening();
                     return ControlTurnA;
@@ -497,6 +515,7 @@ int32_t GAMEAPI top_menu(int32_t hotseat) {
         }
         if (leave) break;
     } while (!ControlTurnA);
+    music_end();
     popup_delete(pop);
     // The game's windows cover the desktop from here.
     close_opening();

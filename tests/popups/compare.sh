@@ -9,6 +9,8 @@
 # boxes, positions and colours are what is compared. Writes OUTDIR/cmp_<popup>.png (original
 # above, smacx in the middle, differing pixels below) and prints the matching fraction per popup.
 set -u
+# No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
+export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="$(realpath -m "$1")"
 ORIG="${2:-$OUT/orig}"

@@ -13,6 +13,8 @@
 # smacx | differing pixels). The buttons are child windows, not part of the canvases: compare the
 # screens (OUTDIR/<save>/bN.smxbase.bmp and OUTDIR/smacx_<save>_N.smxbase.bmp) by eye.
 set -u
+# No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
+export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="$(realpath -m "$1")"; shift
 PY="$ROOT/tools/venv/bin/python"

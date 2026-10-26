@@ -3,7 +3,7 @@
 //   smacx [--new [k=v ...] | --save FILE.sav] [--human N] [--viewer N] [--seed CRT,GAME|clock]
 //         [--keys K1,K2,...] [--exit-after-keys] [--turns N] [--shot FILE.bmp] [--snapshots DIR]
 //         [--rng FILE] [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR]
-//         [--gamedir DIR] [--image FILE] [--ini FILE]
+//         [--gamedir DIR] [--image FILE] [--ini FILE] [--nosound]
 //
 // The reconstructed engine runs as in the original: control_game boots, the main menu (top_menu,
 // src/ui/topmenu.cpp: the opening screens, the game setup dialogs, LOAD GAME's FileBox) sets up or
@@ -26,7 +26,9 @@
 // --keys: scripted input, consumed before real input. Tokens: a character (b, B = shift+b, ., [ ...),
 // LEFT RIGHT UP DOWN HOME END PGUP PGDN ENTER SPACE TAB BACK ESC F1..F12, KP1..KP9 (keypad),
 // C-x (ctrl), S-x (shift), CLICK:XxY (a left click in a popup), POPUP:FILE/LABEL[/FLAGS[/PCX]]
-// (shows a script popup, a test aid), BASEDUMP:FILE (the open base window's canvases in the
+// (shows a script popup, a test aid), PLAYSOUND:FILE (decodes and plays a WAV / MP3 file on the
+// voice object, logging its length), MUSICRENDER:FILE:SECONDS (the music's next seconds into a WAV
+// file in --outdir), MOVIE:NAME (plays movies\NAME.wve), BASEDUMP:FILE (the open base window's canvases in the
 // oracle's basedump format), BASE:N (opens base N's window, a test aid), BASESTATE (the open
 // base's production, queue, workers and stores on stderr), SCREENSTATE (the open report / social
 // engineering / monuments screen: its texts and state), FACTIONSTATE (the viewer's social choice,
@@ -44,6 +46,9 @@
 // state from that seed (load_daemon reseeds it only under GameRules 0x400): without a fixed seed
 // the same save and keys play differently. --seed clock seeds from the clock as the original.
 // SMACX_TRACE=1 logs the generators and the logic clock at every scripted key and popup.
+// SMACX_SOUNDLOG=1 logs the sound, voice, music and movie calls ("sound: T<turn> FX_play 15"; ui/sound.h).
+// --nosound: no audio device (the calls still run and are logged); SDL_AUDIODRIVER chooses the
+// device otherwise (the test scripts use "dummy").
 // --snapshots DIR: turn_NNN.state/.rng/.sav before every turn_upkeep, as the harness writes them
 // (compare runs with harness/compare.py); --rng FILE restores a snapshot's generators after --save.
 // --shot: observer mode: after --turns N turns (default 0) write the screenshot and exit (with
@@ -87,6 +92,7 @@
 #include "ui/sprites.h"
 #include "ui/vehdraw.h"
 #include "ui/basewin.h"
+#include "ui/sound.h"
 #include "ui/topmenu.h"
 #include "ui/win.h"
 
@@ -104,7 +110,7 @@ struct Options {
     std::string new_args;
     int human = -1, viewer = -1, zoom = 0x7FFF, cx = -1, cy = -1, width = 1024, height = 768, turns = 0;
     unsigned seed_crt = 0, seed_game = 0;
-    bool seeded = false, seed_given = false, hidden = false, exit_after_keys = false;
+    bool seeded = false, seed_given = false, hidden = false, exit_after_keys = false, nosound = false;
     std::vector<ScriptedKey> keys;
 } g_opt;
 
@@ -498,6 +504,18 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         out->command = "basestate";
         return true;
     }
+    if (tok.rfind("PLAYSOUND:", 0) == 0) {  // PLAYSOUND:FILE, decodes and plays a sound file (test aid)
+        out->command = "playsound " + tok.substr(10);
+        return true;
+    }
+    if (tok.rfind("MUSICRENDER:", 0) == 0) {  // MUSICRENDER:FILE:SECONDS, the music into a WAV (test aid)
+        out->command = "musicrender " + tok.substr(12);
+        return true;
+    }
+    if (tok.rfind("MOVIE:", 0) == 0) {  // MOVIE:NAME, amovie_project_2(NAME) (test aid)
+        out->command = "movie " + tok.substr(6);
+        return true;
+    }
     if (tok.rfind("POPUP:", 0) == 0) {  // POPUP:FILE/LABEL[/FLAGS[/PCX]], a popup by label (test aid)
         out->command = "popup " + tok.substr(6);
         return true;
@@ -577,7 +595,8 @@ int usage() {
                  "usage: smacx [--new [k=v ...] | --save FILE.sav] [--human N] [--viewer N] [--seed CRT,GAME|clock]\n"
                  "             [--keys K1,K2,..] [--exit-after-keys] [--turns N] [--shot FILE.bmp] [--snapshots DIR] [--rng FILE]\n"
                  "             [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR] [--gamedir DIR]\n"
-                 "             [--image FILE] [--ini FILE] [--dump FILE.smxmap [--like REF.smxmap] [--scroll-from X,Y]]\n");
+                 "             [--image FILE] [--ini FILE] [--dump FILE.smxmap [--like REF.smxmap] [--scroll-from X,Y]]\n"
+                 "             [--nosound]\n");
     return 2;
 }
 
@@ -616,6 +635,7 @@ int main(int argc, char** argv) {
         else if (a == "--snapshots") g_opt.snapshots = next();
         else if (a == "--rng") g_opt.rng = fs::absolute(next()).string();
         else if (a == "--hidden") g_opt.hidden = true;
+        else if (a == "--nosound") g_opt.nosound = true;
         else if (a == "--exit-after-keys") g_opt.exit_after_keys = true;
         else if (a == "--keys") {
             std::string list = next() + ",";
@@ -664,6 +684,8 @@ int main(int argc, char** argv) {
     ScreenWidth = g_opt.width;
     ScreenHeight = g_opt.height;
     if (!platform::video_init("Sid Meier's Alpha Centauri", g_opt.width, g_opt.height, g_opt.hidden)) return 1;
+    // WinMain's init_sound (soundx.dll, DirectSound): the SDL audio device unless --nosound.
+    sound_startup(!g_opt.nosound);
     // system_init's UI part (load_fixed_sprites -> load_palette, load_sprites -> load_terrain)
     // and mapwin_system_init's lighting table.
     load_palette();
@@ -688,6 +710,7 @@ int main(int argc, char** argv) {
     if (menu) g_harness_game_end = [] { std::fprintf(stderr, "game over (turn %d)\n", CurrentTurn); };
     else g_harness_game_end = [] { std::fprintf(stderr, "game over (turn %d)\n", CurrentTurn); std::exit(0); };
     control_game();
+    sound_shutdown();
     platform::video_shutdown();
     return 0;
 }

@@ -104,6 +104,9 @@ trace <n> [turn]      1: log RNG at each faction step; 2: also dump state per st
                       4: log vehicle order changes and a state hash at every step
 watch <turn> <hex>    hardware write watchpoint on a byte, armed at that turn's turn_upkeep
 logcalls <turn>       log calls of spotting/waking functions from that turn on
+logsound <turn>       log the sound layer's calls (FX_play, FX_play_loc, FX_fade, FX_stop, wave_it, ambience,
+                      ambience_veh, boom, movies, load_music, popup_wave_callback, Wave_play_2) from that
+                      turn on: "SOUND T<turn> <name> <args> from <caller>" (tests/sound)
 poison <byte>         stack fill value (default 0)
 poison rand <seed>    pseudo-random stack fill (detects uninitialised reads that 0/0xFF hide)
 poisonpump            also poison after enemy_veh's message pump (do_all_non_input, 0x57928D);

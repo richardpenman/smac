@@ -47,8 +47,6 @@ void GAMEAPI show_replay() {
     if (g_harness_game_end) g_harness_game_end();
 }
 int32_t THISCALL Net_check_for_lobby(uint8_t*, char*, uint8_t*, int32_t, int32_t) { return 0; }
-void THISCALL FX_init(uint8_t*) {}
-int32_t THISCALL Wave_is_playing(uint8_t*) { return 0; }
 void GAMEAPI desktop_close() {}
 void THISCALL GraphicWin_fill(uint8_t*, int32_t) {}
 void THISCALL Win_show(uint8_t*, int32_t) {}

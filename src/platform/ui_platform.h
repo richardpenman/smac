@@ -8,6 +8,7 @@
 // backends can be added without touching src/ui.
 #pragma once
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -89,6 +90,45 @@ bool font_render(int32_t handle, const char* text, int32_t len, std::vector<uint
 // ---- files ----
 // Directory searched first for fonts the game ships (the game directory).
 void set_game_dir(const std::string& dir);
+
+// ---- true-colour frames (the movie player's DirectDraw surface) ----
+// Shows a frame of 0xAARRGGBB pixels (rows of `width`), scaled to fit the window and centred on
+// black, keeping its aspect ratio.
+void video_present_rgb(const uint32_t* pixels, int32_t width, int32_t height);
+
+// ---- audio (DirectSound behind soundx.dll) ----
+// A mixer of sample voices and streams. Nothing here touches game state: playback runs on the
+// audio thread (SDL_AUDIODRIVER chooses the device: dummy, disk, alsa...).
+struct Pcm {
+    std::vector<int16_t> samples;  // interleaved
+    int32_t channels = 1;
+    int32_t rate = 22050;
+    uint32_t ms() const { return rate ? (uint32_t)((uint64_t)samples.size() / channels * 1000 / rate) : 0; }
+};
+struct VoiceParams {
+    float volume = 1.0f;  // linear gain
+    float pan = 0.0f;     // -1 left .. +1 right
+    float pitch = 1.0f;   // playback rate factor
+    bool loop = false;
+};
+// Opens the audio device; false (and every call below a no-op) when disabled or unavailable.
+bool audio_init(bool enabled);
+void audio_shutdown();
+bool audio_enabled();
+// Starts a voice; returns its handle (> 0), 0 when nothing plays.
+int32_t audio_play(const std::shared_ptr<const Pcm>& pcm, const VoiceParams& params);
+void audio_set(int32_t voice, const VoiceParams& params);
+// Stops a voice now, or fades it out over fade_ms.
+void audio_stop(int32_t voice, int32_t fade_ms = 0);
+bool audio_playing(int32_t voice);
+// Streams: fn runs on the audio thread and adds `frames` stereo frames (interleaved floats, full
+// scale 1.0) at `rate` Hz to out. Returns false when the stream has ended (it is then removed).
+using StreamFn = bool (*)(void* user, float* out, int32_t frames, int32_t rate);
+int32_t audio_stream_open(StreamFn fn, void* user);
+void audio_stream_close(int32_t id);
+// Excludes the audio thread (for state shared with stream callbacks).
+void audio_lock();
+void audio_unlock();
 
 }  // namespace platform
 

@@ -4,8 +4,6 @@
 #include "engine/battle.h"
 #include "engine/ui_bridge.h"
 
-// The combat animation draws and plays sounds only (its result is unused by every caller).
-int32_t GAMEAPI boom(int32_t, int32_t, int32_t) { return 0; }
 void THISCALL SubInterface_set_iface_mode(uint8_t*) {}
 void THISCALL BattleWin_clear(uint8_t*) {}
 void THISCALL BattleWin_pulse_timer(uint8_t*) {}
@@ -23,5 +21,4 @@ int32_t GAMEAPI tut_check2(int32_t bit) {
     TutorialHintsShown |= bit;
     return 1;
 }
-void ui_battle_wait_sound() {}
 #endif
