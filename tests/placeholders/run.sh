@@ -165,4 +165,29 @@ check assemble "the scout in the group" "unit 4 f1 Scout Patrol .* state 0C00000
 nocheck assemble "no placeholder" "not reconstructed: Console_assemble"
 nocrash assemble
 
+# 11. The labs report's tree (ReportWin_draw_labs, labs.cpp; ReportIf_draw_labs): blind research's
+#     top box, the progress bar and the breakthrough lines; Biogenetics at the centre with its two
+#     successors; the mouse over GENE SPLICING highlights it; a click moves the tree there (its
+#     prerequisites and successors); the BASES tab lists the bases. In the datalinks (F1 on
+#     turn_147) the technology entry is the same tree, its buttons open the entries.
+run labs $NEW --keys "ENTER,F2,SCREENSTATE,MOVE:733x316,SCREENSTATE,CLICK:733x316,SCREENSTATE,CLICK:180x585,SCREENSTATE,ESC"
+check labs "blind research's top" "^report labs research \\[LABORATORY SUMMARY\\]"
+check labs "the progress bar" "^report labs bar 0 [0-9]+ of 638"
+check labs "the breakthrough line" "^report labs discov Breakthroughs every .*Next breakthrough anticipated"
+check labs "the tree at Biogenetics" "^report labs tree 0 preq leads 48 49"
+check labs "what it allows" "^report labs allows Base Facilities: Recycling Tanks, The Human Genome Project"
+check labs "the technologies list" "^report labs list 6 Centauri Ecology\\|\\[E 1\\]"
+check labs "the progress per category" "^report labs progress 0 1/22"
+check labs "the summary" "^screentext TECH COST: [0-9]+    TECH ACCUMULATED: 0    TECH PER TURN: "
+check labs "the mouse over a successor" "^screentext labs hover 892"
+check labs "the tree moved" "^report labs tree 49 preq 0 44 leads 38 50 60"
+check labs "the bases list" "^report labs list 1024 .*\\|\\+[0-9]+ \\([0-9.]+\\)"
+nocrash labs
+run labsdl --save work/saves_late/turn_147.sav --human 3 --keys "DOWN,ENTER,F1,SCREENSTATE,CLICK:797x237,SCREENSTATE,ESC"
+check labsdl "the entry's tree" "^screentext labs tree 0 preq leads 48 49"
+check labsdl "links in the centre box" "^screentext labs allows Base Facilities: \\\$LINK<Recycling Tanks=100003>"
+check labsdl "a successor's button opens its entry" "^datalink cat 14 index 49 "
+check labsdl "its tree" "^screentext labs tree 49 preq 0 44 leads"
+nocrash labsdl
+
 exit $FAIL

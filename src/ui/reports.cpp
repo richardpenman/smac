@@ -16,10 +16,15 @@
 //     row selects the base (shift / ctrl extend), a double click opens it (BaseWin_zoom), a click
 //     on the base's picture cycles its governor (ReportWin_on_left_click: BaseWin_gov_activate);
 //   * security nexus: the unit type filter (land, naval, air, non-combat, all);
-//   * labs: a click on the research line chooses the research (Console_set_tech).
-// Approximated (not compared with the original's pixels): the layout inside the window (rows
-// and columns at the original's rectangles, text instead of some pictures: the citizens of a
-// base, the technology and project pictures), the scroll bars, the base locator map, the
+//   * labs: a click on the research line puts it at the tree's centre and chooses the research
+//     (Console_set_tech; blind research: Console_set_ai); the technology tree (ReportWin_draw_labs,
+//     labs.cpp: its buttons move the centre, the mouse highlights them); the main interface's
+//     TECHNOLOGY / BASES list (a technology moves the tree, a base opens), the summary line and
+//     the progress per category (ReportIf_draw_labs).
+// Approximated (not compared with the original's pixels): the layout inside the window of the
+// other reports (rows and columns at the original's rectangles, text instead of some pictures:
+// the citizens of a base, the project pictures), the list boxes' look, the scroll bars, the
+// faction logo of the main interface's centre pane, the base locator map, the
 // satellite animation, the hover help. The faction buttons of ReportIf (viewing other factions'
 // reports, only with GameState 0x80) are not drawn.
 #include <algorithm>
@@ -51,11 +56,13 @@
 #include "ui/console.h"
 #include "ui/font_text.h"
 #include "ui/help.h"
+#include "ui/labs.h"
 #include "ui/mapwin.h"
 #include "ui/popup.h"
 #include "ui/reports.h"
 #include "ui/screenwin.h"
 #include "ui/sprites.h"
+#include "ui/techwin.h"
 #include "ui/vehdraw.h"
 #include "ui/win.h"
 
@@ -86,6 +93,14 @@ struct ReportScreen : ScreenWin {
     BaseButton* ops_btn[3]{};    // the views of base operations (ids 0x8B3..0x8B5)
     std::vector<BaseButton*> ops_iface;  // GOVERNOR / BEST BASES tabs, the governor buttons
     bool ops_best = false;       // the BEST BASES tab (0xD0B) is shown
+    std::vector<BaseButton*> labs_iface;  // TECHNOLOGY / BASES tabs (0x92, 0x93)
+    int32_t labs_tab = 1;        // ReportIf + 0x1E1D8: 1 the technologies, 0 the bases
+    struct Row {
+        std::string text;
+        int32_t id;
+    };
+    std::vector<Row> labs_list;  // the left pane's list (ListBox items)
+    int32_t labs_top = 0;
     std::vector<std::string> state;  // what log_state prints
 
     void redraw() override;
@@ -93,6 +108,7 @@ struct ReportScreen : ScreenWin {
     void on_key(int32_t key) override;
     void on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool right, bool dbl) override;
     void log_state() override;
+    void on_move(int32_t x, int32_t y) override;
 
     // geometry (ReportWin_init at 1024 x 768)
     UiRect inner() const { return {0x1A, 3, 0x28A + 0x14, 0x161 + 200 - 0x35}; }
@@ -425,93 +441,179 @@ void ops_governor(ReportScreen* s, int32_t id) {
 
 // ---- labs ----
 
-void ReportScreen::draw_labs() {
-    Buffer* c = &canvas;
-    title("[" + up(adj(faction)) + " " + up(sw_label(0xAC4)) + "]");
-    Faction& f = Factions[faction];
-    energy_compute(faction, 0);
-    UiRect in = inner(), tr = title_rect();
-    int32_t y = tr.bottom + 8, x = in.left + 12;
-    std::string res;
-    if (!(GameState & 0x80) && (GameRules & 0x200)) {
-        res = up(sw_label(0xAC4));  // blind research
-    } else {
-        StrBuffer[0] = 0;
-        res = sw_label(0x254) + ": ";
-        if (f.tech_research_id >= 0) {
-            say_tech_2(StrBuffer, f.tech_research_id, 0);
-            res += up(StrBuffer);
-            if (f.tech_research_id == 0x58) {
-                res += " " + num(f.tech_count_transcendent + 1);
-            } else {
-                int32_t cat = tech_category(f.tech_research_id);
-                res += " (" + std::string(label_get((int32_t)(0x824 / 4) + cat)) + " " +
-                       num(tech_recurse(f.tech_research_id, 0)) + ")";
-            }
-        }
-    }
-    UiRect rr{in.left + 6, y - 3, in.right - 6, y + line_h() + 6};
-    Buffer_box_sprite(c, &rr, box_def(1));
-    spot_add(&spots[0], 0x29A, 0, rr.left, rr.top, rr.right - rr.left, rr.bottom - rr.top);
-    sw_font(c, f_bold, 0xE1);
-    sw_text(this, c, res, x, y);
-    state.push_back("labs " + res);
-    y = rr.bottom + 8;
-    // What the research gives (ReportWin_labs_line per category).
-    int32_t t = f.tech_research_id;
-    if (t < 0) return;
-    struct Cat {
-        uint32_t label;
-        std::vector<std::string> items;
-    };
-    std::vector<Cat> cats = {{0x234, {}}, {0x120, {}}, {0x124, {}}, {0x128, {}}, {0x12C, {}},
-                             {0x110, {}}, {0x118, {}}};
-    for (int32_t i = 0; i < 4; i++)
-        if (Reactor[i].preq_tech == t) cats[0].items.push_back(Reactor[i].name);
-    for (int32_t i = 0; i < 9; i++)
-        if (Chassis[i].preq_tech == t) cats[1].items.push_back(Chassis[i].offsv1_name);
-    for (int32_t i = 0; i < 26; i++)
-        if (Weapon[i].preq_tech == t) cats[2].items.push_back(Weapon[i].name);
-    for (int32_t i = 0; i < 14; i++)
-        if (Armor[i].preq_tech == t) cats[3].items.push_back(Armor[i].name);
-    for (int32_t i = 0; i < 29; i++)
-        if (Ability[i].preq_tech == t) cats[4].items.push_back(Ability[i].name);
-    for (int32_t i = 1; i < 134; i++)
-        if (Facility[i].preq_tech == t && Facility[i].name) cats[5].items.push_back(Facility[i].name);
-    for (int32_t k = 0; k < 4; k++)
-        for (int32_t m = 0; m < 4; m++)
-            if (SocialField[k].soc_preq_tech[m] == t) cats[6].items.push_back(SocialField[k].soc_name[m]);
-    for (const Cat& ct : cats) {
-        if (ct.items.empty()) continue;
-        std::string s = sw_label(ct.label) + ": ";
-        for (size_t i = 0; i < ct.items.size(); i++) s += (i ? ", " : "") + ct.items[i];
-        sw_font(c, f_text, 0x99);
-        sw_text(this, c, s, x, y);
-        state.push_back("labs gives " + s);
-        y += line_h() + 4;
-    }
-}
+// ReportWin_draw_labs (labs.cpp): the research, the progress bar and the technology tree.
+void ReportScreen::draw_labs() { labs_draw(this, &canvas, false, faction, inner(), &state); }
 
+// ReportIf_draw_labs: the TECHNOLOGY / BASES list (left pane), the summary line (centre), the
+// progress per category (right pane).
 void ReportScreen::iface_labs() {
-    // ReportIf_draw_labs: TECH COST (tech_rate), TECH ACCUMULATED, TECH PER TURN (energy_compute's
-    // research points / 100, one decimal).
     Buffer* m = &mi;
     Faction& f = Factions[faction];
+    Font* f10 = find_font(10, 0);
+    Font* f12 = find_font(12, 0);
+    Font* f14 = find_font(14, 0);
+    int32_t lh = f12->field_0 < 0 ? f12->height : f12->ascent_above + f12->field_0;  // ReportIf + 0x1C
+    UiRect all{0, 0, m->width, m->height};
+    // The left pane: the tabs' bar, the list's box and the list (Dialog_init_3, font 12, 0x99;
+    // labs_write: the category part in the technology's colour).
     UiRect p = mi_rect(kMiPaneQueue);
-    UiRect r{p.left + 6, p.top + 6, p.right - 6, p.bottom - 6};
+    int32_t x = p.left + 6, y = p.top + 6, w = (p.right - p.left) - 12, h = (p.bottom - p.top) - 12;
+    UiRect r{x, y, x + w, y + 0x1A};
     Buffer_box_sprite(m, &r, box_def(3));
-    int32_t y = r.top + 6, lh = f_small->height + 2;
+    r = {x, r.bottom + 2, x + w, p.bottom - 6};
+    Buffer_box_sprite(m, &r, box_def(0));
+    y += 0x20;
+    h -= 0x20;
+    UiRect lr{x + 3, y + 3, x + w - 3, y + h - 3};
+    labs_list.clear();
+    if (!labs_tab) {
+        for (int32_t i = 0; i < BaseCount; i++) {
+            const BASE& b = Bases[i];
+            if (b.faction_id != faction) continue;
+            StrBuffer[0] = 0;
+            say_base(StrBuffer, i);
+            std::string t = std::string(StrBuffer) + "|+" + num(b.labs_total) + " (";
+            int32_t rs = std::max(-5, std::min(5, f.SE_research_pending));
+            int32_t v = (rs + 10) * b.labs_total * 10;
+            t += num(v / 100);
+            if (v % 100) t += "." + num((v % 100) / 10);
+            t += ")" + std::string(label_get(0x5EC / 4));
+            labs_list.push_back({t, i + 0x400});
+        }
+    } else {
+        int32_t key[89];
+        for (int32_t t = 0; t < 89; t++) key[t] = has_tech(t, faction) ? tech_category(t) + tech_recurse(t, 0) * 4 : 0;
+        for (int32_t n = 0; n < 89; n++) {
+            int32_t best = 89;
+            for (int32_t t = 0; t < 89; t++)
+                if (key[t] && (best == 89 || key[t] < key[best])) best = t;
+            if (best >= 89) break;
+            StrBuffer[0] = 0;
+            say_tech_2(StrBuffer, best, 0);
+            std::string t = std::string(StrBuffer) + "|[" + label_get(0x9D4 / 4 + (key[best] & 3)) + " " +
+                            num(key[best] >> 2) + "]";
+            labs_list.push_back({t, best});
+            key[best] = 0;
+        }
+    }
+    int32_t row = lh + 2, rows = std::max(1, (lr.bottom - lr.top) / row);
+    int32_t sel = -1;
+    for (size_t i = 0; i < labs_list.size(); i++)
+        if (labs_tab && labs_list[i].id == labs_tree_tech()) sel = (int32_t)i;
+    if (sel >= 0 && (sel < labs_top || sel >= labs_top + rows)) labs_top = std::max(0, sel - rows / 2);
+    labs_top = std::max(0, std::min(labs_top, std::max(0, (int32_t)labs_list.size() - rows)));
+    Buffer_set_clip(m, &lr);
+    for (int32_t k = 0; k < rows && labs_top + k < (int32_t)labs_list.size(); k++) {
+        int32_t i = labs_top + k, ry = lr.top + k * row;
+        const std::string& t = labs_list[i].text;
+        size_t bar = t.find('|');
+        std::string l = t.substr(0, bar), rt = bar == std::string::npos ? "" : t.substr(bar + 1);
+        if (i == sel) {
+            UiRect hl{lr.left, ry, lr.right, ry + row};
+            Buffer_box_sprite(m, &hl, box_def(2));
+        }
+        Buffer_set_font(m, f12, f12, f12, nullptr);
+        Buffer_set_text_color(m, i == sel ? 0xF2 : 0x99, -1, 1, 1);
+        Buffer_set_text_color2(m, 0x99, -1, 1, 1);
+        Buffer_set_text_color3(m, labs_tab ? mandate_color(tech_category(labs_list[i].id)) : 0x99, -1, 1, 1);
+        sw_text(this, m, l, lr.left + 2, ry + 1);
+        UiRect rr{lr.left, ry + 1, lr.right - 2, ry + 1 + lh};
+        sw_text_right(this, m, rt, rr);
+        spot_add(&spots[1], labs_list[i].id, 4, lr.left, ry, lr.right - lr.left, row);
+        state.push_back("labs list " + num(labs_list[i].id) + " " + t);
+    }
+    Buffer_set_clip(m, &all);
+    // The centre pane: the title and the summary.
+    UiRect c = mi_rect(kMiPaneCenter);
+    bool wide = ScreenWidth != 800;  // ReportIf + 0x1E230
+    int32_t cx = c.left + (wide ? 0x4C : 0), cw = (c.right - (wide ? 0x4C : 0)) - c.left, cy = c.top;
+    Buffer_set_font(m, f14, find_font(14, 2), find_font(14, 1), nullptr);
+    Buffer_set_text_color(m, 0xE1, -1, 1, 1);
+    std::string t = up(MFactions[faction].adj_name_faction) + " " + label_get(0xAC4 / 4);
+    if (wide) t += std::string(", ") + " " + label_get(0xB68 / 4) + " " + num(game_year(CurrentTurn));
+    Buffer_write_cent_l_5(m, t.c_str(), cx, cy + 10, cw, (int32_t)t.size());
+    texts.push_back(t);
+    Buffer_set_font(m, f10, f10, f10, nullptr);
+    Buffer_set_text_color(m, 0x99, -1, 1, 1);
+    cy += lh * 2;
     int32_t cost = tech_rate(faction);
+    std::string s = std::string(label_get(0x5E0 / 4)) + ": " + num(cost) + "    " + label_get(0x5E4 / 4) + ": " +
+                    num(f.tech_accumulated);
+    if (!wide) {
+        Buffer_write_cent_l_5(m, s.c_str(), cx, cy, cw, (int32_t)s.size());
+        texts.push_back(s);
+        cy += lh;
+        s.clear();
+    } else {
+        s += "    ";
+    }
     energy_compute(faction, 0);
     std::string per = num(FactionCurrentLabs / 100);
     if (FactionCurrentLabs % 100) per += "." + num((FactionCurrentLabs % 100) / 10);
-    sw_font(m, f_small, 0x99);
-    sw_text(this, m, sw_label(0x5E0) + ": " + num(cost), r.left + 6, y);
-    y += lh;
-    sw_text(this, m, sw_label(0x5E4) + ": " + num(f.tech_accumulated), r.left + 6, y);
-    y += lh;
-    sw_text(this, m, sw_label(0x5E8) + ": " + per, r.left + 6, y);
+    s += std::string(label_get(0x5E8 / 4)) + ": " + per;
+    Buffer_write_cent_l_5(m, s.c_str(), cx, cy, cw, (int32_t)s.size());
+    texts.push_back(s);
     state.push_back("labs cost " + num(cost) + " accumulated " + num(f.tech_accumulated) + " per turn " + per);
+    // The right pane: the title box, then per category its bar (known / defined technologies) and
+    // its name with the percentage.
+    UiRect q = mi_rect(kMiPaneRight);
+    x = q.left + 6;
+    y = q.top + 6;
+    w = (q.right - q.left) - 12;
+    h = (q.bottom - q.top) - 12;
+    Buffer_set_font(m, f12, find_font(12, 1), find_font(14, 1), nullptr);
+    r = {x, y, x + w, y + lh + 6};
+    Buffer_box_sprite(m, &r, box_def(0));
+    r = {x, r.bottom + 2, x + w, q.bottom - 6};
+    Buffer_box_sprite(m, &r, box_def(0));
+    std::string head = "[";
+    if (f.tech_count_transcendent == 0) {
+        Buffer_set_text_color3(m, 0xE1, -1, 1, 1);
+        head += label_get(0xB00 / 4);
+    } else {
+        Buffer_set_text_color3(m, mandate_color(1), -1, 1, 1);
+        StrBuffer[0] = 0;
+        say_tech_2(StrBuffer, f.tech_research_id, 0);
+        head += up(StrBuffer) + " " + num(f.tech_count_transcendent);
+    }
+    head += "]";
+    h -= 4;
+    y += 4;
+    Buffer_write_cent_l_5(m, head.c_str(), x, y, w, (int32_t)head.size());
+    texts.push_back(head);
+    h -= lh;
+    y += lh;
+    Buffer_set_text_color3(m, 0xE1, -1, 1, 1);
+    h -= 2;
+    x += 3;
+    int32_t seg = h / 4 - 0xF;
+    w -= 6;
+    int32_t total[4] = {}, known[4] = {};
+    for (int32_t i = 0; i < 89; i++) {
+        if (Tech[i].preq_tech1 == -2 || Tech[i].preq_tech2 == -2) continue;
+        int32_t k = tech_category(i);
+        if (k < 0 || k > 3) continue;
+        total[k]++;
+        if (has_tech(i, faction)) known[k]++;
+    }
+    y += 8;
+    static const int32_t frames[4] = {38, 41, 44, 47}, fills[4] = {36, 39, 42, 45};
+    for (int32_t k = 0; k < 4; k++) {
+        r = {x, y, x + w, y + 0xF};
+        Buffer_box_sprite(m, &r, box_def(frames[k]));
+        UiRect cr{x, y, w * known[k] / std::max(total[k], 1) + x, y + 0xF};
+        Buffer_set_clip(m, &cr);
+        Buffer_box_sprite(m, &r, box_def(fills[k]));
+        Buffer_set_clip(m, &all);
+        y += 0xF;
+        Buffer_set_text_color3(m, mandate_color(k), -1, 1, 1);
+        std::string l = "[" + std::string(label_get(0x824 / 4 + k)) + "   " + num(known[k] * 100 / std::max(total[k], 1)) +
+                        "%]";
+        Buffer_write_l_3(m, l.c_str(), x + 2, (seg - lh) / 2 + y, (int32_t)l.size());
+        texts.push_back(l);
+        state.push_back("labs progress " + num(k) + " " + num(known[k]) + "/" + num(total[k]));
+        y += seg;
+    }
 }
 
 // ---- energy ----
@@ -897,7 +999,7 @@ void ReportScreen::redraw() {
         std::string h = up(adj(faction)) + " " + up(sw_label(names[k])) + ",  " + sw_label(0xB68) + " " +
                         num(game_year(CurrentTurn));
         sw_font(&mi, f_bold, 0xE1);
-        sw_text_cent(this, &mi, h, {cp.left, cp.top + 4, cp.right, cp.top + 4 + f_bold->height});
+        if (k != kLabs) sw_text_cent(this, &mi, h, {cp.left, cp.top + 4, cp.right, cp.top + 4 + f_bold->height});
         if (k == kOps) {
             sw_font(&mi, f_small, 0xF2);
             sw_text_cent(this, &mi, up(sw_label(0xE4)) + ": " + num(Factions[faction].energy_credits),
@@ -920,11 +1022,19 @@ void ReportScreen::redraw() {
         b->shown = kind() == kOps && (b->id == 0xD0A || b->id == 0xD0B || !ops_best);
         if (b->id == 0xD0A || b->id == 0xD0B) bw_button_set(b, (b->id == 0xD0B) == ops_best);
     }
+    for (BaseButton* b : labs_iface) {
+        b->shown = kind() == kLabs;
+        bw_button_set(b, (b->id == 0x92) == (labs_tab != 0));
+    }
     for (int32_t i = 0; i < 3; i++) {
         if (!ops_btn[i]) continue;
         ops_btn[i]->shown = kind() == kOps;
         bw_button_set(ops_btn[i], g_ops_view == i);
     }
+}
+
+void ReportScreen::on_move(int32_t x, int32_t y) {
+    if (kind() == kLabs) labs_mouse(this, &canvas, x, y);
 }
 
 void ReportScreen::log_state() {
@@ -964,6 +1074,8 @@ void ReportScreen::on_button(int32_t id) {
         }
     }
     if (id == 0xD0A || id == 0xD0B) ops_best = id == 0xD0B;
+    if ((id == 0x92 || id == 0x93) && kind() == kLabs) labs_tab = id == 0x92;  // ReportIf_on_iface_group_clicked
+    if (kind() == kLabs) labs_button(id);  // the tree's buttons (ReportWin_on_button_clicked)
     if (id >= 0xCEF && id <= 0xCF5 && kind() == kOps && faction == CurrentPlayerFaction) ops_governor(this, id);
 }
 
@@ -1003,6 +1115,12 @@ void ReportScreen::on_key(int32_t key) {
 
 void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t, int32_t, bool, bool dbl) {
     if (parent == 1) {
+        // ReportIf_on_iface_selected (labs): a technology moves the tree, a base opens.
+        if (kind() == kLabs && type == 4 && index >= 0) {
+            if (index < 0x400) labs_tree_tech() = index;
+            else BaseWin_zoom(&BaseWin, index - 0x400, 0);
+            return;
+        }
         if (kind() == kOps && type == 2 && index > 0 && index < 9) ops_sort(index);
         if (kind() == kSecurity && type == 3 && index >= 0 && index < 5) {
             g_sec_filter = index;
@@ -1019,7 +1137,12 @@ void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t
         return;
     }
     if (kind() == kLabs && index == 0x29A) {
-        Console_set_tech(&MainConsole, CurrentPlayerFaction);
+        // ReportWin_on_left_click: the research at the tree's centre, then the research choice
+        // (blind research: the priorities).
+        int32_t r = Factions[faction].tech_research_id;
+        if (r >= 0 && ((GameState & 0x80) || !(GameRules & 0x200))) labs_tree_tech() = r;
+        if (!(GameRules & 0x200)) Console_set_tech(&MainConsole, CurrentPlayerFaction);
+        else Console_set_ai(&MainConsole, CurrentPlayerFaction);
         return;
     }
     if (kind() != kOps) return;
@@ -1144,9 +1267,22 @@ void open_reports(int32_t k) {
     gy += 0x16;
     s->ops_iface.push_back(sw_button(s, up(sw_label(0xBB4)).c_str(), 0xCF5, gx, gy, gw, 0x14, 1, s->f_bold));
     s->ops_best = false;
+    // The labs report's tabs (ReportIf_on_status: TECHNOLOGY 0x92, BASES 0x93) and the tree's
+    // technology: the research (0 with blind research or none).
+    s->labs_iface.clear();
+    s->labs_iface.push_back(sw_button(s, sw_label(0x5D4).c_str(), 0x92, gx, q.top + 9, gw / 2 - 1, 0x14, 1, s->f_bold));
+    s->labs_iface.push_back(sw_button(s, sw_label(0x5D8).c_str(), 0x93, gx + gw / 2 + 1, q.top + 9, gw / 2, 0x14, 1, s->f_bold));
+    s->labs_tab = 1;
+    s->labs_top = 0;
+    {
+        int32_t r = Factions[s->faction].tech_research_id;
+        bool blind = !(GameState & 0x80) && (GameRules & 0x200);
+        labs_tree_tech() = (blind || r < 0 || r > 0x59) ? 0 : r;
+    }
     sw_run(s);
     sw_clear_buttons(s);
     s->ops_iface.clear();
+    s->labs_iface.clear();
     for (auto& p : s->report_btn) p = nullptr;
     for (auto& p : s->ops_btn) p = nullptr;
 }

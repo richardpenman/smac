@@ -601,6 +601,12 @@ bool ui_wait_input(UiInput* in) {
                 pending_up = 2;
                 return true;
             }
+            if (std::sscanf(k.command.c_str(), "move %d %d", &x, &y) == 2) {  // MOVE:XxY
+                in->type = UiInput::MOVE;
+                in->x = x;
+                in->y = y;
+                return true;
+            }
             bool dbl = std::sscanf(k.command.c_str(), "dclick %d %d", &x, &y) == 2;
             if (dbl || std::sscanf(k.command.c_str(), "click %d %d", &x, &y) == 2) {
                 in->type = UiInput::LDOWN;

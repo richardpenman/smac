@@ -1,5 +1,6 @@
 // Script-driven popups of the original UI (see popup.h).
 #include "ui/popup.h"
+#include "ui/labs.h"
 #include "ui/sound.h"
 #include "ui/sprites.h"
 
@@ -153,6 +154,8 @@ void GAMEAPI load_box_sprites() {
                 (uint8_t)Buffer_get_pixel(&canvas, 0x166 + i, 0x2F4 + j);
     Sprite* l = g_box_large_sprites;
     g_box_large = {{&l[0], &l[2], &l[5], &l[7]}, {&l[1], &l[6], &l[3], &l[4]}, &g_box_large_center, 7};
+    // The tree's arrows (0x75AFD0 [3]: plain, -, highlighted; 7 x 13 at (0x8C + 8k, 0x25)).
+    labs_load_arrows(&canvas);
 }
 
 int32_t THISCALL Buffer_tile_2(Buffer* self, Sprite* tile, int32_t sx, int32_t sy, int32_t x, int32_t y, int32_t w,

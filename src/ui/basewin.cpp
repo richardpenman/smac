@@ -242,7 +242,8 @@ void bw_button_draw(BaseButton* b) {
     int32_t tw = r.right - r.left - 6;
     int32_t wh = Buffer_wrap_height(c, text, tw);
     int32_t y = ((r.bottom - r.top) - (wh - Buffer_text_line_height(c) + Buffer_text_height(c))) / 2 + r.top;
-    if (y >= 0 && Buffer_text_width(c, text) <= tw) {
+    // Wrapped and centred when it fits: more than one line, or one line within the width.
+    if (y >= 0 && (buffer_text(c).lines > 1 || Buffer_text_width(c, text) <= tw)) {
         Buffer_wrap_cent_4(c, text, r.left + 3, y, tw);
         return;
     }

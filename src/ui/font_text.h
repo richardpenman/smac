@@ -38,6 +38,9 @@ struct BufferText {
     };
     std::vector<LinkSpot> link_spots;
     int32_t link_x = 0, link_y = 0;  // where the link being written started
+    // A link wrapped onto the next line: its parts on the lines before (their end at link_end_x).
+    std::vector<UiRect> link_parts;
+    int32_t link_end_x = 0;
 };
 BufferText& buffer_text(Buffer* self);
 // Buffer_clear_links (0x5DC370 area): forgets the registered hyperlink spots.

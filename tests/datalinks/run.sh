@@ -42,20 +42,23 @@ nocrash() {
 }
 
 # Screen positions (1024 x 768): the browser at (112, 30); the link "Recycling Tanks" of
-# Biogenetics' entry (618, 78), BACK (387, 512), EXIT (636, 512); the category buttons of the main
+# Biogenetics' entry (in the tree's centre box, 665, 247), BACK (387, 512), EXIT (636, 512); the category buttons of the main
 # interface: BASIC CONCEPTS (124, 581), BASIC UNIT TYPES (124, 653), WEAPONS (124, 725), BASE
 # FACILITIES (900, 701); the labs report's DATALINKS button (388, 520).
 
-# 1. turn_147 as faction 3: F1 opens the technologies at Biogenetics; a link opens Recycling Tanks
+# 1. turn_147 as faction 3: F1 opens the technologies at Biogenetics (the labs report's tree:
+#    ReportWin_draw_labs in the entry); a link opens Recycling Tanks
 #    (base facilities), BACK returns, a category button shows its first entry, Down the next one;
 #    EXIT closes.
-run browse147 --save work/saves_late/turn_147.sav --human 3 --keys "DOWN,ENTER,F1,SHOT:techs.bmp,SCREENSTATE,CLICK:618x78,\
+run browse147 --save work/saves_late/turn_147.sav --human 3 --keys "DOWN,ENTER,F1,SHOT:techs.bmp,SCREENSTATE,CLICK:665x247,\
 SHOT:facility.bmp,SCREENSTATE,CLICK:387x512,SCREENSTATE,CLICK:124x581,SCREENSTATE,DOWN,SHOT:concept.bmp,SCREENSTATE,\
 CLICK:124x653,DOWN,DOWN,DOWN,DOWN,SHOT:unit.bmp,SCREENSTATE,CLICK:124x725,SCREENSTATE,CLICK:636x512,SCREENSTATE"
 nocrash browse147
 check "browse147 F1" "$(line browse147 datalink 1)" "datalink cat 14 index 0 sel 11 items 86 history 140000"
 has browse147 "tech entry title" "^screentext title BIOGENETICS"
-has browse147 "tech entry links" "^screentext text1 Base Facilities: \\\$LINK<Recycling Tanks=100003>"
+has browse147 "tech entry tree" "^screentext labs tree 0 preq leads 48 49"
+has browse147 "tech entry centre" "^screentext labs centre \\[DISCOVER 1\\]"
+has browse147 "tech entry links" "^screentext labs allows Base Facilities: \\\$LINK<Recycling Tanks=100003>"
 has browse147 "tech quote" "^screentext blurb +-- Chairman Sheng-ji Yang,"
 check "browse147 link" "$(line browse147 datalink 2)" "datalink cat 10 index 3 sel 34 items 46 history 140000 100003"
 has browse147 "facility entry" "^screentext title RECYCLING TANKS"

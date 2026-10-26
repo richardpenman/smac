@@ -15,7 +15,9 @@
 //     HELPWEAPON(2) / WEAPONDESC, HELPDEFENSE(2) / ARMORDESC, HELPABIL / ABILDESC,
 //     HELPTERRALAND / HELPTERRASEA, HELPFAC(FREE) / HELPFAC<n> + BLURBSX FAC<n>, HELPPROJ /
 //     HELPPROJ<n> + BLURBSX PROJECT<n>, HELPSOC<f>[<m>], HELPEFFECT<n>, conceptsx CONCEPT<n> /
-//     ADVCONCEPT<n>; a technology: help_tech_info and BLURBSX TECH<n>; a faction: its file's
+//     ADVCONCEPT<n>; a technology: the labs report's tree (Datalink_draw_tech: ReportWin_draw_labs
+//     in the entry's rectangle, labs.cpp; its buttons and links move through the technologies)
+//     and BLURBSX TECH<n>; a faction: its file's
 //     DATALINKS1 / DATALINKS2 / BLURB), with "$LINK<text=id>" links (Datalink_on_link_clicked: a
 //     click opens that entry; ids above 1000 within a category are ignored), the history of the
 //     last 20 entries (BACK, Datalink_on_button_clicked 0x10; with one entry BACK closes), EXIT
@@ -28,9 +30,7 @@
 // two text boxes on the right, BACK / EXIT below), the category buttons in the main interface's
 // left and right panes; pictures: facilities and projects (facs\, projs\), technologies (mono in
 // the category colour), units (veh_draw); the quotes of technologies, facilities and projects
-// (BLURBSX) in the main interface's centre pane. Not reconstructed: the technology tree view of
-// the labs report inside a technology entry (ReportWin_draw_labs; the tech's consequences are
-// listed instead), scroll bars.
+// (BLURBSX) in the main interface's centre pane. Not reconstructed: scroll bars.
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -53,6 +53,7 @@
 #include "ui/console.h"
 #include "ui/font_text.h"
 #include "ui/help.h"
+#include "ui/labs.h"
 #include "ui/popup.h"
 #include "ui/screenwin.h"
 #include "ui/techwin.h"
@@ -87,6 +88,9 @@ struct DatalinkState : ScreenWin {
     void on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool right,
                   bool dbl) override;
     void log_state() override;
+    void on_move(int32_t x, int32_t y) override {
+        if (cat == 14) labs_mouse(this, &canvas, x, y);
+    }
 
     void set_cat(int32_t c, int32_t force);  // 0x42A2C0
     void fill(int32_t c);                   // the set_cat_* functions
@@ -394,18 +398,12 @@ void DatalinkState::build_entry(int32_t c, int32_t i) {
         title = SocialParam[i].set2;
         load_section(&text2, "HELPX", "HELPEFFECT" + std::to_string(i));
         break;
-    case 14: {
+    case 14:
+        // Datalink_draw_tech: the title, the labs report's tree (ReportWin_draw_labs in the
+        // entry's rectangle, drawn by redraw) and the quote.
         title = Tech[i].name;
-        for (int32_t k = 0; k < 2; k++) {
-            int32_t p = k ? Tech[i].preq_tech2 : Tech[i].preq_tech1;
-            if (p >= 0 && p < 89) text1.add(("^" + help_link(Tech[p].name, 14, p)).c_str());
-        }
-        help_tech_info([&](const char* l) { text1.add(l); }, i, CurrentPlayerFaction, -1);
         load_section(&blurb, "BLURBSX", "TECH" + std::to_string(i));
-        picture = 2;
-        picture_id = i;
         break;
-    }
     case 15: {
         title = MFactions[i].noun_faction;
         std::string file = MFactions[i].filename;
@@ -459,12 +457,26 @@ void DatalinkState::redraw() {
     r = r_title;
     Buffer_box_sprite(c, &r, box_def(6));
     UiRect t1 = r_text1, t2 = r_text2;
-    Buffer_box_sprite(c, &t1, box_def(0));
-    Buffer_box_sprite(c, &t2, box_def(0));
+    bool tree = cat == 14 && !items.empty();
+    if (tree) {
+        UiRect tu{r_text1.left, r_text1.top, r_text2.right, r_text2.bottom};  // +0x10334
+        Buffer_box_sprite(c, &tu, box_def(0));
+    } else {
+        Buffer_box_sprite(c, &t1, box_def(0));
+        Buffer_box_sprite(c, &t2, box_def(0));
+    }
     sw_font(c, find_font(0x12, 1), 0xE0);
     texts.push_back("title " + sw_upper(title));
     std::string up = sw_upper(title);
     Buffer_write_cent_l_7(c, up.c_str(), &r_title, (int32_t)up.size());
+    if (tree) {
+        labs_tree_tech() = index;
+        ReportWinKind = 2;
+        UiRect tu{r_text1.left, r_text1.top, r_text2.right, r_text2.bottom};
+        labs_draw(this, c, true, CurrentPlayerFaction, tu, &texts);
+    } else {
+        labs_clear(this);
+    }
     int32_t tx = r_text1.left + 6;
     if (picture) {
         UiRect p = r_pic;
@@ -525,6 +537,10 @@ void DatalinkState::redraw() {
 }
 
 void DatalinkState::on_button(int32_t id) {
+    if (cat == 14 && labs_button(id)) {  // ReportWin_on_button_clicked: Datalink_set_index
+        link(14 * 10000 + labs_tree_tech());
+        return;
+    }
     if (id == 0x10) {  // BACK
         if (hist_n < 2) {
             sw_close(this);
@@ -616,7 +632,7 @@ void THISCALL Datalink_exec(uint8_t*, int32_t cat, int32_t id) {
         g_dl->link(cat * 10000 + id);
         return;
     }
-    int32_t saved_kind = ReportWinKind;
+    int32_t saved_kind = ReportWinKind, saved_tech = labs_tree_tech();
     DatalinkState w;
     w.name = "datalink";
     int32_t extra = ScreenWidth == 800 ? 0 : 0x8A;
@@ -648,4 +664,5 @@ void THISCALL Datalink_exec(uint8_t*, int32_t cat, int32_t id) {
     g_dl = nullptr;
     sw_clear_buttons(&w);
     ReportWinKind = saved_kind;
+    labs_tree_tech() = saved_tech;
 }

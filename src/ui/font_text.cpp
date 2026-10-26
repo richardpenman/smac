@@ -300,10 +300,20 @@ int32_t THISCALL Buffer_text_height(Buffer* self) { return self->fonts[0] ? self
 int32_t THISCALL Buffer_write_multi_font_raw_l(Buffer* self, const char* text, int32_t x, int32_t y, int32_t len) {
     BufferText& bt = buffer_text(self);
     if (!bt.multi_font) return write_raw(self, text, x, y, len);
+    if (self->font_index == 3 && bt.link_y != y) {
+        // The link continues on another line: the part written so far is a spot of its own.
+        bt.link_parts.push_back({bt.link_x, bt.link_y, bt.link_end_x, bt.link_y + line_height(self)});
+        bt.link_x = x;
+        bt.link_y = y;
+    }
     const char* seg = text;
     for (;;) {
         const char* p = scan(seg, &len, self->font_index == 3);
-        if (!len) return write_raw(self, seg, x, y, (int32_t)(p - seg));
+        if (!len) {
+            int32_t end = write_raw(self, seg, x, y, (int32_t)(p - seg));
+            if (self->font_index == 3) bt.link_end_x = end;
+            return end;
+        }
         bool doubled;
         int32_t next = self->font_index;
         int32_t s = markup_slot(bt, p, self->font_index, &doubled);
@@ -317,6 +327,7 @@ int32_t THISCALL Buffer_write_multi_font_raw_l(Buffer* self, const char* text, i
         if (s == 3) {
             bt.link_x = x;
             bt.link_y = y;
+            bt.link_parts.clear();
         }
         if (bt.link_state == 1) {
             p += 5;
@@ -332,6 +343,8 @@ int32_t THISCALL Buffer_write_multi_font_raw_l(Buffer* self, const char* text, i
                 spot.r = {bt.link_x, bt.link_y, x, bt.link_y + line_height(self)};
                 spot.target.assign(p, gt);
                 bt.link_spots.push_back(spot);
+                for (const UiRect& part : bt.link_parts) bt.link_spots.push_back({part, spot.target});
+                bt.link_parts.clear();
                 len -= (int32_t)(gt + 1 - p);
                 seg = gt + 1;
             }
