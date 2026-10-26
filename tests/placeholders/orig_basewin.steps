@@ -1,0 +1,36 @@
+; The plain original under Xvfb (tests/popups/orig_drive.py): QUICK START, the start-of-game
+; popups answered, the first base's window (a click on the base), its production picker (CHANGE),
+; the support map (SUPPORT); the tutorial window over the base window is closed first and the units present pane's menu (a click on the colony pod).
+wait 10
+click 835 362
+wait 7
+key Return
+wait 4
+key Return
+wait 4
+key Return
+wait 3
+click 512 290
+wait 3
+shot base
+click 476 735
+wait 2
+click 177 723
+wait 3
+shot pick
+key Escape
+wait 2
+click 511 308
+wait 2
+shot support
+click 284 724
+wait 2
+shot garrison
+key Escape
+wait 1
+key Escape
+wait 1
+key C+q
+wait 2
+key Return
+wait 1

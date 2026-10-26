@@ -709,7 +709,7 @@ void THISCALL BaseWin_soft_zoom(uint8_t* self, int32_t base_id) {
 
 // The common tail of BaseWin_exit and BaseWin_base_killed: closes the window and recentres the
 // view on the selected unit when it is not well inside the view.
-static void bw_close_window(uint8_t* self) {
+void bw_close_window(uint8_t* self) {
     int32_t was = Win_is_visible(self);
     bwf(kBwOpen) = 0;
     // Time_stop (the window's animation timer).
@@ -984,6 +984,8 @@ static void compose_buttons(Buffer* screen, int32_t parent, int32_t ox, int32_t 
     one(g_bw.staple2);
 }
 
+Sprite* bw_sprite_at(uint32_t off) { return ArtSprite(0x6A7628 + off); }
+
 void basewin_compose(Buffer* screen) {
     if (!g_bw.visible) return;
     blit_keyed(screen, &g_bw.canvas, g_bw.x, g_bw.y);
@@ -991,6 +993,7 @@ void basewin_compose(Buffer* screen) {
     const UiRect& mp = mi_rect(kMiPos);
     blit_keyed(screen, &g_bw.mi_canvas, mp.left, mp.top);
     compose_buttons(screen, 1, mp.left, mp.top);
+    prodwin_compose(screen);  // the production picker over the base window
 }
 
 void basewin_log_state() {

@@ -63,4 +63,20 @@ check drag "drag text with the distance" "goto drag: Move to \(38, 12\): Dist = 
 check drag "go-to order 24" "unit 4 f1 Scout Patrol \([0-9]+,[0-9]+\) order 24"
 nocrash drag
 
+# 4. The base window (late save, faction 1, base 30): the production picker's grid (its items, a
+#    right click's menu: Obsolete on the Recon Rover hides it), the support map pane, the units
+#    present pane's menu (BaseWin_garrison_click at the click: Activate unit 113 closes the window).
+if [ -f "$ROOT/work/saves_late/turn_100.sav" ]; then
+    run basewin --save work/saves_late/turn_100.sav --human 1 --keys \
+"BASE:30,c,SHOT:pick.bmp,ESC,c,RCLICK:240x80,DOWN,DOWN,DOWN,ENTER,ESC,CLICK:511x308,SHOT:support.bmp,\
+CLICK:340x724,DOWN,DOWN,ENTER,BASESTATE,UNITS"
+    check basewin "picker items" "prodwin items: 67 64 .* -69"
+    check basewin "picker menu" "pulldown item 1: Obsolete"
+    check basewin "obsolete: the list without 67" "prodwin items: 64 "
+    check basewin "garrison menu at the click" "pulldown shown: 6 items at 341,615"
+    check basewin "activated: the window closes" "basestate closed"
+    check basewin "activated: order 0" "unit 113 f1 Scout Rover \(3,43\) order 0 moves 0 state 04000000"
+    nocrash basewin
+fi
+
 exit $FAIL

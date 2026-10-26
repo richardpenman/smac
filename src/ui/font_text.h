@@ -90,6 +90,9 @@ ADDR_NATIVE(0x5DD530) int32_t THISCALL Buffer_wrap_2(Buffer* self, const char* t
 // Word-wrapped, each line centred in width w; returns the y below the last line.
 ADDR_NATIVE(0x5DD920) int32_t THISCALL Buffer_wrap_cent_4(Buffer* self, const char* text, int32_t x, int32_t y,
                                                          int32_t w);
+// Word-wrapped in the rectangle's width from its top, each line centred; returns the y below the
+// last line (the rectangle's bottom is not a limit).
+ADDR_NATIVE(0x5DDAB0) int32_t THISCALL Buffer_wrap_cent_6(Buffer* self, const char* text, const UiRect* rect);
 // Height of text wrapped to width w.
 ADDR_NATIVE(0x5DC360) int32_t THISCALL Buffer_wrap_height(Buffer* self, const char* text, int32_t w);
 // The flying writer's measuring twins: start (width w), continue with more text, finish.

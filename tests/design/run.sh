@@ -171,13 +171,13 @@ nocrash design300
 has design300 "opened" "^designstate f6 unit "
 check "design300 unchanged" "$(grep -a '^proto ' "$OUT/design300.log" | sort | uniq -u | wc -l)" "0"
 
-# 6. From the base window (turn_147, University Base): the build menu's last item opens the design
-#    workshop, Esc returns to the build menu.
-D40=$(printf 'DOWN,%.0s' $(seq 1 40))
-run basedesign147 --save work/saves_late/turn_147.sav --human 3 --keys "DOWN,ENTER,BASE:2,c,${D40}ENTER,SCREENSTATE,ESC,ESC,ESC"
+# 6. From the base window (turn_147, University Base): the build menu's WORKSHOP button opens the
+#    design workshop on the selected unit (the current production, 214), Esc returns to the build
+#    menu.
+run basedesign147 --save work/saves_late/turn_147.sav --human 3 --keys "DOWN,ENTER,BASE:2,c,CLICK:459x515,SCREENSTATE,ESC,ESC,ESC"
 nocrash basedesign147
-has basedesign147 "design item" "^popup  answer: 32767"
-has basedesign147 "workshop open" "^designstate f3 unit 208 "
-check "basedesign147 build menu again" "$(grep -a '^popup  answer' "$OUT/basedesign147.log" | sed -n 2p)" "popup  answer: -1 (button 0)"
+has basedesign147 "workshop mode" "^prodwin answer: mode 2 selected 2 item 214"
+has basedesign147 "workshop open" "^designstate f3 unit 214 "
+check "basedesign147 build menu again" "$(grep -a '^prodwin answer' "$OUT/basedesign147.log" | sed -n 2p)" "prodwin answer: mode 0 selected -1 item -9999"
 
 exit $FAIL

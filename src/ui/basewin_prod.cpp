@@ -4,12 +4,9 @@
 // BaseWin_production follows the original (0x417040) after the item is chosen: the queue counters
 // (Faction units_queue), the retool penalty popup (RETOOLPENALTYn[A]), the queue insertion modes,
 // the production change bookkeeping (state/governor flags, log, wave, draw_radius, waking the
-// sentried formers / colony pods at the base), the redraw and the "Ascent" interlude. The original
-// picker (FUN_00494700, a full-screen grid of item pictures built by FUN_00492fa0) is replaced by a
-// text popup listing the same items in the same order (units in proto_sort order filtered by
-// veh_avail, then facilities 1..0x85 filtered by facility_avail) with the same return codes
-// (-9999 cancel, unit id, 0x200 + facility id); a last item opens the design workshop (the
-// picker's DESIGN mode) and shows the picker again.
+// sentried formers / colony pods at the base), the redraw and the "Ascent" interlude, with the
+// picker (prodwin.cpp: FUN_00494700) and its modes (help, workshop, reset, queue delete / insert /
+// replace; the picker stays open while a queue slot is edited).
 #include <cstdio>
 #include <cstring>
 #include "engine/action.h"
@@ -27,78 +24,16 @@
 #include "engine/ui_bridge.h"
 #include "engine/veh.h"
 #include "ui/basewin_internal.h"
+#include "ui/pulldown.h"
+#include "ui/console.h"
+#include "engine/veh.h"
+#include "engine/map.h"
+#include "engine/base.h"
 #include "ui/console.h"
 #include "ui/popup.h"
 #include "ui/win.h"
 
 namespace {
-
-// Minerals left to build item (FUN_00492fa0's cost column, with the retool loss shown when the
-// item belongs to another category than the production at open).
-int32_t pick_rest(int32_t item, int32_t prod_at_open, int32_t slot) {
-    BASE& b = cur_base();
-    const Faction& f = Factions[b.faction_id];
-    int32_t cf = cost_factor(b.faction_id, 1, -1);
-    if (item >= 0) {
-        int32_t has_proto = 0;
-        int32_t cost = cf * veh_cost(item, CurrentBaseID, &has_proto);
-        if (slot != 0) return cost;
-        int32_t acc = b.minerals_accumulated_2;
-        if (base_making(item, CurrentBaseID) != base_making(prod_at_open, CurrentBaseID) && f.diff_level >= 2 &&
-            acc > Rules.retool_exemption)
-            acc = (acc - Rules.retool_exemption) * (100 - Rules.retool_penalty_prod_change) / 100 +
-                  Rules.retool_exemption;
-        return cost - acc;
-    }
-    int32_t cost = cf * Facility[-item].cost;
-    if (slot != 0) return cost;
-    if (base_making(item, CurrentBaseID) == base_making(prod_at_open, CurrentBaseID) || f.diff_level < 2)
-        return cost - b.minerals_accumulated;
-    return cost - b.minerals_accumulated / 2;
-}
-
-void pick_item(BasePop* pop, int32_t item, int32_t code, int32_t prod_at_open, int32_t slot) {
-    BASE& b = cur_base();
-    char buf[64];
-    StrBuffer[0] = 0;
-    crt_strcat(StrBuffer, item >= 0 ? Units[item].name : Facility[-item].name);
-    int32_t rest = pick_rest(item, prod_at_open, slot);
-    if (rest < 0) rest = 0;
-    int32_t surplus = b.mineral_surplus;
-    if (surplus > 0) snprintf(buf, sizeof buf, "  (%d, %d)", rest, (rest + surplus - 1) / surplus);
-    else snprintf(buf, sizeof buf, "  (%d)", rest);
-    if (item != -0x45) crt_strcat(StrBuffer, buf);
-    BasePop_item(pop, StrBuffer, code);
-}
-
-constexpr int32_t kPickDesign = 0x7FFF;  // the stand-in's design workshop item
-
-// FUN_00494700 stand-in: the choice for queue slot `slot` (0 = current production).
-int32_t production_pick(int32_t faction, int32_t slot, int32_t prod_at_open) {
-    BasePop* pop = popup_new();
-    Popup_start(pop, nullptr, nullptr, -1, nullptr, 0x40);
-    BasePop_string(pop, cur_base().name);
-    BasePop_set_max_rows(pop, 20);  // columns of 20 (the original picker is a grid)
-    int32_t current = cur_base().queue_items[slot], active = -9999;
-    proto_sort(faction);
-    for (int32_t i = 0; i < 128; i++) {
-        int32_t u = ProtoSortList[i];
-        if (!veh_avail(u, faction, CurrentBaseID)) continue;
-        if (u == current) active = u;
-        pick_item(pop, u, u, prod_at_open, slot);
-    }
-    for (int32_t fac = 1; fac <= 0x85; fac++) {
-        if (!facility_avail(fac, faction, CurrentBaseID, slot)) continue;
-        if (-fac == current) active = 0x200 + fac;
-        pick_item(pop, -fac, 0x200 + fac, prod_at_open, slot);
-    }
-    // The picker's DESIGN mode (the original's button beside the grid), as a last item.
-    BasePop_item(pop, label_get(915), kPickDesign);
-    if (active != -9999) BasePop_set_active(pop, active);
-    int32_t r = BasePop_exec_3(pop, 0, 0);
-    popup_delete(pop);
-    return r < 0 ? -9999 : r;
-}
 
 void queue_count(int32_t faction, int32_t delta) {
     BASE& b = cur_base();
@@ -131,14 +66,9 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
     queue_count(faction, -1);
     for (;;) {
         refresh_base(self);
-        int32_t item = production_pick(faction, slot, bwf(kBwProdAtOpen));
-        if (item == kPickDesign) {
-            // The picker's design mode (BaseWin_production's mode 3: DesignWin_exec for a new
-            // design, set_base), then the picker again.
-            DesignWin_exec(&DesignWin, faction, -1);
-            set_base(bwf(kBwBase));
-            continue;
-        }
+        // FUN_00494700: the picker (BaseWin's member at +0xA1C) for the selected queue slot.
+        int32_t mode = 0;
+        int32_t item = prodwin_pick(faction, bwf(kBwQueueSel), &mode);
         if (slot != 0 && item == -9999) {
             for (int32_t i = 0; i < 10; i++) cur_base().queue_items[i] = saved[i];
             cur_base().queue_size = saved_size;
@@ -152,11 +82,67 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
             BaseWin_draw_queue(self, 1);
             if (!no_lock) bw_unlock_base(CurrentBaseID);
             queue_count(faction, 1);
+            prodwin_hide();
             return;
         }
-        // (The picker's design / help / queue-edit modes, self+0xB194, are not offered by the
-        // stand-in picker: mode 0, a plain choice.)
-        if (item == 9999) break;
+        // The picker's modes (+0xB194).
+        bool next = false;
+        switch (mode) {
+        case 1:  // HELP: the facility's / project's datalink entry, the unit's design
+            next = true;
+            if (item < 0) {
+                help_topic(-item < 0x46 ? 10 : 11, -item);
+            } else if (item != 9999) {
+                if (item < 0x200) DesignWin_exec(&DesignWin, (uint8_t)cb.faction_id, item);
+                else help_topic(item - 0x200 < 0x46 ? 10 : 11, item - 0x200);
+            }
+            break;
+        case 2:  // WORKSHOP (the selected unit's design) / 3 a new design; then the list again
+        case 3:
+            DesignWin_exec(&DesignWin, (uint8_t)cb.faction_id, mode == 2 && item >= 0 ? item : -1);
+            refresh_base(self);
+            prodwin_rebuild();
+            next = true;
+            break;
+        case 4:  // DELETE (queue) / RESET (production: the governor chooses)
+        case 6:
+            if (slot == 0) {
+                base_reset(CurrentBaseID, 0);
+                if (!no_lock) bw_unlock_base(CurrentBaseID);
+                BaseWin_on_redraw(self);
+                GraphicWin_redraw(self);
+                queue_count(faction, 1);
+                prodwin_hide();
+                return;
+            }
+            if (cb.queue_size < bwf(kBwQueueSel)) {
+                bwf(kBwQueueSel) = std::max(bwf(kBwQueueSel) - 1, 1);
+                BaseWin_draw_queue(self, 1);
+            } else {
+                for (int32_t i = bwf(kBwQueueSel); i < 9; i++) cb.queue_items[i] = cb.queue_items[i + 1];
+                cb.queue_size--;
+                if (cb.queue_size < bwf(kBwQueueSel)) bwf(kBwQueueSel) = std::max(cb.queue_size, 1);
+                BaseWin_draw_queue(self, 1);
+                BaseWin_draw_queue(self, 1);
+            }
+            break;
+        case 5:  // INSERT
+            if (slot != 0) BaseWin_add_queue(self, item, 1);
+            break;
+        case 7:  // REPLACE
+            if (slot != 0) BaseWin_add_queue(self, item, 0);
+            break;
+        default: break;
+        }
+        if (next) continue;
+        if (item == 9999) {
+            // The old design workshop list (design_workshop 0x583E30, not reconstructed: the
+            // picker never returns 9999), then the list again.
+            console_not_reconstructed("design_workshop");
+            refresh_base(self);
+            prodwin_rebuild();
+            continue;
+        }
         if (item > 0x1FF) item = 0x200 - item;
         bool retool = slot == 0 && item == cb.queue_items[0];
         if (!retool) {
@@ -217,7 +203,6 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
                 }
             }
         }
-        if (slot != 0 && !retool) BaseWin_add_queue(self, item, 0);  // the picker's queue mode (7)
         log_say_2("BASE: changed production", CurrentBaseID, slot, cb.queue_items[slot]);
         if (slot == 0) {
             cb.queue_items[0] = item;
@@ -236,8 +221,8 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
                 }
             }
         }
-        // The original loops back to the picker while it stays open (queue editing); the stand-in
-        // closes after each choice.
+        // The picker stays open while a queue is edited: back to it.
+        if (prodwin_shown()) continue;
         if (!no_lock) bw_unlock_base(CurrentBaseID);
         queue_count(faction, 1);
         // (Multiplayer: message_data for a project started or dropped, not reconstructed.)
@@ -254,9 +239,6 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
         }
         return;
     }
-    // 9999: the design workshop, then the picker again (not offered by the stand-in).
-    if (!no_lock) bw_unlock_base(CurrentBaseID);
-    queue_count(faction, 1);
 }
 
 // The queue pane (iface spot 8, index = slot + 2): left click picks the item for that slot; a
@@ -277,8 +259,154 @@ void THISCALL BaseWin_queue_click(uint8_t* self, int32_t index, int32_t, int32_t
     BaseWin_production(self, s, 0);
 }
 
-// The units present pane (iface spot 6): the unit's popup menu is the console's (not reconstructed
-// here); a click centres the map on the base.
-void THISCALL BaseWin_garrison_click(uint8_t* self, int32_t, int32_t, int32_t, int32_t) {
-    console_not_reconstructed("BaseWin_garrison_click");
+// BaseWin_garrison_click (0x40B140): a click on a unit of the units present (spot 6) or supported
+// (spot 7) panes. With the "quick select" preference (0x40000) a left click activates the unit
+// and closes the window; otherwise its menu (PullDown): activate (sentry / held / patrolling:
+// clear the order), select, sentry, hold, disband, change home base / show the home base, return
+// to the home base, centre the map on it. Multiplayer locks: not reconstructed (none in
+// single-player games).
+void THISCALL BaseWin_garrison_click(uint8_t* self, int32_t veh_id, int32_t x, int32_t y, int32_t right) {
+    if (Vehs[veh_id].faction_id != CurrentPlayerFaction ||
+        (MultiplayerActive && (NetSessionState[0x1F] || NetLocked || ControlTurnC)))
+        return;
+    // Selects the unit, closes the window (or the report) and recentres the view.
+    auto select = [&](bool clear) {
+        MapWinVehA = veh_id;
+        if (clear) {
+            Vehs[veh_id].order = 0;
+            Vehs[veh_id].state &= 0xFCFFBDFFu;
+            ui_synch_veh(veh_id);
+            net_await_synch();
+        }
+        Console_set_move(&MainConsole, 1);
+        mw(&MainConsole, kConAnySelect) = 1;
+        if (Win_is_visible(&BaseWin)) bw_close_window(self);
+        else if (Win_is_visible(&ReportWindow)) console_not_reconstructed("ReportIf_done");
+    };
+    if (!right && (GameMorePreferences & 0x40000)) {
+        if (!veh_selectable(veh_id) || net_lock_veh(&veh_id, 0)) return;
+        select(true);
+        net_unlock_veh();
+        return;
+    }
+    PullDown pd;
+    PullDown_init(&pd);
+    VEH& v = Vehs[veh_id];
+    uint32_t st = v.state;
+    if (v.order || (st & 0x4200) || (st & 0x1000200) == 0x1000200 ||
+        ((st & 0x2000200) == 0x2000200 && v.patrol_current_point < v.waypoint_count))
+        PullDown_add_item(&pd, 1, label_get(0xB6C / 4));
+    PullDown_add_item(&pd, 2, label_get(0x958 / 4));
+    if (GameState & 0x40) PullDown_add_item(&pd, 0x5A, label_get(0xDFC / 4));
+    PullDown_add_separator(&pd, 99);
+    PullDown_add_item(&pd, 10, label_get(0xB70 / 4));
+    PullDown_add_item(&pd, 0xB, label_get(0xB74 / 4));
+    PullDown_add_item(&pd, 0xC, label_get(0xB78 / 4));
+    int32_t home = v.home_base_id;
+    if (home >= 0 && home != CurrentBaseID) {
+        PullDown_add_separator(&pd, 99);
+        if (Bases[CurrentBaseID].faction_id == v.faction_id) PullDown_add_item(&pd, 0x14, label_get(0xB7C / 4));
+        PullDown_add_item(&pd, 0x15, label_get(0xB80 / 4));
+    }
+    if (home == CurrentBaseID && (v.x != Bases[CurrentBaseID].x || v.y != Bases[CurrentBaseID].y)) {
+        if (map_tile(v.x, v.y)->region == map_tile(Bases[CurrentBaseID].x, Bases[CurrentBaseID].y)->region ||
+            Chassis[Units[v.unit_id].chassis_id].triad != 0) {
+            PullDown_add_separator(&pd, 99);
+            PullDown_add_item(&pd, 0x1E, label_get(0xB84 / 4));
+        }
+        PullDown_add_item(&pd, 0x1F, label_get(0x910 / 4));
+    }
+    int32_t shown = veh_id;
+    // Win_client_to_screen_2: the panes' coordinates are the main interface's.
+    const UiRect& mp = mi_rect(kMiPos);
+    PullDown_show(&pd, x + mp.left, y + mp.top);
+    if (GameState & 0x800) return;
+    int32_t sel = PullDown_get_selected(&pd);
+    int32_t id = sel < 0x40 ? pulldown_item_id(&pd, sel) : -1;
+    if (veh_id != shown || net_lock_veh(&veh_id, 0)) return;
+    VEH& u = Vehs[veh_id];
+    if (u.faction_id != CurrentPlayerFaction) {
+        net_unlock_veh();
+        return;
+    }
+    auto jail = [&]() {
+        if (!veh_jail(veh_id)) return false;
+        X_pop("JAIL", 0);
+        return true;
+    };
+    switch (id) {
+    case 1:
+        if (jail()) break;
+        u.order = 0;
+        ui_synch_veh(veh_id);
+        net_await_synch();
+        break;
+    case 2:
+        if (jail()) break;
+        select(true);
+        net_unlock_veh();
+        return;
+    case 10:
+        if (jail()) break;
+        sleep(veh_id);
+        ui_synch_veh(veh_id);
+        net_await_synch();
+        break;
+    case 0xB:
+        if (jail()) break;
+        u.order = 2;
+        ui_synch_veh(veh_id);
+        net_await_synch();
+        break;
+    case 0xC:
+        net_unlock_veh();
+        Console_disband(&MainConsole, veh_id);
+        if (Win_is_visible(&BaseWin)) {
+            bw_redraw();
+            GraphicWin_redraw(&MainInterfaceWin);
+        }
+        return;
+    case 0x14:
+        if (Bases[bwf(kBwBase)].faction_id == u.faction_id) {
+            u.home_base_id = (int16_t)bwf(kBwBase);
+            ui_synch_veh(veh_id);
+            net_await_synch();
+        }
+        break;
+    case 0x15:
+        net_unlock_veh();
+        BaseWin_zoom(&BaseWin, u.home_base_id, 0);
+        return;
+    case 0x1E:
+        if (jail()) break;
+        u.state &= 0xFCFFBDFFu;
+        u.order = 0x18;
+        u.waypoint_x[0] = Bases[u.home_base_id].x;
+        u.waypoint_y[0] = Bases[u.home_base_id].y;
+        ui_synch_veh(veh_id);
+        net_await_synch();
+        break;
+    case 0x1F:
+        net_unlock_veh();
+        Console_set_view(&MainConsole, 0);
+        pfncMoveMap(&MainConsole, u.x, u.y, 1);
+        Console_set_cursor(&MainConsole, u.x, u.y);
+        if (Win_is_visible(&BaseWin)) bw_close_window(self);
+        else if (Win_is_visible(&ReportWindow)) console_not_reconstructed("ReportIf_done");
+        return;
+    case 0x5A:
+        Console_editor_edit_veh(&MainConsole, veh_id);
+        break;
+    default: break;
+    }
+    net_unlock_veh();
+    if (Win_is_visible(&BaseWin)) {
+        set_base(BaseUpkeepDrawID);
+        base_compute(1);
+        bw_redraw();
+        GraphicWin_redraw(&MainInterfaceWin);
+        BaseWin_draw_garrison(self, 1);
+    } else if (Win_is_visible(&ReportWindow)) {
+        GraphicWin_redraw(&ReportWindow);
+    }
 }

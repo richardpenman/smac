@@ -48,13 +48,13 @@ aborts() {  # aborts CASE : fails when smacx stopped on a function not reconstru
 
 # 1. turn_100 as faction 1 (The Flowers Preach, base 30; no popups at the start of the turn).
 #    Clicks: the tile right of the base (worker moves there), the citizen (CITIZEN2: too small
-#    for specialists), a queue slot (picker: first item).
+#    for specialists), a queue slot (picker: the first item, INSERT, OK).
 run late100 --save work/saves_late/turn_100.sav --human 1 --keys \
 "BASE:30,BASESTATE,SHOT:open.bmp,\
 CLICK:560x200,BASESTATE,\
-c,SHOT:pick.bmp,DOWN,ENTER,BASESTATE,\
+c,SHOT:pick.bmp,RIGHT,ENTER,BASESTATE,\
 h,SHOT:hurry.bmp,DOWN,ENTER,BASESTATE,\
-CLICK:180x606,ENTER,BASESTATE,\
+CLICK:180x606,HOME,CLICK:562x515,CLICK:356x515,BASESTATE,\
 CLICK:287x648,ENTER,BASESTATE,\
 r,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,\
 B,l,o,o,m,ENTER,BASESTATE,SHOT:done.bmp,\
@@ -64,7 +64,7 @@ check "late100 open" "$(field late100 1 tiles) $(queue late100 1)" "00000801 67"
 check "late100 tile click" "$(field late100 2 tiles)" "00000009"
 check "late100 production" "$(queue late100 3) $(field late100 3 state)" "64 83001000"
 check "late100 hurry" "$(field late100 4 credits) $(field late100 4 minerals)" "38 16/16"
-check "late100 queue add" "$(queue late100 5)" "64 0"
+check "late100 queue add" "$(queue late100 5)" "64 67"
 check "late100 citizen" "$(field late100 6 tiles)" "00000009"
 grep -q "^basestate base 30 Bloom f1" "$OUT/late100.log" && echo "PASS late100 rename" ||
     { echo "FAIL late100 rename"; FAIL=1; }
@@ -74,10 +74,10 @@ check "late100 close" "$(grep '^basestate' "$OUT/late100.log" | tail -1)" "bases
 run reload --save "$OUT/late100/after.sav" --human 1 --keys "BASE:30,BASESTATE,ESC"
 aborts reload
 check "reload" "$(grep '^basestate' "$OUT/reload.log" | head -1)" \
-    "basestate base 30 Bloom f1 pop 1 tiles 00000009 spec 0 minerals 16/16 credits 38 queue 64 0 state 83001000 gov 00DFBE01"
+    "basestate base 30 Bloom f1 pop 1 tiles 00000009 spec 0 minerals 16/16 credits 38 queue 64 67 state 83001000 gov 00DFBE01"
 
 # 2. turn_120 / turn_147 / turn_300 as faction 3 (University Base, base 2): the build menu's next
-#    item, a hurry (turn_120: a facility, partial payment of 50 credits; turn_147: a unit, in full),
+#    item (the item after the current one in the list: the next grid cell), a hurry (turn_120: a facility, partial payment of 50 credits; turn_147: a unit, in full),
 #    the next / previous base. turn_300: one popup first (Enter), then the turn's messages, so only
 #    the absence of aborts is checked there. (The runs are reproducible: smacx seeds the generators,
 #    --seed default 0,0; with the original's clock seed the turn's events, e.g. FUNGUSGROWS2, came
@@ -85,8 +85,9 @@ check "reload" "$(grep '^basestate' "$OUT/reload.log" | head -1)" \
 for t in 120 147 300; do
     pre=""; [ $t == 300 ] && pre="ENTER,"; [ $t == 147 ] && pre="DOWN,ENTER,"  # 147: the Hive calls (COMM: not now)
     pay="DOWN,ENTER"; [ $t == 120 ] && pay="DOWN,ENTER,BACK,BACK,BACK,BACK,5,0,ENTER"
+    pick="RIGHT"; [ $t == 120 ] && pick="DOWN,LEFT,LEFT,LEFT,LEFT"  # the grid cell after the current item
     run late$t --save work/saves_late/turn_$t.sav --human 3 --keys \
-"${pre}BASE:2,BASESTATE,SHOT:open.bmp,c,SHOT:pick.bmp,DOWN,ENTER,BASESTATE,h,SHOT:hurry.bmp,$pay,BASESTATE,\
+"${pre}BASE:2,BASESTATE,SHOT:open.bmp,c,SHOT:pick.bmp,$pick,ENTER,BASESTATE,h,SHOT:hurry.bmp,$pay,BASESTATE,\
 PGDN,BASESTATE,SHOT:next.bmp,PGUP,BASESTATE,ESC,BASESTATE"
     aborts late$t
     n=$(grep -c "^basestate base" "$OUT/late$t.log")
@@ -96,8 +97,7 @@ done
 check "late120 production (facility 2)" "$(queue late120 2)" "-2"
 check "late120 partial hurry" "$(field late120 3 credits) $(field late120 3 state)" "76 C3004000"
 # (the item after the current one in the build menu: the answer the picker logged)
-ans=$(grep -o 'popup  answer: [0-9]*' "$OUT/late147.log" | head -1 | sed 's/.* //')
-[ -n "$ans" ] && [ "$ans" -ge 512 ] && ans=$((512 - ans))
+ans=$(grep -o 'prodwin answer: .* item -*[0-9]*' "$OUT/late147.log" | head -1 | sed 's/.* //')
 check "late147 production" "$(queue late147 2)" "$ans"
 check "late147 hurry" "$(field late147 3 credits) $(field late147 3 minerals)" "99 24/24"
 check "late147 next / previous" "$(field late147 4 base) $(field late147 5 base)" "24 2"

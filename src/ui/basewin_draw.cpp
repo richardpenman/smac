@@ -1613,15 +1613,49 @@ void THISCALL BaseWin_draw_psych(uint8_t* self, int32_t) {
     ui_invalidate();
 }
 
-// BaseWin_draw_support (0x408EB0): a map of the planet with the base's supported units, drawn by
-// the window's own map window (MapWin_init_2, pfncRedrawMap at the zoom that fits). Not
-// reconstructed: the pane is cleared only.
+// BaseWin_draw_support (0x408EB0): a map of the planet around the base, drawn by the window's own
+// map window (the MapWin member at +0x1E674, MapWin_init_2(2): the pane's rectangle) at the
+// largest zoom step (2, 1, 0, ...) at which the whole map fits, centred on the base, with options
+// 0x200402; copied into the pane, centred.
 void THISCALL BaseWin_draw_support(uint8_t* self, int32_t) {
+    static Buffer canvas;
     Buffer* c = bwc();
     UiRect m = rect_at(kBwRectMap);
+    UiRect saved = c->clip;
     Buffer_set_clip(c, &m);
     Buffer_fill_3(c, &m, 0);
-    console_not_reconstructed_quiet("BaseWin_draw_support");
+    uint8_t* map = self + 0x1E674;
+    int32_t w = m.right - m.left, h = m.bottom - m.top;
+    if (w <= 0 || h <= 0) return;
+    // MapWin_init_2(2, 0): the window over the pane (options 0x80000082, zoom -7, replaced below).
+    MapWinNative* n = ui_mapwin_native(map);
+    if (!n || canvas.width != w || canvas.height != h) {
+        Buffer_ctor(&canvas);
+        Buffer_init(&canvas, w, h, 8, 0);
+        ui_mapwin_attach(map, kMapWinVBase, &canvas);
+    }
+    mw(map, 0x1DD74) = 1;
+    mw(map, kMwOptions) = (int32_t)0x80000082;
+    mw(map, kMwZoom) = -7;
+    mw(map, kMwElevScale) = 0x19 >> 1;
+    mw(map, kMwOptions) = 0x200402;
+    int32_t zoom = 2, step_w = 900, step_h = 0x1C2, half_x = MapAreaX / 2;
+    do {
+        int32_t tw = ZoomNum < 1 ? step_w / 16 : ZoomNum * 0x32 / ZoomDenom;
+        if (half_x * tw <= w) {
+            int32_t th = ZoomNum < 1 ? step_h / 16 : ZoomNum * 0x19 / ZoomDenom;
+            if ((MapAreaY / 2) * th <= h) break;
+        }
+        zoom--;
+        step_w -= 0x32;
+        step_h -= 0x19;
+    } while (step_w > 0x32);
+    mw(map, kMwZoom) = zoom;
+    mw(map, kMwCenterX) = Bases[CurrentBaseID].x;
+    mw(map, kMwCenterY) = Bases[CurrentBaseID].y;
+    pfncRedrawMap(map, 1);  // vtable +0xF8
+    Buffer_copy_4(&canvas, c, 0, 0, (m.right - m.left) / 2 - w / 2 + m.left, (m.bottom - m.top) / 2 - h / 2 + m.top, w, h);
+    Buffer_set_clip(c, &saved);
     ui_invalidate();
 }
 

@@ -424,6 +424,11 @@ int32_t THISCALL Buffer_wrap_cent_4(Buffer* self, const char* text, int32_t x, i
     return y;
 }
 
+int32_t THISCALL Buffer_wrap_cent_6(Buffer* self, const char* text, const UiRect* rect) {
+    if (!text || !rect) return rect ? rect->top : 0;
+    return Buffer_wrap_cent_4(self, text, rect->left, rect->top, rect->right - rect->left);
+}
+
 int32_t THISCALL Buffer_wrap_height(Buffer* self, const char* text, int32_t w) {
     if (!text) return 0;
     BufferText& bt = buffer_text(self);

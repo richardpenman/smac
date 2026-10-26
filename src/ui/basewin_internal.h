@@ -93,6 +93,9 @@ const char* label_upper(uint32_t off);
 void bw_set_base();
 bool bw_own_base();
 void bw_redraw();
+// The common tail of BaseWin_exit / BaseWin_base_killed / BaseWin_garrison_click: closes the
+// window and recentres the view on the selected unit when it is not well inside the view.
+void bw_close_window(uint8_t* self);
 void bw_button_set(BaseButton* b, int32_t on);
 void bw_button_draw(BaseButton* b);
 // FlatButton_ctor's look / BaseButton_init (also used by the screens of screenwin.h).
@@ -113,3 +116,10 @@ bool mapwin_tile_in_view(uint8_t* win, int32_t x, int32_t y, int32_t margin);
 // textcolor_init (0x4BA220) into the memory image (basewin_draw.cpp); the boot function itself
 // stays in the headless boot area.
 void textcolor_load();
+Sprite* bw_sprite_at(uint32_t off);  // the base window's sprite at +off (ArtSprite)
+// The production picker (prodwin.cpp, FUN_00494700): see there.
+int32_t prodwin_pick(int32_t faction, int32_t slot, int32_t* mode);
+void prodwin_rebuild();
+void prodwin_hide();
+bool prodwin_shown();
+void prodwin_compose(Buffer* screen);

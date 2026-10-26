@@ -391,8 +391,24 @@ void ops_governor(ReportScreen* s, int32_t id) {
         }
         return;
     }
-    if (id == 0xCF4) {  // ADVANCED SETTINGS: the governor dialog (BaseWin_governor), not reconstructed
-        console_not_reconstructed("ReportIf: ADVANCED SETTINGS (BaseWin_governor)");
+    if (id == 0xCF4) {  // ADVANCED SETTINGS: the governor dialog of the first selected base, then
+                        // its settings (Faction.base_governor_adv) for every selected base
+        log_say_2("Global governor advanced set", 0, 0, 0);
+        bool asked = false;
+        for (int32_t i = 0; i < BaseCount; i++) {
+            if (Bases[i].faction_id != CurrentPlayerFaction || !(s->selected[i >> 5] & (1u << (i & 31)))) continue;
+            if (!asked) {
+                BaseWin_soft_zoom(&BaseWin, i);
+                if (BaseWin_governor(&BaseWin, 1)) break;
+                asked = true;
+            }
+            if (bw_lock_base(i)) continue;
+            BaseWin_soft_zoom(&BaseWin, i);
+            Bases[i].governor_flags = Factions[s->faction].base_governor_adv;
+            BaseWin_gov_activate(&BaseWin);
+            draw_radius(Bases[i].x, Bases[i].y, 2, 2);
+            bw_unlock_base(i);
+        }
         return;
     }
     if (id == 0xCF5) {  // TURN GOVERNOR OFF

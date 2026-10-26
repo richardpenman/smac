@@ -141,7 +141,7 @@ src/app/smacx.cpp the native game executable
 | 2 | complete `MapWin_gen_terrain_poly`: coasts/beaches (Texture_draw_coast), rivers, roads/mag tubes, landmarks textures and sprites, territory borders, resources/pods/monolith, jungle; bit-exact Texture_draw_* stepping; `pfncPtToTile`; scrolled redraws (`pfncRedrawMap` partial copy) | pixel diff per tile class |
 | 3 | units: load_vehicles, flags, Units.pcx natives, voxel renderer (cvr) or pre-rendered sprite cache; veh_draw with stacks, health, animation (vehdraw_*) | unit close-ups vs oracle |
 | 4 | Win/GraphicWin/z-order/message pump/modal loops on the platform events; MainInterface (console frame), StatusWin, InfoWin, WorldWin (mini map), MessageWin; Console key handling and `Console_human_turn`: a human player can move units and end turns | scripted key sequences, state compare with oracle (same keys) |
-| 5 (mostly done: src/ui/basewin*.cpp, tests/basewin/) | BaseWin (base screen): layout and art, panes, city map, clicks, build menu (text popup stand-in for the picker grid), queue, hurry, governor, specialists, rename, recycling; headless stubs in src/headless/ui_headless_basewin.cpp | `basedump` canvases vs oracle (tests/basewin/compare.sh), scripted keys (tests/basewin/run.sh) |
+| 5 (mostly done: src/ui/basewin*.cpp, tests/basewin/) | BaseWin (base screen): layout and art, panes, city map, clicks, build menu (the picker grid, prodwin.cpp), queue, hurry, governor, units present / supported menus, support map, specialists, rename, recycling; headless stubs in src/headless/ui_headless_basewin.cpp | `basedump` canvases vs oracle (tests/basewin/compare.sh), scripted keys (tests/basewin/run.sh) |
 | 6 (done, section 6) | popups: BasePop on the game's script files (Script.txt, xscript.txt etc.: `#LABEL`, `^` lines, `$STR` parsing via the reconstructed text module), `popp/popb/X_pop*`, NetMsg, choice lists | popups by label vs oracle |
 | 7 (done, section 9) | design workshop (DesignWin), tech pick (research window, Console_set_tech / set_ai), NewTechWin, datalinks (help); social engineering was done with the reports (section 8) | tests/design/run.sh, tests/datalinks/run.sh; tests/design/compare.sh vs the original |
 | 8 (done, section 10; reports and monuments in section 8) | diplomacy (communicate and the human's menus, DiploPop), council window (CouncilWin); hotseat/PBEM `diplo` (DiploWin) not reconstructed | tests/diplo/run.sh |
@@ -390,7 +390,8 @@ F10 hall of fame, F11 menu detail, F12 the commlink panel (MainInterface_on_ifac
 * **Reports** (reports.cpp: report_* 0x4AC9A0.., ReportWin / ReportIf): the report kinds and keys
   of ReportWin_on_key_click; base operations with the eight sort keys (ReportIf_merge_sort), the
   three views, selection, double click (BaseWin_zoom), the governor (picture click, GOVERNOR tab:
-  Set to EXPLORE.. / off); security nexus with the unit type filter; labs (Console_set_tech on the
+  Set to EXPLORE.. / ADVANCED SETTINGS (BaseWin_governor's dialog, then the faction's settings for
+  every selected base) / off); security nexus with the unit type filter; labs (Console_set_tech on the
   research line); energy; projects; satellites; score (compute_score, #SCORING); the intelligence
   file (report_intel). Layout at the original's rectangles; the labs tree, the energy budget's two
   columns, the base locator map, the satellite FLC and scroll bars are simplified or missing.
@@ -437,8 +438,7 @@ F10 hall of fame, F11 menu detail, F12 the commlink panel (MainInterface_on_ifac
   (the original renders each component's model). The design is drawn with the voxel renderer
   (vehdraw_construct_chassis / weapon / armor / reactor / abil; vehdraw_construct_reactor 0x4C3800
   is now a function of its own). Reached by u (design_new_veh), the menu, tech_achieved's
-  ASKSEEDESIGN and the base window's build menu (a last item standing for the picker's DESIGN
-  mode). Multiplayer paths (diplo_lock, message_data) are not reconstructed.
+  ASKSEEDESIGN and the base window's build menu (the picker's WORKSHOP button and HELP on a unit). Multiplayer paths (diplo_lock, message_data) are not reconstructed.
 * **Datalinks** (src/ui/datalink.cpp): Datalink_exec with the 16 categories (lists, ids
   category * 10000 + entry, sorting), the entries from the helpx.txt / conceptsx.txt / BLURBSX /
   faction file sections the original uses, hyperlinks ($LINK<text=id>: the text writer now
