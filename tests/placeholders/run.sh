@@ -411,4 +411,21 @@ check editor2 "base editor: a project made unbuilt" "^base editor: project 2 at 
 nocheck editor2 "no placeholder" "not reconstructed"
 nocrash editor2
 
+# 23. The new technology window's picture buttons (NewTechWin_exec, FUN_00483EB0): the quote and
+#     the long description (sprites of interface.pcx, load_box_sprites 0x822610), the quote's
+#     selected; a click on the second shows techlongs.txt's TECHn in the quote's place, the first
+#     the BLURBSX quote again. (Doctrine: Mobility is discovered on turn 8, as tests/design's; a
+#     supply pod's data shows the same window.)
+T="C-ENTER,DOWN,ENTER"
+run newtech --new size=0 rules=0x180e --human 1 --keys "ENTER,R,ENTER,$T,$T,$T,$T,$T,$T,$T,SCREENSTATE,\
+CLICK:755x619,SCREENSTATE,SHOT:desc.bmp,CLICK:724x619,SCREENSTATE,ENTER,ENTER"
+check newtech "the quote button's picture, selected" "^newtechwin button 1 sprite 28x34 set 1"
+check newtech "the description button's picture" "^newtechwin button 2 sprite 28x34 set 0"
+check newtech "the quote" "^screentext blurb quote"
+check newtech "the description shown" "^screentext blurb description"
+check newtech "techlongs.txt's text" "^screentext blurb The early colonists quickly learned the importance of"
+check newtech "the description button selected" "^newtechwin button 2 sprite 28x34 set 1"
+if [ "$(grep -c '^screentext blurb quote' "$OUT/newtech.log")" = 2 ]; then echo "PASS newtech: the quote again"; else echo "FAIL newtech: the quote again"; FAIL=1; fi
+nocrash newtech
+
 exit $FAIL

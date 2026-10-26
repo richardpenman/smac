@@ -39,6 +39,9 @@ struct BoxDef {
 };
 BoxDef* box_def(int32_t index);  // 0x78D528 + index * 0x28
 BoxDef* box_def_large();  // 0x6846B0: the larger frame (interface windows)
+// NewTechWin's picture buttons (0x822610 [2][3], load_box_sprites): button 0 the quote, 1 the long
+// description; states normal, highlighted, pressed.
+Sprite* newtech_button_sprite(int32_t button, int32_t state);
 ADDR_NATIVE(0x453A70) void GAMEAPI load_box_sprites();
 ADDR_NATIVE(0x5E2DD3) void THISCALL Buffer_box_sprite(Buffer* self, const UiRect* rect, const BoxDef* box);
 // Tiles a sprite / canvas over (x, y, w, h) with the pattern origin at (x - sx % w, y - sy % h).

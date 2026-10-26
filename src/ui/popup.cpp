@@ -40,6 +40,7 @@ BoxDef g_boxes[51];
 // 0x2C7..0x34D: 61x44 corners and edges around a 61x44 centre).
 BoxDef g_box_large;
 Sprite g_box_large_sprites[8];
+Sprite g_newtech_buttons[2][3];  // 0x822610
 Buffer g_box_large_center;
 Sprite g_box_sprites[51][8];
 Buffer g_box_centers[51];
@@ -111,6 +112,9 @@ bool intersect(UiRect* out, const UiRect& a, const UiRect& b) {
 
 BoxDef* box_def(int32_t index) { return (index >= 0 && index < 51) ? &g_boxes[index] : nullptr; }
 BoxDef* box_def_large() { return &g_box_large; }
+Sprite* newtech_button_sprite(int32_t button, int32_t state) {
+    return (button >= 0 && button < 2 && state >= 0 && state < 3) ? &g_newtech_buttons[button][state] : nullptr;
+}
 
 void GAMEAPI load_box_sprites() {
     Buffer canvas;
@@ -160,6 +164,12 @@ void GAMEAPI load_box_sprites() {
     g_box_large = {{&l[0], &l[2], &l[5], &l[7]}, {&l[1], &l[6], &l[3], &l[4]}, &g_box_large_center, 7};
     // The tree's arrows (0x75AFD0 [3]: plain, -, highlighted; 7 x 13 at (0x8C + 8k, 0x25)).
     labs_load_arrows(&canvas);
+    // NewTechWin's picture buttons (0x822610: two columns of three states, 0x1C x 0x22 at
+    // (0x187 + 0x1D i, 0x236 + 0x23 k)).
+    for (int32_t i = 0; i < 2; i++)
+        for (int32_t k = 0; k < 3; k++)
+            pfncSpriteFromCanvasRectTrans(&g_newtech_buttons[i][k], &canvas, kKey, 0x187 + 0x1D * i, 0x236 + 0x23 * k,
+                                          0x1C, 0x22, 0);
 }
 
 int32_t THISCALL Buffer_tile_2(Buffer* self, Sprite* tile, int32_t sx, int32_t sy, int32_t x, int32_t y, int32_t w,

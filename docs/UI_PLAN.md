@@ -444,9 +444,12 @@ F10 hall of fame, F11 menu detail, F12 the commlink panel (MainInterface_on_ifac
 * **New technology window** (techwin.cpp: NewTechWin_exec 0x483F90, FUN_00483950): the 550 x 600
   window with its title (breakthrough / acquired), the tech's name and picture, help_tech_info's
   four sections (base facilities, technologies, unit advances, miscellaneous) with their links,
-  the BLURBSX quote, OK; a link opens the datalinks, then the window again. help_tech_info and
+  the BLURBSX quote, OK; a link opens the datalinks, then the window again. The two picture
+  buttons beside the quote (interface.pcx sprites of load_box_sprites, 0x822610; a ButtonGroup
+  with the quote's selected) switch the box between the BLURBSX quote and techlongs.txt's long
+  description (FUN_00483EB0); the quote's frame spans the window's width under them. help_tech_info and
   tech_heck (helpx.txt TECHHECK) are in src/ui/help.cpp, with the help_* entry points. Not
-  reconstructed: the two picture buttons' function, scroll bars. The voice clip: section 12.
+  reconstructed: scroll bars. The voice clip: section 12. (tests/placeholders/run.sh case 23.)
 * **Design workshop** (src/ui/designwin.cpp): DesignWin_exec and its methods with the original's
   game state changes (setup_veh, design_it, check_abil, suggest_abil, the select_* rules, the
   buttons APPLY / DONE / RENAME / OBSOLETE / UPGRADE / RETIRE / CANCEL / presets, the keys, the

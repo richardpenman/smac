@@ -34,9 +34,10 @@
 // ACQUIRED TECHNOLOGY!), the tech's name in its category colour and picture, the four sections of
 // help_tech_info (base facilities, technologies, unit advances, miscellaneous) with their links,
 // the BLURBSX quote and OK. A click on a link opens that datalinks page, then the window again.
+// The two picture buttons beside the quote (a ButtonGroup, the quote's selected) show the BLURBSX
+// quote or the long description of techlongs.txt in its place (FUN_00483EB0).
 // The voice clip voices\techN.mp3 plays while the window is up (sound.cpp's Wave objects).
-// Not reconstructed: the two picture buttons beside the quote (drawn, inactive), scroll bars of the
-// sections.
+// Not reconstructed: scroll bars of the sections.
 #include "ui/techwin.h"
 #include "ui/sound.h"
 
@@ -444,16 +445,30 @@ int32_t techwin_run(int32_t f, const int32_t* list, int32_t n, const char* label
 
 struct NewTechWinState : ScreenWin {
     int32_t tech = 0, from = 0;  // +0xB24, +0xB28
-    UiRect outer{}, ok{}, title{}, picture{}, blurb{}, b1{}, b2{};
+    // blurb: the quote's frame (+0xAD4, the full width, under the picture buttons b1 / b2);
+    // blurb_text: its StringBox (+0xAE4, left of the buttons).
+    UiRect outer{}, ok{}, title{}, picture{}, blurb{}, blurb_text{}, b1{}, b2{};
     UiRect header[4]{}, box[4]{};  // the sections: headers and their text boxes
     HelpText sections[4];
     HelpText quote;
     int32_t link = -1;  // DAT_00686960: the link clicked
     BaseButton* ok_button = nullptr;
+    BaseButton* pic_button[2] = {};  // ids 1 (the quote) and 2 (the long description)
+    int32_t shown = 1;  // the ButtonGroup's selection
 
     void redraw() override;
+    // FUN_00483EB0: button 1 loads the BLURBSX quote TECHn into the quote's StringBox, button 2
+    // techlongs' TECHn (the ButtonGroup selects the button).
+    void show_text(int32_t id) {
+        shown = id;
+        for (int32_t i = 0; i < 2; i++)
+            if (pic_button[i]) bw_button_set(pic_button[i], i + 1 == id);
+        std::string label = "TECH" + std::to_string(tech);
+        help_load_text(&quote, id == 1 ? "BLURBSX" : "techlongs", label.c_str(), true);
+    }
     void on_button(int32_t id) override {
         if (id == -1) sw_close(this);
+        else if (id == 1 || id == 2) show_text(id);
     }
     void on_key(int32_t key) override {
         int32_t vk = key & 0xFFFF;
@@ -466,7 +481,16 @@ struct NewTechWinState : ScreenWin {
         link = std::atoi(target->c_str());
         sw_close(this);
     }
-    void log_state() override { std::fprintf(stderr, "newtechwin tech %d from %d\n", tech, from); }
+    void log_state() override {
+        std::fprintf(stderr, "newtechwin tech %d from %d\n", tech, from);
+        // The picture buttons: their sprite (normal state) and BaseButton_set state.
+        for (int32_t i = 0; i < 2; i++) {
+            const BaseButton* b = pic_button[i];
+            const Sprite* sp = b ? b->sprite[0] : nullptr;
+            std::fprintf(stderr, "newtechwin button %d sprite %dx%d set %d\n", i + 1, sp ? sp->width : 0,
+                         sp ? sp->height : 0, b ? b->set_state : -1);
+        }
+    }
 };
 
 void NewTechWinState::redraw() {
@@ -538,17 +562,18 @@ void NewTechWinState::redraw() {
                              b.right - b.left, 0);
         for (const TextLine& l : sections[i].lines) texts.push_back("section " + std::to_string(i) + " " + l.text);
     }
-    UiRect b{blurb.left + 3, blurb.top + 3, blurb.right - 3, blurb.bottom - 3};
+    UiRect b{blurb_text.left + 3, blurb_text.top + 3, blurb_text.right - 3, blurb_text.bottom - 3};
     Buffer_set_clip(c, &b);
     Buffer_set_font(c, find_font(0xC, 0), find_font(0xC, 1), find_font(0xC, 2), nullptr);
     Buffer_set_text_color(c, 0x98, -1, 1, 1);
+    // The StringBox's own canvas has only the first text colour set (Buffer_ctor leaves the
+    // others -1): the {...} / [...] runs of techlongs.txt take that colour in their fonts.
+    for (int32_t k = 1; k < 4; k++) c->text_color[k] = c->shadow_color[k] = -1;
     Buffer_write_strings(c, quote.lines.data(), (int32_t)quote.lines.size(), b.left, b.top, b.right - b.left, 0);
     Buffer_set_clip(c, &all);
-    // The two picture buttons beside the quote (ButtonGroup, the first set; not active here).
-    r = b1;
-    Buffer_box_sprite(c, &r, box_def(2));
-    r = b2;
-    Buffer_box_sprite(c, &r, box_def(0));
+    texts.push_back(shown == 1 ? "blurb quote" : "blurb description");
+    for (const TextLine& l : quote.lines) texts.push_back(std::string("blurb ") + l.text);
+    // (The picture buttons b1 / b2 are BaseButtons drawn over the frame.)
 }
 
 }  // namespace
@@ -576,7 +601,8 @@ int32_t THISCALL NewTechWin_exec(uint8_t*, int32_t tech_id, int32_t from) {
     w.box[3] = {mid + 3, bb, x2, bb + 0x4C};
     w.b1 = {w.outer.right - 0x41, w.outer.bottom - 0x28, w.outer.right - 0x25, w.outer.bottom - 6};
     w.b2 = {w.outer.right - 0x22, w.outer.bottom - 0x28, w.outer.right - 6, w.outer.bottom - 6};
-    w.blurb = {x1, bb + 0x4F, w.b1.left - 4, w.outer.bottom - 3};
+    w.blurb = {x1, bb + 0x4F, x2, w.outer.bottom - 3};
+    w.blurb_text = {x1, bb + 0x4F, w.b1.left - 4, w.outer.bottom - 3};
     (void)bottom;
     for (int32_t i = 0; i < 4; i++) {
         HelpText& h = w.sections[i];
@@ -587,6 +613,20 @@ int32_t THISCALL NewTechWin_exec(uint8_t*, int32_t tech_id, int32_t from) {
     sw_init(&w, (ScreenWidth - W) / 2, (ScreenHeight - H) / 2, W, H, false);
     w.ok_button = sw_button(&w, label_get(101), -1, w.ok.left, w.ok.top, w.ok.right - w.ok.left, w.ok.bottom - w.ok.top,
                             0, find_font(0xE, 1));
+    // The picture buttons (ButtonGroup of ids 1 and 2, sprites of load_box_sprites), the quote's
+    // selected (ButtonGroup_set(1, 1)).
+    const UiRect* pr[2] = {&w.b1, &w.b2};
+    for (int32_t i = 0; i < 2; i++) {
+        BaseButton* bt =
+            sw_button(&w, nullptr, i + 1, pr[i]->left, pr[i]->top, pr[i]->right - pr[i]->left, pr[i]->bottom - pr[i]->top,
+                      0, nullptr);
+        for (int32_t st = 0; st < 3; st++) {
+            bt->tl[st] = bt->top[st] = bt->tr[st] = nullptr;
+            bt->sprite[st] = newtech_button_sprite(i, st);
+        }
+        w.pic_button[i] = bt;
+    }
+    bw_button_set(w.pic_button[0], 1);
     // The voice clip (voices\techN.mp3 on FacilityVoice, at the voices group's volume) when the
     // viewer is human and voiceovers are on (GameMorePreferences 0x4000).
     std::string voice = "voices\\tech" + std::to_string(tech_id) + ".mp3";
