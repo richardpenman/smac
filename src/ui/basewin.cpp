@@ -144,7 +144,7 @@ void bw_set_base() {
         bw_unlock_base(CurrentBaseID);
 }
 
-bool bw_own_base() { return cur_base().faction_id == CurrentPlayerFaction || (GameState & 0x80); }
+bool bw_own_base() { return cur_base().faction_id == CurrentPlayerFaction || (GameState & STATE_OMNISCIENT_VIEW); }
 
 void bw_invalidate() { ui_invalidate(); }
 
@@ -602,16 +602,16 @@ void bw_status(int32_t on) {
             g_bw.staple2.shown = true;
             continue;
         }
-        if (i == 0x15 && !(GameState & 0x40)) continue;
+        if (i == 0x15 && !(GameState & STATE_SCENARIO_EDITOR)) continue;
         if (g_bw.buttons[i].inited) g_bw.buttons[i].shown = true;
     }
     bwf(kBwDragState) = -1;
-    if ((GamePreferences & 0x400) && !Wave_is_playing(menu2)) Wave_play_2(menu2);
+    if ((GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE) && !Wave_is_playing(menu2)) Wave_play_2(menu2);
     ambience(0xCD);
     g_bw.visible = true;
     ui_invalidate();
     slide_show_window(&g_bw.canvas, g_bw.x, g_bw.y, &g_bw.back);  // slide_show(win, 0): the arms
-    if (GamePreferences & 0x400) Sound_fade(menu2);
+    if (GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE) Sound_fade(menu2);
 }
 
 // BaseWin_show (0x41E890) / BaseWin_hide (0x41E8B0) through the iface mode stack.
@@ -820,7 +820,7 @@ void THISCALL BaseWin_check_veh(uint8_t* self, int32_t veh_id) {
 // one in alphabetical order (wrapping around).
 static void bw_step(uint8_t* self, bool next) {
     set_base(bwf(kBwBase));
-    if (cur_base().faction_id != CurrentPlayerFaction && !(GameState & 0x80)) return;
+    if (cur_base().faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) return;
     if (ControlTurnC) {
         X_pop("ARROWUPKEEP", 0);
         return;
@@ -945,17 +945,17 @@ int32_t basewin_console_key(uint8_t* console, int32_t ch, int32_t vk, int32_t ke
         BaseWin_rename(self);
         return 1;
     case 'e':
-        if (GameState & 0x40) BaseWin_base_editor(self);
+        if (GameState & STATE_SCENARIO_EDITOR) BaseWin_base_editor(self);
         return 1;
     case '+': case '=':  // scenario editor: population
-        if (GameState & 0x40) {
+        if (GameState & STATE_SCENARIO_EDITOR) {
             BaseWin_focus(self);
             if (cur_base().pop_size < 99) cur_base().pop_size++;
             BaseWin_recompute(self, 0);
         }
         break;
     case '-': case '_':
-        if (GameState & 0x40) {
+        if (GameState & STATE_SCENARIO_EDITOR) {
             BaseWin_focus(self);
             if (cur_base().pop_size > 1) cur_base().pop_size--;
             BaseWin_recompute(self, 0);

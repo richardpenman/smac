@@ -106,7 +106,8 @@ static void ring_alt_set(int32_t x, int32_t y, int32_t altitude, int32_t toggle)
     }
     alt_set_both(x, y, altitude);
     MAP* sq = map_tile(x, y);
-    if (((sq->items & 3) == 0 || (sq->val2 & 0xF) > 7) && bonus_at(x, y) == 0) owner_set(x, y, -1);
+    if (((sq->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) == 0 || (sq->val2 & 0xF) > 7) && bonus_at(x, y) == 0)
+        owner_set(x, y, -1);
 }
 
 void GAMEAPI world_alt_set(int32_t x, int32_t y, int32_t altitude, int32_t toggle) {
@@ -207,11 +208,11 @@ void GAMEAPI brush(int32_t x, int32_t y, int32_t altitude) {
         sq->region = 1;
         changed |= tile_alt(map_tile(bx, by)) != altitude;
         world_alt_set(bx, by, altitude, 1);
-        if ((GameState & 0x80) && altitude > 3) temp_set(bx, by, 1);
+        if ((GameState & STATE_OMNISCIENT_VIEW) && altitude > 3) temp_set(bx, by, 1);
         BrushVal2++;
         BrushVal1++;
     }
-    if ((GameState & 0x80) && changed) draw_radius(x, y, 2, 2);
+    if ((GameState & STATE_OMNISCIENT_VIEW) && changed) draw_radius(x, y, 2, 2);
 }
 
 void GAMEAPI paint_land(int32_t x, int32_t y, int32_t altitude, int32_t size) {
@@ -454,7 +455,7 @@ void GAMEAPI world_fungus() {
             }
             MAP* sq = map_tile(x, y);
             if ((sq->val3 & 0xC0) >= 0x80 && !tile_ocean(sq)) continue;
-            sq->items |= 0x20;
+            sq->items |= BIT_FUNGUS;
             map_tile(x, y)->items &= ~FungusClearItems;
             if (game_rand() % 40 == 0 && !map_is_ocean(x, y) && ExpansionEnabled) veh_init(BSC_FUNGAL_TOWER, 0, x, y);
         }
@@ -463,7 +464,7 @@ void GAMEAPI world_fungus() {
 }
 
 void GAMEAPI world_riverbeds() {
-    for (int32_t i = 0; i < game().map.tile_count; i++) game().map.tiles[i].items &= ~0x100u;
+    for (int32_t i = 0; i < game().map.tile_count; i++) game().map.tiles[i].items &= ~BIT_RIVER_SRC;
     int32_t placed = 0;
     int32_t limit = (((WorldBuilder.rivers_rain_mod * MapCloudCover + WorldBuilder.rivers_base) *
                       (4 - MapOceanCoverage)) / 3 * game().map.tile_count) / 3200;
@@ -474,7 +475,7 @@ void GAMEAPI world_riverbeds() {
         if (x & 1) x--;
         if (y & 1) x++;
         MAP* sq = map_tile(x, y);
-        if (!tile_ocean(sq) && !(sq->items & 0x100)) {
+        if (!tile_ocean(sq) && !(sq->items & BIT_RIVER_SRC)) {
             int32_t best = -1;
             uint32_t best_alt = 0;
             bool near_river = false;
@@ -483,7 +484,7 @@ void GAMEAPI world_riverbeds() {
                 int32_t y2 = y + TableOffsetY[i];
                 if (!map_in_bounds(x2, y2)) continue;
                 MAP* nb = map_tile(x2, y2);
-                if (nb->items & 0x100) {
+                if (nb->items & BIT_RIVER_SRC) {
                     near_river = true;
                     break;
                 }
@@ -506,7 +507,7 @@ void GAMEAPI world_rivers() {
     for (int32_t sy = 0; sy < game().map.y; sy++) {
         for (int32_t sx = sy & 1; sx < game().map.x; sx += 2) {
             MAP* src = map_tile(sx, sy);
-            if (!(src->items & 0x100) || tile_ocean(src)) continue;
+            if (!(src->items & BIT_RIVER_SRC) || tile_ocean(src)) continue;
             for (int32_t i = 0; i < game().map.tile_count; i++) game().map.tiles[i].landmarks &= 0xFF7FFFFF;
             game_reseed(sy * 47 + sx * 31);
             int32_t dir = game_random(0, 4);
@@ -521,7 +522,7 @@ void GAMEAPI world_rivers() {
             int32_t cur_detail = src->contour;
             int32_t x = sx, y = sy;
             bool ended_on_river = false;
-            if (src->items & 0x1000000) {
+            if (src->items & BIT_THERMAL_BORE) {
                 ended_on_river = true;
             } else {
                 for (;;) {
@@ -548,7 +549,7 @@ void GAMEAPI world_rivers() {
                             for (int32_t k = 0; k < 4; k++) {
                                 int32_t x3 = map_wrap_x(cx + DiagOffsetX[k]);
                                 int32_t y3 = cy + DiagOffsetY[k];
-                                if (map_in_bounds(x3, y3) && (map_tile(x3, y3)->items & 0x100)) beds++;
+                                if (map_in_bounds(x3, y3) && (map_tile(x3, y3)->items & BIT_RIVER_SRC)) beds++;
                             }
                             if (beds > 1) {
                                 end_river = true;
@@ -577,7 +578,7 @@ void GAMEAPI world_rivers() {
                             if (tile_ocean(t) && (cand_climate & 0xE0) >= 0x60 && level_run < 5) weight /= 2;
                             if (t->contour > cand_detail) {
                                 higher++;
-                                if (t->items & 0x80) {
+                                if (t->items & BIT_RIVER) {
                                     skip = true;
                                     break;
                                 }
@@ -632,7 +633,7 @@ void GAMEAPI world_rivers() {
                     map_tile(x, y)->landmarks |= 0x800000;
                     step_parity++;
                     level_run++;
-                    if (map_tile(x, y)->items & 0x1000000) {
+                    if (map_tile(x, y)->items & BIT_THERMAL_BORE) {
                         ended_on_river = true;
                         break;
                     }
@@ -645,7 +646,7 @@ void GAMEAPI world_rivers() {
                 if (!(items & 0x80) && mouth && ((items & 3) == 0 || (sq->val2 & 0xF) >= 8)) sq->items = items | 0x200;
             }
             for (int32_t i = 0; i < game().map.tile_count; i++) {
-                if (game().map.tiles[i].landmarks & 0x800000) game().map.tiles[i].items |= 0x80;
+                if (game().map.tiles[i].landmarks & 0x800000) game().map.tiles[i].items |= BIT_RIVER;
             }
         }
         do_all_non_input();
@@ -658,7 +659,7 @@ void GAMEAPI world_shorelines() {
         for (int32_t x = y & 1; x < game().map.x; x += 2) {
             int32_t alt = alt_natural(x, y);
             alt_set(x, y, alt);
-            if ((GameState & 0x80) && WorldAddTemperature) {
+            if ((GameState & STATE_OMNISCIENT_VIEW) && WorldAddTemperature) {
                 if (alt > 2) temp_set(x, y, clamp(alt - 3, 0, 2));
                 draw_tile(x, y, 2);
             }
@@ -673,7 +674,7 @@ void GAMEAPI world_shorelines() {
             do_all_non_input();
         }
     }
-    if ((GameState & 0x80) && WorldAddTemperature) {
+    if ((GameState & STATE_OMNISCIENT_VIEW) && WorldAddTemperature) {
         MapWin_clear_terrain(MapWins[0]);
         draw_map(1);
     }
@@ -720,7 +721,7 @@ void GAMEAPI world_temperature() {
                 int32_t y2 = y + TableOffsetY[i];
                 if (!map_in_bounds(x2, y2)) continue;
                 MAP* sq = map_tile(x2, y2);
-                if ((sq->items & 0x1000000) && (alt <= 4 || tile_alt(sq) >= alt)) {
+                if ((sq->items & BIT_THERMAL_BORE) && (alt <= 4 || tile_alt(sq) >= alt)) {
                     temp++;
                     break;
                 }
@@ -753,7 +754,7 @@ void GAMEAPI world_rainfall() {
     for (int32_t i = 0; i < game().map.tile_count; i++) game().map.tiles[i].unk_1 = 0;
     for (int32_t y = 0; y < game().map.y; y++) {
         for (int32_t x = y & 1; x < game().map.x; x += 2) {
-            if (map_tile(x, y)->items & 0x400000) {
+            if (map_tile(x, y)->items & BIT_CONDENSER) {
                 for (int32_t i = 0; i < 9; i++) {
                     int32_t x2 = map_wrap_x(x + TableOffsetX[i]);
                     int32_t y2 = y + TableOffsetY[i];
@@ -790,7 +791,7 @@ void GAMEAPI world_rainfall() {
             MAP* sq = map_tile(x, y);
             int32_t alt = tile_alt(sq);
             if (alt <= 4) {
-                if (alt >= 3 && (sq->items & 0x200000)) {
+                if (alt >= 3 && (sq->items & BIT_FOREST)) {
                     for (int32_t y2 = y - 1; y2 <= y + 1; y2++) {
                         int32_t x2 = map_wrap_x(x + 1);
                         if (map_in_bounds(x2, y2)) map_tile(x2, y2)->unk_1 |= 0x40;
@@ -886,7 +887,7 @@ void GAMEAPI world_rainfall() {
                     belt = 0;
                 }
             }
-            if (sq->items & 0x80) {  // river
+            if (sq->items & BIT_RIVER) {  // river
                 if ((x >> 1) % 3 != 0 && bonus < 0) bonus = 0;
                 moist = 1;
                 belt = 0;
@@ -968,7 +969,7 @@ int32_t GAMEAPI world_site(int32_t x, int32_t y, int32_t sea) {
         int32_t y2 = y + TableOffsetY[i];
         if (!map_in_bounds(x2, y2)) continue;
         MAP* sq = map_tile(x2, y2);
-        if (!(sq->items & 1)) continue;
+        if (!(sq->items & BIT_BASE_IN_TILE)) continue;
         bases++;
         if (i - 21 < 4) {
             bases++;
@@ -990,13 +991,13 @@ int32_t GAMEAPI world_site(int32_t x, int32_t y, int32_t sea) {
             if (i < 9 && Continents[sq->region].tile_count >= 50) big_sea = 1;
             if (i != 0 && bonus_at(x2, y2) != 0) {
                 MAP* t = map_tile(x2, y2);
-                if (!(t->items & 0x20) || (t->climate & 0xE0) < 0x40) score++;
+                if (!(t->items & BIT_FUNGUS) || (t->climate & 0xE0) < 0x40) score++;
             }
             continue;
         }
         int32_t rock = sq->val3 >> 6;
         if (rock != 0 && i != 0 && rock > 1) rocky++;
-        if (!(sq->items & 0x20)) {
+        if (!(sq->items & BIT_FUNGUS)) {
             if (bonus_at(x2, y2) != 0) score += i != 0 ? 2 : -1;
             MAP* t = map_tile(x2, y2);
             uint32_t lm = t->landmarks;
@@ -1034,7 +1035,7 @@ int32_t GAMEAPI world_site(int32_t x, int32_t y, int32_t sea) {
     }
     score += rivers / 4;
     if (big_sea) score += sea ? -2 : 4;
-    if (last->items & 0x40004000) score += 4;
+    if (last->items & (BIT_CANAL_COAST | BIT_DOUBLE_SEA)) score += 4;
     if (sea)
         score += deep / 2 + (ocean - big_sea) / 2;
     else
@@ -1060,7 +1061,7 @@ void GAMEAPI world_analysis() {
             uint32_t region = sq->region;
             uint8_t alt_bits = sq->climate & 0xE0;
             if (alt_bits >= 0x60 && (sq->climate & 0x18) && (sq->val3 & 0xC0) < 0x80 &&
-                (!(sq->items & 0x20) || alt_bits < 0x40))
+                (!(sq->items & BIT_FUNGUS) || alt_bits < 0x40))
                 Continents[region].open_terrain++;
             walk->items &= 0xBFFFBFFF;
             if (map_is_ocean(x, y)) continue;
@@ -1075,7 +1076,7 @@ void GAMEAPI world_analysis() {
                     if (water != prev) {
                         coast_changes++;
                         prev = water;
-                        if (coast_changes > 3 && Continents[region].tile_count >= 80) walk->items |= 0x40000000;
+                        if (coast_changes > 3 && Continents[region].tile_count >= 80) walk->items |= BIT_DOUBLE_SEA;
                     }
                 } else {
                     if (water != prev || k == 8) {
@@ -1084,7 +1085,7 @@ void GAMEAPI world_analysis() {
                     }
                     if (y2 > 4 && y2 < game().map.y - 4 && nb->region < 0x40 && nb->region != region &&
                         Continents[nb->region].tile_count >= 40 && Continents[region].tile_count >= 40)
-                        walk->items |= 0x4000;
+                        walk->items |= BIT_CANAL_COAST;
                 }
             }
             if (outer_changes < 4) walk->items &= 0xBFFFFFFF;
@@ -1565,7 +1566,7 @@ void GAMEAPI world_build() {
         WorldBuildVal1 =
             (((2 - MapOceanCoverage) * WorldBuilder.land_mod + WorldBuilder.land_base) * game().map.tile_count) / 3200;
         BrushVal1 = 0;
-        if (GameState & 0x80) {
+        if (GameState & STATE_OMNISCIENT_VIEW) {
             MapWin_clear_terrain(MapWins[0]);
             draw_map(1);
         }
@@ -1583,7 +1584,7 @@ void GAMEAPI world_build() {
         if (!(game().map.flat & 1) && MapOceanCoverage < 2 && (MapOceanCoverage == 0 || game_rand() % 3 == 0))
             world_polar_caps();
         world_shorelines();
-        if ((GameState & 0x80) || !world_validate() || ++attempt >= 4) break;
+        if ((GameState & STATE_OMNISCIENT_VIEW) || !world_validate() || ++attempt >= 4) break;
     }
     world_temperature();
     world_riverbeds();

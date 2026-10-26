@@ -88,7 +88,7 @@ void THISCALL BaseWin_farm_click(uint8_t* self, int32_t x, int32_t y, int32_t) {
     int32_t from = -1;
     bw_set_base();
     int32_t faction_id = (uint8_t)cur_base().faction_id;
-    if (faction_id != CurrentPlayerFaction && !(GameState & 0x80)) return;
+    if (faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) return;
     if (bwf(kBwPane) != 0) return;
     if (bwf(kBwDragType) == 0) from = BaseWin_farm_get(self, bwf(kBwDownX), bwf(kBwDownY));
     int32_t tile = BaseWin_farm_get(self, x, y);
@@ -199,7 +199,7 @@ void THISCALL BaseWin_farm_click(uint8_t* self, int32_t x, int32_t y, int32_t) {
 
 void THISCALL BaseWin_pop_click(uint8_t* self, int32_t index, int32_t, int32_t, int32_t) {
     bw_set_base();
-    if (cur_base().faction_id != CurrentPlayerFaction && !(GameState & 0x80)) return;
+    if (cur_base().faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) return;
     int32_t current = index < 0 ? 999 : specialist_type(index);
     if (current < 0) current = 1;
     BasePop* pop = popup_new();
@@ -277,7 +277,7 @@ void THISCALL BaseWin_pop_click(uint8_t* self, int32_t index, int32_t, int32_t, 
 
 void THISCALL BaseWin_facilities_click(uint8_t* self, int32_t fac, int32_t, int32_t, int32_t) {
     int32_t faction_id = (uint8_t)cur_base().faction_id;
-    if (faction_id != CurrentPlayerFaction && !(GameState & 0x80)) return;
+    if (faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) return;
     parse_says(0, cur_base().name, -1, -1);
     parse_say(1, Facility[fac].name, -1, -1);
     bool al = alien(faction_id);
@@ -301,7 +301,7 @@ void THISCALL BaseWin_facilities_click(uint8_t* self, int32_t fac, int32_t, int3
         X_pop("DURINGUPKEEP", 0);
         return;
     }
-    if ((cur_base().state_flags & 0x200) && !(GameState & 0x80)) {
+    if ((cur_base().state_flags & 0x200) && !(GameState & STATE_OMNISCIENT_VIEW)) {
         parse_says(0, cur_base().name, -1, -1);
         popp(script(), "ONERECYCLE", 0, pcx, 0);
         return;
@@ -335,7 +335,7 @@ void THISCALL BaseWin_facilities_click(uint8_t* self, int32_t fac, int32_t, int3
             if (fac == 0x1A && (map_tile(Bases[i].x, Bases[i].y)->climate & 0xE0) < 0x60) continue;
             if (!base_fac(i, fac)) continue;
             count++;
-            if (!(cur_base().state_flags & 0x200) || !(GameState & 0x80)) refundable++;
+            if (!(cur_base().state_flags & 0x200) || !(GameState & STATE_OMNISCIENT_VIEW)) refundable++;
         }
         refund = Facility[fac].cost * refundable * 5;
         parse_num(0, refund);
@@ -403,7 +403,7 @@ int32_t GAMEAPI X_pop_ask_number(const char* label, int32_t value, int32_t a3) {
 void THISCALL BaseWin_hurry(uint8_t* self) {
     bool locked = false;
     bw_set_base();
-    if ((uint8_t)Bases[bwf(kBwBase)].faction_id != CurrentPlayerFaction && !(GameState & 0x80)) return;
+    if ((uint8_t)Bases[bwf(kBwBase)].faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) return;
     BASE* b = &cur_base();
     int32_t faction_id = (uint8_t)b->faction_id;
     int32_t item = b->queue_items[0];
@@ -421,7 +421,7 @@ void THISCALL BaseWin_hurry(uint8_t* self) {
         if (minerals < cost_factor(faction_id, 1, -1) * 4) price *= 2;
     }
     if (minerals < Rules.retool_exemption) price *= 2;
-    if (SecretProjects[31] >= 0) price *= 2;
+    if (SecretProjects[FAC_VOICE_OF_PLANET - SP_ID_First] >= 0) price *= 2;
     if (MFactions[faction_id].rule_hurry != 100) price = MFactions[faction_id].rule_hurry * price / 100;
     if (price <= 0) return;
     parse_says(0, cur_base().name, -1, -1);
@@ -567,7 +567,8 @@ static const uint32_t kGovBits[19] = {0x80000000, 0x200000, 0x80,    0x40,    1,
 
 int32_t THISCALL BaseWin_governor(uint8_t* self, int32_t a1) {
     bw_set_base();
-    if ((uint8_t)Bases[bwf(kBwBase)].faction_id != CurrentPlayerFaction && !(GameState & 0x80)) return 1;
+    if ((uint8_t)Bases[bwf(kBwBase)].faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW))
+        return 1;
     int32_t faction_id = (uint8_t)cur_base().faction_id;
     uint32_t g = (uint32_t)cur_base().governor_flags;
     DialogChoices = 0;
@@ -630,11 +631,11 @@ void THISCALL BaseWin_update_gov_buttons(uint8_t* self) {
 
 void THISCALL BaseWin_nerve_staple(uint8_t* self) {
     bw_set_base();
-    if ((uint8_t)Bases[bwf(kBwBase)].faction_id != CurrentPlayerFaction && !(GameState & 0x80)) return;
+    if ((uint8_t)Bases[bwf(kBwBase)].faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) return;
     int32_t faction_id = (uint8_t)cur_base().faction_id;
     bool al = alien(faction_id);
     parse_says(0, cur_base().name, -1, -1);
-    if (Factions[faction_id].SE_police_pending + has_fac(0x23, CurrentBaseID, 0) * 2 < 0) {
+    if (Factions[faction_id].SE_police_pending + has_fac(FAC_BROOD_PIT, CurrentBaseID, 0) * 2 < 0) {
         popp(ScriptFileName, "NERVESTAPLEHELLNO", 0, al ? "Alopdir.pcx" : "talent_sm.pcx", 0);
         return;
     }
@@ -756,7 +757,7 @@ void THISCALL BaseWin_click(uint8_t* self, int32_t x, int32_t y, int32_t right, 
     if (spot_check(&g_bw.spots_win, x, y, &index, &type) < 0) return;
     bw_set_base();
     int32_t owner = (uint8_t)cur_base().faction_id;
-    if ((owner == CurrentPlayerFaction || (GameState & 0x80) ||
+    if ((owner == CurrentPlayerFaction || (GameState & STATE_OMNISCIENT_VIEW) ||
          (Factions[CurrentPlayerFaction].diplo_status[owner] & 1) || type == 6) &&
         a4 == 0) {
         if (type == 0) BaseWin_farm_click(self, x, y, right);
@@ -793,7 +794,7 @@ void THISCALL BaseWin_iface_click(uint8_t* self, int32_t x, int32_t y, int32_t r
     if (!Win_is_visible(self) || type == 8) bw_set_base();
     else bw_set_base();
     int32_t owner = (uint8_t)cur_base().faction_id;
-    if (!(owner == CurrentPlayerFaction || (GameState & 0x80) ||
+    if (!(owner == CurrentPlayerFaction || (GameState & STATE_OMNISCIENT_VIEW) ||
           (Factions[CurrentPlayerFaction].diplo_status[owner] & 1) || type == 6) ||
         a4 != 0)
         return;
@@ -812,7 +813,7 @@ void THISCALL BaseWin_on_button_clicked(uint8_t* self, int32_t id) {
     bw_set_base();
     TutWin_reset(&TutWin);
     if (InfcList[InfcUsed] != 3) return;
-    bool own = cur_base().faction_id == CurrentPlayerFaction || (GameState & 0x80);
+    bool own = cur_base().faction_id == CurrentPlayerFaction || (GameState & STATE_OMNISCIENT_VIEW);
     switch (id) {
     case 1: BaseWin_rename(self); return;
     case 2: BaseWin_prev(self); return;

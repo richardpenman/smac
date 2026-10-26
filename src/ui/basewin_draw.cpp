@@ -1948,7 +1948,7 @@ void THISCALL BaseWin_draw_garrison(uint8_t* self, int32_t flag) {
             veh_draw(c, v, x, y, 0, 0x1800, 0);
             StrBuffer[0] = 0;
             say_stats_short(StrBuffer, Vehs[v].unit_id);
-            if ((GameState & 0x40) && (GameState & 0x1000)) {
+            if ((GameState & STATE_SCENARIO_EDITOR) && (GameState & STATE_DEBUG_MODE)) {
                 cat(" ");
                 cat("(");
                 cat_num(v);

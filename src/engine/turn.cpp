@@ -181,8 +181,12 @@ int32_t GAMEAPI council_votes(int32_t faction_id) {
     for (int32_t i = 0; i < game().base_count; i++) {
         if (game().bases[i].faction_id == faction_id) votes += game().bases[i].pop_size;
     }
-    if (SecretProjects[4] >= 0 && game().bases[SecretProjects[4]].faction_id == faction_id) votes += votes / 2;
-    if (SecretProjects[26] >= 0 && game().bases[SecretProjects[26]].faction_id == faction_id) votes *= 2;
+    if (SecretProjects[FAC_EMPATH_GUILD - SP_ID_First] >= 0 &&
+        game().bases[SecretProjects[FAC_EMPATH_GUILD - SP_ID_First]].faction_id == faction_id)
+        votes += votes / 2;
+    if (SecretProjects[FAC_CLINICAL_IMMORTALITY - SP_ID_First] >= 0 &&
+        game().bases[SecretProjects[FAC_CLINICAL_IMMORTALITY - SP_ID_First]].faction_id == faction_id)
+        votes *= 2;
     const MFaction& m = game().mfactions[faction_id];
     for (int32_t i = 0; i < m.faction_bonus_count; i++) {
         if (m.faction_bonus_id[i] == RULE_VOTES && m.faction_bonus_val1[i] >= 0) votes *= m.faction_bonus_val1[i];
@@ -285,7 +289,8 @@ void GAMEAPI random_events(int32_t is_extra) {
         for (int32_t human = 1; human < 8; human++) {
             if (!is_human(human)) continue;
             for (int32_t ai = 1; ai < 8; ai++) {
-                if (!is_human(ai) && !(game().factions[ai].diplo_status[human] & 0x30)) set_treaty(ai, human, 0xC00, 0);
+                if (!is_human(ai) && !(game().factions[ai].diplo_status[human] & (DIPLO_VENDETTA | DIPLO_WANT_REVENGE)))
+                    set_treaty(ai, human, 0xC00, 0);
             }
         }
         if (DustCloudDuration > 0 && --DustCloudDuration == 0) POP2("NOMOREDUST", "stars_sm.pcx", -1);
@@ -386,9 +391,15 @@ void GAMEAPI random_events(int32_t is_extra) {
             if ((dx + dy) >> 1 > radius) continue;
             if (base_has_facility(i, FAC_RESEARCH_HOSPITAL) || base_has_facility(i, FAC_NANOHOSPITAL)) continue;
             uint8_t owner = (uint8_t)b.faction_id;
-            if (SecretProjects[0] >= 0 && (uint8_t)game().bases[SecretProjects[0]].faction_id == owner) continue;
-            if (SecretProjects[14] >= 0 && (uint8_t)game().bases[SecretProjects[14]].faction_id == owner) continue;
-            if (SecretProjects[26] >= 0 && (uint8_t)game().bases[SecretProjects[26]].faction_id == owner) continue;
+            if (SecretProjects[FAC_HUMAN_GENOME_PROJECT - SP_ID_First] >= 0 &&
+                (uint8_t)game().bases[SecretProjects[FAC_HUMAN_GENOME_PROJECT - SP_ID_First]].faction_id == owner)
+                continue;
+            if (SecretProjects[FAC_LONGEVITY_VACCINE - SP_ID_First] >= 0 &&
+                (uint8_t)game().bases[SecretProjects[FAC_LONGEVITY_VACCINE - SP_ID_First]].faction_id == owner)
+                continue;
+            if (SecretProjects[FAC_CLINICAL_IMMORTALITY - SP_ID_First] >= 0 &&
+                (uint8_t)game().bases[SecretProjects[FAC_CLINICAL_IMMORTALITY - SP_ID_First]].faction_id == owner)
+                continue;
             b.pop_size = (int8_t)((b.pop_size + 1) / 2);
             draw_tile(b.x, b.y, 2);
             if (owner == CurrentPlayerFaction) {
@@ -678,7 +689,7 @@ void GAMEAPI random_events(int32_t is_extra) {
             int32_t y = by + TableOffsetY[k];
             if (!map_in_bounds(x, y)) continue;
             MAP* sq = map_tile(x, y);
-            if ((sq->climate & 0xE0) < 0x60 || !(sq->items & 0x208000)) continue;
+            if ((sq->climate & 0xE0) < 0x60 || !(sq->items & (BIT_FARM | BIT_FOREST))) continue;
             if (!tile_known(faction_id, sq) || !tile_claimable(faction_id, x, y)) continue;
             if (!lab) {
                 if (!shown) {
@@ -824,7 +835,8 @@ namespace {
 // Vehicle visible to the viewer (own and not hidden, or seen).
 bool veh_visible_to_viewer(int32_t veh_id) {
     const VEH& veh = game().vehs[veh_id];
-    return (veh.faction_id == (uint32_t)CurrentPlayerFaction && (veh.flags & 0x440) != 0x440) ||
+    return (veh.faction_id == (uint32_t)CurrentPlayerFaction &&
+            (veh.flags & (VFLAG_LURKER | VFLAG_INVISIBLE)) != 0x440) ||
            (veh.visibility & (uint8_t)(1 << (CurrentPlayerFaction & 31)));
 }
 // Mind worms, or (one in five with the expansion) a spore launcher.
@@ -911,7 +923,7 @@ void GAMEAPI alien_fauna() {
             }
             if ((sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40) break;
             if ((sq->climate & 0xE0) >= 0x60) continue;
-            if ((sq->items & 3) && (sq->val2 & 0xF) < 8) continue;
+            if ((sq->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) && (sq->val2 & 0xF) < 8) continue;
             if ((region & 0x3F) == 0x3F || (region & 0x3F) == 0) continue;
             if (Continents[region].tile_count < 50) continue;
             break;
@@ -923,13 +935,13 @@ void GAMEAPI alien_fauna() {
             if (early) count = 1;
             bool spawned = true;
             if (ExpansionEnabled && (engine_logic_time() & 1)) {
-                int32_t veh_id = veh_init(14, 0, x, y);  // Sealurk
+                int32_t veh_id = veh_init(BSC_SEALURK, 0, x, y);  // Sealurk
                 if (veh_id < 0)
                     spawned = false;
                 else
                     veh_promote(veh_id);
             } else {
-                int32_t veh_id = veh_init(9, 0, x, y);  // Isle of the Deep
+                int32_t veh_id = veh_init(BSC_ISLE_OF_THE_DEEP, 0, x, y);  // Isle of the Deep
                 if (veh_id < 0) {
                     spawned = false;
                 } else {
@@ -939,7 +951,7 @@ void GAMEAPI alien_fauna() {
                 }
             }
             // Locusts of Chiron once someone knows Centauri Meditation or ... (techs 63 / 25).
-            if (spawned && (TechOwners[63] || TechOwners[25])) veh_init(10, 0, x, y);
+            if (spawned && (TechOwners[63] || TechOwners[25])) veh_init(BSC_LOCUSTS_OF_CHIRON, 0, x, y);
         }
     }
     // Mind worms on fungus: next to a unit away from bases, or in the wild near bases.
@@ -953,7 +965,7 @@ void GAMEAPI alien_fauna() {
         if ((region & 0x3F) == 0x3F || (region & 0x3F) == 0) continue;
         if ((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8) continue;
         int32_t base_id = base_find_filtered(x, y, -1, region, -1, -1);
-        if ((sq->items & 2) && (sq->val2 & 0xF) < 8) {
+        if ((sq->items & BIT_VEH_IN_TILE) && (sq->val2 & 0xF) < 8) {
             int32_t owner = sq->val2 & 0xF;
             if (owner > 0 && (base_id < 0 || BaseFindDist > 2)) {
                 for (int32_t k = 9; k < 25; k++) {
@@ -966,7 +978,7 @@ void GAMEAPI alien_fauna() {
                     if ((sq2->climate & 0xE0) < 0x60 || (game().factions[owner].player_flags & PFLAG_MAP_REVEALED) ||
                         (sq2->visibility & (uint8_t)(1 << owner)))
                         continue;
-                    if ((sq2->items & 3) && (sq2->val2 & 0xF) < 8) continue;
+                    if ((sq2->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) && (sq2->val2 & 0xF) < 8) continue;
                     if (zoc_any(x2, y2, 0)) continue;
                     int32_t veh_id = veh_init(native_spawn_unit(), 0, x2, y2);
                     if (veh_id >= 0 && veh_visible_to_viewer(veh_id)) draw_tile(x2, y2, 2);
@@ -989,7 +1001,7 @@ void GAMEAPI do_fungal_towers() {
     for (int32_t veh_id = game().veh_count - 1; veh_id >= 0; veh_id--) {
         VEH& veh = game().vehs[veh_id];
         if (veh.unit_id != 19) continue;  // Fungal Tower
-        veh.state |= 4;
+        veh.state |= VSTATE_HAS_MOVED;
         int32_t x = veh.x;
         int32_t y = veh.y;
         // Fungus grows on a random neighbour and on the tower's tile.
@@ -1031,7 +1043,7 @@ void GAMEAPI turn_upkeep() {
             veh.movement_turns++;
             return;
         }
-        veh.state |= 4;
+        veh.state |= VSTATE_HAS_MOVED;
         const UNIT& u = Units[veh.unit_id];
         if (chassis.range == 1 && u.chassis_id == 6) {  // copter: loses three reactor steps
             veh.damage_taken = (uint8_t)(veh.damage_taken + (int8_t)u.reactor_id * 3);
@@ -1170,7 +1182,7 @@ void GAMEAPI repair_phase(int32_t faction_id) {
         int32_t unit_id = veh.unit_id;
         // Battle ogres never heal; other units heal when they did not move (towers always).
         if (unit_id == 16 || unit_id == 17 || unit_id == 18) continue;
-        if (unit_id != 19 && (veh.state & 4)) continue;
+        if (unit_id != 19 && (veh.state & VSTATE_HAS_MOVED)) continue;
         if (!veh.damage_taken) continue;
         uint32_t rate = 1;
         if (unit_id != 19) {
@@ -1183,7 +1195,7 @@ void GAMEAPI repair_phase(int32_t faction_id) {
             if (veh_triad(veh_id) == TRIAD_LAND && (map_tile(x, y)->items & BIT_BUNKER)) rate++;
         }
         int32_t base_id = base_at(x, y);
-        if (base_id >= 0 && !(game().bases[base_id].state_flags & 2)) {
+        if (base_id >= 0 && !(game().bases[base_id].state_flags & BSTATE_DRONE_RIOTS_ACTIVE)) {
             rate++;
             int32_t unit = veh.unit_id;
             if (Weapon[Units[unit].weapon_id].offense_value < 0 && unit < 64) {
@@ -1366,7 +1378,7 @@ void GAMEAPI allocate_energy(int32_t faction_id) {
         if (game().bases[i].faction_id != faction_id) continue;
         // BUG(original): tests the current base (CurrentBase), not base i.
         const BASE& cb = cur_base();
-        if (cb.state_flags & 2) {
+        if (cb.state_flags & BSTATE_DRONE_RIOTS_ACTIVE) {
             raise = true;
             break;
         }
@@ -1382,7 +1394,7 @@ void GAMEAPI allocate_energy(int32_t faction_id) {
                 set_base(i);
                 base_compute(1);
                 const BASE& cb = cur_base();
-                if (cb.talent_total < cb.drone_total && (cb.state_flags & 2)) {
+                if (cb.talent_total < cb.drone_total && (cb.state_flags & BSTATE_DRONE_RIOTS_ACTIVE)) {
                     found = true;
                     break;
                 }
@@ -1668,7 +1680,7 @@ int32_t GAMEAPI end_of_game(int32_t check) {
         popp(ScriptFileName, "DIPLOMATICVICTORY", 0, "dipvic_sm.pcx", 0);
         break;
     case 7:
-        if (GamePreferences & 0x10000000) {
+        if (GamePreferences & PREF_AV_SECRET_PROJECT_MOVIES) {
             if (game().mfactions[CurrentPlayerFaction].rule_flags & RFLAG_ALIEN)
                 amovie_project_name("losealien");
             else
@@ -1722,8 +1734,9 @@ int32_t GAMEAPI end_of_game(int32_t check) {
     case 11:
         say_faction(victor);
         popp(ScriptFileName,
-             (game().factions[victor].diplo_status[CurrentPlayerFaction] & 0x40020) ? "DIPLOMATICLOSE2"
-                                                                                    : "DIPLOMATICLOSE",
+             (game().factions[victor].diplo_status[CurrentPlayerFaction] & (DIPLO_WANT_REVENGE | DIPLO_ATROCITY_VICTIM))
+                 ? "DIPLOMATICLOSE2"
+                 : "DIPLOMATICLOSE",
              0, "dipvic_sm.pcx", 0);
         break;
     case 12:
@@ -1736,7 +1749,9 @@ int32_t GAMEAPI end_of_game(int32_t check) {
     case 14:
         say_faction(victor);
         popp(ScriptFileName,
-             (game().factions[victor].diplo_status[CurrentPlayerFaction] & 0x40020) ? "ECONOMICLOSE2" : "ECONOMICLOSE",
+             (game().factions[victor].diplo_status[CurrentPlayerFaction] & (DIPLO_WANT_REVENGE | DIPLO_ATROCITY_VICTIM))
+                 ? "ECONOMICLOSE2"
+                 : "ECONOMICLOSE",
              0, "econwin_sm.pcx", 0);
         break;
     case 15:
@@ -1746,7 +1761,7 @@ int32_t GAMEAPI end_of_game(int32_t check) {
         interlude(0x20, 0, 4, 0);
         say_faction(victor);
         popp(ScriptFileName, "ENDBEACON", 0, "beacon_sm.pcx", 0);
-        if (GamePreferences & 0x10000000) {
+        if (GamePreferences & PREF_AV_SECRET_PROJECT_MOVIES) {
             StrBuffer[0] = 0;
             crt_strcat(StrBuffer, game().mfactions[CurrentPlayerFaction].search_key);
             CharUpperA(StrBuffer);
@@ -1789,7 +1804,7 @@ int32_t GAMEAPI end_of_game(int32_t check) {
     default:
         break;
     }
-    if (!(GamePreferences & 0x40000)) {
+    if (!(GamePreferences & PREF_AV_INTERLUDES_DISABLED)) {
         switch (GameVictoryType) {
         case 4:
         case 6:
@@ -2035,7 +2050,7 @@ int32_t GAMEAPI wants_prop(int32_t faction_id, int32_t proposal, int32_t candida
         for (int32_t i = 1; i < 8; i++) {
             if (i == faction_id) continue;
             if (f.tech_commerce_bonus < game().factions[i].tech_commerce_bonus) n--;
-            n += bit_count(f.diplo_status[i] & 3);
+            n += bit_count(f.diplo_status[i] & (DIPLO_PACT | DIPLO_TREATY));
         }
         if (f.AI_wealth) n++;
         value = n;
@@ -2182,8 +2197,9 @@ void GAMEAPI council_action(int32_t proposal, int32_t winner) {
                 bool defied = false;
                 for (int32_t i = 1; i < 8; i++) {
                     if (i == winner || !is_alive(i) || !(GameRules & RULES_VICTORY_CONQUEST)) continue;
-                    if (!(game().factions[i].diplo_status[winner] & 0xC0000) &&
-                        !(game().factions[winner].diplo_status[i] & 0x80000) &&
+                    if (!(game().factions[i].diplo_status[winner] &
+                          (DIPLO_ATROCITY_VICTIM | DIPLO_MAJOR_ATROCITY_VICTIM)) &&
+                        !(game().factions[winner].diplo_status[i] & DIPLO_MAJOR_ATROCITY_VICTIM) &&
                         !(game().factions[i].diplo_agenda[winner] & 0x800) &&
                         !(game().factions[i].diplo_agenda[winner] & 8))
                         continue;
@@ -2276,7 +2292,9 @@ int32_t GAMEAPI can_call_council(int32_t faction_id, int32_t show_reason) {
         return 0;
     }
     // Without the UN Headquarters, faction_id needs commlinks with every living faction.
-    if (SecretProjects[4] >= 0 && (uint8_t)game().bases[SecretProjects[4]].faction_id == (uint32_t)faction_id) return 1;
+    if (SecretProjects[FAC_EMPATH_GUILD - SP_ID_First] >= 0 &&
+        (uint8_t)game().bases[SecretProjects[FAC_EMPATH_GUILD - SP_ID_First]].faction_id == (uint32_t)faction_id)
+        return 1;
     for (int32_t i = 1; i < 8; i++) {
         if (game().mfactions[i].rule_flags & RFLAG_ALIEN) continue;
         if (!is_alive(i) || i == faction_id || (game().factions[faction_id].diplo_status[i] & 0x8000008)) continue;
@@ -2682,7 +2700,7 @@ void GAMEAPI control_game() {
         GamePreferences = AlphaIniPrefs.preferences;
         int32_t no_movie = prefs_get_int("DisableOpeningMovie", 0, 0);
         prefs_put_int("DisableOpeningMovie", (uint32_t)no_movie, 0);
-        if (!no_movie && (GamePreferences & 0x10000000)) amovie_project_name("openingx");
+        if (!no_movie && (GamePreferences & PREF_AV_SECRET_PROJECT_MOVIES)) amovie_project_name("openingx");
     }
     if (!ui_shift_pressed()) FX_init(&Sounds);
     for (;;) {

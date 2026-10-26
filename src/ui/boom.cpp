@@ -263,7 +263,8 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
                 if (shot_file && f == frames / 2 && i == 0) ui_screenshot(g_ui_outdir + "/" + shot_file);
                 if (MultiplayerActive) break;
             }
-            bool fast = (ui_key_state(VKEY_SHIFT) & 0x8000) || ((GamePreferences & 8) && !(flags & 0x12)) || MultiplayerActive;
+            bool fast = (ui_key_state(VKEY_SHIFT) & 0x8000) ||
+                        ((GamePreferences & PREF_ADV_FAST_BATTLE_RESOLUTION) && !(flags & 0x12)) || MultiplayerActive;
             int32_t delay = fast ? 0 : ((flags & 0x12) ? 0x32 : 0x19);
             if (!nowait) {
                 uint32_t now;
@@ -290,7 +291,9 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
         std::fprintf(stderr, "boom anim: flags %X frames %d at %d,%d\n", flags, frames, rect[0].left, rect[0].top);
     }
     if (anim && (flags & 2)) g_buster_ok = false;  // the buster's animation closed
-    if (!(ui_key_state(VKEY_SHIFT) & 0x8000) && !(GamePreferences & 8) && !MultiplayerActive) clock_wait(0x32);
+    if (!(ui_key_state(VKEY_SHIFT) & 0x8000) && !(GamePreferences & PREF_ADV_FAST_BATTLE_RESOLUTION) &&
+        !MultiplayerActive)
+        clock_wait(0x32);
     BoomActive = 0;
     return 1;
 }

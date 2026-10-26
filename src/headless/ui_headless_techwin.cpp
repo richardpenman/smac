@@ -18,7 +18,7 @@
 // Human factions would get the dialog; headless they choose like an AI. The dialog's own
 // random draws use the UI generator (they only order the display).
 int32_t GAMEAPI tech_pick(int32_t faction_id, int32_t is_free, int32_t from_faction_id, const char*) {
-    bool blind = (GameRules & 0x200) && from_faction_id <= 0;
+    bool blind = (GameRules & RULES_BLIND_RESEARCH) && from_faction_id <= 0;
     bool human = (FactionStatus[0] & (1u << (faction_id & 31))) != 0;
     if (!is_free && (!CurrentTurn || !human || blind) && from_faction_id < 0) return tech_ai(faction_id);
     int32_t listed = 0, best = -1, best_value = -1;

@@ -36,7 +36,7 @@ void THISCALL Console_time_controls(uint8_t*) {}
 // (NetDaemon_synch of the names: multiplayer, out of scope.)
 void THISCALL Console_custom_my_faction(uint8_t*) {
     int32_t f = CurrentPlayerFaction;
-    if ((GameState & 0x40) && (GameState & 0x80)) {
+    if ((GameState & STATE_SCENARIO_EDITOR) && (GameState & STATE_OMNISCIENT_VIEW)) {
         BasePop* who = popup_new();
         PopupDialogState = 6;
         Popup_start(who, ScriptFileName, "EDITORWHO", -1, nullptr, 0x40);

@@ -154,7 +154,7 @@ void SocialWinState::reset() {
 void SocialWinState::accept() {
     Faction& f = fac(faction);
     int32_t cost = social_upheaval(faction, choices) - f.SE_upheaval_cost_paid;
-    if (!(GameState & 0x40) || !(GameState & 0x80)) {
+    if (!(GameState & STATE_SCENARIO_EDITOR) || !(GameState & STATE_OMNISCIENT_VIEW)) {
         if (cost > 0) {
             parse_num(0, cost);
             parse_num(1, f.energy_credits);

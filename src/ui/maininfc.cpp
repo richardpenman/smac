@@ -59,7 +59,7 @@
 // (SubInterface_set_iface_mode, BattleWin_clear / pulse_timer / stop_timer: battlewin.cpp)
 int32_t GAMEAPI tut_check2(int32_t bit) {
     if (MultiplayerActive) return 0;
-    if (!(GamePreferences & 0x20)) return 0;
+    if (!(GamePreferences & PREF_BSC_TUTORIAL_MSGS)) return 0;
     if (bit & TutorialHintsShown) return 0;
     if (MFactions[CurrentPlayerFaction].rule_flags & 0x80) return 0;
     TutorialHintsShown |= bit;
@@ -378,7 +378,7 @@ void THISCALL StatusWin_draw_active(uint8_t* self, int32_t veh_id, int32_t base_
         VEH& v = Vehs[veh_id];
         int32_t y = zoom_or(0x38, 0x4B) + 8 + top;
         std::string s = Units[v.unit_id].name;
-        if ((GameState & 0x40) && (GameState & 0x1000)) s += "(" + num(veh_id) + ")";
+        if ((GameState & STATE_SCENARIO_EDITOR) && (GameState & STATE_DEBUG_MODE)) s += "(" + num(veh_id) + ")";
         Buffer_set_text_color(c, tc(0x8C6B8C), tc(0x8C6B90), 1, 1);
         y = wrap_cent_font(c, &g_font[2], s, x0, y, w);
         Buffer_set_text_color(c, tc(0x8C6B94), tc(0x8C6B98), 1, 1);
@@ -408,10 +408,10 @@ void THISCALL StatusWin_draw_active(uint8_t* self, int32_t veh_id, int32_t base_
         if ((vf && (uint8_t)plan < 8) || (plan == 0xB && morale_veh(veh_id, 1, 0) > 1)) {
             char m[128] = "";
             say_morale(m, veh_id, 0);
-            if (vf == CurrentPlayerFaction || (GameState & 0x80)) y = wrap3(c, m, x0, y, w);
+            if (vf == CurrentPlayerFaction || (GameState & STATE_OMNISCIENT_VIEW)) y = wrap3(c, m, x0, y, w);
             else y = wrap_cent4(c, m, x0, y, w);
         }
-        if (vf == CurrentPlayerFaction || (GameState & 0x80)) {
+        if (vf == CurrentPlayerFaction || (GameState & STATE_OMNISCIENT_VIEW)) {
             s = v.home_base_id < 0 ? lbl(0x308) : Bases[v.home_base_id].name;
             y = wrap3(c, s, x0, y, w);
             int32_t sp = speed(veh_id, 0);
@@ -466,13 +466,13 @@ void THISCALL StatusWin_draw_active(uint8_t* self, int32_t veh_id, int32_t base_
             Buffer_set_text_color(c, g_iface_color(1), g_iface_color(4), 1, 1);
             y += lh;
         }
-        if ((vf == CurrentPlayerFaction || (GameState & 0x80) || pact(vf)) && (v.state & 0x80)) {
+        if ((vf == CurrentPlayerFaction || (GameState & STATE_OMNISCIENT_VIEW) || pact(vf)) && (v.state & 0x80)) {
             Buffer_set_text_color(c, 0xFB, -1, 1, 1);
             write(c, lbl(0x1048), x0, y);
             y += lh;
         }
         Buffer_set_text_color(c, tc(0x8C6B94), tc(0x8C6B98), 1, 1);
-        if (vf == CurrentPlayerFaction || (GameState & 0x80) || pact(vf)) {
+        if (vf == CurrentPlayerFaction || (GameState & STATE_OMNISCIENT_VIEW) || pact(vf)) {
             char o[256] = "";
             say_orders(o, veh_id);
             int32_t yy = wrap3(c, o, x0, y, w);
@@ -485,7 +485,8 @@ void THISCALL StatusWin_draw_active(uint8_t* self, int32_t veh_id, int32_t base_
         }
         if (spots) spot_add(&g_spots, veh_id, 10, r.left, r.top, r.right - r.left, r.bottom - r.top);
         DestLinesVeh = -1;
-        if ((vf == CurrentPlayerFaction || (GameState & 0x80)) && v.order == 0x18 && !(GameMorePreferences & 0x2000000)) {
+        if ((vf == CurrentPlayerFaction || (GameState & STATE_OMNISCIENT_VIEW)) && v.order == 0x18 &&
+            !(GameMorePreferences & MPREF_MAP_HIDE_ACTIVE_VEH_GOTO_PATH)) {
             // draw_my_dest + Win_show(DesktopWin): the go-to order's path on the overlay.
             Buffer_fill_2(ui_desktop_canvas(), 9);
             MapWin_dest_line(MapWins[0], v.x, v.y, v.waypoint_x[0], v.waypoint_y[0], v.unit_id, vf,
@@ -512,7 +513,7 @@ void THISCALL StatusWin_draw_active(uint8_t* self, int32_t veh_id, int32_t base_
         Buffer_set_font(c, &g_font[0], nullptr, nullptr, nullptr);
         int32_t y = zoom_or(0x38, 0x4B) + 8 + top;
         std::string s = bs.name;
-        if ((GameState & 0x40) && (GameState & 0x1000)) s += " (" + num(b) + ")";
+        if ((GameState & STATE_SCENARIO_EDITOR) && (GameState & STATE_DEBUG_MODE)) s += " (" + num(b) + ")";
         y = wrap_cent_font(c, &g_font[2], s, x0, y, w);
         int32_t bf = (uint8_t)bs.faction_id;
         if (bf != CurrentPlayerFaction) {
@@ -551,7 +552,7 @@ void THISCALL StatusWin_draw_active(uint8_t* self, int32_t veh_id, int32_t base_
             }
         }
         Buffer_set_text_color(c, tc(0x8C6B94), tc(0x8C6B98), 1, 1);
-        if (bf == CurrentPlayerFaction || (GameState & 0x80) || pact(bf) || spying(bf)) {
+        if (bf == CurrentPlayerFaction || (GameState & STATE_OMNISCIENT_VIEW) || pact(bf) || spying(bf)) {
             int32_t item = bs.queue_items[0], cost;
             s = std::string(lbl(0x798)) + ": ";
             if (item < 0) {
@@ -600,7 +601,7 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
         if (shown >= 0) {
             int32_t last = shown;
             while (Vehs[last].next_veh_id_stack >= 0) last = Vehs[last].next_veh_id_stack;
-            if (Vehs[shown].faction_id != CurrentPlayerFaction && !(GameState & 0x80)) {
+            if (Vehs[shown].faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) {
                 MAP* sq = map_tile(x, y);
                 bool seen = (Factions[CurrentPlayerFaction].player_flags & 0x200) ||
                             (sq->visibility & (1 << (CurrentPlayerFaction & 31)));
@@ -624,7 +625,7 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
                             if (owner == CurrentPlayerFaction) near = true;
                         }
                     }
-                    if ((bf != CurrentPlayerFaction && !(GameState & 0x80) &&
+                    if ((bf != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW) &&
                          !(Bases[base_id].visibility & (1 << (CurrentPlayerFaction & 31)))) ||
                         !near)
                         shown = -1;
@@ -643,7 +644,7 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
         shown = sw(0x15BC);
     }
     sw(0x15DC) = shown >= 0;
-    if (sel_base >= 0 && !(GameState & 0x80) && Bases[sel_base].faction_id != CurrentPlayerFaction &&
+    if (sel_base >= 0 && !(GameState & STATE_OMNISCIENT_VIEW) && Bases[sel_base].faction_id != CurrentPlayerFaction &&
         !(Bases[sel_base].visibility & (1 << (CurrentPlayerFaction & 31)))) {
         sel_base = -1;
         sw(0x15C0) = -1;
@@ -660,26 +661,26 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
     int32_t py = r.top;
     if (on_map) {
         MAP* sq = map_tile(x, y);
-        if (!(GameState & 0x80) && !(Factions[CurrentPlayerFaction].player_flags & 0x200) &&
+        if (!(GameState & STATE_OMNISCIENT_VIEW) && !(Factions[CurrentPlayerFaction].player_flags & 0x200) &&
             !(sq->visibility & (1 << (CurrentPlayerFaction & 31)))) {
             std::string s = lbl(0x300);
             Buffer_write_cent_l_7(c, s.c_str(), &r, (int32_t)s.size());
         } else {
             ZoomDenom = 100;
             ZoomNum = r.right - r.left - 4;
-            MapWin_gen_terrain_poly(c, nullptr, 0, (GameState & 0x80) ? -1 : CurrentPlayerFaction, 0, 0x621, x, y,
-                                    r.left + 2, r.top + 1);
+            MapWin_gen_terrain_poly(c, nullptr, 0, (GameState & STATE_OMNISCIENT_VIEW) ? -1 : CurrentPlayerFaction, 0,
+                                    0x621, x, y, r.left + 2, r.top + 1);
             ZoomNum = -1;
             ZoomDenom = -1;
             py = (r.right - r.left) / 2 + 3 + r.top;
             if (!sw(0x15A8)) tile_words(c, x, y, &r, &py, lh);
             else tile_numbers(c, x, y, r.left, &py, lh);
         }
-        if ((GameState & 0x40) && (GameState & 0x1000)) {
+        if ((GameState & STATE_SCENARIO_EDITOR) && (GameState & STATE_DEBUG_MODE)) {
             Buffer_set_text_color(c, tc(0x8C6BA4), tc(0x8C6BA8), 1, 1);
             write(c, "(" + num(sq->region) + ")", r.left + 2, r.bottom - lh);
         }
-        if (((GameState & 0x40) && (GameState & 0x1000)) || py < r.bottom - lh) {
+        if (((GameState & STATE_SCENARIO_EDITOR) && (GameState & STATE_DEBUG_MODE)) || py < r.bottom - lh) {
             std::string s = "(" + num(x) + " , " + num(y) + ")";
             Buffer_set_text_color(c, tc(0x8C6BA4), tc(0x8C6BA8), 1, 1);
             write(c, s, r.right - 2 - Buffer_text_width_2(c, s.c_str(), (int32_t)s.size()), r.bottom - lh);  // Buffer_write_right_l_5
@@ -712,7 +713,7 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
     int32_t b = base_at(x, y);
     int32_t count = 0;
     if (b >= 0) {
-        if (!(GameState & 0x80) && Bases[b].faction_id != CurrentPlayerFaction &&
+        if (!(GameState & STATE_OMNISCIENT_VIEW) && Bases[b].faction_id != CurrentPlayerFaction &&
             !((1 << (CurrentPlayerFaction & 31)) & Bases[b].visibility))
             b = -1;
         else
@@ -763,12 +764,12 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
             std::string s;
             int32_t color = tc(0x8C6BAC), shadow = tc(0x8C6BB0);
             if (order < 4 || order > 0x17 ||
-                (u.faction_id != CurrentPlayerFaction && !(GameState & 0x80) && !pact(u.faction_id))) {
+                (u.faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW) && !pact(u.faction_id))) {
                 char st[128] = "";
                 say_stats_short(st, u.unit_id);
                 s = st;
                 if (u.state & 0x80) s += "#";
-                if ((GameState & 0x40) && (GameState & 0x1000)) s += " (" + num(v) + ")";
+                if ((GameState & STATE_SCENARIO_EDITOR) && (GameState & STATE_DEBUG_MODE)) s += " (" + num(v) + ")";
             } else {
                 int32_t t = action_terraform(v, order - 4, 0);
                 s = num(t + 1) + " " + lbl(t == 1 ? 0xC0 : 0xC4);
@@ -915,7 +916,8 @@ void worldwin_draw_to(Buffer* c) {
             if (!(sq->items & 1) || (sq->val2 & 0xF) >= 8) continue;
             int32_t px, py;
             pfncTileToPoint(map, wx, ty, &px, &py);
-            MapWin_draw_bases(map, wx, ty, px, py - mw(map, kMwHalfH), (GameState & 0x80) ? -1 : CurrentPlayerFaction);
+            MapWin_draw_bases(map, wx, ty, px, py - mw(map, kMwHalfH),
+                              (GameState & STATE_OMNISCIENT_VIEW) ? -1 : CurrentPlayerFaction);
         }
     }
     Buffer_copy_4(&g_world_map, &g_world_final, 0, 0, 0, 0, w, h);
@@ -1095,7 +1097,7 @@ void THISCALL StatusWin_on_left_click(uint8_t* self, int32_t x, int32_t y) {
     case 1:
     case 0xB: {
         int32_t f = Bases[index].faction_id;
-        if ((GameState & 0x80) || f == CurrentPlayerFaction || spying(f) ||
+        if ((GameState & STATE_OMNISCIENT_VIEW) || f == CurrentPlayerFaction || spying(f) ||
             (Factions[CurrentPlayerFaction].diplo_status[f] & 1))
             BaseWin_zoom(&BaseWin, index, 0);
         break;
@@ -1148,15 +1150,15 @@ void THISCALL StatusWin_on_right_click(uint8_t* self, int32_t x, int32_t y, int3
             veh = type == 10 ? MapWinVehA : index;
             PullDown_add_item(&pd, 6, label_get(0x958 / 4));
             PullDown_add_item(&pd, 7, label_get(0x112C / 4));
-            if (GameState & 0x40) PullDown_add_item(&pd, 0x5A, label_get(0xDFC / 4));
+            if (GameState & STATE_SCENARIO_EDITOR) PullDown_add_item(&pd, 0x5A, label_get(0xDFC / 4));
             PullDown_add_separator(&pd, 99);
         } else {
             base = index;
             int32_t owner = Bases[base].faction_id;
-            if ((GameState & 0x80) || owner == CurrentPlayerFaction || spying(owner) ||
+            if ((GameState & STATE_OMNISCIENT_VIEW) || owner == CurrentPlayerFaction || spying(owner) ||
                 (Factions[CurrentPlayerFaction].diplo_status[owner] & 1))
                 PullDown_add_item(&pd, 5, label_get(0x894 / 4));
-            if (owner == CurrentPlayerFaction || (GameState & 0x80)) {
+            if (owner == CurrentPlayerFaction || (GameState & STATE_OMNISCIENT_VIEW)) {
                 static char str[6][256];
                 auto ind = [&](int32_t k, uint32_t off) {
                     std::snprintf(str[k], sizeof(str[k]), " %s", label_get((int32_t)(off / 4)));

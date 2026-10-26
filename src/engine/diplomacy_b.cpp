@@ -61,17 +61,18 @@ void say_noun(int32_t n, int32_t faction_id) {
 bool viewer_learns(int32_t faction_id, int32_t faction_id_with) {
     int32_t v = CurrentPlayerFaction;
     if (status(v, faction_id) & 0x1000) return true;
-    if (has_project(4, v)) return true;
+    if (has_project(FAC_EMPATH_GUILD - SP_ID_First, v)) return true;
     if (v == GovernorFaction && !is_alien(faction_id)) return true;
     if (status(v, faction_id_with) & 0x1000) return true;
-    if (has_project(4, v)) return true;
+    if (has_project(FAC_EMPATH_GUILD - SP_ID_First, v)) return true;
     if (v == GovernorFaction && !is_alien(faction_id_with)) return true;
-    return (GameState & 0x80) != 0;
+    return (GameState & STATE_OMNISCIENT_VIEW) != 0;
 }
 
 // The viewer owns the Empath Guild (enemies_unpact, enemies_treaty test the project's base).
 bool viewer_has_empath_guild() {
-    return SecretProjects[4] >= 0 && game().bases[SecretProjects[4]].faction_id == CurrentPlayerFaction;
+    return SecretProjects[FAC_EMPATH_GUILD - SP_ID_First] >= 0 &&
+           game().bases[SecretProjects[FAC_EMPATH_GUILD - SP_ID_First]].faction_id == CurrentPlayerFaction;
 }
 
 }  // namespace
@@ -96,7 +97,7 @@ static int32_t wants_to_attack_core(int32_t faction_id, int32_t faction_id_tgt, 
     if (f2.major_atrocities != 0 && f1.major_atrocities == 0) return 1;
     if (s & 0x4000000) return 0;
     if (f1.base_count <= 1) return 0;
-    if (!is_human(faction_id_tgt) && (f1.player_flags & 0x800000)) return 0;
+    if (!is_human(faction_id_tgt) && (f1.player_flags & PFLAG_TEAM_UP_VS_HUMAN)) return 0;
     int32_t score = 0;
     int32_t surrendered_to = 0;
     int32_t ally_at_war = 0;
@@ -104,21 +105,21 @@ static int32_t wants_to_attack_core(int32_t faction_id, int32_t faction_id_tgt, 
         if (i == faction_id || i == faction_id_tgt) continue;
         uint32_t u = f1.diplo_status[i];
         if ((u & 0x2000000) && (u & 1)) surrendered_to = i;
-        if ((u & 0x10) && !(f2.diplo_status[i] & 1)) {
+        if ((u & 0x10) && !(f2.diplo_status[i] & DIPLO_PACT)) {
             score++;
             if (game().factions[i].mil_strength_1 > f2.mil_strength_1 * 3 / 2) score++;
         }
-        if (great_beelzebub(i, 0) && (CurrentTurn >= 100 || (GameRules & 0x40))) {
+        if (great_beelzebub(i, 0) && (CurrentTurn >= 100 || (GameRules & RULES_INTENSE_RIVALRY))) {
             uint32_t t = f2.diplo_status[i];
             if (t & 0x10) score++;
-            if ((t & 8) && (f1.diplo_status[i] & 8)) score++;
+            if ((t & 8) && (f1.diplo_status[i] & DIPLO_COMMLINK)) score++;
         }
         uint32_t a = f1.diplo_status[i];
         if ((a & 1) && is_human(i)) {
             uint32_t c = f2.diplo_status[i];
             if (c & 1) score += 2;
             uint32_t surr = a & 0x2000000;
-            if (surr && (game().factions[i].diplo_status[faction_id_tgt] & 3)) return 0;
+            if (surr && (game().factions[i].diplo_status[faction_id_tgt] & (DIPLO_PACT | DIPLO_TREATY))) return 0;
             if (c & 0x10) {
                 ally_at_war = 1;
                 score -= surr ? 4 : 2;
@@ -182,7 +183,7 @@ static int32_t wants_to_attack_core(int32_t faction_id, int32_t faction_id_tgt, 
     if (!(s = f1.diplo_status[faction_id_tgt], s & 0x10)) score++;
     if (s & 1) score++;
     if (odds_override > 0 && !great_satan(odds_override, 0)) score--;
-    if ((f1.diplo_agenda[faction_id_tgt] & 0x200) && !(GameRules & 0x40)) score--;
+    if ((f1.diplo_agenda[faction_id_tgt] & 0x200) && !(GameRules & RULES_INTENSE_RIVALRY)) score--;
     int32_t integrity = (f2.integrity_blemishes - f1.integrity_blemishes + 2) / 3;
     if (integrity < 0)
         integrity = 0;
@@ -232,7 +233,7 @@ int32_t GAMEAPI great_beelzebub(int32_t faction_id, int32_t is_aggressive) {
     int32_t min_bases = (CurrentTurn + 25) / 50;
     if (min_bases < 4) min_bases = 4;
     if (game().factions[faction_id].base_count > min_bases &&
-        (game().factions[faction_id].diff_level > 1 || (GameRules & 0x40) || is_aggressive))
+        (game().factions[faction_id].diff_level > 1 || (GameRules & RULES_INTENSE_RIVALRY) || is_aggressive))
         return 1;
     return 0;
 }
@@ -298,7 +299,7 @@ void GAMEAPI pact_attacks(int32_t faction_id, int32_t faction_id_tgt) {
 
 void GAMEAPI enemies_war(int32_t faction_id, int32_t faction_id_with) {
     Faction& f1 = game().factions[faction_id];
-    if (f1.diplo_status[faction_id_with] & 0x10) return;
+    if (f1.diplo_status[faction_id_with] & DIPLO_VENDETTA) return;
     int32_t v = CurrentPlayerFaction;
     const char* label = nullptr;
     int32_t speaker = -1, other = -1;
@@ -366,7 +367,8 @@ void GAMEAPI enemies_unpact(int32_t faction_id, int32_t faction_id_with) {
         pact_unpact(faction_id_with, faction_id);
     if ((status(v, faction_id) & 0x1000) || viewer_has_empath_guild() ||
         (v == GovernorFaction && !is_alien(faction_id)) || (status(v, faction_id_with) & 0x1000) ||
-        viewer_has_empath_guild() || (v == GovernorFaction && !is_alien(faction_id_with)) || (GameState & 0x80)) {
+        viewer_has_empath_guild() || (v == GovernorFaction && !is_alien(faction_id_with)) ||
+        (GameState & STATE_OMNISCIENT_VIEW)) {
         say_noun(0, faction_id);
         say_noun(1, faction_id_with);
         parse_says(2, get_pact_hood(faction_id, faction_id_with), -1, -1);
@@ -437,7 +439,7 @@ static bool tech_tradeable(int32_t owner, int32_t tech_id, uint32_t pact_status,
 void GAMEAPI enemies_trade_tech(int32_t faction_id, int32_t faction_id_with) {
     int32_t tech_for_1 = -1, tech_for_2 = -1;
     int32_t best_1 = -9999, best_2 = -9999;
-    if (GameRules & 0x2000000) return;
+    if (GameRules & RULES_SCN_NO_TECH_TRADING) return;
     for (int32_t t = 0; t < 89; t++) {
         if (!has_tech(t, faction_id) && has_tech(t, faction_id_with)) {
             if (tech_tradeable(faction_id_with, t, status(faction_id, faction_id_with), faction_id_with)) {
@@ -483,7 +485,7 @@ void GAMEAPI enemies_treaty(int32_t faction_id, int32_t faction_id_with, int32_t
         truce = true;
         if (!(s & 0x60) && !(status(p2, p1) & 0x60) &&
             (game().factions[p2].ranking < 6 || game().factions[p1].ranking < 6)) {
-            int32_t level = (GameRules & 0x40) ? 5 : DiffLevel;
+            int32_t level = (GameRules & RULES_INTENSE_RIVALRY) ? 5 : DiffLevel;
             int32_t r = game_rand() % 16;
             if (game().factions[p1].AI_fight + game().factions[p2].AI_fight - level + 8 <= r) truce = false;
         }
@@ -628,7 +630,7 @@ void GAMEAPI encounter(int32_t faction_id, int32_t faction_id_with, int32_t x, i
         return;
     }
     if (is_alien(p1)) {
-        if (!has_tech(0x4E, p2) && !has_tech(4, p1)) {
+        if (!has_tech(TECH_PrPsych, p2) && !has_tech(TECH_Psych, p1)) {
             treaty_on(p1, p2, 0x80000008);
             if (on_map) treaty_on(p1, p2, 0x40000000);
             if (p1 == v) interlude(0x22, 0, 1, 0);
@@ -639,7 +641,7 @@ void GAMEAPI encounter(int32_t faction_id, int32_t faction_id_with, int32_t x, i
         if (p2 == v) interlude(0x17, 0, 1, 0);
     }
     if (is_alien(p2)) {
-        if (!has_tech(0x4E, p1) && !has_tech(4, p2)) {
+        if (!has_tech(TECH_PrPsych, p1) && !has_tech(TECH_Psych, p2)) {
             treaty_on(p1, p2, 0x80000008);
             if (on_map) treaty_on(p1, p2, 0x40000000);
             if (p1 == v) interlude(0x16, 0, 1, 0);
@@ -667,13 +669,13 @@ void GAMEAPI encounter(int32_t faction_id, int32_t faction_id_with, int32_t x, i
             int32_t self = p1 == v ? p1 : p2, other = p1 == v ? p2 : p1;
             say_noun(0, other);
             if (!is_alien(self)) {
-                if (!has_tech(0x4E, self) && !has_tech(4, other)) {
+                if (!has_tech(TECH_PrPsych, self) && !has_tech(TECH_Psych, other)) {
                     if (tut_check2(0x8000)) label = "GUYMEETSALNOPSYCH";
                 } else if (tut_check2(0x8000)) {
                     label = "GUYMEETSAL";
                 }
             } else if (!is_alien(other)) {
-                if (!has_tech(4, self) && !has_tech(0x4E, other)) {
+                if (!has_tech(TECH_Psych, self) && !has_tech(TECH_PrPsych, other)) {
                     if (tut_check2(0x4000)) label = "ALMEETSGUYNOPSYCH";
                 } else if (tut_check2(0x4000)) {
                     label = "ALMEETSGUY";
@@ -729,7 +731,7 @@ int32_t GAMEAPI territory(int32_t faction_id, int32_t faction_id_with, int32_t f
         veh.state &= ~0x400u;
         if (veh.faction_id != faction_id_with) continue;
         uint8_t plan = (uint8_t)Units[veh.unit_id].plan;
-        if (!(plan <= 8 || (plan == 10 && veh.order == 3))) continue;
+        if (!(plan <= 8 || (plan == 10 && veh.order == ORDER_CONVOY))) continue;
         MAP* sq = map_tile(veh.x, veh.y);
         if ((sq->climate & 0xE0) < 0x60 || tolerated[sq->region]) continue;
         // BUG(original): base_id keeps its previous value (initially status bit 0x20) when
@@ -787,7 +789,7 @@ void GAMEAPI atrocity(int32_t faction_id, int32_t faction_id_vs, int32_t count_i
                         int32_t r = game_rand() % 16;
                         declare = r - game().factions[f].atrocities <= 8;
                     } else {
-                        int32_t m = (8 - ((GameRules & 0x40) ? 5 : DiffLevel)) * 2;
+                        int32_t m = (8 - ((GameRules & RULES_INTENSE_RIVALRY) ? 5 : DiffLevel)) * 2;
                         int32_t r = m - 1 > 0 ? game_rand() % m : 0;
                         declare = r == 0;
                     }
@@ -819,7 +821,7 @@ void GAMEAPI atrocity(int32_t faction_id, int32_t faction_id_vs, int32_t count_i
     // BUG(original): the "victim is an AI" test uses the loop counter (8) instead of the victim:
     // always true.
     if (is_human(f) && !(FactionStatus[0] & (1u << i)) && !was_victim && atrocities >= 5)
-        game().factions[faction_id_vs].player_flags |= 0x1000000;
+        game().factions[faction_id_vs].player_flags |= PFLAG_COMMIT_ATROCITIES_WANTONLY;
     say_leader(0, f);
     say_leader(2, faction_id_vs);
     parse_num(0, fac.atrocities * 10);
@@ -955,7 +957,7 @@ int32_t GAMEAPI value_of_base(int32_t base_id, int32_t faction_id, int32_t facti
     int32_t value = (credits + 1000) / (dist + 4) * pop;
     if (value < 100) value = 100;
     MAP* sq = map_tile(base.x, base.y);
-    if (!(sq->items & 2) || (sq->val2 & 0xF) >= 8) value /= 2;
+    if (!(sq->items & BIT_VEH_IN_TILE) || (sq->val2 & 0xF) >= 8) value /= 2;
     uint8_t bases_with = game().factions[faction_id_with].region_total_bases[region];
     uint8_t bases_own = game().factions[faction_id].region_total_bases[region];
     if (!bases_with) value *= 2;
@@ -1022,7 +1024,7 @@ void GAMEAPI give_a_base(int32_t base_id, int32_t faction_id) {
                 if (!(game().map.flat & 1) && ndx > game().map.half_x) ndx = game().map.x - ndx;
                 if ((std::abs(game().bases[nb].y - by) + ndx) & ~1) {
                     stack_put(stack_veh(i, 1), game().bases[nb].x, game().bases[nb].y);
-                    veh.order = 0;
+                    veh.order = ORDER_NONE;
                     if (veh.home_base_id == base_id) veh.home_base_id = (int16_t)nb;
                     continue;
                 }
@@ -1033,7 +1035,7 @@ void GAMEAPI give_a_base(int32_t base_id, int32_t faction_id) {
         game().factions[faction_id].units_active[veh.unit_id]++;
         veh.home_base_id = (int16_t)base_id;
         veh.moves_spent = 0;
-        if (veh.order != 2) veh.order = 0;
+        if (veh.order != ORDER_HOLD) veh.order = ORDER_NONE;
         owner_set(veh.x, veh.y, faction_id);
     }
     base.faction_id = (uint8_t)faction_id;
@@ -1118,11 +1120,11 @@ int32_t GAMEAPI contiguous(int32_t faction_id, int32_t faction_id_with, int32_t 
 
 // at_climax (0x539EF0, first half of the module), needed by the AI and base production.
 int32_t GAMEAPI at_climax(int32_t faction_id) {
-    if (is_human(faction_id) || (GameState & 1) || DiffLevel == 0 || !climactic_battle()) return 0;
+    if (is_human(faction_id) || (GameState & STATE_GAME_DONE) || DiffLevel == 0 || !climactic_battle()) return 0;
     if (aah_ooga(faction_id, faction_id)) return 1;
     for (int32_t i = 1; i < 8; i++) {
         if (i == faction_id || game().factions[i].corner_market_turn <= CurrentTurn) continue;
-        if (!(status(faction_id, i) & 1) || !(GameRules & 0x1000)) return 1;
+        if (!(status(faction_id, i) & 1) || !(GameRules & RULES_VICTORY_COOPERATIVE)) return 1;
     }
     int32_t mine = 0, theirs = 0;
     for (int32_t i = 0; i < game().base_count; i++) {

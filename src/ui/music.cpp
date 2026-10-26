@@ -922,7 +922,7 @@ void GAMEAPI load_music(int32_t faction_id) {
     else set = "aset1.amb", m = new MusicA();
     sound_log("load_music %d %s %s", faction_id, key, set);
     g_music = m;
-    if ((GamePreferences & 0x800) && platform::audio_enabled()) {
+    if ((GamePreferences & PREF_AV_VOLUME_MUSIC_TOGGLE) && platform::audio_enabled()) {
         std::string path = std::string("fx\\") + set;
         if (m->load(path.c_str())) {
             m->set_volume(127);

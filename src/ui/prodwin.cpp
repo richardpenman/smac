@@ -121,7 +121,7 @@ void build_list(ProdWin* w) {
         ProdItem it;
         it.id = u;
         it.name = Units[u].name;
-        if (GameState & 0x80) {
+        if (GameState & STATE_OMNISCIENT_VIEW) {
             it.name += "(" + num(Factions[w->faction].units_active[u]) + "/" + num(Factions[w->faction].units_queue[u]) + ")";
         }
         int32_t proto = 0;
@@ -513,7 +513,7 @@ int32_t prodwin_pick(int32_t faction, int32_t slot, int32_t* mode) {
         sw_clear_buttons(w);
         BASE& b = Bases[CurrentBaseID];
         bool ai = !((1u << (faction & 31)) & (uint8_t)FactionStatus[0]) ||
-                  ((GameState & 0x40) && (b.governor_flags & 0x80000000) && (b.governor_flags & 1));
+                  ((GameState & STATE_SCENARIO_EDITOR) && (b.governor_flags & 0x80000000) && (b.governor_flags & 1));
         w->nbuttons = slot ? 6 : (ai ? 5 : 4);
         int32_t x = ((w->canvas.width - (w->bwidth + 3) * w->nbuttons) - 0x20) / 2 + (w->nbuttons - 1) * (w->bwidth + 3);
         int32_t y = w->ch * w->rows + 8;

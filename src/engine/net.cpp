@@ -36,7 +36,7 @@ void GAMEAPI rebuild_vehicle_bits() {
     MAP* sq = game().map.tiles;
     for (int32_t y = 0; y < game().map.y; y++) {
         for (int32_t x = y & 1; x < game().map.x; x += 2, sq++) {
-            uint32_t items = sq->items & ~2u;
+            uint32_t items = sq->items & ~BIT_VEH_IN_TILE;
             sq->items = items;
             for (int32_t i = 0; i < game().veh_count; i++) {
                 if (game().vehs[i].x == x && game().vehs[i].y == y) {
@@ -56,10 +56,10 @@ void GAMEAPI rebuild_base_bits() {
     MAP* sq = game().map.tiles;
     for (int32_t y = 0; y < game().map.y; y++) {
         for (int32_t x = y & 1; x < game().map.x; x += 2, sq++) {
-            sq->items &= ~1u;
+            sq->items &= ~BIT_BASE_IN_TILE;
             for (int32_t i = 0; i < game().base_count; i++) {
                 if (game().bases[i].x == x && game().bases[i].y == y) {
-                    sq->items |= 1;
+                    sq->items |= BIT_BASE_IN_TILE;
                     sq->val2 &= 0xF0;
                     sq->val2 = (uint8_t)((game().bases[i].faction_id & 0xF) | sq->val2);
                     break;

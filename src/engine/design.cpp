@@ -653,7 +653,7 @@ void GAMEAPI retire_proto(int32_t unit_id, int32_t faction_id) {
                 if (!unseen) {
                     MAP* tile = map_tile(veh.x, veh.y);
                     uint32_t owner = tile->val2 & 0xF;
-                    unseen = (tile->items & 1) && owner < 8 && owner != 0;
+                    unseen = (tile->items & BIT_BASE_IN_TILE) && owner < 8 && owner != 0;
                 }
                 if (unseen && veh.faction_id == (uint32_t)faction_id) {
                     veh.unit_id = (int16_t)best;
@@ -747,7 +747,7 @@ void GAMEAPI prune_protos(int32_t faction_id, int32_t unit_id, int32_t net_synch
         }
     }
     if (is_human(faction_id)) {
-        if (!MultiplayerActive && !(GameMorePreferences & 0x100000)) return;
+        if (!MultiplayerActive && !(GameMorePreferences & MPREF_BSC_AUTO_PRUNE_OBS_VEH)) return;
         // Human players with automatic obsolescence: designs dominated by another become obsolete;
         // the player may replace them in the build queues.
         for (int32_t i = 0; i < 128; i++) {
@@ -1257,14 +1257,16 @@ void GAMEAPI consider_designs(int32_t faction_id) {
         for (int32_t i = 1; i < 8; i++) {
             if (!is_human(i)) continue;
             if (!great_satan(i, 0)) {
-                uint32_t war = (fac.diff_level < 4 && !(GameRules & 0x40)) ? 0 : 0x10;
+                uint32_t war = (fac.diff_level < 4 && !(GameRules & RULES_INTENSE_RIVALRY)) ? 0 : 0x10;
                 if (!(fac.diplo_status[i] & (war | 0x20))) continue;
             }
             if (game().mfactions[i].rule_psi > 0 ||
-                (SecretProjects[19] >= 0 && (uint8_t)game().bases[SecretProjects[19]].faction_id == i))
+                (SecretProjects[FAC_DREAM_TWISTER - SP_ID_First] >= 0 &&
+                 (uint8_t)game().bases[SecretProjects[FAC_DREAM_TWISTER - SP_ID_First]].faction_id == i))
                 threats |= 1;
             if (game().mfactions[i].rule_psi > 0 ||
-                (SecretProjects[9] >= 0 && (uint8_t)game().bases[SecretProjects[9]].faction_id == i))
+                (SecretProjects[FAC_NEURAL_AMPLIFIER - SP_ID_First] >= 0 &&
+                 (uint8_t)game().bases[SecretProjects[FAC_NEURAL_AMPLIFIER - SP_ID_First]].faction_id == i))
                 threats |= 2;
         }
     }

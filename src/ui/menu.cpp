@@ -415,7 +415,7 @@ void build() {
 
 bool menu_shown(const Menu& m) {
     if (m.section == "NETWORK") return MultiplayerActive != 0;
-    if (m.section == "SCENARIO" || m.section == "EDITOR") return (GameState & 0x40) != 0;
+    if (m.section == "SCENARIO" || m.section == "EDITOR") return (GameState & STATE_SCENARIO_EDITOR) != 0;
     return true;
 }
 
@@ -528,11 +528,14 @@ void choose(const Item& it) {
 // its rectangle, from y = bottom - top piece's height up by a fifth of its height per frame
 // (DAT_00691AF8 ms apart). Unattended runs skip the frames.
 void alphamenu_show() {
-    if (GamePreferences & 0x400) Wave_play_2(mem::host(0x6A7090));
-    std::fprintf(stderr, "alphamenu show (sound %d, slide %d)\n", (GamePreferences & 0x400) ? 1 : 0,
-                 (GamePreferences & 0x8000000) && !MultiplayerActive && !g_ui_exit_when_script_done ? 1 : 0);
+    if (GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE) Wave_play_2(mem::host(0x6A7090));
+    std::fprintf(
+        stderr, "alphamenu show (sound %d, slide %d)\n", (GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE) ? 1 : 0,
+        (GamePreferences & PREF_AV_SLIDING_WINDOWS) && !MultiplayerActive && !g_ui_exit_when_script_done ? 1 : 0);
     Buffer* scr = ui_screen_canvas();
-    if (!(GamePreferences & 0x8000000) || MultiplayerActive || g_ui_exit_when_script_done || !scr || !scr->data) return;
+    if (!(GamePreferences & PREF_AV_SLIDING_WINDOWS) || MultiplayerActive || g_ui_exit_when_script_done || !scr ||
+        !scr->data)
+        return;
     load_art();
     // The column's picture: drawn alone into a screen-sized canvas of colour 9.
     Buffer pic;
@@ -837,15 +840,15 @@ void enable_if(int32_t index, int32_t id, bool on) { on ? enable_item(index, id)
 // editor's items (enabled in the scenario editor). (Multiplayer's items as the single player's.)
 void THISCALL pfncMainMenuUpdateVisible(uint8_t*, int32_t veh) {
     build();
-    bool detail = GameMorePreferences & 0x200000;
+    bool detail = GameMorePreferences & MPREF_ADV_DETAIL_MAIN_MENUS;
     show_if(0, detail ? 0x52 : 0x51, true);
     hide_item(0, detail ? 0x51 : 0x52);
-    if (!MultiplayerActive && !PbemActive && !(GameRules & 0x400)) {
+    if (!MultiplayerActive && !PbemActive && !(GameRules & RULES_IRONMAN)) {
         show_item(0, 0x5C);
         show_item(0, 0x5A);
     } else {
         if (!(!MultiplayerActive && !PbemActive)) hide_item(0, 0x5C);
-        show_if(0, 0x5A, GameState & 0x1000);
+        show_if(0, 0x5A, GameState & STATE_DEBUG_MODE);
     }
     static const int32_t kDetail2[] = {0x205, 0x206, 0x207, 0x208, 0x20C, 0x215, 0x211, 0x212};
     static const int32_t kDetail3[] = {0x31B, 0x324, 0x306, 0x304, 0x319, 0x31A, 0x317, 799, 800, 0x307, 0x322};
@@ -855,14 +858,18 @@ void THISCALL pfncMainMenuUpdateVisible(uint8_t*, int32_t veh) {
         for (int32_t id : kDetail3) show_item(3, id);
         for (int32_t id : kDetail9) show_item(9, id);
     }
-    show_if(1, 0x115, (GameState & 0x10) || ObjectiveReqVictory < 1000 || ObjectivesSuddenDeathVictory < 1000);
+    show_if(1, 0x115,
+            (GameState & STATE_IS_SCENARIO) || ObjectiveReqVictory < 1000 || ObjectivesSuddenDeathVictory < 1000);
     show_item(8, 0x807);  // (multiplayer: 0x808 during the others' turns)
     hide_item(8, 0x808);
-    show_if(1, 0x105, (GameState & 0xC0) || !(GameMoreRules & 8));
-    show_item(1, (GameRules & 0x200) ? 0x106 : 0x107);
-    hide_item(1, (GameRules & 0x200) ? 0x107 : 0x106);
-    bool econ = (has_tech(Rules.tech_preq_economic_victory, CurrentPlayerFaction) && (GameRules & 4)) ||
-                ((GameState & 0x1000) && (GameState & 0x40));
+    show_if(1, 0x105,
+            (GameState & (STATE_SCENARIO_EDITOR | STATE_OMNISCIENT_VIEW)) ||
+                !(GameMoreRules & MRULES_NO_SOCIAL_ENGINEERING));
+    show_item(1, (GameRules & RULES_BLIND_RESEARCH) ? 0x106 : 0x107);
+    hide_item(1, (GameRules & RULES_BLIND_RESEARCH) ? 0x107 : 0x106);
+    bool econ =
+        (has_tech(Rules.tech_preq_economic_victory, CurrentPlayerFaction) && (GameRules & RULES_VICTORY_ECONOMIC)) ||
+        ((GameState & STATE_DEBUG_MODE) && (GameState & STATE_SCENARIO_EDITOR));
     show_if(1, 0x114, econ);
     show_if(1, 9, econ);
     show_item(2, MapWinInVehMode ? 0x201 : 0x200);
@@ -972,8 +979,8 @@ void THISCALL pfncMainMenuUpdateVisible(uint8_t*, int32_t veh) {
         show_if(3, 0x317, !base_tile);
         show_if(3, 0x316, base_tile);
     }
-    for (int32_t id = 0x601; id < 0x61C; id++) enable_if(6, id, GameState & 0x40);
-    for (int32_t id = 0xA00; id < 0xA55; id++) enable_if(10, id, GameState & 0x40);
+    for (int32_t id = 0x601; id < 0x61C; id++) enable_if(6, id, GameState & STATE_SCENARIO_EDITOR);
+    for (int32_t id = 0xA00; id < 0xA55; id++) enable_if(10, id, GameState & STATE_SCENARIO_EDITOR);
     if (!detail) {
         for (int32_t id : kDetail2) hide_item(2, id);
         for (int32_t id : {0x31B, 0x324, 0x306, 0x304, 0x319, 0x31A, 0x317, 800, 799, 0x307, 0x322}) hide_item(3, id);

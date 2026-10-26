@@ -330,7 +330,8 @@ static void cmd_newgame(char* args) {
     MapNativeLifeForms = natives;
     DiffLevel = diff;
     GameRules = (int32_t)(((uint32_t)GameRules & 0xFFFF0000u) | (rules_set ? rules : default_rules()));
-    GameState = (int32_t)((uint32_t)GameState & ~0x1800000u);
+    GameState =
+        (int32_t)((uint32_t)GameState & ~(STATE_RAND_FAC_LEADER_PERSONALITIES | STATE_RAND_FAC_LEADER_SOCIAL_AGENDA));
     if (random_leaders & 1) GameState |= STATE_RAND_FAC_LEADER_PERSONALITIES;
     if (random_leaders & 2) GameState |= STATE_RAND_FAC_LEADER_SOCIAL_AGENDA;
     for (int i = 1; i < 8; i++) {

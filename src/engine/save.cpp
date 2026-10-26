@@ -325,7 +325,7 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
 
     int32_t map_result;
     if (!SaveFileWrite) {
-        if (!SaveFileMenu && !(GameState & 1)) {
+        if (!SaveFileMenu && !(GameState & STATE_GAME_DONE)) {
             // Hotseat/PBEM: refuse a game that another human player has in progress.
             uint32_t humans = FactionStatus[1] & FactionStatus[0];
             if (bit_count(humans) > 1) {
@@ -409,7 +409,7 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
             }
         }
     }
-    if ((GameState & 0x10) && !save_io(ScenarioFileName, 0x100, file)) return 1;
+    if ((GameState & STATE_IS_SCENARIO) && !save_io(ScenarioFileName, 0x100, file)) return 1;
     if (SaveFileVersion < 1) {
         crt_strcpy(GameAltPath, EmptyPathA);
     } else if (!save_io(GameAltPath, 0x100, file)) {
@@ -510,9 +510,9 @@ int32_t GAMEAPI save_daemon(const char* filename) {
     char path[1024];  // 256 in the original (longer names overflow it)
     if (PbemActive) PbemSaveCount++;
     uint32_t stamp = engine_logic_time();
-    if ((GameRules & 0x400) && !MultiplayerActive) game_srand(stamp);
+    if ((GameRules & RULES_IRONMAN) && !MultiplayerActive) game_srand(stamp);
     SaveFileVersion = kSaveFileVersion;
-    if (GameRules & 0x400) {  // iron man: encrypted
+    if (GameRules & RULES_IRONMAN) {  // iron man: encrypted
         NetDiploSeq = 0;
         GameState |= 0x10000000;
     }
@@ -549,13 +549,13 @@ int32_t GAMEAPI save_daemon(const char* filename) {
 void GAMEAPI see_map_check() {
     for (int32_t i = 1; i < 8; i++) {
         Faction& faction = game().factions[i];
-        faction.player_flags &= ~0x200u;  // PFLAG_MAP_REVEALED
+        faction.player_flags &= ~PFLAG_MAP_REVEALED;  // PFLAG_MAP_REVEALED
         const int32_t* satellites = &faction.satellites_nutrient;
         for (int32_t k = 0; k < 4; k++) {
-            if (satellites[k]) faction.player_flags |= 0x200;
+            if (satellites[k]) faction.player_flags |= PFLAG_MAP_REVEALED;
         }
         for (int32_t t = 0; t < 89; t++) {
-            if ((Tech[t].flags & 8) && has_tech(t, i)) faction.player_flags |= 0x200;  // TFLAG_REVEALS_MAP
+            if ((Tech[t].flags & 8) && has_tech(t, i)) faction.player_flags |= PFLAG_MAP_REVEALED;  // TFLAG_REVEALS_MAP
         }
     }
 }
@@ -581,7 +581,7 @@ int32_t GAMEAPI load_daemon(const char* filename, int32_t relinearize) {
             result = 4;
             if (!game_data(file, 0)) {
                 uint32_t seed;
-                if ((GameRules & 0x400) && crt_fread(&seed, 4, 1, file)) game_srand(seed);
+                if ((GameRules & RULES_IRONMAN) && crt_fread(&seed, 4, 1, file)) game_srand(seed);
                 if (!MultiplayerActive) {
                     for (int32_t i = 2; i < 8; i++) {
                         if (MapWins[i]) mapwin_field(MapWins[i], kMapWinActive) = 0;
@@ -613,7 +613,7 @@ int32_t GAMEAPI load_daemon(const char* filename, int32_t relinearize) {
                         FactionStatus[1] &= (uint8_t)~(1 << f);
                     }
                 }
-                if (GameRules & 0x400) crt_remove(filename);  // iron man: one load per save
+                if (GameRules & RULES_IRONMAN) crt_remove(filename);  // iron man: one load per save
                 for (int32_t i = 0; i < 32; i++) {
                     MapWinCursorX[i] = MapWinCursorX[MapWinCursorIndex];
                     MapWinCursorY[i] = MapWinCursorY[MapWinCursorIndex];
@@ -622,8 +622,8 @@ int32_t GAMEAPI load_daemon(const char* filename, int32_t relinearize) {
                 rebuild_base_bits();
                 if (crt_strstr(filename, "multi") && !MultiplayerActive) {
                     MapWinInVehMode = 0;
-                    GameState |= 0x10C0;
-                    ui_editor_panel_show((GameState & 0x80) && (GameState & 0x40));
+                    GameState |= (STATE_SCENARIO_EDITOR | STATE_OMNISCIENT_VIEW | STATE_DEBUG_MODE);
+                    ui_editor_panel_show((GameState & STATE_OMNISCIENT_VIEW) && (GameState & STATE_SCENARIO_EDITOR));
                 }
                 ControlTurnMove = CurrentPlayerFaction;
                 if (!MultiplayerActive) {
@@ -700,7 +700,7 @@ int32_t GAMEAPI load_map_daemon(const char* filename) {
                 MAP* sq = game().map.tiles;
                 for (int32_t i = 0; i < game().map.tile_count; i++, sq++) {
                     sq->visibility = 0;
-                    sq->items &= ~3u;  // no bases or vehicles
+                    sq->items &= ~(BIT_BASE_IN_TILE | BIT_VEH_IN_TILE);  // no bases or vehicles
                 }
                 ComputeBaseID = -1;
                 std::memcpy(AltNatural, AltNaturalLinear, sizeof(AltNatural));
@@ -738,7 +738,7 @@ void GAMEAPI kill_auto_save() { crt_remove("saves\\auto\\Alpha Centauri Autosave
 
 void GAMEAPI auto_save() {
     if (PbemActive && !MultiplayerActive) return;
-    if ((GameRules & 0x400) && !(GameState & 0x40)) {
+    if ((GameRules & RULES_IRONMAN) && !(GameState & STATE_SCENARIO_EDITOR)) {
         crt_remove("saves\\auto\\Alpha Centauri Autosave 30.SAV");
         crt_remove("saves\\auto\\Alpha Centauri Autosave 20.SAV");
         crt_remove("saves\\auto\\Alpha Centauri Autosave 10.SAV");
@@ -790,7 +790,7 @@ void GAMEAPI wipe_undo() {
 }
 
 void GAMEAPI auto_undo() {
-    if (!(GamePreferences & 2)) return;
+    if (!(GamePreferences & PREF_BSC_AUTOSAVE_EACH_TURN)) return;
     char prev[256], name[256], digits[80];
     UndoIndex = 1;
     prev[0] = 0;
@@ -904,7 +904,7 @@ int32_t GAMEAPI save_game(int32_t scenario) {
     bool renamed = crt_stricmp(path_file_name(base), path_file_name(StrBuffer)) != 0;
     if (scenario) {
         crt_strcpy(ScenarioFileName, renamed ? base : EmptyPathB);
-        GameState |= 0x10;
+        GameState |= STATE_IS_SCENARIO;
         for (int32_t i = 0; i < 8; i++) game().factions[i].unk_101 = 0;
     } else {
         crt_strcpy(LastSavePath, renamed ? base : EmptyPathC);
@@ -922,7 +922,7 @@ int32_t GAMEAPI save_game(int32_t scenario) {
         d.destroy();
         return 1;
     }
-    if (!scenario && (GameRules & 0x400)) {  // iron man: saving ends the session
+    if (!scenario && (GameRules & RULES_IRONMAN)) {  // iron man: saving ends the session
         auto_save();
         ControlTurnA = 1;
         if (MultiplayerActive) {
@@ -992,7 +992,7 @@ int32_t GAMEAPI load_game(int32_t scenario, int32_t relinearize) {
             for (int32_t i = 1; i < 8; i++) load_faction_art(i);
             load_flags();
             GameState &= (int32_t)0xF79FCF16;
-            ui_editor_panel_show((GameState & 0x80) && (GameState & 0x40));
+            ui_editor_panel_show((GameState & STATE_OMNISCIENT_VIEW) && (GameState & STATE_SCENARIO_EDITOR));
             // The scenario's directory becomes the alternate data directory.
             crt_strcpy(GameAltPath, base);
             if (char* slash = crt_strrchr(GameAltPath, '\\')) {
@@ -1004,7 +1004,7 @@ int32_t GAMEAPI load_game(int32_t scenario, int32_t relinearize) {
         }
         GameAltPathChanged = crt_strcmp(GameAltPath, old_alt);
         filefind_set_alternate(GameAltPath);
-        scenario |= GameState & 0x10;
+        scenario |= GameState & STATE_IS_SCENARIO;
         if (!MultiplayerActive && !PbemActive) {
             int32_t i = 1;
             while (i < 8 && !game().factions[i].unk_102) i++;
@@ -1059,7 +1059,7 @@ int32_t GAMEAPI load_game(int32_t scenario, int32_t relinearize) {
                 crt_remove(StrBuffer);
             }
         }
-        if (GamePreferences & 0x20000000) {
+        if (GamePreferences & PREF_ADV_RADIO_BTN_NOT_SEL_SING_CLK) {
             GameDialogFlags &= ~4;
         } else {
             GameDialogFlags |= 4;

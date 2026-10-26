@@ -57,8 +57,9 @@ constexpr int32_t kW = 0x8A, kRowH = 0x11;  // MultiWin_draw: 0x8A wide, seven r
 bool listed(int32_t f) {
     int32_t v = CurrentPlayerFaction;
     if (f == v || !(FactionStatus[1] & (1 << f))) return false;
-    return (GameState & 0x80) || (Factions[v].diplo_status[f] & 8) ||
-           (SecretProjects[4] >= 0 && Bases[SecretProjects[4]].faction_id == v) ||
+    return (GameState & STATE_OMNISCIENT_VIEW) || (Factions[v].diplo_status[f] & 8) ||
+           (SecretProjects[FAC_EMPATH_GUILD - SP_ID_First] >= 0 &&
+            Bases[SecretProjects[FAC_EMPATH_GUILD - SP_ID_First]].faction_id == v) ||
            ((FactionStatus[0] & (1 << f)) && auto_contact());
 }
 

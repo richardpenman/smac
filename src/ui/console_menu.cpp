@@ -61,7 +61,7 @@ void quit_question(bool wimp_test_mp) {
             FactionStatus[0] &= (uint8_t)~(1 << (CurrentPlayerFaction & 31));
             save_game(0);
         }
-        if ((GameRules & 0x400) && !PbemActive) auto_save();
+        if ((GameRules & RULES_IRONMAN) && !PbemActive) auto_save();
         if (MultiplayerActive) console_not_reconstructed("NetDaemon_hang_up");
         ControlTurnA = 1;
         log_say_values("Quit                            ", 0, 0, 0);
@@ -77,8 +77,8 @@ void quit_question(bool wimp_test_mp) {
 void console_toggle_pref(int32_t id) {
     switch (id) {
     case 0x209:
-        GameMorePreferences ^= 0x10000;
-        console_menu_check(2, 0x209, (GameMorePreferences & 0x10000) != 0);
+        GameMorePreferences ^= MPREF_MAP_SHOW_FLAT_TERRAIN;
+        console_menu_check(2, 0x209, (GameMorePreferences & MPREF_MAP_SHOW_FLAT_TERRAIN) != 0);
         AlphaIniPrefs.more_preferences = GameMorePreferences;
         break;
     case 0x20A:
@@ -94,10 +94,12 @@ void console_toggle_pref(int32_t id) {
         draw_map(1);
         return;
     case 0x210:
-        if (!(GameMorePreferences & 0x1000))
-            AlphaIniPrefs.more_preferences = GameMorePreferences | ((GameMorePreferences & 0x2000) ? 0x1000 : 0x2000);
+        if (!(GameMorePreferences & MPREF_MAP_SHOW_PROD_WITH_BASE_NAMES))
+            AlphaIniPrefs.more_preferences =
+                GameMorePreferences | ((GameMorePreferences & MPREF_MAP_SHOW_BASE_NAMES) ? 0x1000 : 0x2000);
         else
-            AlphaIniPrefs.more_preferences = GameMorePreferences & ~0x3000;
+            AlphaIniPrefs.more_preferences =
+                GameMorePreferences & ~(MPREF_MAP_SHOW_PROD_WITH_BASE_NAMES | MPREF_MAP_SHOW_BASE_NAMES);
         GameMorePreferences = AlphaIniPrefs.more_preferences;
         break;
     default: return;
@@ -149,7 +151,7 @@ void THISCALL Console_show_scen_objectives(uint8_t* self) {
     int32_t f = CurrentPlayerFaction;
     parse_num(0, ObjectiveReqVictory);
     parse_num(1, ObjectivesSuddenDeathVictory);
-    parse_num(2, num_objectives(f, GameRules & 0x1000));
+    parse_num(2, num_objectives(f, GameRules & RULES_VICTORY_COOPERATIVE));
     parse_num(3, EndingMissionYear);
     PluralDefault = 0;
     GenderDefault = MFactions[f].is_leader_female;
@@ -170,7 +172,7 @@ void THISCALL Console_show_scen_objectives(uint8_t* self) {
 // Console_corner_the_market (0x4E2000): the economic victory's purchase (CORNERMARKET).
 void THISCALL Console_corner_the_market(uint8_t* self) {
     int32_t f = CurrentPlayerFaction;
-    if (!(GameRules & 4) || !has_tech(Rules.tech_preq_economic_victory, f)) return;
+    if (!(GameRules & RULES_VICTORY_ECONOMIC) || !has_tech(Rules.tech_preq_economic_victory, f)) return;
     for (int32_t b = 0; b < BaseCount; b++) {
         if (Bases[b].faction_id != f) continue;
         int32_t off, mask;
@@ -269,12 +271,12 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
     switch (id) {
     // Game
     case 0x51:
-        GameMorePreferences |= 0x200000;
+        GameMorePreferences |= MPREF_ADV_DETAIL_MAIN_MENUS;
         pfncMainMenuUpdateVisible(main_menu(self), veh(self));
         X_pop("MENUDETAIL", 0);
         break;
     case 0x52:
-        GameMorePreferences &= ~0x200000;
+        GameMorePreferences &= ~MPREF_ADV_DETAIL_MAIN_MENUS;
         pfncMainMenuUpdateVisible(main_menu(self), veh(self));
         X_pop("MENUSIMPLE", 0);
         break;
@@ -297,7 +299,7 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
     case 0x103: design_new_veh(CurrentPlayerFaction, -1); break;
     case 0x105: social_select(CurrentPlayerFaction); break;
     case 0x106:
-        if (GameRules & 0x200) {
+        if (GameRules & RULES_BLIND_RESEARCH) {
             Faction& f = Factions[CurrentPlayerFaction];
             int32_t* p = reinterpret_cast<int32_t*>(reinterpret_cast<uint8_t*>(&f) + 0x3E0);
             DialogChoices = p[0] != 0;
@@ -315,7 +317,7 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
         }
         break;
     case 0x107:
-        if (!(GameRules & 0x200)) Console_set_tech(self, CurrentPlayerFaction);
+        if (!(GameRules & RULES_BLIND_RESEARCH)) Console_set_tech(self, CurrentPlayerFaction);
         break;
     case 0x108: help_topic(2, 0); break;
     case 0x109: report_labs(); break;
@@ -474,7 +476,7 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
     default: break;
     }
     // The scenario editor's commands (Scenario and Edit Map menus).
-    if (!(GameState & 0x40)) return;
+    if (!(GameState & STATE_SCENARIO_EDITOR)) return;
     if ((id >= 0x601 && id <= 0x61B) || id >= 0xA00) {
         if (id == 0x601) {  // omniscient view
             editor_toggle_omniscient();

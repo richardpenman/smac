@@ -37,7 +37,8 @@ int32_t wrap_x(int32_t x) {
 MAP* tile(int32_t x, int32_t y) { return &MapTiles[MapHalfX * y + (x >> 1)]; }
 bool omniscient(int32_t faction_id) { return faction_id >= 0 && faction_id < 8 && (Factions[faction_id].player_flags & 0x200); }
 bool tile_known(int32_t faction_id, MAP* sq) {
-    return (GameState & 0x80) || omniscient(faction_id) || (faction_id >= 0 && (sq->visibility & (1 << faction_id)));
+    return (GameState & STATE_OMNISCIENT_VIEW) || omniscient(faction_id) ||
+           (faction_id >= 0 && (sq->visibility & (1 << faction_id)));
 }
 // Faction of the units on a base tile (items bit 1 and the occupant nibble), or -1.
 int32_t tile_occupant(MAP* sq) {
@@ -183,7 +184,7 @@ void GAMEAPI base_draw(Buffer* dest, int32_t base_id, int32_t px, int32_t py, in
     bool plain = false;  // undefended base seen by a friend: black frame, coloured number
     if (occupant < 0) {
         int32_t viewer = CurrentPlayerFaction;
-        if ((Factions[f].diplo_status[viewer] & 1) || spying(f) || (GameState & 0x80) ||
+        if ((Factions[f].diplo_status[viewer] & 1) || spying(f) || (GameState & STATE_OMNISCIENT_VIEW) ||
             (Factions[viewer].player_flags & 0x200) || f == viewer) {
             plain = true;
         } else {
@@ -227,10 +228,10 @@ void GAMEAPI base_draw(Buffer* dest, int32_t base_id, int32_t px, int32_t py, in
 void THISCALL MapWin_draw_bases(uint8_t* win, int32_t x, int32_t y, int32_t px, int32_t py, int32_t faction_id) {
     uint32_t opts = (uint32_t)mw(win, kMwOptions);
     if (!(opts & 0x200080)) return;
-    if (!ControlTurnStarted && !ControlTurnMove && !(GameRules & 0x80)) return;
+    if (!ControlTurnStarted && !ControlTurnMove && !(GameRules & RULES_TIME_WARP)) return;
     int32_t b = base_at(x, y);
     if (b < 0) return;
-    if (!(GameState & 0x80)) {
+    if (!(GameState & STATE_OMNISCIENT_VIEW)) {
         MAP* sq = tile(x, y);
         if (!omniscient(faction_id) && !(faction_id >= 0 && (sq->visibility & (1 << faction_id)))) return;
         if ((uint8_t)Bases[b].faction_id != (uint32_t)CurrentPlayerFaction &&
@@ -242,13 +243,13 @@ void THISCALL MapWin_draw_bases(uint8_t* win, int32_t x, int32_t y, int32_t px, 
 }
 
 void THISCALL MapWin_draw_base_names(uint8_t* win) {
-    if (!ControlTurnStarted && !ControlTurnMove && !(GameRules & 0x80)) return;
+    if (!ControlTurnStarted && !ControlTurnMove && !(GameRules & RULES_TIME_WARP)) return;
     MapWinNative* n = ui_mapwin_native(win);
     Buffer* canvas = n->canvas;
     UiRect saved = canvas->clip;
     Buffer_set_clip(canvas, reinterpret_cast<UiRect*>(win + n->vbase + kGwClientRect));
     MapWin_draw_base_dest(win, 0);
-    if (!(mw(win, kMwOptions) & 0x800) || !(GameMorePreferences & 0x2000)) {
+    if (!(mw(win, kMwOptions) & 0x800) || !(GameMorePreferences & MPREF_MAP_SHOW_BASE_NAMES)) {
         Buffer_set_clip(canvas, &saved);
         return;
     }
@@ -277,7 +278,7 @@ void THISCALL MapWin_draw_base_names(uint8_t* win) {
     for (int32_t i = 0; i < BaseCount; i++) {
         BASE& b = Bases[i];
         uint8_t f = (uint8_t)b.faction_id;
-        if (!(GameState & 0x80) && f != (uint32_t)viewer && !(b.visibility & (1 << viewer))) continue;
+        if (!(GameState & STATE_OMNISCIENT_VIEW) && f != (uint32_t)viewer && !(b.visibility & (1 << viewer))) continue;
         if (!in_view(b.x, b.y)) continue;
         int32_t px, py;
         pfncTileToPoint(win, b.x, b.y, &px, &py);
@@ -286,14 +287,15 @@ void THISCALL MapWin_draw_base_names(uint8_t* win) {
         std::snprintf(line, sizeof(line), "%s", b.name);
         if ((b.state_flags & 0x10) && f == (uint32_t)viewer) std::strncat(line, str(0x686358), sizeof(line) - std::strlen(line) - 1);
         Buffer_set_text_color(canvas, FactionColorText[f], FactionColorShadow[f], 1, 1);
-        if ((GameState & 0x1000) && ((GameState & 0x80) || !(FactionStatus[0] & (1 << viewer)))) {
+        if ((GameState & STATE_DEBUG_MODE) &&
+            ((GameState & STATE_OMNISCIENT_VIEW) || !(FactionStatus[0] & (1 << viewer)))) {
             const uint8_t* fac = reinterpret_cast<const uint8_t*>(&Factions[f]);
             int32_t tx = *reinterpret_cast<const int32_t*>(fac + 0x3F0), ty = *reinterpret_cast<const int32_t*>(fac + 0x3F4);
             if (tx >= 0 && b.x == tx && b.y == ty) Buffer_set_text_color(canvas, 0xFF, 0, 1, 1);
         }
         int32_t cx = px + mw(win, kMwHalfW);
         Buffer_write_cent_l_8(canvas, line, cx, (mw(win, kMwQ) * 7) / 2 + py, (int32_t)std::strlen(line));
-        bool objective = is_objective(i) && !(GameRules & 0x20000000);
+        bool objective = is_objective(i) && !(GameRules & RULES_SCN_VICT_ALL_BASE_COUNT_OBJ);
         auto objective_line = [&]() {
             if (!objective) return;
             std::snprintf(line, sizeof(line), "%s", label_get(0x382));
@@ -304,13 +306,13 @@ void THISCALL MapWin_draw_base_names(uint8_t* win) {
             int32_t id = b.queue_items[0];
             return id < 0 ? Facility[-id].name : Units[id].name;
         };
-        if ((GameState & 0x1000) && (GameState & 0x80) && mw(win, kMwZoom) >= -3) {
+        if ((GameState & STATE_DEBUG_MODE) && (GameState & STATE_OMNISCIENT_VIEW) && mw(win, kMwZoom) >= -3) {
             uint8_t region = MapTiles[MapHalfX * b.y + (b.x >> 1)].region;
             uint8_t plan = Factions[f].region_base_plan[region];
             std::snprintf(line, sizeof(line), "%s%s%s%s%s", str(0x682E9C), PlansShortName[plan], str(0x682E94), production(),
                           str(0x682E98));
             Buffer_write_cent_l_8(canvas, line, cx, second_line_y(py), (int32_t)std::strlen(line));
-        } else if (!(GameMorePreferences & 0x1000) && !(mw(win, kMwOptions) & 0x8000000)) {
+        } else if (!(GameMorePreferences & MPREF_MAP_SHOW_PROD_WITH_BASE_NAMES) && !(mw(win, kMwOptions) & 0x8000000)) {
             objective_line();
         } else if (f == (uint32_t)viewer || spying(f)) {
             std::snprintf(line, sizeof(line), "%s", str(0x682E9C));
@@ -343,7 +345,9 @@ void THISCALL MapWin_draw_base_names(uint8_t* win) {
         int32_t lx = *reinterpret_cast<const int32_t*>(lmk), ly = *reinterpret_cast<const int32_t*>(lmk + 4);
         const char* name = reinterpret_cast<const char*>(lmk + 8);
         MAP* sq = &MapTiles[MapHalfX * ly + (lx >> 1)];
-        if (!(GameState & 0x80) && !(Factions[viewer].player_flags & 0x200) && !(sq->visibility & (1 << viewer))) continue;
+        if (!(GameState & STATE_OMNISCIENT_VIEW) && !(Factions[viewer].player_flags & 0x200) &&
+            !(sq->visibility & (1 << viewer)))
+            continue;
         if (!in_view(lx, ly)) continue;
         if ((sq->items & 1) && (sq->val2 & 0xF) <= 7) continue;  // a base is named instead
         int32_t px, py;

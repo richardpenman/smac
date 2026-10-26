@@ -492,7 +492,7 @@ void THISCALL Console_activate(uint8_t* self, int32_t x, int32_t y, int32_t sele
     if (stack_check(v, 1, -1, -1, -1) != 1) goto pick;
     if (veh_selectable(v) || veh(v).order || (veh(v).state & 0x4200)) {
         log_say_values("VEH ORDERS", v, 0, 0);
-        if ((int8_t)veh(v).order > 2 && !(GameMorePreferences & 0x40000)) {
+        if ((int8_t)veh(v).order > 2 && !(GameMorePreferences & MPREF_ADV_CLICK_VEH_CANCELS_ORDERS)) {
             // The unit has orders: asked whether to cancel them (2: and do not ask again).
             parse_says(0, Units[veh(v).unit_id].name, -1, -1);
             StrBuffer[0] = 0;
@@ -507,7 +507,7 @@ void THISCALL Console_activate(uint8_t* self, int32_t x, int32_t y, int32_t sele
             int32_t r = X_pop(StrBuffer, 0);
             if (!r) return;
             if (r == 2) {
-                GameMorePreferences |= 0x40000;
+                GameMorePreferences |= MPREF_ADV_CLICK_VEH_CANCELS_ORDERS;
                 prefs_save(0);
             }
         }
@@ -548,12 +548,13 @@ activate:
 }
 
 void THISCALL Console_disband(uint8_t* self, int32_t veh_id) {
-    if ((veh(veh_id).flags & 0x20) && !(GameState & 0x40)) {
+    if ((veh(veh_id).flags & 0x20) && !(GameState & STATE_SCENARIO_EDITOR)) {
         pop_msg("DISBANDOBJ");  // a scenario objective unit
         return;
     }
     if (net_lock_veh(&veh_id, 4)) return;
-    if (veh(veh_id).faction_id != (uint32_t)mw(self, kConFaction) && (MultiplayerActive || !(GameState & 0x80))) {
+    if (veh(veh_id).faction_id != (uint32_t)mw(self, kConFaction) &&
+        (MultiplayerActive || !(GameState & STATE_OMNISCIENT_VIEW))) {
         net_unlock_veh();
         return;
     }
@@ -605,7 +606,7 @@ void THISCALL Console_disband_2(uint8_t* self, int32_t x, int32_t y) {
         return;
     }
     // Scenario editor: the base at the cursor is removed.
-    if (!(GameState & 0x40) || MultiplayerActive) return;
+    if (!(GameState & STATE_SCENARIO_EDITOR) || MultiplayerActive) return;
     auto_undo();
     int32_t base_id = base_at(x, y);
     if (base_id < 0) return;
@@ -1250,7 +1251,9 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
                 }
             }
             // Known bases only.
-            if (owner != faction_id && !(b.visibility & (1 << (faction_id & 31))) && !(GameState & 0x80)) continue;
+            if (owner != faction_id && !(b.visibility & (1 << (faction_id & 31))) &&
+                !(GameState & STATE_OMNISCIENT_VIEW))
+                continue;
             StrBuffer[0] = 0;
             crt_strcat(StrBuffer, b.name);
             crt_strcat(StrBuffer, "|");  // the rest is right-aligned
@@ -1265,7 +1268,7 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
             if (artifact && owner == faction_id) {
                 // Where an artifact can go: the Planetary Datalinks or a network node.
                 const char* what = nullptr;
-                if (SecretProjects[20] == bid) {
+                if (SecretProjects[FAC_UNIVERSAL_TRANSLATOR - SP_ID_First] == bid) {
                     what = Facility[0].name;  // DAT_009A5C48 (the facility name the original reads)
                 } else {
                     int32_t offset, mask;
@@ -1398,8 +1401,8 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
 
 void THISCALL Console_load_proc(uint8_t* self, int32_t scenario, int32_t relinearize) {
     BaseWin_exit(&BaseWin);
-    if (MultiplayerActive && !(GameState & 0x1000)) return;
-    if (PbemActive && !(GameState & 0x1000)) return;
+    if (MultiplayerActive && !(GameState & STATE_DEBUG_MODE)) return;
+    if (PbemActive && !(GameState & STATE_DEBUG_MODE)) return;
     if (load_game(scenario, relinearize)) return;
     if (GameAltPathChanged) {
         if (!game_reload(1, 0)) goto shown;
@@ -1414,7 +1417,7 @@ void THISCALL Console_load_proc(uint8_t* self, int32_t scenario, int32_t relinea
     draw_map(1);
 shown:
     if (scenario) {
-        GameState |= 0xE0;
+        GameState |= (STATE_SCENARIO_CHEATED_FLAG | STATE_SCENARIO_EDITOR | STATE_OMNISCIENT_VIEW);
         draw_map(1);
     }
     pfncMainMenuUpdateVisible(self + 0x22A2C, mw(self, kConVeh));

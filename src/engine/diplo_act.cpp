@@ -78,7 +78,7 @@ void GAMEAPI intervention(int32_t faction_id, int32_t faction_id_with) {
     for (int32_t i = 1; i < 8; i++) {
         if (i == faction_id || i == faction_id_with || !(FactionStatus[1] & (uint8_t)(1 << i))) continue;
         if (!(game().factions[i].diplo_status[faction_id] & DIPLO_PACT) ||
-            (game().factions[i].diplo_status[faction_id_with] & 0x11))
+            (game().factions[i].diplo_status[faction_id_with] & (DIPLO_PACT | DIPLO_VENDETTA)))
             continue;
         say_noun(0, i);
         say_noun(1, faction_id);
@@ -157,7 +157,7 @@ void GAMEAPI double_cross(int32_t faction_id, int32_t faction_id_with, int32_t a
             }
             if (is_human_bit(faction_id)) {
                 if (w.diplo_agenda[faction_id] & 0x400) set_agenda(faction_id_with, faction_id, 0x800, 1);
-                if (w.diplo_status[faction_id] & 0x20) set_agenda(faction_id_with, faction_id, 0x400, 1);
+                if (w.diplo_status[faction_id] & DIPLO_WANT_REVENGE) set_agenda(faction_id_with, faction_id, 0x400, 1);
                 set_treaty(faction_id_with, faction_id, 0x20, 1);
             }
         }
@@ -187,7 +187,7 @@ void GAMEAPI double_cross(int32_t faction_id, int32_t faction_id_with, int32_t a
         if (human_part) {
             if (is_human_bit(faction_id)) {
                 if (w.diplo_agenda[faction_id] & 0x400) set_agenda(faction_id_with, faction_id, 0x800, 1);
-                if (w.diplo_status[faction_id] & 0x20) set_agenda(faction_id_with, faction_id, 0x400, 1);
+                if (w.diplo_status[faction_id] & DIPLO_WANT_REVENGE) set_agenda(faction_id_with, faction_id, 0x400, 1);
                 set_treaty(faction_id_with, faction_id, 0x20, 1);
             }
             if (a3 >= 0) cause_friction(a3, faction_id, -2);
@@ -372,7 +372,7 @@ void GAMEAPI capture_base(int32_t base_id, int32_t faction_id, int32_t is_probe)
         game().factions[old].energy_credits = credits;
     }
     BASE& base = game().bases[base_id];
-    if (!is_probe && !liberated && !(base.state_flags & 0x40000) && !is_objective(base_id) &&
+    if (!is_probe && !liberated && !(base.state_flags & BSTATE_ASSISTANT_KILLER_HOME) && !is_objective(base_id) &&
         (base.pop_size > 1 || (FactionStatus[0] & base.visibility) || MultiplayerActive) && --base.pop_size == 0) {
         // A size 1 base is destroyed.
         base_kill(base_id);
@@ -422,8 +422,8 @@ void GAMEAPI capture_base(int32_t base_id, int32_t faction_id, int32_t is_probe)
         }
         set_fac(FAC_HEADQUARTERS, base_id, 0);
         if (!liberated) {
-            set_fac(6, base_id, 0);
-            set_fac(3, base_id, 0);
+            set_fac(FAC_RECREATION_COMMONS, base_id, 0);
+            set_fac(FAC_RECYCLING_TANKS, base_id, 0);
         }
         for (int32_t i = 0; i < 21; i++) {
             int32_t tx = map_wrap_x(TableOffsetX[i] + x);
@@ -478,8 +478,8 @@ void GAMEAPI capture_base(int32_t base_id, int32_t faction_id, int32_t is_probe)
     crt_strcat(msg, "BASE");
     const uint32_t old_bit = 1u << old;
     if ((FactionStatus[0] & old_bit) && !(new_bit & FactionStatus[0]) && base_id >= 0 &&
-        !(game().bases[base_id].state_flags & 0x80) && !liberated) {
-        game().bases[base_id].state_flags |= 0x10000;
+        !(game().bases[base_id].state_flags & BSTATE_SKIP_RENAME) && !liberated) {
+        game().bases[base_id].state_flags |= BSTATE_RENAME_BASE;
     }
     if (faction_id != CurrentPlayerFaction && old != CurrentPlayerFaction) {
         draw_tile_fixup(x, y, 1, 2);
@@ -543,14 +543,15 @@ void GAMEAPI capture_base(int32_t base_id, int32_t faction_id, int32_t is_probe)
             int32_t ty = TableOffsetY[k] + game().bases[base_id].y;
             if (!map_in_bounds(tx, ty)) continue;
             MAP* sq = map_tile(tx, ty);
-            if ((sq->items & 3) && (sq->val2 & 0xF) < 8 && (sq->val2 & 0xF) != old) continue;
+            if ((sq->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) && (sq->val2 & 0xF) < 8 && (sq->val2 & 0xF) != old)
+                continue;
             veh_init((sq->climate & 0xE0) < 0x60 ? 0x15 : 0, old, tx, ty);
             draw_tile(tx, ty, 2);
             if (--refugees == 0) break;
         }
     }
     // Technology: spoils of war, or a share of the techs the new owner lacks as research.
-    if (!(GameRules & 0x4000) && !(game().mfactions[faction_id].rule_flags & 0x10)) {
+    if (!(GameRules & RULES_SPOILS_OF_WAR) && !(game().mfactions[faction_id].rule_flags & 0x10)) {
         int32_t count = 0;
         for (int32_t t = 0; t < 89; t++)
             if (has_tech(t, old) && !has_tech(t, faction_id)) count++;
@@ -559,13 +560,15 @@ void GAMEAPI capture_base(int32_t base_id, int32_t faction_id, int32_t is_probe)
             (game().factions[faction_id].tech_ranking + 3) * count * mult / 8;
     } else {
         steal_tech(faction_id, old, 1);
-        if (base_id >= 0 && SecretProjects[20] == base_id) steal_tech(faction_id, old, 1);
+        if (base_id >= 0 && SecretProjects[FAC_UNIVERSAL_TRANSLATOR - SP_ID_First] == base_id)
+            steal_tech(faction_id, old, 1);
     }
     // BUG(original): passes the faction as the region and the region as the faction.
     if (!(old_bit & FactionStatus[0])) bases_reset(old, region, 0);
     mon_conquer_base(faction_id, name);
-    if (faction_id == CurrentPlayerFaction && base_id >= 0 && (game().bases[base_id].state_flags & 0x40000) &&
-        !(GamePreferences & 0x40000) && !MultiplayerActive) {
+    if (faction_id == CurrentPlayerFaction && base_id >= 0 &&
+        (game().bases[base_id].state_flags & BSTATE_ASSISTANT_KILLER_HOME) &&
+        !(GamePreferences & PREF_AV_INTERLUDES_DISABLED) && !MultiplayerActive) {
         // The viewer renames a captured objective base after its assistant city.
         parse_says(6, game().mfactions[CurrentPlayerFaction].assistant_city, -1, -1);
         char* base_name = game().bases[base_id].name;

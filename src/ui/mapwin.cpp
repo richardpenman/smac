@@ -175,7 +175,8 @@ bool ui_mapdump_like(uint8_t* win, const char* path, const char* like, int32_t s
         if (radius_r >= 0) {  // on the canvas cleared to 0, as the oracle
             Buffer_fill_2(n->canvas, 0);
             // MapWin_draw_radius(.., 0) (without its check for a pending full redraw)
-            MapWin_gen_radius(win, radius_x, radius_y, radius_r, (GameState & 0x80) ? -1 : CurrentPlayerFaction, 0);
+            MapWin_gen_radius(win, radius_x, radius_y, radius_r,
+                              (GameState & STATE_OMNISCIENT_VIEW) ? -1 : CurrentPlayerFaction, 0);
         }
         mw(win, kMwOptions) = (int32_t)old_options;
     }
@@ -286,7 +287,7 @@ void THISCALL pfncZoomProcessing(uint8_t* win) {
     mw(win, kMwUnitLift) = lift;
     mw(win, kMwUnitLift2) = lift2;
     mw(win, kMwElevScale) = 0x19;
-    if (GameMorePreferences & 0x10000) {  // flat terrain
+    if (GameMorePreferences & MPREF_MAP_SHOW_FLAT_TERRAIN) {  // flat terrain
         mw(win, kMwElevScale) = 8;
         mw(win, kMwUnitLift) = lift / 3;
         mw(win, kMwUnitLift2) = lift2 / 3;
@@ -697,7 +698,7 @@ void THISCALL pfncRedrawMap(uint8_t* win, int32_t flag) {
         oy0 = mw(win, kMwOriginY);
     }
     pfncZoomProcessing(win);
-    const int32_t viewer = (GameState & 0x80) ? -1 : CurrentPlayerFaction;
+    const int32_t viewer = (GameState & STATE_OMNISCIENT_VIEW) ? -1 : CurrentPlayerFaction;
     if (!mw(win, kMwScrolling)) {
         pfncDrawMap(win, viewer, flag < 0);
         return;  // (flag: GraphicWin_redraw shows the canvas; the platform presents it)

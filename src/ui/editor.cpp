@@ -90,27 +90,31 @@ void edit_pane() {
 // ---- Console_editor_on (0x4D9970) ----------------------------------------------------------------
 
 void THISCALL Console_editor_on(uint8_t* self) {
-    if ((MultiplayerActive || PbemActive) && !(GameState & 0x61) && !(GameState & 0x1000)) {
+    if ((MultiplayerActive || PbemActive) &&
+        !(GameState & (STATE_GAME_DONE | STATE_SCENARIO_CHEATED_FLAG | STATE_SCENARIO_EDITOR)) &&
+        !(GameState & STATE_DEBUG_MODE)) {
         NetMsg_pop(&NetMsg, "EDITORNET", 5000, 0, nullptr);
         return;
     }
-    if (!(GameState & 0x60) && !X_pop("SCENEDITOR", 0)) return;
+    if (!(GameState & (STATE_SCENARIO_CHEATED_FLAG | STATE_SCENARIO_EDITOR)) && !X_pop("SCENEDITOR", 0)) return;
     GameState = (GameState ^ 0x40) | 0x20;
-    if (GameRules & 0x400) auto_save();
-    if (!(GameState & 0x40)) {
+    if (GameRules & RULES_IRONMAN) auto_save();
+    if (!(GameState & STATE_SCENARIO_EDITOR)) {
         NetMsg_pop(&NetMsg, "EDITOROFF", 5000, 0, nullptr);
-        GameState &= ~0x80;
+        GameState &= ~STATE_OMNISCIENT_VIEW;
     } else {
         NetMsg_pop(&NetMsg, "EDITORON", 5000, 0, nullptr);
-        GameState |= 0x80;
+        GameState |= STATE_OMNISCIENT_VIEW;
     }
     // EditorPanelWin (the info pane's 0x3EA button) shown with the omniscient view.
-    ui_editor_panel_show((GameState & 0x80) && (GameState & 0x40) && InfcList[InfcUsed] == 0);
+    ui_editor_panel_show((GameState & STATE_OMNISCIENT_VIEW) && (GameState & STATE_SCENARIO_EDITOR) &&
+                         InfcList[InfcUsed] == 0);
     pfncMainMenuUpdateVisible(nullptr, mw(self, 0x23BDC));
-    mi_set_mode((GameState & 0x40) && (GameState & 0x80) ? 0x3EA : 0x3E9);
+    mi_set_mode((GameState & STATE_SCENARIO_EDITOR) && (GameState & STATE_OMNISCIENT_VIEW) ? 0x3EA : 0x3E9);
     set_dirty();
     draw_map(1);
-    std::fprintf(stderr, "scenario editor %s (GameState %08X)\n", (GameState & 0x40) ? "on" : "off", GameState);
+    std::fprintf(stderr, "scenario editor %s (GameState %08X)\n", (GameState & STATE_SCENARIO_EDITOR) ? "on" : "off",
+                 GameState);
     Console_update_data(self, 0);
 }
 
@@ -481,10 +485,10 @@ void GAMEAPI Console_editor_fast() {
     auto_undo();
     wipe_units();
     for (int32_t i = 0; i < MapAreaTiles; i++) *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(&MapTiles[i]) + 8) &= 0xFFFFFFFC;
-    uint32_t omni = GameState & 0x80;
-    GameState &= ~0x80;
+    uint32_t omni = GameState & STATE_OMNISCIENT_VIEW;
+    GameState &= ~STATE_OMNISCIENT_VIEW;
     world_build();
-    if (omni) GameState |= 0x80;
+    if (omni) GameState |= STATE_OMNISCIENT_VIEW;
     draw_map(1);
 }
 
@@ -499,22 +503,22 @@ void GAMEAPI Console_editor_generate() {
     GameState |= 4;
     mw(MapWins[0], kMwZoom) = -0xE;
     pfncRedrawMap(MapWins[0], 1);
-    uint32_t omni = GameState & 0x80;
-    GameState |= 0x80;
+    uint32_t omni = GameState & STATE_OMNISCIENT_VIEW;
+    GameState |= STATE_OMNISCIENT_VIEW;
     world_build();
     draw_map(1);
     if (!omni) {
-        GameState &= ~0x80;
+        GameState &= ~STATE_OMNISCIENT_VIEW;
         draw_map(1);
     }
 }
 
 void GAMEAPI Console_editor_lock2() {
-    if (GameState & 0x8000000) {
-        GameState &= ~0x8000000;
+    if (GameState & STATE_EDITOR_ONLY_MODE) {
+        GameState &= ~STATE_EDITOR_ONLY_MODE;
         NetMsg_pop(&NetMsg, "PROTECTOFF", 5000, 0, nullptr);
     } else {
-        GameState |= 0x8000000;
+        GameState |= STATE_EDITOR_ONLY_MODE;
         NetMsg_pop(&NetMsg, "PROTECTON", 5000, 0, nullptr);
         if (MapWinInVehMode) Console_set_view(&MainConsole, 1);
     }
@@ -680,21 +684,21 @@ void GAMEAPI Console_editor_veh() {
 // (EditorPanelWin) shown with it, the map, the world map, the info and status panes and the
 // caption redrawn.
 void editor_toggle_omniscient() {
-    GameState ^= 0x80;
-    ui_editor_panel_show((GameState & 0x80) && (GameState & 0x40));
+    GameState ^= STATE_OMNISCIENT_VIEW;
+    ui_editor_panel_show((GameState & STATE_OMNISCIENT_VIEW) && (GameState & STATE_SCENARIO_EDITOR));
     draw_map(1);
     GraphicWin_redraw(&WorldWindow);
     desktop_update();
     InfoWin_change(&InfoWindow, 0);
     StatusWin_redraw(&InfoWin);
     MapWin_main_caption(MapWins[0]);
-    std::fprintf(stderr, "editor: omniscient view %s\n", (GameState & 0x80) ? "on" : "off");
+    std::fprintf(stderr, "editor: omniscient view %s\n", (GameState & STATE_OMNISCIENT_VIEW) ? "on" : "off");
 }
 
 // ---- the keys (Console_on_key_click's editor part) -----------------------------------------------
 
 bool editor_key(uint8_t* self, int32_t key, int32_t ch) {
-    if (!(GameState & 0x40)) return false;
+    if (!(GameState & STATE_SCENARIO_EDITOR)) return false;
     int32_t vk = key & 0x7FFFF;
     // The characters' switch (FUN_006466EF's lower case): 'y' the omniscient view. (F10 stays
     // the hall of fame.)
@@ -1126,7 +1130,7 @@ void GAMEAPI Console_editor_scen_victory() {
     c = (uint32_t)DialogChoices;
     for (int32_t i = 0; i < 13; i++)
         if (c & (1u << i)) word(kBit[i].w) |= kBit[i].bit;
-    if (GameState & 0x4000000) {
+    if (GameState & STATE_SCN_VICT_BASE_FACIL_COUNT_OBJ) {
         Popup_start(pop.p, ScriptFileName, "FACOBJ", -1, nullptr, 0);
         for (int32_t i = 1; i < 0x41; i++) BasePop_item(pop.p, Facility[i].name, i);
         BasePop_set_active(pop.p, ScnVictFacilityObj);
@@ -1276,16 +1280,16 @@ void GAMEAPI Console_editor_view() {
     if (r == 99) {
         PopupDialogState = 6;
         if (X_pop("EDITORCONTROLALL", 0)) FactionStatus[0] = FactionStatus[1] & 0xFE;
-        GameState |= 0x80;
+        GameState |= STATE_OMNISCIENT_VIEW;
         PopupDialogState = 0;
         draw_map(1);
         desktop_update();
         std::fprintf(stderr, "editor: view all (humans %02X)\n", FactionStatus[0]);
         return;
     }
-    GameState &= ~0x80;
+    GameState &= ~STATE_OMNISCIENT_VIEW;
     desktop_update();
-    ui_editor_panel_show((GameState & 0x80) && (GameState & 0x40));
+    ui_editor_panel_show((GameState & STATE_OMNISCIENT_VIEW) && (GameState & STATE_SCENARIO_EDITOR));
     if (!(FactionStatus[0] & (1 << r))) {
         PluralDefault = MFactions[r].is_noun_plural;
         GenderDefault = MFactions[r].noun_gender;

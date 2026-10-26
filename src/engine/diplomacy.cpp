@@ -303,7 +303,7 @@ int32_t GAMEAPI pact_withdraw(int32_t faction_id, int32_t faction_id_with) {
         }
         if (best < 0) continue;
         veh_drop(veh_lift(veh_id), game().bases[best].x, game().bases[best].y);
-        veh.order = 0;
+        veh.order = ORDER_NONE;
         veh.state &= 0xFCFFBDFF;
         if (veh_triad(veh_id) == TRIAD_AIR) veh.movement_turns = 0;
         moved++;
@@ -328,7 +328,7 @@ void GAMEAPI pact_ends(int32_t faction_id, int32_t faction_id_with) {
         count = faction_id == CurrentPlayerFaction ? withdrawn : withdrawn_with;
     } else {
         const Faction& viewer = game().factions[CurrentPlayerFaction];
-        if (spying(faction_id) || spying(faction_id_with) || (GameState & 0x80) ||
+        if (spying(faction_id) || spying(faction_id_with) || (GameState & STATE_OMNISCIENT_VIEW) ||
             (viewer.diplo_status[faction_id] & DIPLO_PACT) || (viewer.diplo_status[faction_id_with] & DIPLO_PACT)) {
             GenderDefault = game().mfactions[faction_id].noun_gender;
             PluralDefault = game().mfactions[faction_id].is_noun_plural;
@@ -382,7 +382,7 @@ void say_noun(int32_t n, int32_t faction_id) {
 }
 // Faction of the units on a tile (the original inlines veh_who): -1 none.
 int32_t tile_veh_owner(const MAP* sq) {
-    if (!(sq->items & 2)) return -1;
+    if (!(sq->items & BIT_VEH_IN_TILE)) return -1;
     uint32_t f = sq->val2 & 0xF;
     return f > 7 ? -1 : (int32_t)f;
 }
@@ -651,15 +651,18 @@ void GAMEAPI scan_prototypes(int32_t faction_id, int32_t faction_id_with) {
     for (int32_t i = 0; i < 64; i++) {
         const int32_t unit_id = faction_id_with * 64 + i;
         const UNIT& u = Units[unit_id];
-        if (!(u.unit_flags & 1) || !(u.unit_flags & 4) || (u.obsolete_factions & (1 << faction_id_with))) continue;
+        if (!(u.unit_flags & UNIT_ACTIVE) || !(u.unit_flags & UNIT_PROTOTYPED) ||
+            (u.obsolete_factions & (1 << faction_id_with)))
+            continue;
         bool unmatched = true;  // faction_id has no prototype of this plan and triad as good
         int32_t value = Weapon[u.weapon_id].offense_value * 3 +
                         ((7 - (uint8_t)u.plan) * 0x4000 + Armor[u.armor_id].defense_value) * 4 +
                         Chassis[u.chassis_id].speed;
         for (int32_t j = 0; unmatched && j < 64; j++) {
             const UNIT& v = Units[faction_id * 64 + j];
-            if (!(v.unit_flags & 1) || !(v.unit_flags & 4) || (v.obsolete_factions & (1 << faction_id)) ||
-                v.plan != u.plan || Chassis[v.chassis_id].triad != Chassis[u.chassis_id].triad) {
+            if (!(v.unit_flags & UNIT_ACTIVE) || !(v.unit_flags & UNIT_PROTOTYPED) ||
+                (v.obsolete_factions & (1 << faction_id)) || v.plan != u.plan ||
+                Chassis[v.chassis_id].triad != Chassis[u.chassis_id].triad) {
                 continue;
             }
             if (u.reactor_id < v.reactor_id) unmatched = false;
@@ -710,17 +713,18 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
     DiploNearEndgame = at_climax(p);
     DiploRivalOutranks = R.ranking > P.ranking;
     if (!great_satan(p, 0) || R.base_count < 2 ||
-        ((P.diplo_status[r] & DIPLO_PACT) && (R.ranking < 5 || ((GameRules & 0x1000) && CurrentTurn >= 200)))) {
+        ((P.diplo_status[r] & DIPLO_PACT) &&
+         (R.ranking < 5 || ((GameRules & RULES_VICTORY_COOPERATIVE) && CurrentTurn >= 200)))) {
         DiploGreatSatan = 0;
     } else {
         DiploGreatSatan = 1;
     }
     DiploRunawayLeader = FactionRankingsUnk[FactionRankings[7]] > FactionRankingsUnk[p] * 2 && R.ranking != 7;
-    if (R.player_flags & 0x800000) {
+    if (R.player_flags & PFLAG_TEAM_UP_VS_HUMAN) {
         DiploGreatSatan = 1;
         DiploRunawayLeader = 0;
     }
-    if (R.player_flags & 0x400000) {
+    if (R.player_flags & PFLAG_COOP_WITH_HUMAN) {
         DiploGreatSatan = 0;
         DiploRunawayLeader = 1;
     }
@@ -749,12 +753,12 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
     DiploRivalPactCount = 0;
     DiploRivalStrongPacts = 0;
     DiploRivalPactScore = 0;
-    if ((R.diplo_status[p] & 0x20) && fight < 0) fight = -fight;
+    if ((R.diplo_status[p] & DIPLO_WANT_REVENGE) && fight < 0) fight = -fight;
     int32_t most_bases[7];  // per faction 1-7: its largest base count in a region (at least 1)
     for (int32_t i = 0; i < 7; i++) most_bases[i] = 1;
     for (int32_t i = 1; i < 8; i++) {
         if (!alive(i)) continue;
-        if ((P.diplo_status[i] & DIPLO_PACT) && !(game().factions[i].diplo_status[p] & 0x2000000))
+        if ((P.diplo_status[i] & DIPLO_PACT) && !(game().factions[i].diplo_status[p] & DIPLO_HAVE_SURRENDERED))
             DiploPlayerPactCount++;
         if (R.diplo_status[i] & DIPLO_PACT) {
             if (game().factions[i].ranking > 4 && R.ranking < 5 && i != p && !DiploRunawayLeader)
@@ -867,13 +871,13 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
         }
     }
     DiploTributeDemand = (DiploExposedBaseCount + 1) * DiploTributeDemand;
-    if (DiploExposedBaseCount && !(P.diplo_status[r] & 7)) DiploHostility = 1;
+    if (DiploExposedBaseCount && !(P.diplo_status[r] & (DIPLO_PACT | DIPLO_TREATY | DIPLO_TRUCE))) DiploHostility = 1;
     if (DiploNearEndgame && DiploRivalOutranks) DiploHostility = 3 - (DiploGreatSatan != 0);
     if (P.base_count && R.base_count) {
-        if (!(R.diplo_status[p] & 0x20) && !(R.diplo_agenda[p] & 0x200)) {
+        if (!(R.diplo_status[p] & DIPLO_WANT_REVENGE) && !(R.diplo_agenda[p] & 0x200)) {
             int32_t v = clamp(R.AI_wealth - P.tech_commerce_bonus + R.tech_commerce_bonus - fight, 0, 99);
             DiploTributeDemand -= P.energy_surplus_total / P.base_count * v;
-            if (R.diplo_status[p] & 0x2000) DiploTributeDemand /= 2;
+            if (R.diplo_status[p] & DIPLO_WANT_TO_TALK) DiploTributeDemand /= 2;
         } else {
             int32_t v = clamp(P.tech_commerce_bonus - R.tech_commerce_bonus + fight, 0, 99);
             DiploTributeDemand = (R.energy_surplus_total * v / R.base_count + DiploTributeDemand) * 2;
@@ -882,10 +886,11 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
     if (R.best_weapon_value * 3 / 2 <= P.best_weapon_value || R.best_armor_value * 2 < P.best_weapon_value)
         DiploFearScale *= 2;
     if (combat_r * 2 <= combat_p) DiploFearScale *= 2;
-    if (combat_r * 4 <= combat_p && !(R.diplo_status[p] & 0x20) && DiploFearScale < 9) DiploFearScale = 8;
+    if (combat_r * 4 <= combat_p && !(R.diplo_status[p] & DIPLO_WANT_REVENGE) && DiploFearScale < 9) DiploFearScale = 8;
     if (combat_p * 2 < combat_r) DiploFearScale /= 2;
     if (combat_p * 4 < combat_r) DiploFearScale /= 2;
-    if (DiploFearScale || (P.diff_level <= ((R.diplo_status[p] & 0x20) ? 2 : 4) && !(GameRules & 0x40)))
+    if (DiploFearScale ||
+        (P.diff_level <= ((R.diplo_status[p] & DIPLO_WANT_REVENGE) ? 2 : 4) && !(GameRules & RULES_INTENSE_RIVALRY)))
         DiploAttackChance = 0;
     DiploTributeDemand = (CurrentTurn / 10 + combat_r) * DiploTributeDemand / (combat_p + CurrentTurn / 10);
     int32_t delay = MultiplayerActive ? 0 : (5 - P.diff_level) * 25;
@@ -901,7 +906,7 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
     }
     if (!hostile) {
         hostile = DiploGreatSatan ||
-                  (((R.diplo_status[p] & 0x20) || (R.diplo_agenda[p] & 0x200)) && !DiploOpenBaseID &&
+                  (((R.diplo_status[p] & DIPLO_WANT_REVENGE) || (R.diplo_agenda[p] & 0x200)) && !DiploOpenBaseID &&
                    (!DiploFearScale || R.mil_strength_1 * 2 >= P.mil_strength_1));
     }
     if (hostile) {
@@ -919,13 +924,13 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
     DiploConquestFear = DiploFearScale;
     uint32_t pact = R.diplo_status[p] & DIPLO_PACT;
     if (pact || !DiploCapturedBases) DiploConquestFear = 0;
-    uint32_t rules_hard = GameRules & 0x40;
+    uint32_t rules_hard = GameRules & RULES_INTENSE_RIVALRY;
     int32_t diff = rules_hard ? 5 : P.diff_level;
     int32_t blemishes = clamp(P.integrity_blemishes / 2, 1, 99);
     DiploFearScale = DiploFearScale / ((diff + 3) * (blemishes + 1) / 2);
     DiploEnemyAllyCount = 0;
     DiploEnemyAlly = 0;
-    if (!pact || !(R.diplo_status[p] & 0x2000000)) {
+    if (!pact || !(R.diplo_status[p] & DIPLO_HAVE_SURRENDERED)) {
         for (int32_t i = 1; i < 8; i++) {
             uint32_t to_p = game().factions[i].diplo_status[p];
             if (alive(i) && i != p && i != r && (R.diplo_status[i] & DIPLO_VENDETTA) &&
@@ -938,7 +943,7 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
     }
     DiploFriction = DiploEnemyAllyCount * 3 + DiploFriction;
     if (pact) DiploFriction -= 5;
-    if (R.diplo_status[p] & 0x30) DiploFriction += 5;
+    if (R.diplo_status[p] & (DIPLO_VENDETTA | DIPLO_WANT_REVENGE)) DiploFriction += 5;
     uint32_t agenda = R.diplo_agenda[p];
     if (agenda & 0x400) DiploFriction += 3;
     if (agenda & 0x800) DiploFriction += 3;
@@ -957,7 +962,7 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
     if (DiploFriction > 14) DiploHostility = 4;
     uint32_t vendetta = R.diplo_status[p] & 0x40;  // vendetta intended (set_treaty 0x40)
     if (vendetta) DiploHostility = 1;
-    if (!(GameRules & 0x800) && R.SE_alloc_labs == 0) DiploHostility = 1;
+    if (!(GameRules & RULES_VICTORY_TRANSCENDENCE) && R.SE_alloc_labs == 0) DiploHostility = 1;
     if (DiploFearScale || R.mil_strength_1 * 3 < P.mil_strength_1) DiploHostility = 0;
     if (R.best_weapon_value * 2 <= P.best_weapon_value) DiploHostility = 0;
     diff = rules_hard ? 5 : P.diff_level;
@@ -970,7 +975,7 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
         if (credits > 3999) demand = demand * 3 / 2;
     }
     if ((DiploGreatSatan ||
-         (((R.diplo_status[p] & 0x20) || grudge) && !DiploOpenBaseID &&
+         (((R.diplo_status[p] & DIPLO_WANT_REVENGE) || grudge) && !DiploOpenBaseID &&
           (!DiploFearScale || P.mil_strength_1 <= R.mil_strength_1 * 2))) &&
         P.ranking > 5) {
         int32_t share = (R.ranking + P.ranking) * credits / 21;
@@ -979,7 +984,7 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
     DiploTributeDemand = (demand + 24) / 25 * 25;
     if (DiploTributeDemand == 25) DiploTributeDemand = 50;
     if (credits < DiploTributeDemand && DiploTributeDemand < credits * 2 && (vendetta ? 100 : 50) <= credits &&
-        !(P.diplo_status[r] & 0x40020)) {
+        !(P.diplo_status[r] & (DIPLO_WANT_REVENGE | DIPLO_ATROCITY_VICTIM))) {
         DiploTributeDemand = (credits + 24) / 25 * 25;
     }
     if (!(R.diplo_status[p] & 0x60) && (!DiploGreatSatan || (R.diplo_status[p] & 0x4000000))) {
@@ -1067,7 +1072,7 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
     if (agenda & 0x200) DiploGoodwill--;
     DiploGoodwill += -((DiploReputation - 1) / 3) - DiploExposedBaseCount - fight;
     if (P.tech_commerce_bonus < R.tech_commerce_bonus && fight < 1) DiploGoodwill++;
-    if (!(GameRules & 0x800) && R.SE_alloc_labs == 0) DiploGoodwill--;
+    if (!(GameRules & RULES_VICTORY_TRANSCENDENCE) && R.SE_alloc_labs == 0) DiploGoodwill--;
     if (P.mil_strength_1 < R.mil_strength_1) DiploGoodwill--;
     if (P.best_armor_value * 2 < R.best_weapon_value) DiploGoodwill--;
     if ((int32_t)((P.diplo_status[r] >> 4) & 1) < DiploGoodwill && !DiploGreatSatan && !(s & 0x41) &&
@@ -1092,12 +1097,13 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
         DiploCanSurrender = 0;
     } else {
         DiploCanSurrender = 1;
-        if ((R.diplo_status[p] & DIPLO_VENDETTA) && !(R.diplo_agenda[p] & 8) && !(R.diplo_status[p] & 0x40000))
+        if ((R.diplo_status[p] & DIPLO_VENDETTA) && !(R.diplo_agenda[p] & 8) &&
+            !(R.diplo_status[p] & DIPLO_ATROCITY_VICTIM))
             DiploHostility = 0;
     }
     if (is_full) {
         scan_prototypes(p, r);
-        uint32_t hates = R.player_flags_ext & 0x20;
+        uint32_t hates = R.player_flags_ext & PFLAG_EXT_SHAMELESS_BETRAY_HUMANS;
         s = R.diplo_status[p];
         if ((P.diff_level < 2 && !hates) || DiploExposedBaseCount || (s & DIPLO_PACT) || (R.diplo_agenda[p] & 8) ||
             ((s & DIPLO_VENDETTA) && DiploCapturedBases < 2 && !hates) ||
@@ -1110,7 +1116,7 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
             DiploCanBetray = 1;
         }
     }
-    if ((R.player_flags & 0x400000) && !(R.diplo_status[p] & 0x20)) DiploHostility = 0;
+    if ((R.player_flags & PFLAG_COOP_WITH_HUMAN) && !(R.diplo_status[p] & DIPLO_WANT_REVENGE)) DiploHostility = 0;
     if (!(R.diplo_agenda[p] & 8)) {
         if (DiploCanBetray) {
             DiploHostility = 0;
@@ -1121,7 +1127,7 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
     }
     uint32_t mine = P.diplo_status[r];
     if ((mine & DIPLO_PACT) && (!(mine & 0x20) || DiploRivalWarCount > 1) && (!(mine & 0x200) || DiploRivalWarCount) &&
-        R.ranking < P.ranking && ((GameRules & 0x1000) || DiploRivalWarCount)) {
+        R.ranking < P.ranking && ((GameRules & RULES_VICTORY_COOPERATIVE) || DiploRivalWarCount)) {
         DiploHostility = 0;
     }
     if (R.diplo_agenda[p] & 0x2000) {
@@ -1129,7 +1135,7 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
         DiploHostility = (R.diplo_status[p] >> 4) & 1;
     }
     if (!DiploPrevHostility && (DiploFearScale || (mine & DIPLO_PACT)) && DiploFriction > 14) DiploFriction = 14;
-    if ((DiploHostility || (mine & DIPLO_VENDETTA) || (R.diplo_status[p] & 0x20)) && DiploFriction < 6)
+    if ((DiploHostility || (mine & DIPLO_VENDETTA) || (R.diplo_status[p] & DIPLO_WANT_REVENGE)) && DiploFriction < 6)
         DiploFriction = 6;
 }
 
@@ -1140,7 +1146,7 @@ void GAMEAPI tech_analysis(int32_t faction_id, int32_t faction_id_with) {
     DiploTradeOfferValue2 = DiploTradeWantValue2 = DiploTradeOfferValue1 = DiploTradeWantValue1 = 0;
     DiploTradeWantValue4 = DiploTradeWantValue3 = 0;
     DiploTradeOfferProject2 = DiploTradeOfferProject1 = -1;
-    if (GameRules & 0x2000000) return;  // technology trading disabled
+    if (GameRules & RULES_SCN_NO_TECH_TRADING) return;  // technology trading disabled
     for (int32_t t = 0; t < 89; t++) {
         if (!has_tech(t, faction_id_with)) {
             if (!has_tech(t, faction_id)) continue;
@@ -1499,10 +1505,12 @@ int32_t GAMEAPI do_withdrawal(int32_t faction_id, int32_t faction_id_with) {
                     continue;
                 }
                 uint32_t occupant = near->val2 & 0xF;
-                if ((near->items & 3) && occupant < 8 && occupant != (uint32_t)faction_id_with) continue;
+                if ((near->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) && occupant < 8 &&
+                    occupant != (uint32_t)faction_id_with)
+                    continue;
                 veh_drop(veh_lift(veh_id), nx, ny);
                 veh.visibility = 0;
-                veh.order = 0;
+                veh.order = ORDER_NONE;
                 veh.state &= 0xFCFFBDFF;
                 draw_tiles(x, y, 2);
                 moved++;
@@ -1512,7 +1520,7 @@ int32_t GAMEAPI do_withdrawal(int32_t faction_id, int32_t faction_id_with) {
         if (base_id < 0) continue;
         veh_drop(veh_lift(veh_id), game().bases[base_id].x, game().bases[base_id].y);
         veh.visibility = 0;
-        veh.order = 0;
+        veh.order = ORDER_NONE;
         veh.state &= 0xFCFFBDFF;
         draw_tile_fixup(x, y, has_abil(veh.unit_id, 2), 2);
         moved++;
@@ -1702,8 +1710,9 @@ int32_t GAMEAPI wants_to_speak(int32_t faction_id, int32_t faction_id_with) {
     uint32_t alien = game().mfactions[faction_id].rule_flags, alien_with = game().mfactions[faction_id_with].rule_flags;
     if ((alien ^ alien_with) & 0x80) {
         // Humans and aliens talk only once one of them has the technology to understand the other.
-        bool understood = (alien & 0x80) ? (has_tech(0x4E, faction_id_with) || has_tech(4, faction_id))
-                                         : (has_tech(0x4E, faction_id) || has_tech(4, faction_id_with));
+        bool understood = (alien & 0x80)
+                              ? (has_tech(TECH_PrPsych, faction_id_with) || has_tech(TECH_Psych, faction_id))
+                              : (has_tech(TECH_PrPsych, faction_id) || has_tech(TECH_Psych, faction_id_with));
         if (!understood) {
             DiploCaptionMode = 0;
             return 0;
@@ -2141,7 +2150,7 @@ int32_t GAMEAPI propose_treaty(int32_t faction_id, int32_t faction_id_with) {
             }
         }
     }
-    if ((R.player_flags & 0x400000) && !(dstatus(r, f) & 0x20)) accept = true;
+    if ((R.player_flags & PFLAG_COOP_WITH_HUMAN) && !(dstatus(r, f) & 0x20)) accept = true;
     if (dagenda(f, r) & 0x2000) accept = false;
     const MFaction& m = game().mfactions[f];
     PluralDefault = 0;
@@ -2324,9 +2333,9 @@ int32_t GAMEAPI propose_pact(int32_t faction_id, int32_t faction_id_with) {
             score--;
         }
     }
-    if ((GameRules & 0x40) && f == RankingFactionIDUnk1) score++;
-    if ((GameRules & 0x1000) && !(GameRules & 0x40)) score--;
-    if (R.player_flags & 0x400000) score--;
+    if ((GameRules & RULES_INTENSE_RIVALRY) && f == RankingFactionIDUnk1) score++;
+    if ((GameRules & RULES_VICTORY_COOPERATIVE) && !(GameRules & RULES_INTENSE_RIVALRY)) score--;
+    if (R.player_flags & PFLAG_COOP_WITH_HUMAN) score--;
     int32_t rank = P.ranking;
     if (rank >= 6) {
         if (!DiploRunawayLeader && R.ranking >= (rank != 7) + 5) {
@@ -2582,13 +2591,14 @@ void GAMEAPI threaten(int32_t faction_id, int32_t faction_id_with) {
                 DiploFearScale += R.AI_tech - R.AI_power;
             else if (DiploCurrentProposal == 6)
                 DiploFearScale += R.AI_wealth - R.AI_power;
-            if (!(R.diplo_status[f] & 0x2000000) || DiploFearScale > 3)
+            if (!(R.diplo_status[f] & DIPLO_HAVE_SURRENDERED) || DiploFearScale > 3)
                 DiploFearScale = clamp(DiploFearScale, 0, 999);
             else
                 DiploFearScale = 4;
         }
     }
-    if ((R.diplo_status[f] & DIPLO_PACT) && (R.diplo_status[f] & 0x2000000) && DiploFearScale < 2) DiploFearScale = 2;
+    if ((R.diplo_status[f] & DIPLO_PACT) && (R.diplo_status[f] & DIPLO_HAVE_SURRENDERED) && DiploFearScale < 2)
+        DiploFearScale = 2;
     int32_t demand = (CurrentTurn - DiploSpokeTurn) * DiploFearScale * 25 / 16;
     if (R.energy_credits < demand) demand = R.energy_credits / 25 * 25;
     if (demand < 0) demand = 0;
@@ -2606,11 +2616,11 @@ void GAMEAPI threaten(int32_t faction_id, int32_t faction_id_with) {
         bool pact_war = false;
         if ((P.diplo_status[r] & DIPLO_PACT) &&
             (((P.diplo_status[target] & DIPLO_VENDETTA) && !(R.diplo_status[target] & DIPLO_PACT)) ||
-             (R.diplo_status[f] & 0x2000000))) {
+             (R.diplo_status[f] & DIPLO_HAVE_SURRENDERED))) {
             pact_war = true;
             if (wants_to_attack_fresh(r, target, 0) || wants_to_attack(target, r, 0) ||
-                (R.diplo_status[f] & 0x2000000) || (R.ranking < 5 && P.ranking > 5) ||
-                ((P.diplo_status[target] & 0x20) && P.ranking < game().factions[target].ranking) ||
+                (R.diplo_status[f] & DIPLO_HAVE_SURRENDERED) || (R.ranking < 5 && P.ranking > 5) ||
+                ((P.diplo_status[target] & DIPLO_WANT_REVENGE) && P.ranking < game().factions[target].ranking) ||
                 (P.ranking < game().factions[target].ranking && R.ranking < game().factions[target].ranking)) {
                 say_leader(0, target);
                 say_noun(2, target);
@@ -2666,7 +2676,7 @@ void GAMEAPI threaten(int32_t faction_id, int32_t faction_id_with) {
         if (R.diplo_status[f] & DIPLO_PACT) {
             int32_t region = map_tile(game().bases[base_id].x, game().bases[base_id].y)->region;
             int32_t bases = R.base_count;
-            if (!(R.diplo_status[f] & 0x2000000) || bases < 2 ||
+            if (!(R.diplo_status[f] & DIPLO_HAVE_SURRENDERED) || bases < 2 ||
                 ((P.diplo_agenda[r] & 0x1000) && (uint8_t)game().bases[base_id].faction_id_former != (uint32_t)f &&
                  (P.region_total_bases[region] < R.region_total_bases[region] ||
                   bases / 2 < R.region_total_bases[region]))) {
@@ -2682,7 +2692,7 @@ void GAMEAPI threaten(int32_t faction_id, int32_t faction_id_with) {
             parse_says(0, game().bases[DiploAskBaseSwapID].name, -1, -1);
             net_cede_base(DiploAskBaseSwapID, f, 1);
             X_pops_11("BASEOK", 0x100000, portrait, kPopWait);
-            if (!(R.diplo_status[f] & 0x2000000)) net_set_treaty(r, f, 0x20, 1, 1);
+            if (!(R.diplo_status[f] & DIPLO_HAVE_SURRENDERED)) net_set_treaty(r, f, 0x20, 1, 1);
             diplo_unlock();  // inlined in the original
             done = true;
         }
@@ -2690,8 +2700,8 @@ void GAMEAPI threaten(int32_t faction_id, int32_t faction_id_with) {
     if (!done) {
         if (R.diplo_status[f] & DIPLO_PACT) {
             if ((DiploPrevHostility || DiploGreatSatan || DiploFriction > 10) &&
-                (R.ranking < P.ranking || R.tech_ranking < P.tech_ranking) && !(R.diplo_status[f] & 0x2000000) &&
-                P.ranking > 4) {
+                (R.ranking < P.ranking || R.tech_ranking < P.tech_ranking) &&
+                !(R.diplo_status[f] & DIPLO_HAVE_SURRENDERED) && P.ranking > 4) {
                 // A pact partner does not accept threats.
                 say_leader(0, f);
                 parse_says(2, get_pact(f), -1, -1);
@@ -3089,7 +3099,7 @@ int32_t GAMEAPI propose_attack(int32_t faction_id, int32_t faction_id_with) {
         else if (FactionRankingsUnk[FactionRankings[7]] * 2 >= second * 3)
             price /= 2;
     }
-    if (R.player_flags & 0x400000) price /= 2;
+    if (R.player_flags & PFLAG_COOP_WITH_HUMAN) price /= 2;
     uint32_t pact_target = R.diplo_status[target] & DIPLO_PACT;
     if (pact_target) {
         price *= 3 - R.AI_fight;
@@ -3102,10 +3112,12 @@ int32_t GAMEAPI propose_attack(int32_t faction_id, int32_t faction_id_with) {
     }
     if (T.integrity_blemishes > P.integrity_blemishes) {
         price /= 2;
-        if ((P.diplo_status[target] & 0x20) && !(R.diplo_status[f] & 0x20) && !(T.diplo_status[f] & 0x20)) price /= 2;
+        if ((P.diplo_status[target] & DIPLO_WANT_REVENGE) && !(R.diplo_status[f] & DIPLO_WANT_REVENGE) &&
+            !(T.diplo_status[f] & DIPLO_WANT_REVENGE))
+            price /= 2;
     }
     if (DiploGreatSatan) price *= 2;
-    if ((R.diplo_status[f] & DIPLO_PACT) && (R.diplo_status[f] & 0x2000000)) price /= 2;
+    if ((R.diplo_status[f] & DIPLO_PACT) && (R.diplo_status[f] & DIPLO_HAVE_SURRENDERED)) price /= 2;
     uint32_t war_p = P.diplo_status[target] & DIPLO_VENDETTA;
     if (!war_p && !human(target)) price += price / 2;
     if (T.ranking >= 6 && R.ranking >= 6) price /= 2;
@@ -3116,7 +3128,7 @@ int32_t GAMEAPI propose_attack(int32_t faction_id, int32_t faction_id_with) {
         !pact_target) {
         // A pact partner joins faction_id's war at once.
         if (wants_to_attack_fresh(r, target, 0) || wants_to_attack(target, r, 0) ||
-            ((P.diplo_status[target] & 0x20) && T.ranking > P.ranking) ||
+            ((P.diplo_status[target] & DIPLO_WANT_REVENGE) && T.ranking > P.ranking) ||
             (T.ranking > P.ranking && T.ranking > R.ranking)) {
             say_leader(0, target);
             say_noun(2, target);
@@ -3317,7 +3329,7 @@ void GAMEAPI buy_council_vote(int32_t faction_id, int32_t faction_id_with, int32
     tech_analysis(f, r);
     if (ExpansionEnabled && ((game().mfactions[f].rule_flags & 0x80) || (game().mfactions[r].rule_flags & 0x80)))
         return;
-    if (R.diplo_status[f] & 0x40030) {
+    if (R.diplo_status[f] & (DIPLO_VENDETTA | DIPLO_WANT_REVENGE | DIPLO_ATROCITY_VICTIM)) {
         if (ControlWaitLoop) {
             say_leader(0, r);
             X_pop("BUYNOTALK", kPopWait);
@@ -3339,17 +3351,17 @@ void GAMEAPI buy_council_vote(int32_t faction_id, int32_t faction_id_with, int32
     int32_t promised = R.unk_29[proposal];  // the vote faction_id_with promised for this proposal
     if (promised) {
         int32_t to = R.unk_30[proposal];
-        if (!(R.diplo_status[to] & 0x30)) {
+        if (!(R.diplo_status[to] & (DIPLO_VENDETTA | DIPLO_WANT_REVENGE))) {
             say_leader(0, to);
             X_pops_11("BUYPROMISED", 0x100000, portrait, kPopWait);
             return;
         }
     }
-    if (R.SE_economy_base > 0 && proposal > 1 && !(R.diplo_status[f] & 0x20) && want < -2) want = -2;
+    if (R.SE_economy_base > 0 && proposal > 1 && !(R.diplo_status[f] & DIPLO_WANT_REVENGE) && want < -2) want = -2;
     if (ControlWaitLoop && candidate == CouncilVoteFor[r]) {
         say_leader(0, f);
         X_pop("BUYALREADY", kPopWait);
-        if (MultiplayerActive && (P.diplo_status[r] & DIPLO_TREATY) && !(R.diplo_status[f] & 0x20)) {
+        if (MultiplayerActive && (P.diplo_status[r] & DIPLO_TREATY) && !(R.diplo_status[f] & DIPLO_WANT_REVENGE)) {
             R.unk_29[proposal] = candidate;
             R.unk_30[proposal] = proposal ? f : candidate;
             synch_leader(r);
@@ -3557,20 +3569,20 @@ int32_t GAMEAPI tech_trade(int32_t faction_id, int32_t faction_id_with, int32_t 
             X_pops_11(StrBuffer, 0x100000, portrait, kPopWait);
             return 0;
         }
-        bool slave = (R.diplo_status[f] & DIPLO_PACT) && (R.diplo_status[f] & 0x2000000);
+        bool slave = (R.diplo_status[f] & DIPLO_PACT) && (R.diplo_status[f] & DIPLO_HAVE_SURRENDERED);
         if (!slave) {
             bool reactor = false;  // faction_id_with has a reactor technology faction_id lacks
             for (int32_t i = 0; i < 4; i++) {
                 if (has_tech(Reactor[i].preq_tech, r) && !has_tech(Reactor[i].preq_tech, f)) reactor = true;
             }
             bool fear = false;
-            if (great_satan(f, 0) && !(P.diplo_status[r] & DIPLO_PACT) && !(R.player_flags & 0x400000)) {
+            if (great_satan(f, 0) && !(P.diplo_status[r] & DIPLO_PACT) && !(R.player_flags & PFLAG_COOP_WITH_HUMAN)) {
                 int32_t cost = game().mfactions[r].rule_techcost - 100;
                 int32_t sign = cost > 0 ? 1 : (cost < 0 ? -1 : 0);
                 if (DiploFriction >= ((R.diplo_status[f] & DIPLO_TREATY) ? 3 : 0) + (2 - sign) * 2) fear = true;
             }
-            if (!fear && (MultiplayerActive || (GameRules & 0x40)) && P.ranking == 7 &&
-                !(P.diplo_status[r] & DIPLO_PACT) && !(R.player_flags & 0x400000) &&
+            if (!fear && (MultiplayerActive || (GameRules & RULES_INTENSE_RIVALRY)) && P.ranking == 7 &&
+                !(P.diplo_status[r] & DIPLO_PACT) && !(R.player_flags & PFLAG_COOP_WITH_HUMAN) &&
                 (great_satan(f, 0) || (FactionRankingsUnk[f] * 3 > FactionRankingsUnk[RankingFactionIDUnk2] * 4 &&
                                        P.tech_ranking * 3 > game().factions[RankingFactionIDUnk2].tech_ranking * 4))) {
                 fear = true;
@@ -3588,7 +3600,8 @@ int32_t GAMEAPI tech_trade(int32_t faction_id, int32_t faction_id_with, int32_t 
                 if (counter) return 0;
                 int32_t limit = ((R.diplo_status[f] & DIPLO_TREATY) ? 3 : 0) + (reactor ? 3 : 9) -
                                 (std::strcmp(game().mfactions[r].filename, "HIVE") ? 0 : 3);
-                if (DiploFriction >= limit && !(P.diplo_status[r] & DIPLO_PACT) && !(R.player_flags & 0x400000)) {
+                if (DiploFriction >= limit && !(P.diplo_status[r] & DIPLO_PACT) &&
+                    !(R.player_flags & PFLAG_COOP_WITH_HUMAN)) {
                     // faction_id_with keeps its lead.
                     if (!reactor && buy_tech(f, r, offer, 1, mode)) return 0;
                     if (offer == 5 && mode != 13) {
@@ -3621,10 +3634,10 @@ int32_t GAMEAPI tech_trade(int32_t faction_id, int32_t faction_id_with, int32_t 
             }
         }
         if (DiploTradeWantTech1 < 0 && mode != 5 && mode != 13 && !(R.traded_maps & (1 << f)) && !DiploMapsTraded &&
-            !(P.diplo_status[r] & DIPLO_PACT) && !(R.player_flags & 0x200)) {
+            !(P.diplo_status[r] & DIPLO_PACT) && !(R.player_flags & PFLAG_MAP_REVEALED)) {
             // Nothing to give: maps (9999) instead, if faction_id_with knows few of faction_id's bases.
             int32_t n = known_bases(f, r);
-            if (GameRules & 0x100) {
+            if (GameRules & RULES_NO_UNITY_SURVEY) {
                 if (!n && DiploFriction <= 7) DiploTradeWantTech1 = 9999;
             } else if (n < (P.base_count + 1) / 2 && DiploFriction <= 7) {
                 DiploTradeWantTech1 = 9999;
@@ -3640,7 +3653,7 @@ int32_t GAMEAPI tech_trade(int32_t faction_id, int32_t faction_id_with, int32_t 
             return 0;
         }
         if (DiploTradeOfferTech1 >= 0 && mode != 13 && (R.diplo_status[f] & DIPLO_PACT) &&
-            (R.diplo_status[f] & 0x2000000)) {
+            (R.diplo_status[f] & DIPLO_HAVE_SURRENDERED)) {
             // A surrendered faction hands its technology over.
             if (!wants_to_speak(f, r)) return 0;
             StrBuffer[0] = 0;
@@ -3653,7 +3666,8 @@ int32_t GAMEAPI tech_trade(int32_t faction_id, int32_t faction_id_with, int32_t 
         }
         if (DiploTradeWantTech1 < 0 && DiploTradeOfferTech1 >= 0 && mode != 5 && mode != 13 &&
             (R.diplo_status[f] & DIPLO_PACT) && DiploFriction < 10 &&
-            (!(MultiplayerActive || (GameRules & 0x40)) || f != RankingFactionIDUnk1) && !DiploGreatSatan) {
+            (!(MultiplayerActive || (GameRules & RULES_INTENSE_RIVALRY)) || f != RankingFactionIDUnk1) &&
+            !DiploGreatSatan) {
             int32_t rank = P.ranking, rank_r = R.ranking;
             if ((rank_r > rank || (rank >= 6 && rank_r >= 3)) &&
                 R.tech_ranking >
@@ -3682,9 +3696,10 @@ int32_t GAMEAPI tech_trade(int32_t faction_id, int32_t faction_id_with, int32_t 
             if ((agenda & 0x100) && (f != RankingFactionIDUnk2 || (P.ranking >= 6 && !DiploRunawayLeader)))
                 trade = false;
         }
-        if (trade && ((R.diplo_status[f] & 0x20) || (R.diplo_agenda[f] & 0x200) || P.integrity_blemishes > 3))
+        if (trade &&
+            ((R.diplo_status[f] & DIPLO_WANT_REVENGE) || (R.diplo_agenda[f] & 0x200) || P.integrity_blemishes > 3))
             trade = false;
-        if (trade && (GameRules & 0x40)) {
+        if (trade && (GameRules & RULES_INTENSE_RIVALRY)) {
             if ((agenda & 0x80) && f == RankingFactionIDUnk1 && !(P.diplo_status[r] & DIPLO_PACT) &&
                 FactionRankingsUnk[FactionRankings[7]] * 3 > FactionRankingsUnk[FactionRankings[6]] * 4) {
                 trade = false;
@@ -3694,10 +3709,10 @@ int32_t GAMEAPI tech_trade(int32_t faction_id, int32_t faction_id_with, int32_t 
         }
         if (trade && DiploTradeOfferTech1 < 0) {
             // Maps in return, unless faction_id_with already knows enough.
-            if (DiploMapsTraded || (P.diplo_status[r] & DIPLO_PACT) || (P.player_flags & 0x200)) {
+            if (DiploMapsTraded || (P.diplo_status[r] & DIPLO_PACT) || (P.player_flags & PFLAG_MAP_REVEALED)) {
                 trade = false;
             } else if (P.traded_maps & (1 << r)) {
-                int32_t limit = (GameRules & 0x100) ? (R.base_count + 3) / 4 : (R.base_count + 1) / 2;
+                int32_t limit = (GameRules & RULES_NO_UNITY_SURVEY) ? (R.base_count + 3) / 4 : (R.base_count + 1) / 2;
                 if (seen >= limit) trade = false;
             }
         }
@@ -3710,7 +3725,7 @@ int32_t GAMEAPI tech_trade(int32_t faction_id, int32_t faction_id_with, int32_t 
             } else {
                 crt_strcat(StrBuffer, "REJTECHLATER");
                 int32_t variant = game_random(0, 3);
-                if (P.diplo_status[r] & 3) {
+                if (P.diplo_status[r] & (DIPLO_PACT | DIPLO_TREATY)) {
                     if (DiploTradeWantTech1 < 0)
                         variant = 4;
                     else if (DiploTradeOfferTech1 < 0)
@@ -3817,7 +3832,7 @@ int32_t GAMEAPI tech_trade(int32_t faction_id, int32_t faction_id_with, int32_t 
                 value = DiploTradeWantValue1 / 8;
             } else if (choice == 2) {
                 // faction_id offers its second technology instead.
-                if (!((R.diplo_status[f] & DIPLO_PACT) && (R.diplo_status[f] & 0x2000000))) {
+                if (!((R.diplo_status[f] & DIPLO_PACT) && (R.diplo_status[f] & DIPLO_HAVE_SURRENDERED))) {
                     const char* filename = game().mfactions[r].filename;
                     if (!std::strcmp(filename, "HIVE") || (MultiplayerActive && f == RankingFactionIDUnk1) ||
                         (std::strcmp(filename, "UNIV") && (great_satan(f, 0) || R.tech_ranking > P.tech_ranking))) {

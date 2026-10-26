@@ -272,8 +272,8 @@ struct PrefWin : ScreenWin {
             } else {
                 vol_on[0] = vol_on[3] = vol_on[2] = vol_on[1] = 0;
                 sound_enable_master(false);
-                GamePreferences &= ~0xC00;
-                GameMorePreferences &= ~0x4000;
+                GamePreferences &= ~(PREF_AV_VOLUME_SFX_TOGGLE | PREF_AV_VOLUME_MUSIC_TOGGLE);
+                GameMorePreferences &= ~MPREF_AV_VOLUME_VOICE_TOGGLE;
             }
         } else if (i == 1 || i == 2) {  // 0x56 effects (group 1), 0x57 voices (group 0)
             int32_t group = i == 1 ? 1 : 0;
@@ -292,7 +292,7 @@ struct PrefWin : ScreenWin {
             } else {
                 vol_on[3] = 1;
                 vol_on[0] = 1;
-                GamePreferences |= 0x800;
+                GamePreferences |= PREF_AV_VOLUME_MUSIC_TOGGLE;
                 load_music(CurrentPlayerFaction);
             }
         }
@@ -491,8 +491,8 @@ void prefwin_display(int32_t page) {
 
 // ---- Console_retire_game (0x514B30): Resign ----
 void THISCALL Console_retire_game(uint8_t*) {
-    if (GameRules & 0x400) auto_save();
-    const char* label = (GameRules & 0x400) ? "REALLYRETIRE2" : "REALLYRETIRE";
+    if (GameRules & RULES_IRONMAN) auto_save();
+    const char* label = (GameRules & RULES_IRONMAN) ? "REALLYRETIRE2" : "REALLYRETIRE";
     if ((MultiplayerActive || PbemActive)) {
         int32_t humans = 0;
         for (int32_t f = 1; f < 8; f++)
@@ -510,9 +510,9 @@ void THISCALL Console_retire_game(uint8_t*) {
         MultiplayerActive = 0;
         net = true;
     }
-    if (GameRules & 0x400) kill_auto_save();
+    if (GameRules & RULES_IRONMAN) kill_auto_save();
     report_score(1);
-    if (!(GameState & 0x10)) {
+    if (!(GameState & STATE_IS_SCENARIO)) {
         quayle(CurrentPlayerFaction);
         hall_of_fame(1);
     }
@@ -543,8 +543,8 @@ void THISCALL Console_editor_rules(uint8_t*) {
             uint32_t d = (uint32_t)DialogChoices;
             for (int32_t i = 0; i < 16; i++)
                 if (i == 11 ? !(d & (1u << i)) : (d & (1u << i)) != 0) GameRules |= (int32_t)kRuleBits[i];
-            if (d & 0x10000) GameState |= 0x800000;
-            if (d & 0x20000) GameState |= 0x1000000;
+            if (d & 0x10000) GameState |= STATE_RAND_FAC_LEADER_PERSONALITIES;
+            if (d & 0x20000) GameState |= STATE_RAND_FAC_LEADER_SOCIAL_AGENDA;
             break;
         }
         GameRules |= (int32_t)default_rules();  // Standard Rules

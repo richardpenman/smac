@@ -47,7 +47,7 @@ int32_t moves_left(int32_t veh_id) {
 }
 // Owner of a base on the tile (0-7), or -1.
 inline int32_t tile_base_owner(const MAP* sq) {
-    if (!(sq->items & 1)) return -1;
+    if (!(sq->items & BIT_BASE_IN_TILE)) return -1;
     int32_t owner = sq->val2 & 0xF;
     return owner < 8 ? owner : -1;
 }
@@ -114,18 +114,18 @@ int32_t GAMEAPI order_veh(int32_t veh_id, int32_t dir, int32_t flags) {
     int32_t tmp, tmp2;
 
 L_5949b3:  // (re)start, also with a disembarking passenger as veh_id
-    delayed = (game().vehs[veh_id].state & 0x4200) ? 1 : 0;
+    delayed = (game().vehs[veh_id].state & (VSTATE_ON_ALERT | VSTATE_EXPLORE)) ? 1 : 0;
     triad = veh_chassis_triad(veh_id);
-    if (!(FactionStatus[0] & fbit) && game().vehs[veh_id].order == 0x18) {
+    if (!(FactionStatus[0] & fbit) && game().vehs[veh_id].order == ORDER_MOVE_TO) {
         // AI units do not walk into the territory of factions they are at peace with.
         int32_t owner = whose_territory(faction_id, game().vehs[veh_id].waypoint_x[0],
                                         game().vehs[veh_id].waypoint_y[0], nullptr, 0);
         if (owner >= 0 && owner != faction_id && !(dstat(faction_id, owner) & 0xC11)) {
-            game().vehs[veh_id].order = 0;
+            game().vehs[veh_id].order = ORDER_NONE;
             goto L_599b1a;
         }
     }
-    if (veh_unit(veh_id).plan == 12 && !(game().vehs[veh_id].flags & 0x20) && (VehAttackFlags & 1)) {
+    if (veh_unit(veh_id).plan == 12 && !(game().vehs[veh_id].flags & VFLAG_IS_OBJECTIVE) && (VehAttackFlags & 1)) {
         // Alien artifact entering a base: link it to the network node or a secret project.
         game().vehs[veh_id].movement_turns = 0;
         if (base_id >= 0 && (uint8_t)game().bases[base_id].faction_id == (uint32_t)faction_id) {
@@ -143,15 +143,16 @@ L_5949b3:  // (re)start, also with a disembarking passenger as veh_id
                 char* text = text_get();
                 int32_t offset, mask;
                 bitmask(8, &offset, &mask);  // network node
-                if ((base.facilities_built[offset] & (uint8_t)mask) && SecretProjects[20] != base_id &&
-                    !(base.state_flags & 0x800)) {
+                if ((base.facilities_built[offset] & (uint8_t)mask) &&
+                    SecretProjects[FAC_UNIVERSAL_TRANSLATOR - SP_ID_First] != base_id &&
+                    !(base.state_flags & BSTATE_ARTIFACT_ALREADY_LINKED)) {
                     StrBuffer[0] = 0;
                     parse_string(text, StrBuffer);
                     items = 2;
                     if (!(FactionStatus[0] & fbit)) game().vehs[veh_id].movement_turns = 1;
                 }
                 text = text_get();
-                if (SecretProjects[20] == base_id) {
+                if (SecretProjects[FAC_UNIVERSAL_TRANSLATOR - SP_ID_First] == base_id) {
                     StrBuffer[0] = 0;
                     parse_string(text, StrBuffer);
                     items++;
@@ -168,7 +169,7 @@ L_5949b3:  // (re)start, also with a disembarking passenger as veh_id
                 }
                 text = text_get();
                 item = base.queue_items[0];
-                if (item >= 0 && item >= 64 && !(Units[item].unit_flags & 4)) {
+                if (item >= 0 && item >= 64 && !(Units[item].unit_flags & UNIT_PROTOTYPED)) {
                     StrBuffer[0] = 0;
                     parse_says(2, Units[item].name, -1, -1);
                     parse_string(text, StrBuffer);
@@ -182,11 +183,11 @@ L_5949b3:  // (re)start, also with a disembarking passenger as veh_id
         }
     }
     if (dir >= 8) goto L_5962f2;
-    game().vehs[veh_id].state |= 4;
+    game().vehs[veh_id].state |= VSTATE_HAS_MOVED;
     if (veh_unit(veh_id).plan == 11 && tgt_faction >= 0 && faction_id != tgt_faction) {
         // Probe team: probe actions against other factions.
         if (VehAttackFlags & 1) {
-            game().vehs[veh_id].flags &= ~4;
+            game().vehs[veh_id].flags &= ~VFLAG_PROBE_PACT_OPERATIONS;
             if ((dstat(faction_id, tgt_faction) & 1) && !delayed && faction_id == CurrentPlayerFaction) {
                 if (base_id >= 0) {
                     parse_says(0, game().bases[base_id].name, -1, -1);
@@ -197,7 +198,7 @@ L_5949b3:  // (re)start, also with a disembarking passenger as veh_id
                     parse_says(0, faction_adj(tgt_faction), -1, -1);
                     if (!X_pop("PROBEPACTTEAM", 0)) goto L_595083;
                 }
-                game().vehs[veh_id].flags |= 4;  // probe operations against a pact partner
+                game().vehs[veh_id].flags |= VFLAG_PROBE_PACT_OPERATIONS;  // probe operations against a pact partner
             }
         }
     L_594f3c:
@@ -276,13 +277,15 @@ L_595083:
     if (faction_id == 0) goto L_59512c;
     {
         const MAP* sq = map_tile(tx, ty);
-        if (!(sq->items & 0x20) || (sq->climate & 0xE0) < 0x40 || (sq->items & 8)) goto L_59512c;
-        if ((veh_offense(veh_id) == 0 || game().vehs[veh_id].order == 0x18) && SecretProjects[8] >= 0 &&
-            (uint8_t)game().bases[SecretProjects[8]].faction_id == (uint32_t)faction_id)
+        if (!(sq->items & BIT_FUNGUS) || (sq->climate & 0xE0) < 0x40 || (sq->items & BIT_MAGTUBE)) goto L_59512c;
+        if ((veh_offense(veh_id) == 0 || game().vehs[veh_id].order == ORDER_MOVE_TO) &&
+            SecretProjects[FAC_XENOEMPATHY_DOME - SP_ID_First] >= 0 &&
+            (uint8_t)game().bases[SecretProjects[FAC_XENOEMPATHY_DOME - SP_ID_First]].faction_id ==
+                (uint32_t)faction_id)
             goto L_59512c;
         if (veh_sea != tgt_sea) goto L_59512c;
         if (goody_at(tx, ty)) goto L_59512c;
-        if (GameRules & 0x200000) goto L_59512c;
+        if (GameRules & RULES_SCN_NO_NATIVE_LIFE) goto L_59512c;
         base_find(tx, ty);
         if (BaseFindDist <= 1) goto L_59512c;
         int32_t chance = BaseFindDist < 0 ? 0 : BaseFindDist > 32 ? 32 : BaseFindDist;
@@ -331,7 +334,8 @@ L_595137: {
         if (!(tgt.flags & 0x400)) {
             if (faction_id == tgt_faction) goto L_596052;
             if (dstat(faction_id, tgt_faction) & 1) {
-                if (veh_unit(veh_id).plan != 11 || !(game().vehs[veh_id].flags & 4)) goto L_596052;
+                if (veh_unit(veh_id).plan != 11 || !(game().vehs[veh_id].flags & VFLAG_PROBE_PACT_OPERATIONS))
+                    goto L_596052;
             }
         }
         if (probed) goto L_599b1a;
@@ -342,7 +346,7 @@ L_595137: {
             if ((VehAttackFlags & 1) && faction_id == CurrentPlayerFaction) goto L_596d5d;
         }
         if (base_id >= 0) goto L_595734;
-        if (map_tile(tx, ty)->items & 0x40000) goto L_595734;
+        if (map_tile(tx, ty)->items & BIT_AIRBASE) goto L_595734;
         if (stack_check(stack_id, 0x12, -1, -1, -1) && !has_abil(game().vehs[veh_id].unit_id, 0x20) &&
             !stack_check(stack_id, 6, 0x80, -1, -1))
             goto L_596e0b;  // only fighters attack air units
@@ -514,7 +518,7 @@ L_596052:  // movement checks
     if (faction_id != CurrentPlayerFaction || !(VehAttackFlags & 1)) goto L_599b1a;
     {
         // A ship moving to land: a passenger disembarks.
-        game().vehs[veh_id].order = 0;
+        game().vehs[veh_id].order = ORDER_NONE;
         parse_says(0, veh_unit(veh_id).name, -1, -1);
         if (X_text_open(ScriptFileName, "DISEMBARKERS")) goto L_599b1a;
         text_get();
@@ -522,7 +526,7 @@ L_596052:  // movement checks
         int32_t chosen = -1, count = 0;
         if (veh_id < 0) goto L_599b1a;
         for (int32_t v = top_of(veh_id); v >= 0; v = game().vehs[v].next_veh_id_stack) {
-            if (game().vehs[v].order == 1 && game().vehs[v].waypoint_x[0] == veh_id) {
+            if (game().vehs[v].order == ORDER_SENTRY_BOARD && game().vehs[v].waypoint_x[0] == veh_id) {
                 count++;
                 if (moves_left(v) > 0) {
                     chosen = v;
@@ -539,7 +543,7 @@ L_596052:  // movement checks
         int32_t choice = ui_disembark_menu(veh_id) - 1;
         if (choice < 0) goto L_599b1a;
         veh_id = choice;
-        game().vehs[choice].order = 0;
+        game().vehs[choice].order = ORDER_NONE;
         goto L_5949b3;
     }
 L_5972bd:
@@ -579,7 +583,7 @@ L_597350:
     if (dstat(faction_id, tgt_faction) & 7) {
         // At peace with the owner: AIs stop, the human player is asked to break the treaty.
         if (!(FactionStatus[0] & fbit)) {
-            game().vehs[veh_id].order = 0;
+            game().vehs[veh_id].order = ORDER_NONE;
             goto L_599b1a;
         }
         if (faction_id != CurrentPlayerFaction) goto L_59763b;
@@ -589,11 +593,11 @@ L_597350:
     }
 L_597564:
     if (faction_id == CurrentPlayerFaction && (FactionStatus[0] & fbit) && (VehAttackFlags & 1) &&
-        game().vehs[veh_id].order == 0x18 &&
+        game().vehs[veh_id].order == ORDER_MOVE_TO &&
         !(game().vehs[veh_id].waypoint_x[0] == tx && game().vehs[veh_id].waypoint_y[0] == ty) &&
-        veh_chassis_triad(veh_id) != 2 && !(game().vehs[veh_id].state & 0x4200) && goody_at(tx, ty) &&
-        popp(ScriptFileName, "GOTOGOODY", 0, "supply_sm.pcx", 0)) {
-        game().vehs[veh_id].order = 0;
+        veh_chassis_triad(veh_id) != 2 && !(game().vehs[veh_id].state & (VSTATE_ON_ALERT | VSTATE_EXPLORE)) &&
+        goody_at(tx, ty) && popp(ScriptFileName, "GOTOGOODY", 0, "supply_sm.pcx", 0)) {
+        game().vehs[veh_id].order = ORDER_NONE;
         goto L_599b1a;
     }
 L_59763b: {  // the move itself
@@ -604,7 +608,7 @@ L_59763b: {  // the move itself
         // Not enough movement points: a land unit may still make it (random).
         if (moves_left(veh_id) >= Rules.move_rate_roads) {
             const MAP* sq = map_tile(tx, ty);
-            if (!(sq->items & 0x20) || (sq->climate & 0xE0) < 0x40) goto L_597b24_move;
+            if (!(sq->items & BIT_FUNGUS) || (sq->climate & 0xE0) < 0x40) goto L_597b24_move;
             int32_t unit_id = game().vehs[veh_id].unit_id;
             if (unit_id < 64 && Weapon[Units[unit_id].weapon_id].offense_value < 0) goto L_597b24_move;
             if (Units[unit_id].plan == 9 || Units[unit_id].plan == 12) goto L_597b24_move;
@@ -621,8 +625,9 @@ L_59763b: {  // the move itself
             if (roll < limit) goto L_597b24_move;
         }
         if (faction_id == CurrentPlayerFaction) {
-            if (game().vehs[veh_id].order == 0 && !ui_shift_pressed() && (VehAttackFlags & 1) &&
-                !(game().vehs[veh_id].state & 0x200) && !(GameMorePreferences & 0x80)) {
+            if (game().vehs[veh_id].order == ORDER_NONE && !ui_shift_pressed() && (VehAttackFlags & 1) &&
+                !(game().vehs[veh_id].state & VSTATE_ON_ALERT) &&
+                !(GameMorePreferences & MPREF_ADV_QUICK_MOVE_ALL_VEH)) {
                 // Show the failed attempt.
                 Console_focus(&MainConsole, x, y, CurrentPlayerFaction);
                 stack_veh(veh_id, 1);
@@ -637,23 +642,24 @@ L_59763b: {  // the move itself
             }
             if (faction_id == CurrentPlayerFaction) {
                 const MAP* sq = map_tile(tx, ty);
-                bool fungus = (sq->items & 0x20) && (sq->climate & 0xE0) >= 0x40;
-                if (fungus && game().vehs[veh_id].order == 0 && veh_unit(veh_id).plan != 9 &&
+                bool fungus = (sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40;
+                if (fungus && game().vehs[veh_id].order == ORDER_NONE && veh_unit(veh_id).plan != 9 &&
                     veh_unit(veh_id).plan != 12 && (VehAttackFlags & 1)) {
                     if (tut_check(0x1000)) {
                         TutSlowFungusCount++;
                         FX_play(&Sounds, 9);
                         TutWin_tut_map(&TutWin, "SLOWFUNGUS", tx, ty, -1, nullptr, 0, -1, -1);
-                        game().vehs[veh_id].order = 0;
+                        game().vehs[veh_id].order = ORDER_NONE;
                         goto L_599b1a;
                     }
                     if (!delayed) TutSlowFungusCount++;
                 }
-                if (faction_id == CurrentPlayerFaction && game().vehs[veh_id].order == 0 && !TutDisabledFlag &&
-                    (VehAttackFlags & 1) && !((map_tile(tx, ty)->items & 0x20) && (map_tile(tx, ty)->climate & 0xE0) >= 0x40) &&
+                if (faction_id == CurrentPlayerFaction && game().vehs[veh_id].order == ORDER_NONE && !TutDisabledFlag &&
+                    (VehAttackFlags & 1) &&
+                    !((map_tile(tx, ty)->items & BIT_FUNGUS) && (map_tile(tx, ty)->climate & 0xE0) >= 0x40) &&
                     tut_check(0x4000)) {
                     TutWin_tut_map(&TutWin, "FRACTIONALMOVE", tx, ty, veh_id, nullptr, 0, x, y);
-                    game().vehs[veh_id].order = 0;
+                    game().vehs[veh_id].order = ORDER_NONE;
                     goto L_599b1a;
                 }
             }
@@ -698,12 +704,13 @@ L_59763b: {  // the move itself
             visible = 1;
         } else {
             const VEH& v = game().vehs[veh_id];
-            if ((v.faction_id == (uint32_t)cp && (v.flags & 0x440) != 0x440) || ((1u << (cp & 31)) & v.visibility))
+            if ((v.faction_id == (uint32_t)cp && (v.flags & (VFLAG_LURKER | VFLAG_INVISIBLE)) != 0x440) ||
+                ((1u << (cp & 31)) & v.visibility))
                 visible = 1;
             else
-                visible = (GameState & 0x80) ? 1 : 0;
+                visible = (GameState & STATE_OMNISCIENT_VIEW) ? 1 : 0;
         }
-        if (!(GameState & 0x80) && !(game().factions[cp].player_flags & 0x200) &&
+        if (!(GameState & STATE_OMNISCIENT_VIEW) && !(game().factions[cp].player_flags & PFLAG_MAP_REVEALED) &&
             !(map_tile(tx, ty)->visibility & (uint8_t)(1u << (cp & 31)))) {
             if (!visible) goto L_59814a;
         } else if (!visible) {
@@ -720,9 +727,10 @@ L_59763b: {  // the move itself
                     visible = 1;
                 int32_t owner;
                 if (i < 9)
-                    owner = ((n->items & 3) && (n->val2 & 0xF) < 8) ? (n->val2 & 0xF) : -1;
+                    owner = ((n->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) && (n->val2 & 0xF) < 8) ? (n->val2 & 0xF)
+                                                                                                       : -1;
                 else
-                    owner = ((n->items & 1) && (n->val2 & 0xF) < 8) ? (n->val2 & 0xF) : -1;
+                    owner = ((n->items & BIT_BASE_IN_TILE) && (n->val2 & 0xF) < 8) ? (n->val2 & 0xF) : -1;
                 if (owner == CurrentPlayerFaction) visible = 1;
             }
             if (!visible) goto L_59814a;
@@ -732,9 +740,11 @@ L_59763b: {  // the move itself
             cp = CurrentPlayerFaction;
             if (faction_id == cp) {
                 scroll = 1;
-            } else if ((GamePreferences & 4) && !(game().factions[cp].diplo_status[faction_id] & 1)) {
+            } else if ((GamePreferences & PREF_BSC_DONT_QUICK_MOVE_ENEMY_VEH) &&
+                       !(game().factions[cp].diplo_status[faction_id] & DIPLO_PACT)) {
                 scroll = 1;
-            } else if ((GamePreferences & 0x8000) && (game().factions[cp].diplo_status[faction_id] & 1)) {
+            } else if ((GamePreferences & PREF_BSC_DONT_QUICK_MOVE_ALLY_VEH) &&
+                       (game().factions[cp].diplo_status[faction_id] & DIPLO_PACT)) {
                 scroll = 1;
             } else if (base_id >= 0 && (uint8_t)game().bases[base_id].faction_id != (uint32_t)faction_id &&
                        !(dstat(faction_id, (uint8_t)game().bases[base_id].faction_id) & 1)) {
@@ -745,15 +755,16 @@ L_59763b: {  // the move itself
             bool shift = ui_shift_pressed();
             if (shift) scroll = 0;
             bool jump;
-            if (cost == 0 &&
-                !(faction_id == cp && !(game().vehs[veh_id].state & 0x4200) && game().vehs[veh_id].order != 0x18)) {
+            if (cost == 0 && !(faction_id == cp && !(game().vehs[veh_id].state & (VSTATE_ON_ALERT | VSTATE_EXPLORE)) &&
+                               game().vehs[veh_id].order != ORDER_MOVE_TO)) {
                 jump = true;
-            } else if (shift || (GameMorePreferences & 0x80)) {
+            } else if (shift || (GameMorePreferences & MPREF_ADV_QUICK_MOVE_ALL_VEH)) {
                 jump = true;
-            } else if (!(GameMorePreferences & 0x40)) {
+            } else if (!(GameMorePreferences & MPREF_ADV_QUICK_MOVE_VEH_ORDERS)) {
                 jump = false;
             } else if (faction_id == cp) {
-                jump = (game().vehs[veh_id].state & 0x4200) || game().vehs[veh_id].order == 0x18;
+                jump = (game().vehs[veh_id].state & (VSTATE_ON_ALERT | VSTATE_EXPLORE)) ||
+                       game().vehs[veh_id].order == ORDER_MOVE_TO;
             } else {
                 jump = triad == 2;
             }
@@ -766,7 +777,7 @@ L_59763b: {  // the move itself
                     Console_cursor_next(&MainConsole, tx, ty);
                 }
             }
-            if (visible && !ui_ctrl_pressed() && (scroll || !(GamePreferences & 0x80000)))
+            if (visible && !ui_ctrl_pressed() && (scroll || !(GamePreferences & PREF_ADV_NO_CENTER_VEH_ORDERS)))
                 Console_focus(&MainConsole, x, y, faction_id);
         }
         goto L_5980a8;
@@ -926,7 +937,7 @@ L_59763b: {  // the move itself
         if (veh_cargo(veh_id)) {
             if (base_id >= 0 &&
                 (faction_id == CurrentPlayerFaction || (MultiplayerActive && (FactionStatus[0] & fbit))) &&
-                (game().vehs[veh_id].order != 0x18 ||
+                (game().vehs[veh_id].order != ORDER_MOVE_TO ||
                  (game().vehs[veh_id].waypoint_x[0] == tx && game().vehs[veh_id].waypoint_y[0] == ty))) {
                 for (int32_t v = top_of(veh_id); v >= 0; v = game().vehs[v].next_veh_id_stack) {
                     VEH& p = game().vehs[v];
@@ -936,9 +947,9 @@ L_59763b: {  // the move itself
                 }
             }
         }
-        if (faction_id == CurrentPlayerFaction && (GamePreferences & 0x80000000) && veh_chassis_triad(veh_id) == 1 &&
-            veh_cargo(veh_id) && tgt_sea && moves_left(veh_id) == 0 &&
-            (game().vehs[veh_id].order != 0x18 ||
+        if (faction_id == CurrentPlayerFaction && (GamePreferences & PREF_AUTO_WAKE_VEH_TRANS_REACH_LAND) &&
+            veh_chassis_triad(veh_id) == 1 && veh_cargo(veh_id) && tgt_sea && moves_left(veh_id) == 0 &&
+            (game().vehs[veh_id].order != ORDER_MOVE_TO ||
              (game().vehs[veh_id].waypoint_x[0] == tx && game().vehs[veh_id].waypoint_y[0] == ty))) {
             // Out of moves next to land: the passengers get the focus.
             bool coast = false;
@@ -951,8 +962,8 @@ L_59763b: {  // the move itself
             }
             if (coast) {
                 for (int32_t v = top_of(veh_id); v >= 0; v = game().vehs[v].next_veh_id_stack) {
-                    if (veh_chassis_triad(v) == 0 && game().vehs[v].order == 1 && moves_left(v) > 0) {
-                        game().vehs[v].order = 0;
+                    if (veh_chassis_triad(v) == 0 && game().vehs[v].order == ORDER_SENTRY_BOARD && moves_left(v) > 0) {
+                        game().vehs[v].order = ORDER_NONE;
                         MapWinVehA = v;
                     }
                 }
@@ -964,17 +975,17 @@ L_598cb9:  // after the move (or a won battle)
     if (veh_offense(veh_id) == 0) veh_demote(veh_id);
     if (faction_id == 0) {
         const MAP* sq = map_tile(tx, ty);
-        if ((sq->items & 0x20) && (sq->climate & 0xE0) >= 0x40 && game().vehs[veh_id].damage_taken > 0)
+        if ((sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40 && game().vehs[veh_id].damage_taken > 0)
             game().vehs[veh_id].damage_taken--;  // natives heal in fungus
     }
     spot_all(veh_id, 1);
-    if (faction_id != CurrentPlayerFaction && !(FactionStatus[0] & fbit) && !(GameState & 0x80) && visible &&
-        !MapWinField23BF0 && !ui_shift_pressed() && !MultiplayerActive)
+    if (faction_id != CurrentPlayerFaction && !(FactionStatus[0] & fbit) && !(GameState & STATE_OMNISCIENT_VIEW) &&
+        visible && !MapWinField23BF0 && !ui_shift_pressed() && !MultiplayerActive)
         clock_wait(scroll ? (MapWinField23BF0 ? 5 : 100) : 5);
     if (veh_chassis_triad(veh_id) == 2) {
         // Air units: refuel at bases, airbases and carriers.
         const MAP* sq = map_tile(tx, ty);
-        int32_t no_refuel = (tile_base_owner(sq) < 0 && !(sq->items & 0x40000)) ? 1 : 0;
+        int32_t no_refuel = (tile_base_owner(sq) < 0 && !(sq->items & BIT_AIRBASE)) ? 1 : 0;
         for (int32_t v = veh_id < 0 ? -1 : top_of(veh_id); no_refuel && v >= 0; v = game().vehs[v].next_veh_id_stack) {
             if (has_abil(game().vehs[v].unit_id, 0x80)) no_refuel = 0;
         }
@@ -993,7 +1004,9 @@ L_598cb9:  // after the move (or a won battle)
         if (FactionStatus[0] & fbit) {
             const VEH& v = game().vehs[veh_id];
             if (faction_id != CurrentPlayerFaction) goto L_599037;
-            if (!(GamePreferences & 0x10000) && !(v.state & 0x4200)) goto L_599037;
+            if (!(GamePreferences & PREF_AUTO_AIR_VEH_RET_HOME_FUEL_RNG) &&
+                !(v.state & (VSTATE_ON_ALERT | VSTATE_EXPLORE)))
+                goto L_599037;
             if ((v.state & 0x1000200) == 0x1000200) goto L_599037;
             if ((v.state & 0x2000200) == 0x2000200 && v.patrol_current_point < v.waypoint_count) goto L_599037;
         }
@@ -1002,7 +1015,7 @@ L_598cb9:  // after the move (or a won battle)
         if (moves_left(veh_id) > 0) goto L_599154;
         if (game().vehs[veh_id].movement_turns + 1 >= veh_chassis_range(veh_id)) {
             // Out of fuel.
-            game().vehs[veh_id].state |= 4;
+            game().vehs[veh_id].state |= VSTATE_HAS_MOVED;
             if (visible) boom(game().vehs[veh_id].x, game().vehs[veh_id].y, 0x80);
             const UNIT& u = veh_unit(veh_id);
             if (veh_chassis_range(veh_id) == 1 && u.chassis_id == 6) {
@@ -1033,10 +1046,12 @@ L_598cb9:  // after the move (or a won battle)
             if (FactionStatus[0] & fbit) {
                 const VEH& v = game().vehs[veh_id];
                 if (faction_id != CurrentPlayerFaction) goto L_59943e;
-                if (!(GamePreferences & 0x10000) && !(v.state & 0x4200)) goto L_59943e;
+                if (!(GamePreferences & PREF_AUTO_AIR_VEH_RET_HOME_FUEL_RNG) &&
+                    !(v.state & (VSTATE_ON_ALERT | VSTATE_EXPLORE)))
+                    goto L_59943e;
                 if ((v.state & 0x1000200) == 0x1000200) goto L_59943e;
                 if ((v.state & 0x2000200) == 0x2000200 && v.patrol_current_point < v.waypoint_count) goto L_59943e;
-                if (v.order == 0x18) goto L_59943e;
+                if (v.order == ORDER_MOVE_TO) goto L_59943e;
             }
             action_home(veh_id, 0);
         }
@@ -1051,12 +1066,13 @@ L_598cb9:  // after the move (or a won battle)
     }
 L_599154: {
         const MAP* sq = map_tile(tx, ty);
-        if ((sq->items & 0x2000) && triad != 2) {  // monolith
+        if ((sq->items & BIT_MONOLITH) && triad != 2) {  // monolith
             bool use = true;
             if (dir < 0) {
                 if (veh_offense(veh_id) == 0)
                     use = false;
-                else if (game().vehs[veh_id].damage_taken == 0 && (game().vehs[veh_id].state & 0x100))
+                else if (game().vehs[veh_id].damage_taken == 0 &&
+                         (game().vehs[veh_id].state & VSTATE_MONOLITH_UPGRADED))
                     use = false;
             }
             if (use && !attacked) monolith(veh_id);
@@ -1078,7 +1094,7 @@ L_599154: {
             int32_t artifacts = stack_check(s, 2, 12, -1, -1);
             if (stack_check(s, 1, -1, -1, -1) <= artifacts) continue;
             game().vehs[veh_id].faction_id = (uint8_t)sf;
-            game().vehs[veh_id].order = 0;
+            game().vehs[veh_id].order = ORDER_NONE;
             draw_tile(tx, ty, 2);
             owner_set(tx, ty, game().vehs[veh_id].faction_id);
             if (faction_id == CurrentPlayerFaction) {
@@ -1121,13 +1137,13 @@ L_599154: {
             for (int32_t v = top_of(veh_id); v >= 0; v = game().vehs[v].next_veh_id_stack) {
                 if (veh_cargo(v)) continue;
                 if (game().vehs[v].moves_spent > speed(v, 0)) {
-                    game().vehs[v].order = 0;
+                    game().vehs[v].order = ORDER_NONE;
                     continue;
                 }
                 stack_veh(v, 0);
                 if (game().vehs[veh_id].waypoint_x[0] == v) {
                     MapWinVehA = v;
-                    game().vehs[v].order = 0;
+                    game().vehs[v].order = ORDER_NONE;
                     break;
                 }
             }
@@ -1140,11 +1156,12 @@ L_599154: {
         VEH& v = game().vehs[veh_id];
         if (zoc_any(v.x, v.y, faction_id) || (FactionStatus[0] & v.visibility) || v.status_icon == 'u') {
             for (int32_t w = veh_id < 0 ? -1 : top_of(veh_id); w >= 0; w = game().vehs[w].next_veh_id_stack) {
-                if (game().vehs[w].order == 1 && game().vehs[w].waypoint_x[0] == veh_id) v.order = 0;
+                if (game().vehs[w].order == ORDER_SENTRY_BOARD && game().vehs[w].waypoint_x[0] == veh_id)
+                    v.order = ORDER_NONE;
             }
         }
         int32_t gx = tx, gy = ty;
-        if (v.order == 0x18) {
+        if (v.order == ORDER_MOVE_TO) {
             int32_t mx = (v.waypoint_x[0] + tx) / 2;
             int32_t my = (v.waypoint_y[0] + ty) / 2;
             if (mx & 1) mx--;
@@ -1156,8 +1173,8 @@ L_599154: {
         }
         if (map_is_ocean(gx, gy)) add_goal(faction_id, 6, 2, gx, gy, -1);
     }
-    if (faction_id == CurrentPlayerFaction &&
-        (game().vehs[veh_id].order == 0x18 || (game().vehs[veh_id].state & 0x4200))) {
+    if (faction_id == CurrentPlayerFaction && (game().vehs[veh_id].order == ORDER_MOVE_TO ||
+                                               (game().vehs[veh_id].state & (VSTATE_ON_ALERT | VSTATE_EXPLORE)))) {
         // Long journeys: ask the viewer whether to keep moving.
         VEH& v = game().vehs[veh_id];
         v.iter_count++;
@@ -1165,7 +1182,7 @@ L_599154: {
         if (v.iter_count >= 0x20) {
             parse_says(0, veh_unit(veh_id).name, -1, -1);
             if (MultiplayerActive || X_pop("KEEPMOVING", 0)) {
-                v.order = 0;
+                v.order = ORDER_NONE;
                 v.state &= 0xFCFFBDFF;
             }
             v.iter_count = 0;
@@ -1183,7 +1200,7 @@ L_5962f2:  // no direction (dir 8): end of the unit's move
     if (veh_chassis_triad(veh_id) == 2 && veh_chassis_range(veh_id) && (VehAttackFlags & 1) &&
         faction_id == CurrentPlayerFaction) {
         const MAP* sq = map_tile(tx, ty);
-        if (tile_base_owner(sq) < 0 && !(sq->items & 0x40000)) {
+        if (tile_base_owner(sq) < 0 && !(sq->items & BIT_AIRBASE)) {
             // An aircraft of the viewer ending its move away from a base heads home.
             bool carried = false;
             for (int32_t v = veh_id < 0 ? -1 : top_of(veh_id); v >= 0 && !carried;
@@ -1195,7 +1212,7 @@ L_5962f2:  // no direction (dir 8): end of the unit's move
             if (!carried && moves_left(veh_id) > 0 &&
                 (veh_chassis_range(veh_id) == 1 || game().vehs[veh_id].movement_turns)) {
                 action_home(veh_id, 0);
-                if (game().vehs[veh_id].order == 0x18) {
+                if (game().vehs[veh_id].order == ORDER_MOVE_TO) {
                     if (MultiplayerActive && !ControlTurnC) net_synch_veh(veh_id);
                     return 0;
                 }
@@ -1242,7 +1259,7 @@ L_5968f2:  // zone of control
     FX_play(&Sounds, 13);
     if (faction_id == CurrentPlayerFaction) {
         if (MultiplayerActive) goto L_599b1a;
-        if ((GamePreferences & 0x20) ||
+        if ((GamePreferences & PREF_BSC_TUTORIAL_MSGS) ||
             (game().factions[faction_id].diff_level <= 1 && ((++TutZocMessageCount) & 3) == 1)) {
             int32_t ax = 0, ay = 0, bx = 0, by = 0;
             parse_say(0, ability_name(4), -1, -1);
@@ -1268,7 +1285,7 @@ L_5968f2:  // zone of control
     goto L_599b1a;
 
 L_596bd9:  // native life spawned in front of the unit
-    game().vehs[veh_id].order = 0;
+    game().vehs[veh_id].order = ORDER_NONE;
     spot_stack(stack_id, faction_id);
     draw_tile(tx, ty, 2);
     bit_set(tx, ty, 0x100000, 1);
@@ -1280,7 +1297,7 @@ L_596bd9:  // native life spawned in front of the unit
     goto L_599b1a;
 
 L_596c9f:  // unseen units in the way
-    game().vehs[veh_id].order = 0;
+    game().vehs[veh_id].order = ORDER_NONE;
     spot_stack(stack_id, faction_id);
     draw_tile(tx, ty, 2);
     if (faction_id != CurrentPlayerFaction) goto L_599b1a;
@@ -1290,7 +1307,7 @@ L_596c9f:  // unseen units in the way
     NetMsg_pop(&NetMsg, tgt_faction ? "SPOTTED" : "SPOTTED0", 5000, 0, nullptr);
     goto L_599b1a;
 L_596d5d:
-    game().vehs[veh_id].order = 0;
+    game().vehs[veh_id].order = ORDER_NONE;
     spot_stack(stack_id, faction_id);
     draw_tile(tx, ty, 2);
     FX_play(&Sounds, 13);
@@ -1304,7 +1321,7 @@ L_596e0b:
         parse_say(0, ability_name(0x20), -1, -1);
         NetMsg_pop(&NetMsg, "FIGHTERRULE", 5000, 0, nullptr);
     }
-    if (game().vehs[veh_id].state & 0x4200) veh_skip(veh_id);
+    if (game().vehs[veh_id].state & (VSTATE_ON_ALERT | VSTATE_EXPLORE)) veh_skip(veh_id);
     goto L_599b1a;
 L_596e85:
     if (faction_id == CurrentPlayerFaction && (VehAttackFlags & 1))
@@ -1363,8 +1380,8 @@ L_599b1a:  // end
     if (!result) {
         VEH& v = game().vehs[veh_id];
         bool human = (FactionStatus[0] & (uint8_t)(1u << (faction_id & 31))) != 0;
-        v.order = 0;
-        if (!human || (v.state & 0x4200)) {
+        v.order = ORDER_NONE;
+        if (!human || (v.state & (VSTATE_ON_ALERT | VSTATE_EXPLORE))) {
             v.iter_count++;
             if (v.iter_count >= 0x18 || human) {
                 v.iter_count = 0;
@@ -1378,12 +1395,12 @@ L_599b1a:  // end
         VEH& v = game().vehs[veh_id];
         if (dir >= 0 && dir < 8 && (v.state & 8) && v.x == tx && v.y == ty && !zoc_veh(tx, ty, faction_id))
             v.state &= ~8u;
-        if (MultiplayerActive && !ControlTurnC && v.order == 0x18 && v.x == v.waypoint_x[0] &&
+        if (MultiplayerActive && !ControlTurnC && v.order == ORDER_MOVE_TO && v.x == v.waypoint_x[0] &&
             v.y == v.waypoint_y[0]) {
-            v.order = 0;
+            v.order = ORDER_NONE;
             if ((v.state & 0x2000200) == 0x2000200 && v.patrol_current_point < v.waypoint_count) {
                 v.patrol_current_point++;
-                v.order = 0x18;
+                v.order = ORDER_MOVE_TO;
                 v.waypoint_x[0] = v.waypoint_x[v.patrol_current_point];
                 v.waypoint_y[0] = v.waypoint_y[v.patrol_current_point];
                 v.state &= 0xFDFEFDFF;

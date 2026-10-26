@@ -539,7 +539,8 @@ L_551ecb:
         price = CurrentTurn < 50 ? 25 : 50;
         if (pe && !has_treaty(f, fw, 0x31) && !has_treaty(f, pe, 0x10000001) &&
             !(Factions[f].traded_maps & (1 << pe)) && (!human(pe) || (Factions[fw].traded_maps & (1 << pe))) &&
-            ((DiploTradeWantTech1 >= 0 && !(GameRules & 0x2000000)) || Factions[f].energy_credits >= price) &&
+            ((DiploTradeWantTech1 >= 0 && !(GameRules & RULES_SCN_NO_TECH_TRADING)) ||
+             Factions[f].energy_credits >= price) &&
             wants_to_speak(f, fw)) {
             says_n(0, get_title(f));
             says_n(1, get_name(f));
@@ -570,8 +571,8 @@ L_551ecb:
     // METFRIEND: faction_id_with offers a commlink with a faction faction_id has not met.
     {
         int32_t uf = DiploUnmetFaction;
-        if (uf && !has_treaty(f, fw, 0x30) && !has_project(4, f) && !has_treaty(f, uf, 8) &&
-            !(human(DiploUnmetFaction) && auto_contact()) && wants_to_speak(f, fw)) {
+        if (uf && !has_treaty(f, fw, 0x30) && !has_project(FAC_EMPATH_GUILD - SP_ID_First, f) &&
+            !has_treaty(f, uf, 8) && !(human(DiploUnmetFaction) && auto_contact()) && wants_to_speak(f, fw)) {
             int32_t kind = 0;
             says_n(2, get_title(DiploUnmetFaction));
             says_n(3, get_name(DiploUnmetFaction));
@@ -600,7 +601,7 @@ L_551ecb:
                 if (amount > 0) goto L_552f36;
                 kind = 0;
             }
-            if (DiploTradeWantTech1 >= 0 && CurrentTurn > 25 && !(GameRules & 0x2000000)) {
+            if (DiploTradeWantTech1 >= 0 && CurrentTurn > 25 && !(GameRules & RULES_SCN_NO_TECH_TRADING)) {
                 kind = 1;
                 say_tech_slot(6, DiploTradeWantTech1);
             }
@@ -650,7 +651,7 @@ L_551ecb:
         }
     }
     // ANYNEWS: faction_id_with buys a commlink with a faction faction_id knows.
-    if (!has_treaty(f, fw, 0x30) && !has_project(4, fw) &&
+    if (!has_treaty(f, fw, 0x30) && !has_project(FAC_EMPATH_GUILD - SP_ID_First, fw) &&
         Factions[fw].energy_credits >= (CurrentTurn / 25 + 1) * 10) {
         int32_t i = 1;
         for (; i < 8; i++) {
@@ -709,10 +710,10 @@ L_553464:
         }
     }
 L_55362d:
-    if (!(GameRules & 0x2000000)) tech_trade(f, fw, 1, 4, 4);
+    if (!(GameRules & RULES_SCN_NO_TECH_TRADING)) tech_trade(f, fw, 1, 4, 4);
     if (great_satan(f, 0) || (Factions[f].ranking >= 6 && Factions[fw].ranking <= 4 && !DiploRunawayLeader)) {
         if (!DiploHostility && !DiploCanBetray && !has_agenda(f, fw, 0x2000) &&
-            (!has_treaty(f, fw, 1) || (!(GameRules & 0x1000) && !DiploRivalWarCount))) {
+            (!has_treaty(f, fw, 1) || (!(GameRules & RULES_VICTORY_COOPERATIVE) && !DiploRivalWarCount))) {
             s1c = 1;
             if (DiploTributeDemand == 0 && Factions[f].energy_credits >= 125)
                 DiploTributeDemand = round_down(Factions[f].energy_credits / 5, 25);
@@ -724,7 +725,7 @@ L_55362d:
             DiploHostility = 0;
             goto L_553d24;
         }
-    } else if (has_treaty(f, fw, 1) && !s20 && !has_agenda(f, fw, 0x2000) && !(GameRules & 0x1000) &&
+    } else if (has_treaty(f, fw, 1) && !s20 && !has_agenda(f, fw, 0x2000) && !(GameRules & RULES_VICTORY_COOPERATIVE) &&
                !DiploRivalWarCount &&
                ((DiploNearEndgame && DiploRivalOutranks) || DiploReputation > 4 || DiploFriction > 8)) {
         s1c = 1;
@@ -866,7 +867,7 @@ L_553d24:
     if (first_contact && !s20 && (DiploTradeWantTech1 >= 0 || s38) && !DiploCanBetray && !DiploFearScale &&
         (DiploPrevHostility ||
          ((DiploRivalStrongPacts || Factions[fw].ranking >= 6) && Factions[f].ranking >= 6 && !DiploRunawayLeader))) {
-        int32_t d = (GameRules & 0x40) ? 5 : Factions[f].diff_level;
+        int32_t d = (GameRules & RULES_INTENSE_RIVALRY) ? 5 : Factions[f].diff_level;
         if (DiploFriction + Factions[fw].AI_fight * 2 > (5 - d) / 2 + 10) {
             DiploHostility = 1;
             goto L_553fdd;
@@ -881,7 +882,7 @@ L_553fdd:
         (Factions[f].ranking < 6 || (!DiploRivalStrongPacts && Factions[fw].ranking < 6)))
         goto L_5540e7;
     {
-        int32_t mult = (GameRules & 0x40) ? 2 : 3;
+        int32_t mult = (GameRules & RULES_INTENSE_RIVALRY) ? 2 : 3;
         if (!great_satan(f, 0)) mult++;
         int32_t val = tech_val(DiploTradeWantTech1, fw, 1) * ((CurrentTurn + 7) / 8) * mult;
         if (DiploTributeDemand > val / 2) {
@@ -893,7 +894,7 @@ L_5540e7:
     // DEMANDTECH: faction_id_with wants a technology.
     {
         int32_t w = DiploTradeWantTech1;
-        if (w < 0 || w == 9999 || s20 || s38 || (GameRules & 0x2000000)) goto L_554a4c;
+        if (w < 0 || w == 9999 || s20 || s38 || (GameRules & RULES_SCN_NO_TECH_TRADING)) goto L_554a4c;
         int32_t ac = DiploAttackChance;
         if (ac && DiploTradeWantTech2 < 0) goto L_554a4c;
         if (ac >= 2 && ac + Factions[fw].tech_ranking / 2 >= Factions[f].tech_ranking / 2) goto L_554a4c;
@@ -1202,9 +1203,9 @@ L_5551f7:
             const Faction& W = Factions[fw];
             if (F.ranking < 6 || W.ranking < 6) {
                 if (DiploFriction >= (W.tech_commerce_bonus - F.tech_commerce_bonus) * 2 + 10) {
-                    if (W.ranking >= 5 || !(GameRules & 0x1000) || CurrentTurn < 200) goto L_555562;
+                    if (W.ranking >= 5 || !(GameRules & RULES_VICTORY_COOPERATIVE) || CurrentTurn < 200) goto L_555562;
                 }
-                if (!DiploNearEndgame || !DiploRivalOutranks || (GameRules & 0x1000)) goto L_55564d;
+                if (!DiploNearEndgame || !DiploRivalOutranks || (GameRules & RULES_VICTORY_COOPERATIVE)) goto L_55564d;
             }
         }
     L_555562:
@@ -1344,7 +1345,7 @@ L_555c42:
                     (DiploAcceptedFaction != 0) + 3;
         if (DiploReputation >= t) goto L_556113;
         s3c = F.diplo_reputation <= 3 ? F.diplo_reputation : 3;
-        int32_t fl = ((GameRules & 0x1000) && !(GameRules & 0x40)) ? 1 : 0;
+        int32_t fl = ((GameRules & RULES_VICTORY_COOPERATIVE) && !(GameRules & RULES_INTENSE_RIVALRY)) ? 1 : 0;
         int32_t u = range(W.tech_commerce_bonus - F.tech_commerce_bonus + 1, 0, 99) +
                     !crt_strcmp(MFactions[fw].filename, "HIVE");
         int32_t lim = (s14 ? 11 : 6) + fl + u + (DiploAcceptedFaction != 0);
@@ -1453,7 +1454,7 @@ L_556113:
             if (game_random(0, lim) >= DiploFearScale && !DiploCanSurrender) goto L_556c2a;
         }
         if (DiploTradeOfferTech1 >= 0 && DiploFearScale >= tech_val(DiploTradeOfferTech1, fw, 1) / 2 &&
-            !DiploCanSurrender && !DiploCanBetray && !(GameRules & 0x2000000)) {
+            !DiploCanSurrender && !DiploCanBetray && !(GameRules & RULES_SCN_NO_TECH_TRADING)) {
             say_tech_slot(0, DiploTradeOfferTech1);
             int32_t t = pop("TECHTRUCE", fw);
             while (t > 1) {
@@ -1525,7 +1526,7 @@ L_556113:
                 goto L_556c2a;
             }
             s54 = 1;
-            if (!(GameRules & 0x2000000)) {
+            if (!(GameRules & RULES_SCN_NO_TECH_TRADING)) {
                 for (int32_t t = 0; t < 89; t++)
                     if (has_tech(t, fw) && !has_tech(t, f)) net_tech(f, t, fw, 0);
             }
@@ -1539,20 +1540,21 @@ L_556113:
             net_set_treaty(fw, f, 0x2000000, 1, 0);
             pact_of_brotherhood(f, fw);
             diplomacy_caption(f, fw);
-            if (!MultiplayerActive && (GameRules & 2)) {
+            if (!MultiplayerActive && (GameRules & RULES_VICTORY_CONQUEST)) {
                 int32_t n = 0, pacts = 0;
                 for (int32_t i = 1; i < 8; i++) {
                     if (!alive(i)) continue;
                     n++;
                     if (has_treaty(i, CurrentPlayerFaction, 1) && has_treaty(i, CurrentPlayerFaction, 0x2000000)) {
                         n--;
-                    } else if (has_treaty(i, CurrentPlayerFaction, 1) && (GameRules & 0x1000) && pacts < 2) {
+                    } else if (has_treaty(i, CurrentPlayerFaction, 1) && (GameRules & RULES_VICTORY_COOPERATIVE) &&
+                               pacts < 2) {
                         pacts++;
                     }
                 }
                 if (n - pacts < 2) {
                     GameVictoryType = 4;
-                    GameState |= 0x2001;
+                    GameState |= (STATE_GAME_DONE | STATE_VICTORY_CONQUER);
                     if (pacts) GameVictoryType = 5;
                 }
             }
@@ -1875,9 +1877,9 @@ L_55778a:
 L_558152:
     if (has_treaty(f, fw, 1)) mention_prototypes(f, fw);
     // TEAMTECH: a common research goal.
-    if (has_treaty(f, fw, 1) && !(GameRules & 0x200) && Factions[fw].tech_research_id >= 0 &&
-        !has_tech(Factions[fw].tech_research_id, f) &&
-        Factions[fw].tech_research_id != Factions[f].tech_research_id && !(GameRules & 0x6000000) &&
+    if (has_treaty(f, fw, 1) && !(GameRules & RULES_BLIND_RESEARCH) && Factions[fw].tech_research_id >= 0 &&
+        !has_tech(Factions[fw].tech_research_id, f) && Factions[fw].tech_research_id != Factions[f].tech_research_id &&
+        !(GameRules & (RULES_SCN_NO_TECH_TRADING | RULES_SCN_NO_TECH_ADVANCES)) &&
         Factions[f].tech_accumulated >= tech_rate(f) / 2) {
         int32_t best = -1, best_val = 0;
         for (int32_t t = 0; t < 89; t++) {

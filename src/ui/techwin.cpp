@@ -585,7 +585,8 @@ int32_t THISCALL NewTechWin_exec(uint8_t*, int32_t tech_id, int32_t from) {
     // The voice clip (voices\techN.mp3 on FacilityVoice, at the voices group's volume) when the
     // viewer is human and voiceovers are on (GameMorePreferences 0x4000).
     std::string voice = "voices\\tech" + std::to_string(tech_id) + ".mp3";
-    if ((GameMorePreferences & 0x4000) && (FactionStatus[0] & (1 << (CurrentPlayerFaction & 31)))) {
+    if ((GameMorePreferences & MPREF_AV_VOLUME_VOICE_TOGGLE) &&
+        (FactionStatus[0] & (1 << (CurrentPlayerFaction & 31)))) {
         Wave_unload(&FacilityVoice);
         Wave_load(&FacilityVoice, voice.c_str());
         Wave_set_volume(&FacilityVoice, (uint32_t)sound_group_volume(0));
@@ -598,7 +599,9 @@ int32_t THISCALL NewTechWin_exec(uint8_t*, int32_t tech_id, int32_t from) {
         Datalink_exec(&DatalinkWin, w.link / 10000, w.link % 10000);
     }
     // Voiceovers stop when the window closes (GameMorePreferences 0x20000).
-    if ((GameMorePreferences & 0x4000) && (GameMorePreferences & 0x20000)) Sound_fade_2(&FacilityVoice, 2000);
+    if ((GameMorePreferences & MPREF_AV_VOLUME_VOICE_TOGGLE) &&
+        (GameMorePreferences & MPREF_AV_VOICEOVER_STOP_CLOSE_POPUP))
+        Sound_fade_2(&FacilityVoice, 2000);
     sw_clear_buttons(&w);
     return 0;
 }
@@ -631,14 +634,15 @@ Sprite* tech_picture(int32_t t) {
 
 int32_t GAMEAPI tech_pick(int32_t f, int32_t is_free, int32_t from, const char* label) {
     Faction& fa = Factions[f];
-    bool blind = (GameRules & 0x200) && from <= 0;
+    bool blind = (GameRules & RULES_BLIND_RESEARCH) && from <= 0;
     if (blind && f == CurrentPlayerFaction && !MultiplayerActive &&
         ((fa.tech_ranking >> 1) % 5 == 1 || CurrentTurn < 12) && !SkipTechScreenA) {
-        if ((GamePreferences & 0x20) && tut_check2(1)) popt("TUTOR", "TECHNOLOGY", -1, 0, 0);
+        if ((GamePreferences & PREF_BSC_TUTORIAL_MSGS) && tut_check2(1)) popt("TUTOR", "TECHNOLOGY", -1, 0, 0);
         Console_set_ai(&MainConsole, f);
     }
     if (!is_free && (!CurrentTurn || !is_human(f) || blind) && from < 0) return tech_ai(f);
-    if ((GamePreferences & 0x20) && !SkipTechScreenA && !blind && f == CurrentPlayerFaction && tut_check2(1))
+    if ((GamePreferences & PREF_BSC_TUTORIAL_MSGS) && !SkipTechScreenA && !blind && f == CurrentPlayerFaction &&
+        tut_check2(1))
         popt("TUTOR", "TECHNOLOGY", -1, 0, 0);
     if (MultiplayerActive && ControlTurnC) FX_play(&Sounds, 0x21);
     if (!label) label = "TECHNOLOGY";

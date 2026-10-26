@@ -209,7 +209,8 @@ void GAMEAPI alt_set(int32_t x, int32_t y, int32_t altitude) {
                     VEH& veh = game().vehs[veh_id];
                     int32_t next = veh.next_veh_id_stack;
                     int32_t triad = Chassis[Units[veh.unit_id].chassis_id].triad;
-                    if (triad != TRIAD_AIR && !(veh.flags & 0x20) && (triad == TRIAD_SEA) != (bool)to_ocean) {
+                    if (triad != TRIAD_AIR && !(veh.flags & VFLAG_IS_OBJECTIVE) &&
+                        (triad == TRIAD_SEA) != (bool)to_ocean) {
                         MapBaseIdClosestSubmergedVeh[veh.faction_id] = base_find_faction(x, y, veh.faction_id);
                         veh_kill(veh_id);
                         if (next > veh_id) next--;
@@ -384,7 +385,7 @@ int32_t GAMEAPI bonus_at(int32_t x, int32_t y) {
     uint32_t forced = items & 0x400;  // BIT_SUPPLY_REMOVE: bonus forced by the editor
     if (!forced) {
         if (MapRandomSeed == 0) return 0;
-        if (alt >= 3 && !(GameRules & 0x2000)) return 0;
+        if (alt >= 3 && !(GameRules & RULES_NO_UNITY_SCATTERING)) return 0;
     }
     int32_t s = (x + y) >> 1;
     int32_t d = x - s;
@@ -403,7 +404,7 @@ int32_t GAMEAPI goody_at(int32_t x, int32_t y) {
     MAP* sq = map_tile(x, y);
     uint32_t items = sq->items;
     if (items & 0x102000) return 0;
-    if (GameRules & 0x2000) return (items & 0xC000000) ? 2 : 0;
+    if (GameRules & RULES_NO_UNITY_SCATTERING) return (items & 0xC000000) ? 2 : 0;
     if (items & 0x10000000) return 1;
     if (MapRandomSeed == 0) return 0;
     int32_t s = (x + y) >> 1;
@@ -440,7 +441,7 @@ void GAMEAPI say_loc(char* buffer, int32_t x, int32_t y, int32_t near_base, int3
         crt_itoa(y, num, 10);
         std::strcat(buffer, num);
         std::strcat(buffer, ")");
-        if ((GameState & 0x40) && (GameState & 0x1000)) {
+        if ((GameState & STATE_SCENARIO_EDITOR) && (GameState & STATE_DEBUG_MODE)) {
             // BUG(original): the region number goes to StrBuffer, not to buffer.
             std::strcat(StrBuffer, " ");
             crt_itoa(map_tile(x, y)->region, num, 10);
@@ -461,7 +462,7 @@ static void clear_sites_radius2(int32_t x, int32_t y) {
 void GAMEAPI site_radius(int32_t x, int32_t y) { clear_sites_radius2(x, y); }
 
 void GAMEAPI fungus_site_radius(int32_t x, int32_t y) {
-    map_tile(x, y)->items |= 0x20;
+    map_tile(x, y)->items |= BIT_FUNGUS;
     map_tile(x, y)->items &= 0xFE1FFFAF;
     clear_sites_radius2(x, y);
 }

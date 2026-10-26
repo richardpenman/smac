@@ -237,7 +237,7 @@ void GAMEAPI base_terraform(int32_t flag) {
             uint32_t status = zoc ? f.diplo_status[zoc - 1] : (uint32_t)f.last_base_turn;
             if (status & 0xC30) continue;
             MAP* sq = map_tile(x, y);
-            if ((sq->items & 3) && (sq->val2 & 0xF) < 8) continue;
+            if ((sq->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) && (sq->val2 & 0xF) < 8) continue;
         }
         int32_t owner = whose_territory(faction_id, x, y, nullptr, 0);
         if (owner >= 0 && owner != faction_id) continue;
@@ -291,7 +291,8 @@ void GAMEAPI base_terraform(int32_t flag) {
         }
 
         // Sensor.
-        if (!sensors && !sensor && !bonus && (!improvements || pop > 7) && (!human || (GameMorePreferences & 0x20)) &&
+        if (!sensors && !sensor && !bonus && (!improvements || pop > 7) &&
+            (!human || (GameMorePreferences & MPREF_AUTO_FORMER_BUILD_SENSORS)) &&
             (!unworked_rich || pop - 1 <= worked_farmable || pop > 1) &&
             (!fungus || has_tech(Rules.tech_preq_improv_fungus, faction_id)) &&
             (rocky > 1 || forest || rain == 0 || (fungus && has_tech(Rules.tech_preq_improv_fungus, faction_id)))) {
@@ -433,7 +434,7 @@ void GAMEAPI base_terraform(int32_t flag) {
                 bool road_check = (items2 & BIT_ROAD) != 0;
                 if (!road_check) {
                     if (mine_or_bore || (items2 & BIT_THERMAL_BORE)) {
-                        if (human && (GameMorePreferences & 0x400000)) {
+                        if (human && (GameMorePreferences & MPREF_AUTO_FORMER_CANT_BUILD_ROADS)) {
                             road_check = true;
                         } else if (best < score) {
                             best_idx = i;
@@ -533,7 +534,7 @@ void GAMEAPI base_terraform(int32_t flag) {
 
     int32_t road_priority = has_tech(Terraform[6].preq_tech, faction_id) ? 2 : 1;
     if (best_idx < 1) {
-        if (!human || !(GameMorePreferences & 0x400000)) base_connect(2);
+        if (!human || !(GameMorePreferences & MPREF_AUTO_FORMER_CANT_BUILD_ROADS)) base_connect(2);
     } else {
         int32_t x = map_wrap_x(base.x + TableOffsetX[best_idx]);
         int32_t y = base.y + TableOffsetY[best_idx];
@@ -544,7 +545,7 @@ void GAMEAPI base_terraform(int32_t flag) {
         } else {
             road_priority = 2;
         }
-        if (!human || !(GameMorePreferences & 0x400000)) base_connect(road_priority);
+        if (!human || !(GameMorePreferences & MPREF_AUTO_FORMER_CANT_BUILD_ROADS)) base_connect(road_priority);
         if (flag) {
             // Instant terraforming (time warp).
             map_tile(x, y)->items &= ~BIT_FUNGUS;
@@ -592,7 +593,7 @@ void GAMEAPI base_terraform(int32_t flag) {
                 if (!has_tech(Ability[abil].preq_tech, faction_id) && CurrentTurn <= 200) ok = false;
             }
             if (ok && terrain_avail(14, 0, faction_id) &&
-                (!human || (faction_id == CurrentPlayerFaction && (GamePreferences & 0x2000000)))) {
+                (!human || (faction_id == CurrentPlayerFaction && (GamePreferences & PREF_AUTO_FORMER_BUILD_ADV)))) {
                 add_goal(faction_id, 0x69, 1, bore_x, bore_y, CurrentBaseID);
                 done = true;
             }
@@ -610,15 +611,16 @@ void GAMEAPI base_terraform(int32_t flag) {
                 }
             }
             if (want && terrain_avail(12, 0, faction_id) &&
-                (!human || (faction_id == CurrentPlayerFaction && (GamePreferences & 0x2000000)))) {
+                (!human || (faction_id == CurrentPlayerFaction && (GamePreferences & PREF_AUTO_FORMER_BUILD_ADV)))) {
                 add_goal(faction_id, 0x49, 1, cond_x, cond_y, CurrentBaseID);
                 done = true;
             }
         }
     }
-    if (!done && !((wet && energy_need < 3) || mirror_score < 1 || no_raise ||
-                   (human && (faction_id != CurrentPlayerFaction || !(GamePreferences & 0x20000))) ||
-                   !terrain_avail(16, 0, faction_id)))
+    if (!done &&
+        !((wet && energy_need < 3) || mirror_score < 1 || no_raise ||
+          (human && (faction_id != CurrentPlayerFaction || !(GamePreferences & PREF_AUTO_FORMER_RAISE_LWR_TERRAIN))) ||
+          !terrain_avail(16, 0, faction_id)))
         add_goal(faction_id, 0x29, 1, raise_x, raise_y, CurrentBaseID);
 
     BASE& b = cur_base();

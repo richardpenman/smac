@@ -55,7 +55,7 @@ void refresh_base(uint8_t* self) {
 void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
     set_base(bwf(kBwBase));
     base_compute(0);
-    if (Bases[bwf(kBwBase)].faction_id != CurrentPlayerFaction && !(GameState & 0x80)) return;
+    if (Bases[bwf(kBwBase)].faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) return;
     BASE& b = cur_base();
     int32_t saved_size = b.queue_size, saved[10];
     for (int32_t i = 0; i < 10; i++) saved[i] = b.queue_items[i];
@@ -246,7 +246,7 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
 void THISCALL BaseWin_queue_click(uint8_t* self, int32_t index, int32_t, int32_t, int32_t right) {
     int32_t s = index - 2;
     BASE& b = cur_base();
-    if (Bases[bwf(kBwBase)].faction_id != CurrentPlayerFaction && !(GameState & 0x80)) return;
+    if (Bases[bwf(kBwBase)].faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) return;
     if (s < 1) s = 1;
     if (s > b.queue_size + 1) s = b.queue_size + 1;
     if (s > 9) return;
@@ -283,7 +283,7 @@ void THISCALL BaseWin_garrison_click(uint8_t* self, int32_t veh_id, int32_t x, i
         if (Win_is_visible(&BaseWin)) bw_close_window(self);
         else if (Win_is_visible(&ReportWindow)) console_not_reconstructed("ReportIf_done");
     };
-    if (!right && (GameMorePreferences & 0x40000)) {
+    if (!right && (GameMorePreferences & MPREF_ADV_CLICK_VEH_CANCELS_ORDERS)) {
         if (!veh_selectable(veh_id) || net_lock_veh(&veh_id, 0)) return;
         select(true);
         net_unlock_veh();
@@ -297,7 +297,7 @@ void THISCALL BaseWin_garrison_click(uint8_t* self, int32_t veh_id, int32_t x, i
         ((st & 0x2000200) == 0x2000200 && v.patrol_current_point < v.waypoint_count))
         PullDown_add_item(&pd, 1, label_get(0xB6C / 4));
     PullDown_add_item(&pd, 2, label_get(0x958 / 4));
-    if (GameState & 0x40) PullDown_add_item(&pd, 0x5A, label_get(0xDFC / 4));
+    if (GameState & STATE_SCENARIO_EDITOR) PullDown_add_item(&pd, 0x5A, label_get(0xDFC / 4));
     PullDown_add_separator(&pd, 99);
     PullDown_add_item(&pd, 10, label_get(0xB70 / 4));
     PullDown_add_item(&pd, 0xB, label_get(0xB74 / 4));

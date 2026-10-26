@@ -16,7 +16,7 @@ void THISCALL StatusWin_reset(uint8_t*) {}
 // 0x20) and a non-alien viewer; the hint itself (shown by the caller) is not displayed headless.
 int32_t GAMEAPI tut_check2(int32_t bit) {
     if (MultiplayerActive) return 0;
-    if (!(GamePreferences & 0x20)) return 0;
+    if (!(GamePreferences & PREF_BSC_TUTORIAL_MSGS)) return 0;
     if (bit & TutorialHintsShown) return 0;
     if (game().mfactions[CurrentPlayerFaction].rule_flags & 0x80) return 0;
     TutorialHintsShown |= bit;

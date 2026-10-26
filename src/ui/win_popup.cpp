@@ -190,7 +190,7 @@ int32_t GAMEAPI popb(const char* label, int32_t flags, int32_t sound_id, const c
     BASE& base = cur_base();
     int32_t owner = (uint8_t)base.faction_id;
     if (!(FactionStatus[0] & (1 << (owner & 31)))) return 0;
-    if ((GameState & 1) && !(GameState & 8)) return 0;
+    if ((GameState & STATE_GAME_DONE) && !(GameState & STATE_FINAL_SCORE_DONE)) return 0;
     if (owner != CurrentPlayerFaction && !PbemActive) return 0;
     char name[256];
     crt_strcpy(name, label);
@@ -204,9 +204,9 @@ int32_t GAMEAPI popb(const char* label, int32_t flags, int32_t sound_id, const c
         extra = 2;
     } else {
         extra = 0x3EA;
-        if ((owner == CurrentPlayerFaction || (GameState & 0x80) || (uint8_t)base.faction_id == CurrentPlayerFaction ||
-             (base.visibility & (1 << CurrentPlayerFaction))) &&
-            !(GameMorePreferences & 4))
+        if ((owner == CurrentPlayerFaction || (GameState & STATE_OMNISCIENT_VIEW) ||
+             (uint8_t)base.faction_id == CurrentPlayerFaction || (base.visibility & (1 << CurrentPlayerFaction))) &&
+            !(GameMorePreferences & MPREF_ADV_ZOOM_BASE_NO_RECENTER_MAP))
             Console_focus(&MainConsole, base.x, base.y, owner);
         if (pcx) BasePop_set_picture(h.pop, pcx);
     }
@@ -247,7 +247,7 @@ int32_t GAMEAPI POP2(const char* label, const char* pcx, int32_t) {
     crt_strcpy(StrBuffer, text.c_str());
     if (PbemActive) return 0;  // the PBEM message list is not reconstructed
     MainInterface_set_message(&MainInterfaceWin, text.c_str());
-    if (!(GameWarnings & 0x20000)) return 0;
+    if (!(GameWarnings & WARN_STOP_RANDOM_EVENT)) return 0;
     if (pcx) BasePop_set_picture(h.pop, pcx);
     return BasePop_exec_3(h.pop, 0, 0);
 }

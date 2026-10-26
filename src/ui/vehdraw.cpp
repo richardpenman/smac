@@ -1139,7 +1139,7 @@ int32_t GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, i
     const UNIT& unit = Units[veh.unit_id];
     if ((zoom < -8 || (m & 0x100)) && !(m & 8) && !(m & 0x800)) {
         // Small zoom: a box in the faction colour.
-        if (f != CurrentPlayerFaction && unit.plan == 0xB && !(GameState & 0x80)) return 0;
+        if (f != CurrentPlayerFaction && unit.plan == 0xB && !(GameState & STATE_OMNISCIENT_VIEW)) return 0;
         if (m & 0x400) return 0;
         int32_t right = zscale(zoom, 100) + px, bottom = zscale(zoom, 0x32) + py;
         int32_t left = px, top = py;
@@ -1209,7 +1209,7 @@ int32_t GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, i
         BlitSourceScale = ZoomDenom;
     }
     bool skip_flag = (((m & 0x40) || (m & 0x400)) && !flag_only) ||
-                     (f != CurrentPlayerFaction && unit.plan == 0xB && !(GameState & 0x80));
+                     (f != CurrentPlayerFaction && unit.plan == 0xB && !(GameState & STATE_OMNISCIENT_VIEW));
     if (!skip_flag) {
         // Flag: [faction][morale][no moves left]; behind it a silhouette for stacks.
         int32_t moved = 0;
@@ -1277,8 +1277,8 @@ int32_t GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, i
         };
         if (f == CurrentPlayerFaction && (FactionStatus[0] & (1 << f))) {
             brackets();
-        } else if ((GameState & 0x80) || !(FactionStatus[0] & (1 << CurrentPlayerFaction))) {
-            if ((GameState & 0x40) && (GameState & 0x1000)) text[0] = (char)veh.status_icon;
+        } else if ((GameState & STATE_OMNISCIENT_VIEW) || !(FactionStatus[0] & (1 << CurrentPlayerFaction))) {
+            if ((GameState & STATE_SCENARIO_EDITOR) && (GameState & STATE_DEBUG_MODE)) text[0] = (char)veh.status_icon;
             if (text[0] != '-' && (veh.state & 0x40000))
                 Buffer_set_text_color(dest, (veh.state & 0x20000) ? 0xF8 : 0xFB, -1, 1, 1);
             brackets();
@@ -1289,7 +1289,8 @@ int32_t GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, i
             if (veh.state & 0x200) {
                 Buffer_set_text_color(dest, FactionColorFrame[f], -1, 1, 1);
                 if (text[0] == '-') text[0] = 'a';
-                if ((GameState & 0x40) && (GameState & 0x1000)) text[0] = (char)veh.status_icon;
+                if ((GameState & STATE_SCENARIO_EDITOR) && (GameState & STATE_DEBUG_MODE))
+                    text[0] = (char)veh.status_icon;
             }
             if (veh.state & 0x8000000) Buffer_set_text_color(dest, (CurrentPlayerFaction != 3 ? 5 : 0) - 6, -1, 1, 1);
         }
@@ -1303,12 +1304,13 @@ int32_t GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, i
 
 void THISCALL MapWin_draw_vehicles(uint8_t* win, int32_t x, int32_t y, int32_t px, int32_t py, int32_t faction_id) {
     int32_t mode = 2;
-    if (!ControlTurnStarted && !ControlTurnMove && !(GameRules & 0x80)) return;
+    if (!ControlTurnStarted && !ControlTurnMove && !(GameRules & RULES_TIME_WARP)) return;
     uint32_t opts = (uint32_t)mw(win, kMwOptions);
     if ((opts & 0x1000000) || !(opts & 0x802000C0) || (opts & 0x1000)) return;
     MAP* sq = &MapTiles[MapHalfX * y + (x >> 1)];
     auto known = [&]() {
-        return (GameState & 0x80) || (Factions[faction_id].player_flags & 0x200) || (sq->visibility & (1 << faction_id));
+        return (GameState & STATE_OMNISCIENT_VIEW) || (Factions[faction_id].player_flags & 0x200) ||
+               (sq->visibility & (1 << faction_id));
     };
     if ((!(opts & 0x80000000u) || (opts & 0x80)) && known()) MapWin_draw_bases(win, x, y, px, py, faction_id);
     if (mw(win, kMwOptions) & 0x80000000u) return;
@@ -1335,7 +1337,7 @@ void THISCALL MapWin_draw_vehicles(uint8_t* win, int32_t x, int32_t y, int32_t p
                 (!MultiplayerActive || !ControlTurnC)) {
                 // The selected unit blinks: hidden while the mouse is near it, else drawn
                 // with mode 0x403. (Mouse position: not reconstructed, taken as far away.)
-                if (GameMorePreferences & 0x200) return;
+                if (GameMorePreferences & MPREF_AV_WHOLE_VEH_BLINKS) return;
                 mode = 0x403;
             }
         } else {
@@ -1351,7 +1353,7 @@ void THISCALL MapWin_draw_vehicles(uint8_t* win, int32_t x, int32_t y, int32_t p
             }
         }
         if (v < 0) return;
-        if (!(GameState & 0x80) &&
+        if (!(GameState & STATE_OMNISCIENT_VIEW) &&
             ((Vehs[v].faction_id != CurrentPlayerFaction || (Vehs[v].flags & 0x440) == 0x440) &&
              !(Vehs[v].visibility & (1 << CurrentPlayerFaction))))
             return;

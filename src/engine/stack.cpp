@@ -25,16 +25,16 @@ uint32_t& tile_view(MAP* sq, int32_t faction_id) {
 // Whether newly seen tiles of faction_id are highlighted (the viewer, not in the scenario editor
 // or omniscient view).
 bool marks_discovery(int32_t faction_id) {
-    return faction_id == CurrentPlayerFaction && !(GameState & 0x80) &&
-           !(game().factions[faction_id].player_flags & 0x200);
+    return faction_id == CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW) &&
+           !(game().factions[faction_id].player_flags & PFLAG_MAP_REVEALED);
 }
 
 // Body of spot_tile for a tile on the map (inlined in many places of the original).
 void spot_tile_in_map(int32_t x, int32_t y, int32_t faction_id) {
     MAP* sq = map_tile(x, y);
     uint8_t bit = (uint8_t)(1 << (faction_id & 31));
-    if (faction_id == CurrentPlayerFaction && !(sq->visibility & bit) && !(GameState & 0x80) &&
-        !(game().factions[faction_id].player_flags & 0x200)) {
+    if (faction_id == CurrentPlayerFaction && !(sq->visibility & bit) && !(GameState & STATE_OMNISCIENT_VIEW) &&
+        !(game().factions[faction_id].player_flags & PFLAG_MAP_REVEALED)) {
         sq->landmarks |= 0x400000;
         GameDrawState |= 1;
     }
@@ -101,17 +101,17 @@ void GAMEAPI veh_alert_wake(int32_t veh_id) {
     if ((veh.state & 0x2000200) == 0x2000200 && veh.patrol_current_point < veh.waypoint_count) veh.state &= 0xFDFFFDFF;
     if ((veh.state & 0x1000200) == 0x1000200) veh.state &= 0xFEFFFDFF;
     veh.state &= 0xFFFFBFFF;
-    if (veh.order == 24) veh.order = 0;
+    if (veh.order == ORDER_MOVE_TO) veh.order = ORDER_NONE;
 }
 
 uint32_t GAMEAPI want_to_wake(int32_t faction_id, int32_t veh_id, int32_t spotted_veh_id) {
     VEH& veh = game().vehs[veh_id];
-    if (veh_triad(veh_id) == 2 && veh.movement_turns && veh.order == 24) {
+    if (veh_triad(veh_id) == 2 && veh.movement_turns && veh.order == ORDER_MOVE_TO) {
         // aircraft flying to a friendly base
         MAP* sq = map_tile(veh.waypoint_x[0], veh.waypoint_y[0]);
         uint32_t owner = sq->val2 & 0xF;
-        if ((sq->items & 1) && owner < 8 &&
-            (owner == veh.faction_id || (game().factions[veh.faction_id].diplo_status[owner] & 1)))
+        if ((sq->items & BIT_BASE_IN_TILE) && owner < 8 &&
+            (owner == veh.faction_id || (game().factions[veh.faction_id].diplo_status[owner] & DIPLO_PACT)))
             return 0;
     }
     uint32_t status = game().factions[veh.faction_id].diplo_status[faction_id];
@@ -121,27 +121,27 @@ uint32_t GAMEAPI want_to_wake(int32_t faction_id, int32_t veh_id, int32_t spotte
             wake = 0;
             goto check_triad;
         }
-        wake = GamePreferences & 0x100000;
+        wake = GamePreferences & PREF_AUTO_END_MOVE_SPOT_VEH_PACT;
     } else if (status & 2) {  // treaty
         if (MultiplayerActive) {
             wake = 1;
             goto check_triad;
         }
-        wake = GamePreferences & 0x200000;
+        wake = GamePreferences & PREF_AUTO_END_MOVE_SPOT_VEH_TREATY;
     } else if (status & 4) {  // truce
         if (MultiplayerActive) {
             wake = 1;
             goto check_triad;
         }
-        wake = GamePreferences & 0x400000;
+        wake = GamePreferences & PREF_AUTO_END_MOVE_SPOT_VEH_TRUCE;
     } else {
         if (MultiplayerActive) {
             wake = 1;
             goto check_triad;
         }
-        wake = GamePreferences & 0x800000;
+        wake = GamePreferences & PREF_AUTO_END_MOVE_SPOT_VEH_WAR;
     }
-    if (!(GamePreferences & 0x40000000)) return wake;
+    if (!(GamePreferences & PREF_AUTO_DONT_END_MOVE_DIFF_TRIAD)) return wake;
 check_triad:
     if (veh_id >= 0 && spotted_veh_id >= 0 && veh_triad(veh_id) != veh_triad(spotted_veh_id) &&
         ((veh.state & 0x1000200) != 0x1000200 || veh_triad(spotted_veh_id) == 0))
@@ -153,18 +153,18 @@ void GAMEAPI wake_stack(int32_t veh_id) {
     if (veh_id < 0) return;
     for (int32_t v = stack_top(veh_id); v >= 0; v = game().vehs[v].next_veh_id_stack) {
         VEH& veh = game().vehs[v];
-        if (veh.order != 1) continue;
+        if (veh.order != ORDER_SENTRY_BOARD) continue;
         bool wake = veh_triad(v) != 0;
         if (!wake) {
             MAP* sq = map_tile(veh.x, veh.y);
             if ((sq->climate & 0xE0) >= 0x60) {  // on land
                 int32_t transport = veh.waypoint_x[0];
-                wake = transport < 0 || veh_triad(transport) != 2 || ((sq->items & 1) && (sq->val2 & 0xF) < 8) ||
-                       (sq->items & 0x40000);
+                wake = transport < 0 || veh_triad(transport) != 2 ||
+                       ((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8) || (sq->items & BIT_AIRBASE);
             }
         }
         if (wake) {
-            veh.order = 0;
+            veh.order = ORDER_NONE;
             veh.state &= 0xFFFFBFFF;
         }
     }
@@ -173,9 +173,9 @@ void GAMEAPI wake_stack(int32_t veh_id) {
 int32_t GAMEAPI veh_stealth(int32_t veh_id) {
     if (has_abil(game().vehs[veh_id].unit_id, 0x40)) return 1;
     if (has_abil(game().vehs[veh_id].unit_id, 4)) return 1;
-    if (game().vehs[veh_id].flags & 0x400) return 1;
+    if (game().vehs[veh_id].flags & VFLAG_INVISIBLE) return 1;
     MAP* sq = map_tile(game().vehs[veh_id].x, game().vehs[veh_id].y);
-    if ((sq->items & 0x20) && (sq->climate & 0xE0) >= 0x40 && game().vehs[veh_id].unit_id != 19) return 2;
+    if ((sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40 && game().vehs[veh_id].unit_id != 19) return 2;
     return 0;
 }
 
@@ -203,7 +203,8 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
     if (faction_id == 0) veh.visibility &= here->visibility;
 
     // Viewer's unit with the "highlight unseen" preference: redraw level of the area only.
-    if ((GameMorePreferences & 1) && faction_id == CurrentPlayerFaction && !(GameState & 0x80)) {
+    if ((GameMorePreferences & MPREF_MAP_SHOW_FOG_WAR) && faction_id == CurrentPlayerFaction &&
+        !(GameState & STATE_OMNISCIENT_VIEW)) {
         const int32_t outer = sensor ? 49 : 25;
         for (int32_t i = 0; i < outer; i++) {
             int32_t x2 = map_wrap_x(TableOffsetX[i] + x);
@@ -221,7 +222,9 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                     if (!in_map(x3, y3)) continue;
                     if (j < 9) {
                         MAP* sq = map_tile(x3, y3);
-                        int32_t owner = ((sq->items & 3) && (sq->val2 & 0xF) < 8) ? sq->val2 & 0xF : -1;
+                        int32_t owner = ((sq->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) && (sq->val2 & 0xF) < 8)
+                                            ? sq->val2 & 0xF
+                                            : -1;
                         if (owner == faction_id) {
                             seen = 1;
                             break;
@@ -261,12 +264,12 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                         }
                     }
                     MAP* sq = map_tile(x3, y3);
-                    int32_t base_owner = ((sq->items & 1) && (sq->val2 & 0xF) < 8) ? sq->val2 & 0xF : -1;
+                    int32_t base_owner = ((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8) ? sq->val2 & 0xF : -1;
                     if (base_owner == faction_id) {
                         seen = 1;
                         break;
                     }
-                    int32_t veh_owner = ((sq->items & 2) && (sq->val2 & 0xF) < 8) ? sq->val2 & 0xF : -1;
+                    int32_t veh_owner = ((sq->items & BIT_VEH_IN_TILE) && (sq->val2 & 0xF) < 8) ? sq->val2 & 0xF : -1;
                     if (veh_owner == faction_id || (diplo_status_raw(veh_owner, faction_id) & 1)) {
                         int32_t v = veh_at(x3, y3);
                         if (v >= 0) {
@@ -364,11 +367,13 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
         if (is_sensor(x2, y2)) {
             MAP* sq = map_tile(x2, y2);
             int32_t owner = sq->owner;
-            if (owner > 0 && owner != faction_id && stealth != 1 && (!(sq->items & 1) || (sq->val2 & 0xF) > 7)) {
+            if (owner > 0 && owner != faction_id && stealth != 1 &&
+                (!(sq->items & BIT_BASE_IN_TILE) || (sq->val2 & 0xF) > 7)) {
                 // an enemy sensor sees the unit
                 if (veh_id >= 0 && in_map(veh.x, veh.y)) spot_tile(veh.x, veh.y, owner);
                 if (veh_id >= 0) spot_stack_vehs(veh_id, owner);
-                if (!(game().factions[faction_id].diplo_status[owner] & 7) && flag) {
+                if (!(game().factions[faction_id].diplo_status[owner] & (DIPLO_PACT | DIPLO_TREATY | DIPLO_TRUCE)) &&
+                    flag) {
                     if (triad == 0) {
                         add_goal(owner, 0, 2, x2, y2, -1);
                         add_goal(owner, 2, 1, x2, y2, -1);
@@ -386,10 +391,10 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
             if (faction_id != base_faction) {
                 if (triad != 2 || Chassis[Units[veh.unit_id].chassis_id].range == 0) {
                     if (!at_sea && !stealth) met |= 1u << (base_faction & 31);
-                    else if (!(game().factions[faction_id].diplo_status[base_faction] & 8))
+                    else if (!(game().factions[faction_id].diplo_status[base_faction] & DIPLO_COMMLINK))
                         met |= 1u << (base_faction & 31);
                 }
-                if (faction_id == CurrentPlayerFaction && !(GameState & 0x80)) {
+                if (faction_id == CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) {
                     if (!(fbit & base.visibility)) {
                         if (redraw < 3) redraw = 2;
                     } else if ((uint8_t)base.factions_pop_size_intel[faction_id] != base.pop_size && redraw < 2) {
@@ -397,13 +402,17 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                     }
                 }
                 spot_base_body(base_id, faction_id, true);
-                if (!stealth || !(game().factions[faction_id].diplo_status[(uint8_t)base.faction_id] & 8)) {
+                if (!stealth ||
+                    !(game().factions[faction_id].diplo_status[(uint8_t)base.faction_id] & DIPLO_COMMLINK)) {
                     // the base sees the unit
                     int32_t owner = (uint8_t)base.faction_id;
                     if (veh_id >= 0 && in_map(veh.x, veh.y)) spot_tile(veh.x, veh.y, owner);
                     if (veh_id >= 0) spot_stack_vehs(veh_id, owner);
                 }
-                if (triad == 0 && !(game().factions[(uint8_t)base.faction_id].diplo_status[faction_id] & 7) && flag) {
+                if (triad == 0 &&
+                    !(game().factions[(uint8_t)base.faction_id].diplo_status[faction_id] &
+                      (DIPLO_PACT | DIPLO_TREATY | DIPLO_TRUCE)) &&
+                    flag) {
                     add_goal((uint8_t)base.faction_id, 0, 2, x2, y2, -1);
                     add_goal((uint8_t)base.faction_id, 2, 1, x2, y2, -1);
                 }
@@ -417,7 +426,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
         int32_t other_id = other.faction_id;
         if (other_id == faction_id) continue;
         if (!stealth || has_abil(other.unit_id, 2) ||
-            !(game().factions[faction_id].diplo_status[other.faction_id] & 8)) {
+            !(game().factions[faction_id].diplo_status[other.faction_id] & DIPLO_COMMLINK)) {
             // they see the unit
             if (base_id < 0) {
                 if (veh_id >= 0 && in_map(veh.x, veh.y) && on_map(veh.x, veh.y))
@@ -435,17 +444,18 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
             }
         }
         bool visible;
-        if (!has_abil(other.unit_id, 0x40) && !has_abil(other.unit_id, 4) && !(other.flags & 0x400)) {
+        if (!has_abil(other.unit_id, 0x40) && !has_abil(other.unit_id, 4) && !(other.flags & VFLAG_INVISIBLE)) {
             MAP* sq = map_tile(other.x, other.y);
-            visible = !(sq->items & 0x20) || (sq->climate & 0xE0) < 0x40 || other.unit_id == 19;
+            visible = !(sq->items & BIT_FUNGUS) || (sq->climate & 0xE0) < 0x40 || other.unit_id == 19;
         } else {
             visible = false;
         }
         if (visible || sensor || stack_check(top, 1, -1, -1, -1) != 1 ||
-            !(game().factions[faction_id].diplo_status[other.faction_id] & 8)) {
+            !(game().factions[faction_id].diplo_status[other.faction_id] & DIPLO_COMMLINK)) {
             // the unit sees them
             if (base_id < 0) {
-                if (faction_id == CurrentPlayerFaction && !(GameState & 0x80) && !(fbit & other.visibility) && redraw < 2)
+                if (faction_id == CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW) &&
+                    !(fbit & other.visibility) && redraw < 2)
                     redraw = 1;
                 int32_t tx = other.x, ty = other.y;
                 if (in_map(tx, ty) && on_map(tx, ty)) spot_tile_in_map(tx, ty, faction_id);
@@ -488,11 +498,13 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
         if (is_sensor(x2, y2)) {
             MAP* sq = map_tile(x2, y2);
             int32_t owner = sq->owner;
-            if (owner > 0 && owner != faction_id && stealth != 1 && (!(sq->items & 1) || (sq->val2 & 0xF) > 7)) {
+            if (owner > 0 && owner != faction_id && stealth != 1 &&
+                (!(sq->items & BIT_BASE_IN_TILE) || (sq->val2 & 0xF) > 7)) {
                 // an enemy sensor sees the unit
                 if (veh_id >= 0 && in_map(veh.x, veh.y) && on_map(veh.x, veh.y)) spot_tile_in_map(veh.x, veh.y, owner);
                 if (veh_id >= 0) spot_stack_vehs(veh_id, owner);
-                if (!(game().factions[faction_id].diplo_status[owner] & 7) && flag) {
+                if (!(game().factions[faction_id].diplo_status[owner] & (DIPLO_PACT | DIPLO_TREATY | DIPLO_TRUCE)) &&
+                    flag) {
                     if (triad == 0) {
                         add_goal(owner, 0, 2, x2, y2, -1);
                         add_goal(owner, 2, 1, x2, y2, -1);
@@ -503,7 +515,8 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
             }
         }
         MAP* sq = map_tile(x2, y2);
-        int32_t owner = ((sq->items & 3) && (sq->val2 & 0xF) < 8) ? sq->val2 & 0xF : -1;
+        int32_t owner =
+            ((sq->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) && (sq->val2 & 0xF) < 8) ? sq->val2 & 0xF : -1;
         if (owner == faction_id) continue;
         int32_t top = stack_fix(veh_at(x2, y2));
         int32_t base_id = base_at(x2, y2);
@@ -511,7 +524,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
         if (sensor_view) {
             if (base_id >= 0) {
                 BASE& base = game().bases[base_id];
-                if (faction_id == CurrentPlayerFaction && !(GameState & 0x80)) {
+                if (faction_id == CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) {
                     if (!(base.visibility & fbit)) {
                         if (redraw < 4) redraw = 3;
                     } else if ((uint8_t)base.factions_pop_size_intel[faction_id] != base.pop_size && redraw < 3) {
@@ -523,11 +536,12 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
         }
         if (sensor_view && top >= 0 && base_id < 0) {
             VEH& other = game().vehs[top];
-            if (!has_abil(other.unit_id, 0x40) && !has_abil(other.unit_id, 4) && !(other.flags & 0x400)) {
+            if (!has_abil(other.unit_id, 0x40) && !has_abil(other.unit_id, 4) && !(other.flags & VFLAG_INVISIBLE)) {
                 MAP* osq = map_tile(other.x, other.y);
-                if (!(osq->items & 0x20) || (osq->climate & 0xE0) < 0x40 || other.unit_id == 19) {
+                if (!(osq->items & BIT_FUNGUS) || (osq->climate & 0xE0) < 0x40 || other.unit_id == 19) {
                     // BUG(original): tests the visibility of the spotting unit, not of the spotted one
-                    if (faction_id == CurrentPlayerFaction && !(GameState & 0x80) && !(veh.visibility & fbit) && redraw < 3)
+                    if (faction_id == CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW) &&
+                        !(veh.visibility & fbit) && redraw < 3)
                         redraw = 2;
                     int32_t tx = other.x, ty = other.y;
                     if (in_map(tx, ty) && on_map(tx, ty)) spot_tile_in_map(tx, ty, faction_id);
@@ -543,7 +557,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                 (veh_triad(top) == 2 || at_sea == (veh_triad(top) == 1))) {
                 if (!(diplo_status_raw(faction_id, owner) & 1) && flag) wake_stack(top);
                 MAP* hsq = map_tile(x, y);
-                if (!(hsq->items & 1) || (hsq->val2 & 0xF) > 7) {
+                if (!(hsq->items & BIT_BASE_IN_TILE) || (hsq->val2 & 0xF) > 7) {
                     if (veh_id >= 0 && in_map(veh.x, veh.y)) spot_tile_in_map(veh.x, veh.y, owner);
                     if (veh_id >= 0) spot_stack_vehs(veh_id, owner);
                 }
@@ -553,7 +567,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
         }
         if (base_id >= 0) {
             // the base sees the unit
-            uint32_t owner_hidden = game().factions[owner].player_flags & 0x200;
+            uint32_t owner_hidden = game().factions[owner].player_flags & PFLAG_MAP_REVEALED;
             uint8_t obit = (uint8_t)(1 << (owner & 31));
             MAP* hsq = map_tile(x, y);
             MAP* bsq = map_tile(x2, y2);
@@ -561,7 +575,8 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                 (at_sea != ((bsq->climate & 0xE0) < 0x60) || hsq->region == bsq->region)) {
                 if (veh_id >= 0 && in_map(veh.x, veh.y)) {
                     MAP* vsq = map_tile(veh.x, veh.y);
-                    if (owner == CurrentPlayerFaction && !(obit & vsq->visibility) && !(GameState & 0x80) && !owner_hidden) {
+                    if (owner == CurrentPlayerFaction && !(obit & vsq->visibility) &&
+                        !(GameState & STATE_OMNISCIENT_VIEW) && !owner_hidden) {
                         vsq->landmarks |= 0x400000;
                         GameDrawState |= 1;
                     }
@@ -577,7 +592,7 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                         if (game().vehs[v].state & 0x40000) game().vehs[v].state |= 0x60000;
                     }
                 }
-                if (Units[veh.unit_id].plan == 11 && !(game().factions[faction_id].diplo_status[owner] & 1)) {
+                if (Units[veh.unit_id].plan == 11 && !(game().factions[faction_id].diplo_status[owner] & DIPLO_PACT)) {
                     add_goal(owner, 0, 2, x, y, -1);
                     add_goal(owner, 2, 1, x, y, -1);
                     add_goal(owner, 3, 1, x, y, -1);
@@ -690,14 +705,14 @@ int32_t GAMEAPI stack_veh(int32_t veh_id, int32_t mode) {
         if (mode > 1) {
             // BUG(original): no map bounds check
             MAP* sq = map_tile(veh.x, veh.y);
-            if ((sq->items & 1) && (sq->val2 & 0xF) < 8) return veh_drop(veh_lift(veh_id), -2, -2);
+            if ((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8) return veh_drop(veh_lift(veh_id), -2, -2);
         }
         stack_sort(veh_id);
     }
     bool at_sea = false;  // on an ocean tile outside a base
     if (in_map(veh.x, veh.y)) {
         MAP* sq = map_tile(veh.x, veh.y);
-        at_sea = (sq->climate & 0xE0) < 0x60 && !((sq->items & 1) && (sq->val2 & 0xF) < 8);
+        at_sea = (sq->climate & 0xE0) < 0x60 && !((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8);
     }
     const uint32_t faction_id = veh.faction_id;
     const bool is_air = veh_triad(veh_id) == 2;
@@ -730,12 +745,14 @@ int32_t GAMEAPI stack_veh(int32_t veh_id, int32_t mode) {
                             // BUG(original): no map bounds check
                             MAP* sq = map_tile(veh.x, veh.y);
                             uint32_t owner = sq->val2 & 0xF;
-                            if (!((sq->items & 1) && owner < 8 && owner > 0) && !(sq->items & 0x40000)) allowed = false;
+                            if (!((sq->items & BIT_BASE_IN_TILE) && owner < 8 && owner > 0) &&
+                                !(sq->items & BIT_AIRBASE))
+                                allowed = false;
                         }
                         if (allowed) {
                             uint32_t cargo_faction = cargo.faction_id;
                             if (((1 << (cargo_faction & 31)) & FactionStatus[0]) &&
-                                !((veh.state & 0x200) && (cargo.state & 0x200))) {
+                                !((veh.state & VSTATE_ON_ALERT) && (cargo.state & 0x200))) {
                                 // human player: sentried units, or any unit at sea
                                 if (cargo.order == 1) load = cargo.waypoint_x[0] < 0;
                                 else load = at_sea;

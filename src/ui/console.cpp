@@ -140,8 +140,8 @@ int32_t GAMEAPI not_my_turn() {
 }
 
 int32_t THISCALL Console_edit_lock(uint8_t*) {
-    if (!(GameState & 0x40)) return 0;
-    if (!(ui_key_state(0x91) & 1) && !(GameState & 0x8000000)) return 0;  // GetKeyState(VK_SCROLL) toggle
+    if (!(GameState & STATE_SCENARIO_EDITOR)) return 0;
+    if (!(ui_key_state(0x91) & 1) && !(GameState & STATE_EDITOR_ONLY_MODE)) return 0;  // GetKeyState(VK_SCROLL) toggle
     return 1;
 }
 
@@ -149,7 +149,7 @@ int32_t THISCALL Console_edit_lock(uint8_t*) {
 
 void THISCALL Console_cursor_next(uint8_t* self, int32_t x, int32_t y) {
     if ((x ^ y) & 1) {
-        if (GameState & 0x1000) danger("Bad Cursor Move", "", x, y, 0);
+        if (GameState & STATE_DEBUG_MODE) danger("Bad Cursor Move", "", x, y, 0);
         if (x & 1) x--;
         if (y & 1) x++;
     }
@@ -263,7 +263,7 @@ void THISCALL Console_ready(uint8_t* self) {
         update_panes(self);
         veh_id = mw(self, kConVeh);
         uint32_t state = Vehs[veh_id].state;
-        if (!(GamePreferences & 0x80000) ||
+        if (!(GamePreferences & PREF_ADV_NO_CENTER_VEH_ORDERS) ||
             (!Vehs[veh_id].order && !(state & 0x200) && (state & 0x1000200) != 0x1000200)) {
             if (!Console_focus(self, Vehs[veh_id].x, Vehs[veh_id].y, Vehs[veh_id].faction_id)) {
                 // Recentre unless the unit is at least 3 tiles inside the view (and high
@@ -396,7 +396,7 @@ int32_t THISCALL Console_veh_turn(uint8_t* self) {
     int32_t waited = 0;      // [ebp-0x8]
     bool looped = false;     // [ebp-0x10]
     int32_t auto_moves = 0;  // [ebp-0x4]: moves of an automated unit / order steps this turn
-    if ((GamePreferences & 0x20) && !Vehs[mw(self, kConVeh)].order) Console_give_hints(self);
+    if ((GamePreferences & PREF_BSC_TUTORIAL_MSGS) && !Vehs[mw(self, kConVeh)].order) Console_give_hints(self);
     int32_t& veh = mw(self, kConVeh);
     int32_t ready = veh_ready(veh);
     for (;;) {
@@ -530,7 +530,8 @@ int32_t THISCALL Console_human_turn(uint8_t* self) {
     if (MultiplayerActive) FX_play(&Sounds, 0x21);
     ControlTurnMove = 0;
     for (;;) {
-        if ((GameState & 0x2000) && !(GameState & 1) && (GameRules & 2)) {
+        if ((GameState & STATE_VICTORY_CONQUER) && !(GameState & STATE_GAME_DONE) &&
+            (GameRules & RULES_VICTORY_CONQUEST)) {
             // Conquest victory reached: announced once.
             MFaction& m = MFactions[CurrentPlayerFaction];
             PluralDefault = 0;
@@ -543,7 +544,7 @@ int32_t THISCALL Console_human_turn(uint8_t* self) {
             PluralDefault = m.is_noun_plural;
             parse_says(2, m.noun_faction, -1, -1);
             X_pop("CONQUERPLANET", 0);
-            GameState |= 1;
+            GameState |= STATE_GAME_DONE;
         }
         int32_t v = mw(self, kConVeh);
         bool keep = false;  // the selected unit can go on
@@ -571,9 +572,10 @@ int32_t THISCALL Console_human_turn(uint8_t* self) {
             if (Win_is_visible(&BaseWin) || Win_is_visible(&ReportWindow)) GameState |= 4;
             mw(self, kConTurnActive) = 1;
             if (!Console_edit_lock(self)) {
-                if (!(GamePreferences & 1) && !MultiplayerActive && !PbemActive && waited && !(GameState & 4)) {
+                if (!(GamePreferences & PREF_BSC_PAUSE_END_TURN) && !MultiplayerActive && !PbemActive && waited &&
+                    !(GameState & 4)) {
                     mw(self, kConTurnActive) = 0;  // automatic end of turn
-                } else if (!(GamePreferences & 1) || MultiplayerActive) {
+                } else if (!(GamePreferences & PREF_BSC_PAUSE_END_TURN) || MultiplayerActive) {
                     parse_num(0, game_year(CurrentTurn));
                     NetMsg_pop(&NetMsg, waited ? "ENDOFTURN" : "ENDOFTURN1", 5000, 0, nullptr);
                 }
@@ -827,12 +829,12 @@ void THISCALL Console_new_base(uint8_t* self, int32_t veh_id) {
     if (base_id < 0) {
         NewBaseX = x;
         NewBaseY = y;
-        if (GamePreferences & 0x200) draw_map(1);
+        if (GamePreferences & PREF_MAP_SHOW_BASE_GRID) draw_map(1);
         int32_t r = X_pop_ask("NEWBASE", 0x17, name, 0, 0);
         NewBaseY = -99;
         NewBaseX = -99;
         if (r) {
-            redraw = !(GamePreferences & 0x200) ? false : true;
+            redraw = !(GamePreferences & PREF_MAP_SHOW_BASE_GRID) ? false : true;
             if (redraw) draw_map(1);
             return;
         }
@@ -844,7 +846,7 @@ void THISCALL Console_new_base(uint8_t* self, int32_t veh_id) {
         if (not_my_turn()) {
             error = "SIMULNO";
         } else if (net_lock_veh(&veh_id, 4)) {
-            if (GamePreferences & 0x200) draw_map(1);
+            if (GamePreferences & PREF_MAP_SHOW_BASE_GRID) draw_map(1);
             return;
         } else if (Units[Vehs[veh_id].unit_id].plan != 8) {
             net_unlock_veh();
@@ -915,7 +917,7 @@ void THISCALL Console_new_base(uint8_t* self, int32_t veh_id) {
         }
         NetMsg_pop(&NetMsg, error, 5000, 0, nullptr);
     }
-    if (GamePreferences & 0x200) draw_map(1);
+    if (GamePreferences & PREF_MAP_SHOW_BASE_GRID) draw_map(1);
 }
 
 namespace {
@@ -1004,7 +1006,7 @@ void THISCALL Console_terraform(uint8_t* self, int32_t veh_id, int32_t type) {
             NetMsg_pop(&NetMsg, "LOWTIDAL", 5000, 0, nullptr);
             return;
         }
-        if (!has_tech(0x3E, mw(self, kConFaction))) {
+        if (!has_tech(TECH_EcoEng2, mw(self, kConFaction))) {
             NetMsg_pop(&NetMsg, "NEEDADVECOENG", 5000, 0, nullptr);
             return;
         }
@@ -1096,7 +1098,7 @@ void THISCALL Console_terraform(uint8_t* self, int32_t veh_id, int32_t type) {
         break;
     case FORMER_RAISE_LAND:
     case FORMER_LOWER_LAND: {
-        if (GameRules & 0x800000) {
+        if (GameRules & RULES_SCN_NO_TERRAFORMING) {
             NetMsg_pop(&NetMsg, "NOTINSCENARIO", 5000, 0, nullptr);
             return;
         }
@@ -1343,7 +1345,7 @@ void THISCALL Console_cursor_key(uint8_t* self, int32_t, int32_t key, int32_t) {
         int32_t base_id = base_at(cx, cy);
         if (base_id >= 0) {
             int32_t owner = Bases[base_id].faction_id;
-            if ((GameState & 0x80) || owner == CurrentPlayerFaction ||
+            if ((GameState & STATE_OMNISCIENT_VIEW) || owner == CurrentPlayerFaction ||
                 ((Bases[base_id].visibility & (1 << (CurrentPlayerFaction & 31))) && spying(owner))) {
                 BaseWin_zoom(&BaseWin, base_id, 0);
                 return;
@@ -1390,7 +1392,7 @@ void THISCALL pfncProcZoomKey(uint8_t*, int32_t command, int32_t index) {
         auto seen = [&](int32_t x, int32_t y) {
             return y >= 0 && y < MapAreaY && x >= 0 && x < MapAreaX &&
                    ((Factions[CurrentPlayerFaction].player_flags & 0x200) ||
-                    (map_tile(x, y)->visibility & (1 << CurrentPlayerFaction)) || (GameState & 0x80));
+                    (map_tile(x, y)->visibility & (1 << CurrentPlayerFaction)) || (GameState & STATE_OMNISCIENT_VIEW));
         };
         if (worldwin_screen_tile(mx, my, &tx, &ty) == 0 && seen(tx, ty)) {
             mw(main_view(), kMwCenterX) = tx;
@@ -1431,7 +1433,7 @@ void THISCALL pfncProcZoomKey(uint8_t*, int32_t command, int32_t index) {
 
 void THISCALL Console_turn_hints(uint8_t* self) {
     int32_t f = CurrentPlayerFaction;
-    if (!(GamePreferences & 0x20) || MultiplayerActive || TutorialWinActive) return;
+    if (!(GamePreferences & PREF_BSC_TUTORIAL_MSGS) || MultiplayerActive || TutorialWinActive) return;
     int32_t cx = MapWinCursorX[MapWinCursorIndex], cy = MapWinCursorY[MapWinCursorIndex];
     if (CurrentTurn == 1 && tut_check(1)) {
         int32_t base_id = base_find_faction(cx, cy, f);
@@ -1511,7 +1513,7 @@ bool confirm_quit() {
         FactionStatus[0] &= (uint8_t)~(1 << (CurrentPlayerFaction & 31));
         save_game(0);
     }
-    if ((GameRules & 0x400) && !PbemActive) auto_save();
+    if ((GameRules & RULES_IRONMAN) && !PbemActive) auto_save();
     if (MultiplayerActive) console_not_reconstructed("Console_on_key_click: multiplayer hang up");
     ControlTurnA = 1;
     log_say_values("Quit ------------------------------", 0, 0, 0);
@@ -1560,9 +1562,9 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     InfoWin_reset(&InfoWindow);
     StatusWin_reset(&InfoWin);
     // The scenario editor's keys (editor.cpp); the others as usual.
-    if ((GameState & 0x40) && editor_key(self, vk, ch)) return 1;
+    if ((GameState & STATE_SCENARIO_EDITOR) && editor_key(self, vk, ch)) return 1;
     if (vk >= 0x60 && vk <= 0x69) ch = 0;  // keypad digits
-    if (vk == 0xD && (GameState & 0x80) && (mw(main_view(), kMwOptions) & 0x4000)) {
+    if (vk == 0xD && (GameState & STATE_OMNISCIENT_VIEW) && (mw(main_view(), kMwOptions) & 0x4000)) {
         // Path display (omniscient debug view): the go-to unit at the cursor moves.
         int32_t v = veh_at(MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
         for (; v >= 0; v = Vehs[v].next_veh_id_stack) {
@@ -1682,7 +1684,8 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         if (!net_busy) Console_corner_the_market(self);
         return 1;
     case '=':
-        if ((GameState & 0x10) || ScenarioVictoryA < 9000 || ScenarioVictoryB < 9000) Console_show_scen_objectives(self);
+        if ((GameState & STATE_IS_SCENARIO) || ScenarioVictoryA < 9000 || ScenarioVictoryB < 9000)
+            Console_show_scen_objectives(self);
         return 1;
     case '+': Console_custom_my_faction(self); return 1;
     default: break;
@@ -1701,7 +1704,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         case 'J': Console_assemble(self); break;
         case 'j': Console_go_to(self, mw(self, kConVeh), ORDER_MOVE_TO, 1); break;
         case 'R':
-            if (GameRules & 0x200) Console_set_ai(self, mw(self, kConFaction));
+            if (GameRules & RULES_BLIND_RESEARCH) Console_set_ai(self, mw(self, kConFaction));
             else Console_set_tech(self, mw(self, kConFaction));
             break;
         case 'v':
@@ -1720,15 +1723,16 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     if (key == ':') {
         if (DebugKeyCount == -1) DebugKeyCount = 0;
     } else if (key == '~') {
-        bool toggle = (GameState & 0x60) != 0;
+        bool toggle = (GameState & (STATE_SCENARIO_CHEATED_FLAG | STATE_SCENARIO_EDITOR)) != 0;
         if (!toggle) {
             if (DebugKeyCount == -1 ? !MultiplayerActive : DebugKeyCount < 4) DebugKeyCount++;
             toggle = DebugKeyCount >= (MultiplayerActive ? 4 : 0);
         }
         if (toggle) {
             // Debug mode on/off.
-            GameState ^= 0x1000;
-            if (MultiplayerActive && (GameState & 0x1000) && !(GameState & 0x20)) GameState |= 0xA0;
+            GameState ^= STATE_DEBUG_MODE;
+            if (MultiplayerActive && (GameState & STATE_DEBUG_MODE) && !(GameState & STATE_SCENARIO_CHEATED_FLAG))
+                GameState |= (STATE_SCENARIO_CHEATED_FLAG | STATE_OMNISCIENT_VIEW);
             set_dirty();
             draw_map(1);
             GraphicWin_redraw(&WorldWin);
@@ -1741,8 +1745,9 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
             // Digits: commlink to the n-th other faction.
             int32_t other = vk - 0x30;
             if (CurrentPlayerFaction <= other) other = vk - 0x2F;
-            if ((Factions[CurrentPlayerFaction].diplo_status[other] & 8) || (GameState & 0x80) ||
-                (SecretProjects[4] >= 0 && Bases[SecretProjects[4]].faction_id == CurrentPlayerFaction) ||
+            if ((Factions[CurrentPlayerFaction].diplo_status[other] & 8) || (GameState & STATE_OMNISCIENT_VIEW) ||
+                (SecretProjects[FAC_EMPATH_GUILD - SP_ID_First] >= 0 &&
+                 Bases[SecretProjects[FAC_EMPATH_GUILD - SP_ID_First]].faction_id == CurrentPlayerFaction) ||
                 ((FactionStatus[0] & (1 << (other & 31))) && auto_contact()))
                 commlink_attempt(other);
         }
@@ -1774,8 +1779,9 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
             if (base_id >= 0) {
                 int32_t owner = Bases[base_id].faction_id;
                 bool known = owner == CurrentPlayerFaction ||
-                             (Bases[base_id].visibility & (1 << (CurrentPlayerFaction & 31))) || (GameState & 0x80);
-                if (known && ((GameState & 0x80) || owner == CurrentPlayerFaction || spying(owner)))
+                             (Bases[base_id].visibility & (1 << (CurrentPlayerFaction & 31))) ||
+                             (GameState & STATE_OMNISCIENT_VIEW);
+                if (known && ((GameState & STATE_OMNISCIENT_VIEW) || owner == CurrentPlayerFaction || spying(owner)))
                     BaseWin_zoom(&BaseWin, base_id, 0);
             }
         } else {
@@ -1801,9 +1807,9 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     case 0x78: monument(0); break;                                     // F9
     case 0x79: hall_of_fame(0); break;                                 // F10
     case 0x7A:                                                         // F11: menu detail
-        GameMorePreferences ^= 0x200000;
+        GameMorePreferences ^= MPREF_ADV_DETAIL_MAIN_MENUS;
         pfncMainMenuUpdateVisible(main_menu(self), mw(self, kConVeh));
-        X_pop((GameMorePreferences & 0x200000) ? "MENUDETAIL" : "MENUSIMPLE", 0);
+        X_pop((GameMorePreferences & MPREF_ADV_DETAIL_MAIN_MENUS) ? "MENUDETAIL" : "MENUSIMPLE", 0);
         break;
     case 0x7B: MultiWin_show(nullptr); break;  // F12: MainInterface_on_iface_button_clicked(0x3EC)
     case 0x10008: Console_next_cursor(self); break;  // shift+Backspace
@@ -1817,7 +1823,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         break;
     case 0x20053: save_game(0); break;                     // ctrl+S
     case 0x2004C:                                          // ctrl+L
-        if (!MultiplayerActive || (GameState & 0x1000)) Console_load_proc(self, 0, 0);
+        if (!MultiplayerActive || (GameState & STATE_DEBUG_MODE)) Console_load_proc(self, 0, 0);
         break;
     case 0x20058: pfncProcZoomKey(self, 0x208, 0); break;  // ctrl+X
     case 0x2005A: pfncProcZoomKey(self, 0x207, 0); break;  // ctrl+Z
@@ -1833,7 +1839,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     case 0x30041: console_toggle_pref(0x20C); break;  // ctrl+shift+A: rally points
     case 0x30058: console_toggle_pref(0x209); break;  // ctrl+shift+X: flat terrain
     case 0x30057:                                     // ctrl+shift+W
-        GameMorePreferences ^= 1;
+        GameMorePreferences ^= MPREF_MAP_SHOW_FOG_WAR;
         draw_map(1);
         prefs_save(0);
         break;

@@ -143,7 +143,7 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
         unexplored = true;
         seen = true;
         landmarks &= ~0x200000u;
-    } else if ((GameRules & 0x100) && !(GameState & 0x80) && !omniscient(f) &&
+    } else if ((GameRules & RULES_NO_UNITY_SURVEY) && !(GameState & STATE_OMNISCIENT_VIEW) && !omniscient(f) &&
                !(sq->visibility & (uint8_t)(1u << (f & 31)))) {
         rain = 0;
         rocky = 0;
@@ -151,7 +151,8 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
         unexplored = true;
         seen = false;
         landmarks |= 0x200000;
-    } else if ((GameState & 0x80) || f < 1 || !(GameMorePreferences & 1) || zoom <= -8) {
+    } else if ((GameState & STATE_OMNISCIENT_VIEW) || f < 1 || !(GameMorePreferences & MPREF_MAP_SHOW_FOG_WAR) ||
+               zoom <= -8) {
         seen = true;
         landmarks &= ~0x200000u;
     } else {
@@ -289,7 +290,8 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
     };
     int32_t pts[12][2], uv[12][2], uv_rocky[12][2];
     // Unexplored: only the outline.
-    if (a5 > 0x15 || (!(GameRules & 0x100) && f >= 0 && !omniscient(f) && !(sq->visibility & (1 << f)))) {
+    if (a5 > 0x15 ||
+        (!(GameRules & RULES_NO_UNITY_SURVEY) && f >= 0 && !omniscient(f) && !(sq->visibility & (1 << f)))) {
         if (!no_terrain) {
             for (int32_t i = 0; i < 12; i++) {
                 pts[i][0] = TilePolyX[i] * q2 + px;
@@ -350,7 +352,7 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
     bool territory_look = false;  // local_80
     const uint32_t territory = opts & 0x10000;  // local_c0
     if (territory && (omniscient(CurrentPlayerFaction) || (sq->visibility & (1 << CurrentPlayerFaction)) ||
-                      (GameState & 0x80)) &&
+                      (GameState & STATE_OMNISCIENT_VIEW)) &&
         no_terrain) {
         territory_look = true;
         terr = whose_territory(CurrentPlayerFaction, x, y, nullptr, 0);
@@ -481,8 +483,8 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
                              &quad_uv[0][0]);
     }
     // Grid (preference 0x100): the two upper edges.
-    if ((((GamePreferences & 0x100) && !no_terrain) || (opts & 0x4000000)) &&
-        (is_land(sq) || no_terrain || (GameMorePreferences & 0x800000))) {
+    if ((((GamePreferences & PREF_MAP_SHOW_GRID) && !no_terrain) || (opts & 0x4000000)) &&
+        (is_land(sq) || no_terrain || (GameMorePreferences & MPREF_MAP_SHOW_GRID_OCEAN_SQ))) {
         int32_t nx = wrap_x(x - 1);
         for (int32_t i = 1; i <= 2; i++) {
             int32_t ny = y - 1;
@@ -490,7 +492,7 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
                 uint8_t c = tile(nx, ny)->climate & 0xE0;
                 int32_t line = -1;
                 if (c < 0x60) {
-                    if (no_terrain || (GameMorePreferences & 0x800000)) line = 0xBE;
+                    if (no_terrain || (GameMorePreferences & MPREF_MAP_SHOW_GRID_OCEAN_SQ)) line = 0xBE;
                 } else {
                     line = is_land(sq) ? 0x25 : 0xBE;
                 }
@@ -555,7 +557,7 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
     }
     // Territory borders: edges to tiles of the same region owned by someone else.
     if (territory && (omniscient(CurrentPlayerFaction) || (sq->visibility & (1 << CurrentPlayerFaction)) ||
-                      (GameState & 0x80)) &&
+                      (GameState & STATE_OMNISCIENT_VIEW)) &&
         !no_terrain) {
         terr = whose_territory(CurrentPlayerFaction, x, y, nullptr, 0);
         if (terr >= 0) {
@@ -642,7 +644,7 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
     if ((no_terrain && !keep_points) || (f >= 0 && !omniscient(f) && !(sq->visibility & (1 << f))))
         return restore_and_return(0);
     // Outline (GamePreferences 0x200) around OutlineCenter for unclaimed tiles.
-    if ((GamePreferences & 0x200) && !no_terrain) {
+    if ((GamePreferences & PREF_MAP_SHOW_BASE_GRID) && !no_terrain) {
         auto inside = [&](int32_t tx, int32_t ty) {
             int32_t owner = tile(tx, ty)->val3 & 7;
             if (f >= 0 && owner != f && !(diplo_bits(f, owner) & 8)) owner = 0;

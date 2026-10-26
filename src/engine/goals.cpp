@@ -126,7 +126,7 @@ int32_t GAMEAPI x_dist(int32_t x1, int32_t x2) {
 
 int32_t GAMEAPI site_at(int32_t x, int32_t y, int32_t sea) {
     MAP* sq = map_tile(x, y);
-    if (sq->items & 0x1000) return 0;
+    if (sq->items & BIT_BASE_RADIUS) return 0;
     int32_t site = sq->val2 >> 4;
     if (site == 0) {
         site = world_site(x, y, sea);
@@ -136,7 +136,7 @@ int32_t GAMEAPI site_at(int32_t x, int32_t y, int32_t sea) {
 }
 
 int32_t GAMEAPI is_known(int32_t x, int32_t y, int32_t faction_id) {
-    if (!(game().factions[faction_id].player_flags & 0x200) &&
+    if (!(game().factions[faction_id].player_flags & PFLAG_MAP_REVEALED) &&
         !(map_tile(x, y)->visibility & (uint8_t)(1u << (faction_id & 31))))
         return 0;
     return 1;
@@ -144,13 +144,13 @@ int32_t GAMEAPI is_known(int32_t x, int32_t y, int32_t faction_id) {
 
 int32_t GAMEAPI base_who(int32_t x, int32_t y) {
     const MAP* sq = map_tile(x, y);
-    if (!(sq->items & 1) || (sq->val2 & 0xF) > 7) return -1;
+    if (!(sq->items & BIT_BASE_IN_TILE) || (sq->val2 & 0xF) > 7) return -1;
     return sq->val2 & 0xF;
 }
 
 int32_t GAMEAPI anything_at(int32_t x, int32_t y) {
     const MAP* sq = map_tile(x, y);
-    if (!(sq->items & 3) || (sq->val2 & 0xF) > 7) return -1;
+    if (!(sq->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) || (sq->val2 & 0xF) > 7) return -1;
     return sq->val2 & 0xF;
 }
 

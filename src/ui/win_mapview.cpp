@@ -23,7 +23,7 @@ void GAMEAPI draw_tiles(int32_t x, int32_t y, int32_t mode) {
 // with has_radar) are redrawn and shown at once (the viewer's faction number passed as the
 // mode, as the original does), else the tile with `mode`.
 void GAMEAPI draw_tile_fixup(int32_t x, int32_t y, int32_t has_radar, int32_t mode) {
-    if (GameMorePreferences & 1) {
+    if (GameMorePreferences & MPREF_MAP_SHOW_FOG_WAR) {
         int32_t viewer = CurrentPlayerFaction;
         for_each_mapwin([&](int32_t, uint8_t* w) { MapWin_draw_radius(w, x, y, (has_radar != 0) + 1, viewer); });
         return;
@@ -31,7 +31,7 @@ void GAMEAPI draw_tile_fixup(int32_t x, int32_t y, int32_t has_radar, int32_t mo
     for_each_mapwin([&](int32_t, uint8_t* w) { MapWin_draw_radius(w, x, y, 0, mode); });
 }
 void GAMEAPI draw_tile_fixup_pair(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t has_radar, int32_t mode) {
-    if (!(GameMorePreferences & 1)) {
+    if (!(GameMorePreferences & MPREF_MAP_SHOW_FOG_WAR)) {
         for_each_mapwin([&](int32_t, uint8_t* w) { MapWin_draw_radius(w, x1, y1, 0, mode); });
         return;
     }

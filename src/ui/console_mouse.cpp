@@ -264,7 +264,7 @@ void THISCALL MapWin_on_left_down(uint8_t* win, int32_t px, int32_t py) {
         return;
     }
     bool shift = key_held(VKEY_SHIFT), ctrl = key_held(VKEY_CONTROL);
-    if (((shift && ctrl) || ((ui_key_state(0x91) & 1) && !ctrl)) && (GameState & 0x40)) {
+    if (((shift && ctrl) || ((ui_key_state(0x91) & 1) && !ctrl)) && (GameState & STATE_SCENARIO_EDITOR)) {
         // Scenario editor painting.
         auto_undo();
         mw(win, kMwEditPaint) = 1;
@@ -283,7 +283,7 @@ void THISCALL MapWin_on_left_down(uint8_t* win, int32_t px, int32_t py) {
         if (mw(win, kMwDragBase) < 0) return;
     }
     MapWinMouseIndex = mw(win, kMwIndex);
-    if (key_held(VKEY_SHIFT) && !(GameState & 0x40)) {
+    if (key_held(VKEY_SHIFT) && !(GameState & STATE_SCENARIO_EDITOR)) {
         go_timer();
         return;
     }
@@ -309,7 +309,7 @@ void THISCALL MapWin_on_right_down(uint8_t* win, int32_t px, int32_t py) {
     mw(win, kMwIgnoreClick) = 0;
     if (mw(&MainConsole, kConMode)) return;
     bool shift = key_held(VKEY_SHIFT), ctrl = key_held(VKEY_CONTROL);
-    if (((shift && ctrl) || ((ui_key_state(0x91) & 1) && !ctrl)) && (GameState & 0x40)) {
+    if (((shift && ctrl) || ((ui_key_state(0x91) & 1) && !ctrl)) && (GameState & STATE_SCENARIO_EDITOR)) {
         mw(win, kMwEditPaint) = 2;
         mw(win, 0x1DD94) = -1;
         mw(win, 0x1DD90) = -1;
@@ -439,7 +439,7 @@ void THISCALL MapWin_click(uint8_t* win, int32_t px, int32_t py, int32_t right) 
     go_reset();
     ui_set_drag_target(-1, -1);
     int32_t ctrl = key_held(VKEY_CONTROL);
-    if ((GameState & 0x40) && (ui_key_state(0x91) & 1) && !key_held(VKEY_SHIFT)) ctrl = !ctrl;
+    if ((GameState & STATE_SCENARIO_EDITOR) && (ui_key_state(0x91) & 1) && !key_held(VKEY_SHIFT)) ctrl = !ctrl;
     bool no_cursor = (uint32_t)mw(win, kMwCursor) == kCursorNo;
     int32_t mode = Console_selected(&MainConsole);  // [ebp-0x24]
     if (mode && no_cursor) return;  // out of range
@@ -557,7 +557,7 @@ void THISCALL MapWin_click(uint8_t* win, int32_t px, int32_t py, int32_t right) 
         mw(self, kConWaiting) = 0;
         return;
     }
-    if ((GameState & 0x40) && ctrl && !ControlTurnC) {
+    if ((GameState & STATE_SCENARIO_EDITOR) && ctrl && !ControlTurnC) {
         Console_set_view(self, 1);
         Console_set_cursor(self, x, y);
         auto_undo();
@@ -573,7 +573,7 @@ void THISCALL MapWin_click(uint8_t* win, int32_t px, int32_t py, int32_t right) 
                 InfoWin_set_state(&InfoWindow, -1, 0);
                 return;
             }
-            if (!(GameMorePreferences & 0x100) && !ControlTurnC) {
+            if (!(GameMorePreferences & MPREF_ADV_RIGHT_CLICK_POPS_UP_MENU) && !ControlTurnC) {
                 MapWin_right_menu(win, x, y, px, py);
                 return;
             }
@@ -584,7 +584,7 @@ void THISCALL MapWin_click(uint8_t* win, int32_t px, int32_t py, int32_t right) 
             mw(win, kMwScrolling) = 0;
             return;
         }
-        if (((GameMorePreferences & 0x100) || mw(win, kMwIndex) == 1) && !ControlTurnC) {
+        if (((GameMorePreferences & MPREF_ADV_RIGHT_CLICK_POPS_UP_MENU) || mw(win, kMwIndex) == 1) && !ControlTurnC) {
             MapWin_right_menu(win, x, y, px, py);
             return;
         }
@@ -603,8 +603,9 @@ void THISCALL MapWin_click(uint8_t* win, int32_t px, int32_t py, int32_t right) 
         // A known base opens (own bases, spied on, pact partners'), the view centred on it.
         BASE& b = Bases[base_id];
         int32_t owner = (uint8_t)b.faction_id;
-        bool known = owner == CurrentPlayerFaction || (b.visibility & (1 << (CurrentPlayerFaction & 31))) || (GameState & 0x80);
-        if (known && ((GameState & 0x80) || owner == CurrentPlayerFaction || spying(owner) ||
+        bool known = owner == CurrentPlayerFaction || (b.visibility & (1 << (CurrentPlayerFaction & 31))) ||
+                     (GameState & STATE_OMNISCIENT_VIEW);
+        if (known && ((GameState & STATE_OMNISCIENT_VIEW) || owner == CurrentPlayerFaction || spying(owner) ||
                       (Factions[CurrentPlayerFaction].diplo_status[owner] & 1))) {
             pfncMoveMap(win, x, y, 0);
             if (mw(win, kMwIndex) && (mw(win, kMwOptions) & 0x40000000)) pfncMoveMap(main_view(), x, y, 0);

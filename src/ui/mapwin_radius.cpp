@@ -189,7 +189,7 @@ void THISCALL MapWin_draw_radius(uint8_t* win, int32_t x, int32_t y, int32_t rad
     if (!canvas_of(win) || !canvas_of(win)->data) return;
     // A full redraw is pending (ui_invalidate_map): it draws these tiles too.
     if (win == MapWins[0] && ui_map_dirty()) return;
-    MapWin_gen_radius(win, x, y, radius, (GameState & 0x80) ? -1 : CurrentPlayerFaction, mode < 0);
+    MapWin_gen_radius(win, x, y, radius, (GameState & STATE_OMNISCIENT_VIEW) ? -1 : CurrentPlayerFaction, mode < 0);
     // (The cursor's texture, which the original draws here again when the cursor tile is in the
     // view, is drawn over the view at every presentation: win.cpp draw_map_cursor.)
     UiRect r;
@@ -230,7 +230,7 @@ void THISCALL MapWin_gen_overlays(uint8_t* win, int32_t x, int32_t y) {
     int32_t px, py;
     pfncTileToPoint(win, x, y, &px, &py);
     for (int32_t f = 1; f < 8; f++) {
-        const bool omni = (GameState & 0x80) != 0;
+        const bool omni = (GameState & STATE_OMNISCIENT_VIEW) != 0;
         if (!omni && f != CurrentPlayerFaction) continue;
         Goal* goals = Factions[f].goals;
         for (int32_t i = 0; i < 75; i++) {

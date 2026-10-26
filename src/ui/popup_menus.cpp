@@ -178,13 +178,14 @@ int32_t ui_artifact_menu(int32_t veh_id, int32_t base_id, int32_t) {
         const char* line = text_get();
         int32_t offset, mask;
         bitmask(8, &offset, &mask);  // network node: link the artifact
-        if ((base.facilities_built[offset] & (uint8_t)mask) && SecretProjects[20] != base_id &&
-            !(base.state_flags & 0x800)) {
+        if ((base.facilities_built[offset] & (uint8_t)mask) &&
+            SecretProjects[FAC_UNIVERSAL_TRANSLATOR - SP_ID_First] != base_id && !(base.state_flags & 0x800)) {
             BasePop_item(pop, expand(line), 1);
             items++;
         }
         line = text_get();
-        if (SecretProjects[20] == base_id) {  // the Planetary Datalinks... (project 20)
+        if (SecretProjects[FAC_UNIVERSAL_TRANSLATOR - SP_ID_First] ==
+            base_id) {  // the Planetary Datalinks... (project 20)
             BasePop_item(pop, expand(line), 1);
             items++;
         }

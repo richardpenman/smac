@@ -339,7 +339,7 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
         int32_t spacing = (CurrentTurn == 0 || killer_id == kSetupArrival) ? 6 : 12;
         if (BaseFindDist < spacing * game().map.sq_root / 56) continue;
         if (alt >= 0xA0) continue;
-        if ((sq->items & 3) && (sq->val2 & 0xF) < 8) continue;
+        if ((sq->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) && (sq->val2 & 0xF) < 8) continue;
         if (y < 2 || y >= game().map.y - 2) continue;
         if (quality < 12 - attempts / 80) continue;
         int32_t relax = attempts / 64;
@@ -387,7 +387,7 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
                 uint32_t alt = sq->climate & 0xE0;
                 if ((alt < 0x60) != is_aquatic(f) || sq->region != region || alt >= 0xA0) continue;
                 if ((sq->items & BIT_FUNGUS) && alt >= 0x40) continue;
-                if ((sq->items & 3) && (sq->val2 & 0xF) < 8) continue;
+                if ((sq->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) && (sq->val2 & 0xF) < 8) continue;
                 base_find(x2, y2);
                 for (int32_t v = 0; v < game().veh_count; v++) {
                     // BUG(original): the distance is measured from (x, y), not from the candidate.
@@ -891,7 +891,8 @@ void GAMEAPI setup_game(int32_t reload) {
     ClimateValueB = 0;
     ClimateValueC = 0;
     ClimateFutureChange = 0;
-    if (!MultiplayerActive && reload && !ControlTurnB) GameState |= 0xE0;
+    if (!MultiplayerActive && reload && !ControlTurnB)
+        GameState |= (STATE_SCENARIO_CHEATED_FLAG | STATE_SCENARIO_EDITOR | STATE_OMNISCIENT_VIEW);
     for (int32_t i = 0; i < 89; i++) TechOwners[i] = 0;
     for (int32_t i = 0; i < 64; i++) SecretProjects[i] = -1;
     std::memset(ReplayEvents, 0, sizeof(ReplayEvents));
@@ -1095,7 +1096,7 @@ int32_t GAMEAPI eliminate_player(int32_t faction_id, int32_t killer_id) {
     popp(ScriptFileName, StrBuffer, 0, pic, 0);
     if (!respawned) mon_killed_faction(killer_id, f);
     bool track;
-    if (!MultiplayerActive && (GamePreferences & 0x10000000) && killer_id == CurrentPlayerFaction) {
+    if (!MultiplayerActive && (GamePreferences & PREF_AV_SECRET_PROJECT_MOVIES) && killer_id == CurrentPlayerFaction) {
         if (!respawned) amovie_project_name(m.filename);
         track = respawned != 0;
     } else {
@@ -1103,7 +1104,7 @@ int32_t GAMEAPI eliminate_player(int32_t faction_id, int32_t killer_id) {
     }
     if (track && killer_id == CurrentPlayerFaction) {
         // The viewer's intelligence tracks the escaping colonists.
-        int32_t n = (game().factions[CurrentPlayerFaction].diplo_status[f] & 0x1000) ? 2 : 4;
+        int32_t n = (game().factions[CurrentPlayerFaction].diplo_status[f] & DIPLO_HAVE_INFILTRATOR) ? 2 : 4;
         int32_t veh_id;
         if ((n - 1 <= 0 || game_rand() % n == 0) && (veh_id = veh_find(0, 0, f, -1)) >= 0) {
             int32_t x2 = 0, y2 = 0;
@@ -1231,7 +1232,7 @@ void GAMEAPI time_warp() {
                 unit_id = has_tech(Units[BSC_TRANSPORT_FOIL].preq_tech, f) ? BSC_TRANSPORT_FOIL : BSC_UNITY_FOIL;
             veh_init(unit_id, f, fb.x, fb.y);
             // BUG(original): arguments out of order: facility 4 (perimeter defense) set at base 1.
-            set_fac(4, 1, first);
+            set_fac(FAC_PERIMETER_DEFENSE, 1, first);
         }
         F.energy_credits += (F.AI_wealth * 9 + F.AI_growth * 5 + F.AI_tech + 1) * 25;
         int32_t sea_unit = get_plan(f, PLAN_NAVAL_SUPERIORITY);
@@ -1413,7 +1414,7 @@ void GAMEAPI time_warp() {
                 int32_t y2 = b.y + TableOffsetY[j];
                 if (!map_in_bounds(x2, y2)) continue;
                 map_tile(x2, y2)->visibility |= bit;
-                if (goody_at(x2, y2) && j < 21) map_tile(x2, y2)->items |= 0x100400;
+                if (goody_at(x2, y2) && j < 21) map_tile(x2, y2)->items |= (BIT_BONUS_RES | BIT_SUPPLY_REMOVE);
             }
             set_base(i);
             base_compute(1);

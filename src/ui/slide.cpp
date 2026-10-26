@@ -54,7 +54,7 @@ void load() {
 }
 
 bool animate() {
-    return (GamePreferences & 0x8000000) && !MultiplayerActive && !g_ui_exit_when_script_done;
+    return (GamePreferences & PREF_AV_SLIDING_WINDOWS) && !MultiplayerActive && !g_ui_exit_when_script_done;
 }
 
 int32_t outer_top() { return ScreenWidth != 800 ? 0xEE : 0x5E; }
@@ -103,7 +103,7 @@ void wait_frame(uint32_t start) {
 void slide_show_window(Buffer* win, int32_t sx, int32_t sy, std::vector<uint8_t>* back, bool draw_arms) {
     load();
     std::fprintf(stderr, "slide show %dx%d at %d,%d\n", win->width, win->height, sx, sy);
-    if (GamePreferences & 0x400) Wave_play_2(main_menu_wave());
+    if (GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE) Wave_play_2(main_menu_wave());
     Buffer* scr = ui_screen_canvas();
     if (animate() && scr && scr->data && win->data) {
         ui_present();
@@ -121,7 +121,7 @@ void slide_show_window(Buffer* win, int32_t sx, int32_t sy, std::vector<uint8_t>
         }
         std::memcpy(scr->data, screen.data(), screen.size());
     }
-    if (GamePreferences & 0x400) Sound_fade(main_menu_wave());
+    if (GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE) Sound_fade(main_menu_wave());
     if (!draw_arms) return;
     // The arms in the window's canvas (and its background copy).
     int32_t ax[4];
@@ -143,7 +143,7 @@ void slide_hide_window(const Buffer* win, int32_t sx, int32_t sy) {
     std::fprintf(stderr, "slide hide %dx%d at %d,%d\n", win->width, win->height, sx, sy);
     Buffer* scr = ui_screen_canvas();
     if (!animate() || !scr || !scr->data || !win->data) return;
-    if (GamePreferences & 0x400) Wave_play_2(main_menu_wave());
+    if (GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE) Wave_play_2(main_menu_wave());
     // The window's picture without its side strips over the screen without the window.
     Buffer pic;
     Buffer_ctor(&pic);
@@ -241,7 +241,7 @@ void scroll_show_window(Buffer* win, int32_t sx, int32_t sy) {
         const int32_t n = MultiplayerActive ? 3 : 6;
         const int32_t step = (top0 - S) / n;
         *reinterpret_cast<int32_t*>(mem::host(0x7D3924)) = step;
-        if (step > 1 && (GameMorePreferences & 0x80000)) {
+        if (step > 1 && (GameMorePreferences & MPREF_AV_SLIDING_SCROLLBARS)) {
             UiRect clip{armx, 0, R, mi_rect(kMiPos).top + 0x39};
             int32_t y = top0 - step;
             for (int32_t f = 0; f < n; f++) {
@@ -261,7 +261,7 @@ void scroll_show_window(Buffer* win, int32_t sx, int32_t sy) {
         }
         // The rail slides in from the left of its place, 4 pixels a frame (8 in multiplayer), 8
         // frames (4), clipped to its place.
-        if (GamePreferences & 0x8000000) {
+        if (GamePreferences & PREF_AV_SLIDING_WINDOWS) {
             const int32_t d = MultiplayerActive ? 8 : 4, frames = MultiplayerActive ? 4 : 8;
             UiRect clip{armx, S, R, B};
             int32_t x = d + armx - 0x20;
@@ -301,7 +301,7 @@ void scroll_hide_window(Buffer* win, int32_t sx, int32_t sy) {
     const int32_t armx = R - arm.full_width - 0x20, W = arm.full_width + 0x20;
     std::fprintf(stderr, "scroll hide %dx%d at %d,%d\n", win->width, win->height, sx, sy);
     Buffer* scr = ui_screen_canvas();
-    if (animate() && scr && scr->data && win->data && (GameMorePreferences & 0x80000)) {
+    if (animate() && scr && scr->data && win->data && (GameMorePreferences & MPREF_AV_SLIDING_SCROLLBARS)) {
         // The window's right strip slides left out of view, then the arm sinks to its rest.
         Buffer strip;
         Buffer_ctor(&strip);

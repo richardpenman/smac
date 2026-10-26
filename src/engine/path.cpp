@@ -229,23 +229,25 @@ void THISCALL Path_territory(Path* self, int32_t x, int32_t y, int32_t unused, i
 int32_t THISCALL Path_zoc_path(Path* self, int32_t x, int32_t y, int32_t faction_id) {
     const MAP* sq = map_tile(x, y);
     // Bases are never in a zone of control.
-    if ((sq->items & 1) && (sq->val2 & 0xF) < 8) return 0;
+    if ((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8) return 0;
     bool ocean = (sq->climate & 0xE0) < 0x60;
     for (int32_t i = 0; i < 8; i++) {
         int32_t x2 = map_wrap_x(x + NearOffsetX[i]);
         int32_t y2 = y + NearOffsetY[i];
         if (!map_in_bounds(x2, y2)) continue;
         const MAP* nb = map_tile(x2, y2);
-        if (!(nb->items & 2)) continue;
+        if (!(nb->items & BIT_VEH_IN_TILE)) continue;
         int32_t owner = nb->val2 & 0xF;
         if (owner >= 8 || owner == faction_id || ((nb->climate & 0xE0) < 0x60) != ocean) continue;
-        if (game().factions[faction_id].diplo_status[owner] & 0x11) continue;  // pact or vendetta: ignored
+        if (game().factions[faction_id].diplo_status[owner] & (DIPLO_PACT | DIPLO_VENDETTA))
+            continue;  // pact or vendetta: ignored
         uint8_t bit = (uint8_t)(1u << (faction_id & 31));
         if (!(FactionStatus[0] & bit)) return owner + 1;
         // Human players only know about units they can see.
         for (int32_t veh_id = veh_at(x2, y2); veh_id >= 0; veh_id = game().vehs[veh_id].next_veh_id_stack) {
             const VEH& veh = game().vehs[veh_id];
-            if ((veh.faction_id == (uint32_t)faction_id && (veh.flags & 0x440) != 0x440) || (veh.visibility & bit))
+            if ((veh.faction_id == (uint32_t)faction_id && (veh.flags & (VFLAG_LURKER | VFLAG_INVISIBLE)) != 0x440) ||
+                (veh.visibility & bit))
                 return owner + 1;
         }
     }
@@ -324,7 +326,7 @@ int32_t PathSearch::ai_cost(int32_t x, int32_t y, const MAP*& sq, int32_t cost, 
     uint32_t fbit = 1u << (faction_id & 31);
     uint32_t human = FactionStatus[0] & fbit;
     sq = map_tile(x, y);
-    if (!human || (faction_raw(faction_id).player_flags & 0x200) || (sq->visibility & (uint8_t)fbit)) {
+    if (!human || (faction_raw(faction_id).player_flags & PFLAG_MAP_REVEALED) || (sq->visibility & (uint8_t)fbit)) {
         // Foreign territory.
         uint32_t obit = owner_bit(sq);
         if (!(own_mask & obit)) {
@@ -341,7 +343,7 @@ int32_t PathSearch::ai_cost(int32_t x, int32_t y, const MAP*& sq, int32_t cost, 
                     int32_t y2 = y + TableOffsetY[i];
                     if (!map_in_bounds(x2, y2)) continue;
                     const MAP* t = map_tile(x2, y2);
-                    if (!(t->items & 1)) continue;
+                    if (!(t->items & BIT_BASE_IN_TILE)) continue;
                     int32_t base_owner = t->val2 & 0xF;
                     if (base_owner < 8 && base_owner > 0) extra *= 2;  // near a (faction) base
                 }
@@ -352,7 +354,7 @@ int32_t PathSearch::ai_cost(int32_t x, int32_t y, const MAP*& sq, int32_t cost, 
     // Sea units in open water: enemy artillery in range. Unreachable: Path_find clears 0x80 for
     // sea units.
     if (Chassis[unit->chassis_id].triad == 1 && (sq->climate & 0xE0) < 0x60 &&
-        !((sq->items & 1) && (sq->val2 & 0xF) < 8)) {
+        !((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8)) {
         // BUG(original): the scan reuses the direction loop counter (set to 25), so no further
         // neighbour of the expanded tile is examined.
         *dir = 25;
@@ -363,7 +365,7 @@ int32_t PathSearch::ai_cost(int32_t x, int32_t y, const MAP*& sq, int32_t cost, 
             for (int32_t veh_id = veh_at(x2, y2); veh_id >= 0; veh_id = game().vehs[veh_id].next_veh_id_stack) {
                 const VEH& veh = game().vehs[veh_id];
                 if (veh.faction_id != (uint32_t)faction_id &&
-                    (faction_raw(faction_id).diplo_status[veh.faction_id] & 0x10) && can_arty(veh.unit_id, 1))
+                    (faction_raw(faction_id).diplo_status[veh.faction_id] & DIPLO_VENDETTA) && can_arty(veh.unit_id, 1))
                     cost += 100;
             }
         }
@@ -463,9 +465,9 @@ int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y
                 const MAP* sq = map_tile(nx, ny);
                 bool passable = ((sq->climate & 0xE0) < 0x60) == s.sea || (nx == x1 && ny == y1) ||
                                 (nx == x2 && ny == y2);
-                if (!passable && s.sea && (sq->items & 1) && (sq->val2 & 0xF) < 8) {
+                if (!passable && s.sea && (sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8) {
                     int32_t owner = sq->val2 & 0xF;  // ships enter friendly bases
-                    passable = owner == faction_id || (faction_raw(faction_id).diplo_status[owner] & 1);
+                    passable = owner == faction_id || (faction_raw(faction_id).diplo_status[owner] & DIPLO_PACT);
                 }
                 if (!passable) continue;
                 if (s.unit->plan == 12) {
@@ -476,7 +478,8 @@ int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y
                         for (int32_t k = 0; k < 8 && !unknown; k++) {
                             int32_t mx = map_wrap_x(nx + NearOffsetX[k]);
                             int32_t my = ny + NearOffsetY[k];
-                            unknown = map_in_bounds(mx, my) && !(game().factions[faction_id].player_flags & 0x200) &&
+                            unknown = map_in_bounds(mx, my) &&
+                                      !(game().factions[faction_id].player_flags & PFLAG_MAP_REVEALED) &&
                                       !(map_tile(mx, my)->visibility & (uint8_t)(1u << (faction_id & 31)));
                         }
                         if (unknown) continue;
@@ -486,7 +489,7 @@ int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y
                     uint8_t items = (uint8_t)sq->items;
                     if (!(items & 4) && (!(items & 1) || (sq->val2 & 0xF) >= 8)) continue;
                 }
-                if ((flags & 4) && (sq->items & 0x20) && (sq->climate & 0xE0) >= 0x40) continue;  // no fungus
+                if ((flags & 4) && (sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40) continue;  // no fungus
                 int32_t ncost;
                 if (flags & 1) {
                     ncost = cost + 1;
@@ -497,16 +500,16 @@ int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y
                     if ((map_tile(cx, cy)->climate & 0xE0) < (sq->climate & 0xE0)) ncost--;
                     if (goody_at(nx, ny)) ncost += mr;
                 }
-                if ((flags & 0x10) && (sq->items & 0x20) && (sq->climate & 0xE0) >= 0x40) ncost += mr * 6;
+                if ((flags & 0x10) && (sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40) ncost += mr * 6;
                 if (faction_id >= 0) {
                     if (!(flags & 0x200)) {
                         int32_t occupant = -1;  // faction of units on the tile
-                        if (sq->items & 2) {
+                        if (sq->items & BIT_VEH_IN_TILE) {
                             occupant = sq->val2 & 0xF;
                             if (occupant >= 8) {
                                 occupant = -1;
                             } else if (occupant != faction_id &&
-                                       !(faction_raw(faction_id).diplo_status[occupant] & 1)) {
+                                       !(faction_raw(faction_id).diplo_status[occupant] & DIPLO_PACT)) {
                                 continue;
                             }
                         }
@@ -528,7 +531,7 @@ int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y
                                 if (!(flags & 0x800)) continue;
                                 uint32_t d = faction_raw(faction_id).diplo_status[owner];
                                 if ((d & 0x100000) && !(d & 0x11)) continue;
-                                if (!(faction_raw(owner).diplo_status[faction_id] & 0x11) &&
+                                if (!(faction_raw(owner).diplo_status[faction_id] & (DIPLO_PACT | DIPLO_VENDETTA)) &&
                                     (FactionStatus[0] & (uint8_t)(1u << (owner & 31))))
                                     continue;
                             }
@@ -578,11 +581,11 @@ int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y
         }
         if (faction_id >= 0 && !(flags & 0x200)) {
             int32_t occupant = -1;
-            if (sq->items & 2) {
+            if (sq->items & BIT_VEH_IN_TILE) {
                 occupant = sq->val2 & 0xF;
                 if (occupant >= 8) {
                     occupant = -1;
-                } else if (occupant != faction_id && !(faction_raw(faction_id).diplo_status[occupant] & 1)) {
+                } else if (occupant != faction_id && !(faction_raw(faction_id).diplo_status[occupant] & DIPLO_PACT)) {
                     continue;
                 }
             }
@@ -659,7 +662,8 @@ int32_t THISCALL Path_move(Path* self, int32_t veh_id, int32_t faction_id) {
     }
     const UNIT& unit = Units[veh.unit_id];
     if (Weapon[unit.weapon_id].offense_value == 0 &&
-        (SecretProjects[8] < 0 || (uint8_t)game().bases[SecretProjects[8]].faction_id != veh_faction))
+        (SecretProjects[FAC_XENOEMPATHY_DOME - SP_ID_First] < 0 ||
+         (uint8_t)game().bases[SecretProjects[FAC_XENOEMPATHY_DOME - SP_ID_First]].faction_id != veh_faction))
         flags |= 0x10;  // non-combat units avoid fungus (unless Xenoempathy Dome)
     int32_t triad = Chassis[unit.chassis_id].triad;
     if (triad != 2) {
@@ -672,7 +676,7 @@ int32_t THISCALL Path_move(Path* self, int32_t veh_id, int32_t faction_id) {
                                          SpeedStackResidue != 0);
             if (dir >= 0) return dir;
             if ((veh.state & 0x1000200) == 0x1000200) {
-                veh.order = 0;
+                veh.order = ORDER_NONE;
                 veh.state &= 0xFEFFFDFF;
                 return -1;
             }
@@ -692,13 +696,13 @@ int32_t THISCALL Path_move(Path* self, int32_t veh_id, int32_t faction_id) {
         int32_t dist = (dx + dy) >> 1;
         if (dist == 0) return dir;
         const MAP* sq = map_tile(nx, ny);
-        if ((sq->items & 3) && (sq->val2 & 0xF) < 8) {
+        if ((sq->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) && (sq->val2 & 0xF) < 8) {
             uint32_t owner = sq->val2 & 0xF;
-            if (owner != veh_faction && !(game().factions[veh_faction].diplo_status[owner] & 1)) continue;
+            if (owner != veh_faction && !(game().factions[veh_faction].diplo_status[owner] & DIPLO_PACT)) continue;
         }
         int32_t value;
         if (triad == 2) {
-            if (sq->items & 0x40000) continue;
+            if (sq->items & BIT_AIRBASE) continue;
             int32_t a = std::abs(dx), b = std::abs(dy);
             int32_t big = a > b ? a : b;
             int32_t small = a < b ? a : b;
@@ -708,7 +712,7 @@ int32_t THISCALL Path_move(Path* self, int32_t veh_id, int32_t faction_id) {
             if (zoc_here && zoc_move(nx, ny, (int32_t)veh_faction)) {
                 // BUG(original): tests the tile at index x >> 1 (row 0) for a native base.
                 const MAP* t = &game().map.tiles[nx >> 1];
-                if (!(t->items & 1) || (t->val2 & 0xF) >= 8 || (t->val2 & 0xF) != 0) continue;
+                if (!(t->items & BIT_BASE_IN_TILE) || (t->val2 & 0xF) >= 8 || (t->val2 & 0xF) != 0) continue;
             }
             value = hex_cost(veh.unit_id, (int32_t)veh_faction, x, y, nx, ny, 0) + dist * 32;
         }
@@ -718,13 +722,13 @@ int32_t THISCALL Path_move(Path* self, int32_t veh_id, int32_t faction_id) {
         }
     }
     if (best_dir < 0) {
-        veh.order = 0;
+        veh.order = ORDER_NONE;
         if (!(FactionStatus[0] & fbit)) veh_skip(veh_id);
     }
     if ((veh.state & 0x10000) && best_dir == ((int32_t)veh.rotate_angle ^ 4) &&
         Chassis[Units[veh.unit_id].chassis_id].triad != 2) {
         veh.state &= ~0x10000u;
-        veh.order = 0;
+        veh.order = ORDER_NONE;
         if (!(FactionStatus[0] & fbit)) veh_skip(veh_id);
         return -1;
     }
@@ -744,10 +748,10 @@ int32_t THISCALL Path_sensors(Path* self, int32_t faction_id, int32_t* x, int32_
             MAP* sq = map_tile(tx, ty);
             if (sq->region != region) continue;
             if (whose_territory(faction_id, tx, ty, nullptr, 0) != faction_id) continue;
-            if ((sq->items & 1) && (sq->val2 & 0xF) < 8) continue;
-            if ((sq->items & 2) && (sq->val2 & 0xF) < 8) {
+            if ((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8) continue;
+            if ((sq->items & BIT_VEH_IN_TILE) && (sq->val2 & 0xF) < 8) {
                 int32_t owner = sq->val2 & 0xF;
-                if (owner != faction_id && !(game().factions[faction_id].diplo_status[owner] & 1)) continue;
+                if (owner != faction_id && !(game().factions[faction_id].diplo_status[owner] & DIPLO_PACT)) continue;
             }
             int32_t zoc = zoc_veh(tx, ty, faction_id);
             if (zoc == 1) continue;
@@ -757,8 +761,8 @@ int32_t THISCALL Path_sensors(Path* self, int32_t faction_id, int32_t* x, int32_
             if ((items & 0x50) || (items & 0x1402000)) continue;
             if (bonus_at(tx, ty)) continue;
             bool rough = (sq->val3 & 0xC0) > 0x40 || (sq->climate & 0x18) == 0;
-            if (!rough && (!(sq->items & 0x20) || (sq->climate & 0xE0) < 0x40)) continue;
-            if ((sq->items & 0x20) && (sq->climate & 0xE0) >= 0x40 &&
+            if (!rough && (!(sq->items & BIT_FUNGUS) || (sq->climate & 0xE0) < 0x40)) continue;
+            if ((sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40 &&
                 !has_tech(Rules.tech_preq_improv_fungus, faction_id))
                 continue;
             // Sensor coverage within radius 2 (adjacent: covered).
@@ -781,7 +785,7 @@ int32_t THISCALL Path_sensors(Path* self, int32_t faction_id, int32_t* x, int32_
                 int32_t by = ty + TableOffsetY[i];
                 if (!map_in_bounds(bx, by)) continue;
                 const MAP* b = map_tile(bx, by);
-                int32_t owner = ((b->items & 1) && (b->val2 & 0xF) < 8) ? (b->val2 & 0xF) : -1;
+                int32_t owner = ((b->items & BIT_BASE_IN_TILE) && (b->val2 & 0xF) < 8) ? (b->val2 & 0xF) : -1;
                 if (owner != faction_id) continue;
                 near_base = true;
                 bool base_covered = false;

@@ -105,7 +105,7 @@ struct DatalinkState : ScreenWin {
 void add_items(std::vector<Item>& v, int32_t c) {
     auto item = [&](const std::string& t, int32_t id) {
         std::string s = t;
-        if (GameState & 0x1000) s += "|" + std::to_string(id);
+        if (GameState & STATE_DEBUG_MODE) s += "|" + std::to_string(id);
         v.push_back({s, id});
     };
     switch (c) {

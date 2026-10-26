@@ -94,10 +94,10 @@ void GAMEAPI make_proto(int32_t unit_id, int32_t chassis_id, int32_t weapon_id, 
             id = i % 64;
             if (id != i) id += unit_id - unit_id % 64;
             UNIT& u = Units[id];
-            if (!(u.unit_flags & 1)) continue;
+            if (!(u.unit_flags & UNIT_ACTIVE)) continue;
             if (id < 64) {
                 if (!has_tech(u.preq_tech, faction_id)) continue;
-            } else if (!(u.unit_flags & 4)) {
+            } else if (!(u.unit_flags & UNIT_PROTOTYPED)) {
                 continue;
             }
             if (weapon_id == u.weapon_id) better_weapon = 1;
@@ -220,7 +220,7 @@ void GAMEAPI proto_sort(int32_t faction_id) {
         ProtoSortList[i] = unit_id;
         UNIT& u = Units[unit_id];
         int32_t value;
-        if (!(u.unit_flags & 1) || (unit_id < 64 && !has_tech(u.preq_tech, faction_id))) {
+        if (!(u.unit_flags & UNIT_ACTIVE) || (unit_id < 64 && !has_tech(u.preq_tech, faction_id))) {
             if (unit_id < 64) {
                 value = 999999999;
             } else {
@@ -248,7 +248,7 @@ void GAMEAPI proto_sort_design(int32_t faction_id) {
         int32_t unit_id = proto_list_id(i, faction_id);
         ProtoSortList[i] = unit_id;
         UNIT& u = Units[unit_id];
-        bool available = (u.unit_flags & 1) &&
+        bool available = (u.unit_flags & UNIT_ACTIVE) &&
                          (unit_id >= 64 || (Weapon[u.weapon_id].offense_value >= 0 && unit_id != 15 &&
                                             has_tech(u.preq_tech, faction_id)));
         int32_t value;

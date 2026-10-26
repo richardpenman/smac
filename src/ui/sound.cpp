@@ -440,7 +440,7 @@ void THISCALL FX_init(uint8_t* sounds) {
 namespace {
 // FX_play's body after the log: the preference, ducking and psi attack pitch, then the play.
 void fx_play(uint8_t* sounds, int32_t id, bool loc) {
-    if (!(GamePreferences & 0x400) || id < 0 || id > 96) return;
+    if (!(GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE) || id < 0 || id > 96) return;
     uint8_t* wave = fx(sounds, id);
     WaveState& w = W(wave);
     if (id == 0 || id == 1 || id == 2) {
@@ -496,7 +496,7 @@ void GAMEAPI release_sound() {
 
 void GAMEAPI wave_it(int32_t id) {
     sound_log("wave_it %d", id);
-    if (!(GamePreferences & 0x400)) return;
+    if (!(GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE)) return;
     if (playing(&FacilityVoice) || playing(cpu_voice(g_voice_id))) return;
     if (id < 0 || id >= 45) return;
     g_voice_id = id;
@@ -506,7 +506,7 @@ void GAMEAPI wave_it(int32_t id) {
 
 void sound_popup_wave(int32_t wave, int32_t volume) {
     sound_log("popup_wave %d", wave);
-    if (!(GamePreferences & 0x400) || wave < 0 || !volume || wave >= 0x2D) return;
+    if (!(GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE) || wave < 0 || !volume || wave >= 0x2D) return;
     if (wave == 0x19 && CurrentBasePtr && cur_base().queue_items[0] < -0x46) wave = 0x25;
     if (wave == 0x2B && platform::ticks_ms() % 3 != 1) return;
     if (!playing(cpu_voice(g_voice_id)) && !playing(&FacilityVoice)) {
@@ -541,7 +541,7 @@ void sound_alpha_menu() { Wave_play_2(WaveAlphaMenu()); }
 
 int32_t GAMEAPI ambience(int32_t id) {
     sound_log("ambience %d", id);
-    if (!(GamePreferences & 0x800)) return id;
+    if (!(GamePreferences & PREF_AV_VOLUME_MUSIC_TOGGLE)) return id;
     if (g_ambience == id) return g_ambience;
     if (id >= 200 && id < 0xD6) {
         static const int16_t kMethod[] = {0x13C, 0x130, 0x140, 0x144, 0x148, 0x14C, 0x150,
@@ -572,7 +572,7 @@ void GAMEAPI ambience_veh(int32_t veh_id) {
         fade(w, w.fade_ms);
     }
     g_ambience_veh = veh_id;
-    if (!(GamePreferences & 0x800)) return;
+    if (!(GamePreferences & PREF_AV_VOLUME_MUSIC_TOGGLE)) return;
     const VEH& v = Vehs[veh_id];
     if (v.order != 0) return;
     int32_t unit_id = v.unit_id;

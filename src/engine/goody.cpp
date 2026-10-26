@@ -26,7 +26,7 @@ inline bool is_human(int32_t faction_id) { return (FactionStatus[0] & (uint8_t)(
 
 // Owner of the units at a tile (val2 low nibble when the tile has units or a base), or -1.
 inline int32_t tile_veh_owner(MAP* sq) {
-    if (!(sq->items & 3)) return -1;
+    if (!(sq->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE))) return -1;
     int32_t owner = sq->val2 & 0xF;
     return owner > 7 ? -1 : owner;
 }
@@ -71,7 +71,7 @@ void lower_text(char* s) {
 
 int32_t GAMEAPI tut_check(int32_t hint) {
     if (MultiplayerActive) return 0;
-    if (!(GamePreferences & 0x20)) return 0;
+    if (!(GamePreferences & PREF_BSC_TUTORIAL_MSGS)) return 0;
     if (hint & TutHintsShown) return 0;
     if (game().mfactions[CurrentPlayerFaction].rule_flags & 0x80) return 0;
     TutHintsShown |= hint;
@@ -81,7 +81,7 @@ int32_t GAMEAPI tut_check(int32_t hint) {
 // ---- want_monolith, monolith ------------------------------------------------------------------------------
 
 int32_t GAMEAPI want_monolith(int32_t veh_id) {
-    if (game().vehs[veh_id].state & 0x100) return 0;
+    if (game().vehs[veh_id].state & VSTATE_MONOLITH_UPGRADED) return 0;
     return morale_veh(veh_id, 1, 0) < 6 && game().vehs[veh_id].morale < 6 &&
            Weapon[Units[game().vehs[veh_id].unit_id].weapon_id].offense_value != 0;
 }
@@ -94,16 +94,18 @@ void GAMEAPI monolith(int32_t veh_id) {
     int32_t y = v.y;
     if (unit_id == 16 || unit_id == 17 || unit_id == 18) return;
     if (faction_id == CurrentPlayerFaction && !MultiplayerActive) {
-        if (v.order == 0x18 && v.waypoint_x[0] == x && v.waypoint_y[0] == y) v.order = 0;
+        if (v.order == ORDER_MOVE_TO && v.waypoint_x[0] == x && v.waypoint_y[0] == y) v.order = ORDER_NONE;
         if (v.order) return;
     }
     const char* label;
     int32_t delay;
     if (Weapon[Units[v.unit_id].weapon_id].offense_value == 0) {
         if (v.damage_taken == 0) {
-            if (v.state & 0x100) return;
-            v.state |= 0x100;
-            if (faction_id != CurrentPlayerFaction || (GameMorePreferences & 0x800) || MultiplayerActive) return;
+            if (v.state & VSTATE_MONOLITH_UPGRADED) return;
+            v.state |= VSTATE_MONOLITH_UPGRADED;
+            if (faction_id != CurrentPlayerFaction || (GameMorePreferences & MPREF_AUTO_ALWAYS_INSPECT_MONOLITH) ||
+                MultiplayerActive)
+                return;
             label = "SEEMONOLITH";
             delay = -5000;
         } else {
@@ -120,7 +122,7 @@ void GAMEAPI monolith(int32_t veh_id) {
     }
     for (int32_t f = 1; f < 8; f++) del_site(f, 0, x, y, 0);
     if (!is_human(faction_id)) {
-        if ((v.state & 0x100) || morale_veh(veh_id, 1, 0) > 5 || v.morale > 5 ||
+        if ((v.state & VSTATE_MONOLITH_UPGRADED) || morale_veh(veh_id, 1, 0) > 5 || v.morale > 5 ||
             Weapon[Units[v.unit_id].weapon_id].offense_value == 0) {
             if (v.damage_taken) {
                 v.damage_taken = 0;
@@ -130,12 +132,12 @@ void GAMEAPI monolith(int32_t veh_id) {
             add_monolith_sites(x, y);
             return;
         }
-    } else if (!MultiplayerActive && !(GameMorePreferences & 0x800)) {
+    } else if (!MultiplayerActive && !(GameMorePreferences & MPREF_AUTO_ALWAYS_INSPECT_MONOLITH)) {
         FX_play(&Sounds, 6);
         int32_t choice = popp(ScriptFileName, "MONOLITH", 0, "monolith_sm.pcx", 0);
         FX_stop(&Sounds, 6);
         if (choice == 2) {
-            GameMorePreferences |= 0x800;
+            GameMorePreferences |= MPREF_AUTO_ALWAYS_INSPECT_MONOLITH;
             prefs_save(0);
         } else if (choice == 0) {
             add_monolith_sites(x, y);
@@ -146,21 +148,21 @@ void GAMEAPI monolith(int32_t veh_id) {
         v.damage_taken = 0;
         veh_skip(veh_id);
         draw_tile(x, y, 2);
-        if ((v.state & 0x100) || morale_veh(veh_id, 1, 0) > 5) {
+        if ((v.state & VSTATE_MONOLITH_UPGRADED) || morale_veh(veh_id, 1, 0) > 5) {
             if (faction_id != CurrentPlayerFaction) return;
-            delay = (GameMorePreferences & 0x800) ? 5000 : -5000;
+            delay = (GameMorePreferences & MPREF_AUTO_ALWAYS_INSPECT_MONOLITH) ? 5000 : -5000;
             NetMsg_pop(&NetMsg, "MONOLITHHEAL", delay, 0, "monolith_sm.pcx");
             GameState |= 4;
             return;
         }
     }
-    if (!(v.state & 0x100) && morale_veh(veh_id, 1, 0) < 6) {
+    if (!(v.state & VSTATE_MONOLITH_UPGRADED) && morale_veh(veh_id, 1, 0) < 6) {
         int32_t keep = game_rand() % 32;
         if (!(map_tile(x, y)->items & 0x2000000) || CurrentTurn < 100) {
             keep = 1;
             bit_set(x, y, 0x2000000, 1);
         }
-        v.state |= 0x100;
+        v.state |= VSTATE_MONOLITH_UPGRADED;
         uint32_t morale = v.morale + 1u;
         if (morale > 6) morale = 6;
         v.morale = (uint8_t)morale;
@@ -182,12 +184,13 @@ void GAMEAPI monolith(int32_t veh_id) {
             StrBuffer[0] = 0;
             std::strcat(StrBuffer, "MONOLITH");
             std::strcat(StrBuffer, keep != 0 ? "1" : "0");
-            delay = (GameMorePreferences & 0x800) ? 5000 : -5000;
+            delay = (GameMorePreferences & MPREF_AUTO_ALWAYS_INSPECT_MONOLITH) ? 5000 : -5000;
             NetMsg_pop(&NetMsg, StrBuffer, delay, 0, "monolith_sm.pcx");
             GameState |= 4;
         }
     } else if (faction_id == CurrentPlayerFaction) {
-        if (GameMorePreferences & 0x800) NetMsg_pop(&NetMsg, "MONOLITHNO", 5000, 0, "monolith_sm.pcx");
+        if (GameMorePreferences & MPREF_AUTO_ALWAYS_INSPECT_MONOLITH)
+            NetMsg_pop(&NetMsg, "MONOLITHNO", 5000, 0, "monolith_sm.pcx");
         else NetMsg_pop(&NetMsg, "MONOLITHNO", -5000, 0, "monolith_sm.pcx");
     }
 }
@@ -206,7 +209,8 @@ int32_t GAMEAPI goody_box(int32_t veh_id, int32_t) {
     int32_t opened = fac.goody_opened;
     fac.goody_opened = opened + 1;
     if (MultiplayerActive) game_srand(MapRandomSeed + (opened + 1) * 37);
-    if (fac.SE_research_pending * -5 <= CurrentTurn && !(GameRules & 0x4000000)) fac.tech_accumulated++;
+    if (fac.SE_research_pending * -5 <= CurrentTurn && !(GameRules & RULES_SCN_NO_TECH_ADVANCES))
+        fac.tech_accumulated++;
     bool forced = false;  // a scenario-placed pod (items 0x4000000/0x8000000)
     int32_t kind;
     {
@@ -233,7 +237,8 @@ int32_t GAMEAPI goody_box(int32_t veh_id, int32_t) {
         }
     }
 dispatch:
-    if (Units[game().vehs[veh_id].unit_id].plan == 12 && game_rand() % 3 == 0 && !(game().vehs[veh_id].flags & 0x20)) {
+    if (Units[game().vehs[veh_id].unit_id].plan == 12 && game_rand() % 3 == 0 &&
+        !(game().vehs[veh_id].flags & VFLAG_IS_OBJECTIVE)) {
     vanish:
         if (viewer) NetMsg_pop(&NetMsg, is_sea ? "GOODYWHIRLPOOL" : "GOODYVANISH", 5000, 0, nullptr);
         kill(veh_id);
@@ -291,11 +296,12 @@ dispatch:
     }
     case 1:
         // river source
-        if (!is_sea && !(map_tile(x, y)->items & 0x80)) {
+        if (!is_sea && !(map_tile(x, y)->items & BIT_RIVER)) {
             for (int32_t i = 0; i < 9; i++) {
                 int32_t tx = map_wrap_x(TableOffsetX[i] + x);
                 int32_t ty = TableOffsetY[i] + y;
-                if (map_in_bounds(tx, ty) && ((map_tile(tx, ty)->items & 0x80) || map_is_ocean(tx, ty))) goto reroll;
+                if (map_in_bounds(tx, ty) && ((map_tile(tx, ty)->items & BIT_RIVER) || map_is_ocean(tx, ty)))
+                    goto reroll;
             }
             if (viewer) {
                 FX_play(&Sounds, 0x26);
@@ -331,7 +337,7 @@ dispatch:
         break;
     case 3: {
         // earthquake
-        if ((GameRules & 0x1000000) && DiffLevel <= 1) break;
+        if ((GameRules & RULES_SCN_FORCE_CURRENT_DIFF_LEVEL) && DiffLevel <= 1) break;
         if ((map_tile(x, y)->climate & 0xE0) > 0x80 || fac.base_count <= 1 || is_sea || MultiplayerActive) break;
         int32_t n = fac.goody_earthquake * 2 + 2;
         if (!(n == 1 || fac.goody_earthquake * 2 + 1 < 0 || game_rand() % n == 0)) break;
@@ -343,7 +349,7 @@ dispatch:
             int32_t tx = map_wrap_x(TableOffsetX[i] + x);
             int32_t ty = TableOffsetY[i] + y;
             if (!map_in_bounds(tx, ty)) continue;
-            if ((map_tile(tx, ty)->items & 4) && game_rand() % 3 == 0) {
+            if ((map_tile(tx, ty)->items & BIT_ROAD) && game_rand() % 3 == 0) {
                 bit_set(tx, ty, 4, 0);
                 synch_bit(tx, ty, faction_id);
             }
@@ -359,12 +365,13 @@ dispatch:
     }
     case 4: {
         // teleport
-        if (!is_sea && (GameState & 0x100000)) {
+        if (!is_sea && (GameState & STATE_PERIHELION_ACTIVE)) {
             kind = 7;
             goto dispatch;
         }
         int32_t plan = Units[game().vehs[veh_id].unit_id].plan;
-        if (MultiplayerActive || plan == 12 || ((GameRules & 0x1000000) && DiffLevel <= 1)) break;
+        if (MultiplayerActive || plan == 12 || ((GameRules & RULES_SCN_FORCE_CURRENT_DIFF_LEVEL) && DiffLevel <= 1))
+            break;
         if (CurrentTurn < 25 || (CurrentTurn < 50 && DiffLevel < 2)) {
             kind = 8;
             goto dispatch;
@@ -390,9 +397,9 @@ dispatch:
                     MAP* sq = map_tile(tx, ty);
                     if (((sq->climate & 0xE0) < 0x60) != (is_sea != 0)) continue;
                     if (sq->region != region) continue;
-                    if ((sq->items & 3) && (sq->val2 & 0xF) < 8) continue;
+                    if ((sq->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) && (sq->val2 & 0xF) < 8) continue;
                     if (zoc_any(tx, ty, faction_id)) continue;
-                    if (fac.player_flags & 0x200) continue;
+                    if (fac.player_flags & PFLAG_MAP_REVEALED) continue;
                     if (map_tile(tx, ty)->visibility & (uint8_t)(1 << (faction_id & 31))) continue;
                     break;
                 }
@@ -401,7 +408,7 @@ dispatch:
         if (viewer) NetMsg_pop(&NetMsg, is_sea ? "GOODYWAVE" : "GOODYGATE", -5000, 0, is_sea ? nullptr : "stars_sm.pcx");
         VEH& v = game().vehs[veh_id];
         v.moves_spent = 0;
-        v.order = 0;
+        v.order = ORDER_NONE;
         v.state &= 0xFCFFFDFF;
         stack_put(stack_veh(veh_id, 1), tx, ty);
         if (game().vehs[veh_id].faction_id == CurrentPlayerFaction)
@@ -417,7 +424,7 @@ dispatch:
     }
     case 5: {
         // production boost
-        if ((GameState & 0x100000) && !is_sea) {
+        if ((GameState & STATE_PERIHELION_ACTIVE) && !is_sea) {
             kind = 7;
             goto dispatch;
         }
@@ -449,22 +456,24 @@ dispatch:
                 }
             }
         }
-        if (is_sea || (GameRules & 0x40000)) break;
+        if (is_sea || (GameRules & RULES_SCN_UNITY_PODS_NO_ARTIFACTS)) break;
         int32_t artifacts = fac.units_active[7];
         for (int32_t i = 0; i < game().base_count; i++)
-            if ((uint8_t)game().bases[i].faction_id == faction_id && (game().bases[i].state_flags & 0x400)) artifacts++;
-        if (artifacts < fac.base_count || (GameState & 0x40000)) goto artifact;
+            if ((uint8_t)game().bases[i].faction_id == faction_id &&
+                (game().bases[i].state_flags & BSTATE_ARTIFACT_LINKED))
+                artifacts++;
+        if (artifacts < fac.base_count || (GameState & STATE_SCN_VICT_ALL_ARTIFACTS_OBJ_UNIT)) goto artifact;
         break;
     }
     case 6:
     artifact:
-        if (GameRules & 0x40000) break;
+        if (GameRules & RULES_SCN_UNITY_PODS_NO_ARTIFACTS) break;
         if (retry > 1 && kind == 6) {
             kind = 5;
             goto dispatch;
         }
         if (is_sea && stack_check(veh_id, 8, -1, -1, -1) <= 0) break;
-        if (MultiplayerActive && !(GameState & 0x40000)) {
+        if (MultiplayerActive && !(GameState & STATE_SCN_VICT_ALL_ARTIFACTS_OBJ_UNIT)) {
             for (int32_t i = 1; i < 8; i++)
                 if (i != faction_id && is_human(i) && game().factions[i].goody_artifact < fac.goody_artifact)
                     goto reroll;
@@ -472,7 +481,7 @@ dispatch:
         fac.goody_artifact++;
         if (Units[game().vehs[veh_id].unit_id].plan == 12) break;
         {
-            int32_t nv = veh_init(7, faction_id, x, y);
+            int32_t nv = veh_init(BSC_ALIEN_ARTIFACT, faction_id, x, y);
             if (nv < 0) return 0;
             veh_skip(nv);
             draw_tile(x, y, 2);
@@ -483,7 +492,9 @@ dispatch:
         }
     case 7: {
         // fungus bloom
-        if ((GameRules & 0x200000) || ((GameRules & 0x1000000) && DiffLevel <= 1) || retry >= 2) break;
+        if ((GameRules & RULES_SCN_NO_NATIVE_LIFE) ||
+            ((GameRules & RULES_SCN_FORCE_CURRENT_DIFF_LEVEL) && DiffLevel <= 1) || retry >= 2)
+            break;
         if (is_sea) {
             kind = 8;
             goto dispatch;
@@ -509,7 +520,7 @@ dispatch:
             if (!spawned && may_spawn && game_rand() % 2 != 0) {
                 MAP* sq = map_tile(tx, ty);
                 if (tile_veh_owner(sq) == -1 && ExpansionEnabled && (sq->climate & 0xE0) >= 0x60) {
-                    veh_init(19, 0, tx, ty);
+                    veh_init(BSC_FUNGAL_TOWER, 0, tx, ty);
                     may_spawn = false;
                     spawned = true;
                 }
@@ -520,7 +531,7 @@ dispatch:
     }
     case 8:
         // monolith
-        if ((GameRules & 0x20000) || bonus_at(x, y) != 0 || is_sea) break;
+        if ((GameRules & RULES_SCN_UNITY_PODS_NO_MONOLITHS) || bonus_at(x, y) != 0 || is_sea) break;
         site_radius(x, y);
         bit_set(x, y, 0x2000, 1);
         bit_set(x, y, 0x20, 0);
@@ -530,7 +541,7 @@ dispatch:
         return 0;
     case 9: {
         // Unity rover, chopper or foil (battle ogres in the expansion)
-        if ((GameMoreRules & 1) || TechOwners[77]) break;
+        if ((GameMoreRules & MRULES_SCN_UNITY_PODS_NO_VEHICLES) || TechOwners[77]) break;
         if (is_sea && stack_check(veh_id, 8, -1, -1, -1) <= 0) break;
         int32_t unit_id = 11;
         if (TechOwners[38] && game_rand() % 3 == 0 && !fac.units_active[12]) {
@@ -568,8 +579,8 @@ dispatch:
         if (unit_id == 11 && game_rand() % 5 == 0 && ExpansionEnabled) {
             int32_t level = 0;
             for (int32_t f = 1; f < 8; f++) {
-                if (has_tech(82, f) && level == 0) level = 1;
-                if (has_tech(83, f)) level = 2;
+                if (has_tech(TECH_Bioadap, f) && level == 0) level = 1;
+                if (has_tech(TECH_SentRes, f)) level = 2;
             }
             unit_id = 16;
             if (level != 0) unit_id = 17;
@@ -593,11 +604,11 @@ dispatch:
     }
     case 10: {
         // commlink frequency or a technology
-        if (GameMoreRules & 2) break;
+        if (GameMoreRules & MRULES_SCN_UNITY_PODS_NO_TECH) break;
         if (game_rand() % 4 == 0) {
             int32_t o = game_rand() % 7 + 1;
             uint32_t bit = 1u << o;
-            if (o != faction_id && !(game().factions[faction_id].diplo_status[o] & 8) &&
+            if (o != faction_id && !(game().factions[faction_id].diplo_status[o] & DIPLO_COMMLINK) &&
                 (FactionStatus[1] & (uint8_t)bit) && !(FactionStatus[0] & bit) && is_human(faction_id) &&
                 !(game().mfactions[o].rule_flags & 0x80)) {
                 treaty_on(faction_id, o, 8);
@@ -609,7 +620,7 @@ dispatch:
                 return 0;
             }
         }
-        if (GameRules & 0x4000000) break;
+        if (GameRules & RULES_SCN_NO_TECH_ADVANCES) break;
         if (MultiplayerActive && !forced) {
             for (int32_t i = 1; i < 8; i++) {
                 if (i != faction_id && is_human(i) && game().factions[i].goody_tech + 1 < fac.goody_tech &&
@@ -673,7 +684,7 @@ dispatch:
             int32_t tx = map_wrap_x(TableOffsetX[i] + x);
             int32_t ty = TableOffsetY[i] + y;
             if (!map_in_bounds(tx, ty)) continue;
-            if (i != 0 && (map_tile(tx, ty)->items & 0x100000)) continue;
+            if (i != 0 && (map_tile(tx, ty)->items & BIT_SUPPLY_REMOVE)) continue;
             MAP* t = map_tile(tx, ty);
             if (!is_sea) {
                 uint8_t rocky = t->val3 & 0xC0;
@@ -720,15 +731,19 @@ dispatch:
     default: {
         // 12..17: native life
         bool spore = false;
-        if ((GameRules & 0x200000) || ((GameRules & 0x1000000) && DiffLevel <= 1)) break;
+        if ((GameRules & RULES_SCN_NO_NATIVE_LIFE) ||
+            ((GameRules & RULES_SCN_FORCE_CURRENT_DIFF_LEVEL) && DiffLevel <= 1))
+            break;
         base_find_faction(x, y, faction_id);
         int32_t own_dist = BaseFindDist;
         base_find(x, y);
         if (BaseFindDist <= 1) break;
         if (kind > 13) {
             MAP* sq = map_tile(x, y);
-            int32_t m = ((sq->items & 0x20) && (sq->climate & 0xE0) >= 0x40) ? 2 : 4;
-            if ((((GameState & 0x100000) != 0) + 1) * own_dist < (kind - 13) * m + (4 - MapNativeLifeForms) * 2) break;
+            int32_t m = ((sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40) ? 2 : 4;
+            if ((((GameState & STATE_PERIHELION_ACTIVE) != 0) + 1) * own_dist <
+                (kind - 13) * m + (4 - MapNativeLifeForms) * 2)
+                break;
         }
         if (MultiplayerActive && faction_id == RankingFactionIDUnk2 && game_rand() % 2 == 0) break;
         if (is_sea) {
@@ -743,16 +758,17 @@ dispatch:
             int32_t ty = NearOffsetY[d] + y;
             if (map_in_bounds(tx, ty)) {
                 MAP* t = map_tile(tx, ty);
-                if (((t->climate & 0xE0) < 0x60) == (is_sea != 0) && (!(t->items & 3) || (t->val2 & 0xF) > 7)) {
+                if (((t->climate & 0xE0) < 0x60) == (is_sea != 0) &&
+                    (!(t->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) || (t->val2 & 0xF) > 7)) {
                     if (!is_sea) {
                         base_find(tx, ty);
                         if (BaseFindDist > 1) {
                             int32_t nv;
                             if (game_rand() % 5 == 0 && ExpansionEnabled) {
-                                nv = veh_init(15, 0, tx, ty);
+                                nv = veh_init(BSC_SPORE_LAUNCHER, 0, tx, ty);
                                 spore = true;
                             } else {
-                                nv = veh_init(8, 0, tx, ty);
+                                nv = veh_init(BSC_MIND_WORMS, 0, tx, ty);
                             }
                             if (nv >= 0) {
                                 count++;
@@ -764,7 +780,7 @@ dispatch:
                             }
                         }
                     } else {
-                        int32_t nv = veh_init(9, 0, tx, ty);
+                        int32_t nv = veh_init(BSC_ISLE_OF_THE_DEEP, 0, tx, ty);
                         if (nv >= 0) {
                             count++;
                             game().vehs[nv].visibility |= map_tile(tx, ty)->visibility;
@@ -772,10 +788,10 @@ dispatch:
                             if (veh_cargo(nv) <= n) n = veh_cargo(nv);
                             for (; n > 0; n--) {
                                 if (game_rand() % 5 == 0 && ExpansionEnabled) {
-                                    veh_init(15, 0, tx, ty);
+                                    veh_init(BSC_SPORE_LAUNCHER, 0, tx, ty);
                                     spore = true;
                                 } else {
-                                    veh_init(8, 0, tx, ty);
+                                    veh_init(BSC_MIND_WORMS, 0, tx, ty);
                                 }
                             }
                             break;
@@ -814,8 +830,8 @@ resource:
     if (retry > 1) return 0;
     {
         MAP* sq = map_tile(x, y);
-        if ((!is_sea || (sq->climate & 0xE0) >= 0x40) && (!(sq->items & 0x20) || (sq->climate & 0xE0) < 0x40) &&
-            y > 1 && y < game().map.y - 2 && !(GameRules & 0x10000)) {
+        if ((!is_sea || (sq->climate & 0xE0) >= 0x40) && (!(sq->items & BIT_FUNGUS) || (sq->climate & 0xE0) < 0x40) &&
+            y > 1 && y < game().map.y - 2 && !(GameRules & RULES_SCN_UNITY_PODS_NO_RESOURCES)) {
             bit_set(x, y, 0x400, 1);
             int32_t bonus = bonus_at(x, y);
             site_radius(x, y);
@@ -862,11 +878,12 @@ int32_t GAMEAPI study_artifact(int32_t veh_id) {
     int32_t faction_id = game().vehs[veh_id].faction_id;
     std::strcat(label, "ARTIFACTTECH");
     int32_t b = base_at(x, y);
-    if (SecretProjects[20] != b && b >= 0 && (game().bases[b].state_flags & 0x400)) {
-        if (!(game().bases[b].state_flags & 0x800) && faction_id == CurrentPlayerFaction) {
+    if (SecretProjects[FAC_UNIVERSAL_TRANSLATOR - SP_ID_First] != b && b >= 0 &&
+        (game().bases[b].state_flags & BSTATE_ARTIFACT_LINKED)) {
+        if (!(game().bases[b].state_flags & BSTATE_ARTIFACT_ALREADY_LINKED) && faction_id == CurrentPlayerFaction) {
             parse_says(0, game().bases[b].name, -1, -1);
             NetMsg_pop(&NetMsg, "ALREADYARTIFACT", -5000, 0, "art_dis_sm.pcx");
-            game().bases[b].state_flags |= 0x800;
+            game().bases[b].state_flags |= BSTATE_ARTIFACT_ALREADY_LINKED;
         }
         return 0;
     }
@@ -879,7 +896,7 @@ int32_t GAMEAPI study_artifact(int32_t veh_id) {
     Faction& f = game().factions[faction_id];
     if (!(f.player_flags & 0x10)) f.player_flags |= 0x10;
     else f.player_flags |= 4;
-    if (b >= 0) game().bases[b].state_flags |= 0x400;
+    if (b >= 0) game().bases[b].state_flags |= BSTATE_ARTIFACT_LINKED;
     int32_t best_value = -1;
     int32_t best = -1;
     for (int32_t t = 0; t < 89; t++) {

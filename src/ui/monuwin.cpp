@@ -757,7 +757,7 @@ void fame_move_down(int32_t f, int32_t slot) {
 // earliest transcendence, 0x20 the earliest conquest; all of 1..8 without other entries), and the
 // world map pane's picture written as hof_<f>_<slot + 1>.pcx.
 void fame_add() {
-    if (GameState & 0x20) return;
+    if (GameState & STATE_SCENARIO_CHEATED_FLAG) return;
     const int32_t f = CurrentPlayerFaction;
     if (f < 1 || f > 7) return;
     compute_score(f, nullptr, nullptr, 0);
@@ -790,12 +790,12 @@ void fame_add() {
     PluralDefault = MFactions[f].is_noun_plural;
     strncpy_pad(reinterpret_cast<char*>(n + 0x52), MFactions[f].noun_faction, 0x18);
     n[0x20] = (uint8_t)fi(f, 8);
-    if (GameRules & 0x400) n[0] |= 2;
-    if (GameState & 0x2000) n[0] |= 8;
-    else if (GameState & 0x400000) n[0] |= 0x10;
-    else if (GameState & 0x200000) n[0] |= 0x20;
+    if (GameRules & RULES_IRONMAN) n[0] |= 2;
+    if (GameState & STATE_VICTORY_CONQUER) n[0] |= 8;
+    else if (GameState & STATE_VICTORY_ECONOMIC) n[0] |= 0x10;
+    else if (GameState & STATE_VICTORY_DIPLOMATIC) n[0] |= 0x20;
     else if (fi(f, 0x20C0)) n[0] |= 4;
-    else if (GameState & 0x10) n[0] |= 0x40;
+    else if (GameState & STATE_IS_SCENARIO) n[0] |= 0x40;
     auto others = [&](auto&& fn) {
         for (int32_t g = 1; g < 8; g++)
             for (int32_t i = 0; i < 5; i++)
@@ -845,7 +845,8 @@ void fame_add() {
 
 void GAMEAPI monument(int32_t is_new) {
     if ((MFactions[CurrentPlayerFaction].rule_flags & 0x80) || MultiplayerActive) return;
-    if (is_new && ((GameMorePreferences & 0x1000000) || (GameState & 0x10) || ((GameState & 1) && (GameState & 8))))
+    if (is_new && ((GameMorePreferences & MPREF_AV_MONUMENTS_DISABLED) || (GameState & STATE_IS_SCENARIO) ||
+                   ((GameState & STATE_GAME_DONE) && (GameState & STATE_FINAL_SCORE_DONE))))
         return;
     MonumentCount = 0;
     for (int32_t i = 0; i < 15; i++)

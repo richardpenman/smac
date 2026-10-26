@@ -87,11 +87,12 @@ void GAMEAPI say_base(char* buffer, int32_t base_id) {
 }
 
 int32_t GAMEAPI base_at(int32_t x, int32_t y) {
-    if (y < 0 || y >= game().map.y || x < 0 || x >= game().map.x || !(map_tile(x, y)->items & 1)) return -1;
+    if (y < 0 || y >= game().map.y || x < 0 || x >= game().map.x || !(map_tile(x, y)->items & BIT_BASE_IN_TILE))
+        return -1;
     for (int32_t i = 0; i < game().base_count; i++)
         if (game().bases[i].x == x && game().bases[i].y == y) return i;
     if (!BaseBitErrorShown) log_say_values("Base Bits Error  (x, y)", x, y, 0);
-    if (!(GameState & 0x1000)) {
+    if (!(GameState & STATE_DEBUG_MODE)) {
         rebuild_base_bits();
         return -1;
     }
@@ -149,7 +150,7 @@ int32_t GAMEAPI base_find_filtered(int32_t x, int32_t y, int32_t faction_id, int
         if (faction_id >= 0) {
             if (owner != faction_id) {
                 if (faction_id_2 == -2) {
-                    if (!(game().factions[faction_id].diplo_status[owner] & 1)) continue;
+                    if (!(game().factions[faction_id].diplo_status[owner] & DIPLO_PACT)) continue;
                 } else if (faction_id_2 < 0 || faction_id_2 != owner) {
                     continue;
                 }
@@ -174,7 +175,7 @@ int32_t GAMEAPI whose_territory(int32_t faction_id, int32_t x, int32_t y, int32_
     int32_t owner = sq->owner;
     if (owner < 1) return -1;
     if (owner == faction_id) return owner;
-    if (!ignore_comm && !(GameState & 0x80) &&
+    if (!ignore_comm && !(GameState & STATE_OMNISCIENT_VIEW) &&
         (game().factions[faction_id].diplo_status[owner] & 0x8000008) != 0x8000008)
         return -1;
     if (base_id) *base_id = base_find_filtered(x, y, -1, sq->region, -1, -1);
@@ -187,7 +188,7 @@ int32_t GAMEAPI base_territory(int32_t faction_id, int32_t x, int32_t y) {
     if (owner < 0 || owner == faction_id) return -1;
     uint32_t humans = FactionStatus[0];
     if (!(humans & (1u << faction_id)) && !(humans & (1u << owner))) return -1;
-    if (game().factions[faction_id].diplo_status[owner] & 0x10) return -1;
+    if (game().factions[faction_id].diplo_status[owner] & DIPLO_VENDETTA) return -1;
     return base_id;
 }
 
@@ -402,7 +403,7 @@ void GAMEAPI base_first(int32_t base_id) {
     for (int32_t unit_id = 0; unit_id < 512; unit_id++) {
         if (!veh_avail(unit_id, (uint8_t)base.faction_id, base_id)) continue;
         UNIT& u = Units[unit_id];
-        if (unit_id >= 64 && !(u.unit_flags & 4)) continue;
+        if (unit_id >= 64 && !(u.unit_flags & UNIT_PROTOTYPED)) continue;
         int32_t value = Armor[u.armor_id].defense_value << 5;
         if (u.plan == 2) value <<= 2;
         if (u.plan == 1) value *= 3;
@@ -609,7 +610,8 @@ void GAMEAPI base_kill(int32_t base_id) {
         for (int32_t veh_id = game().veh_count; veh_id >= 0; veh_id--) {
             VEH& v = game().vehs[veh_id];
             if (Chassis[Units[v.unit_id].chassis_id].triad != 0) continue;
-            if (((std::abs(v.y - y) + wrap_dx(v.x, x)) & ~1) == 0 && (v.order != 1 || v.waypoint_x[0] < 0))
+            if (((std::abs(v.y - y) + wrap_dx(v.x, x)) & ~1) == 0 &&
+                (v.order != ORDER_SENTRY_BOARD || v.waypoint_x[0] < 0))
                 kill(veh_id);
         }
     } else {
@@ -658,7 +660,7 @@ void GAMEAPI base_change(int32_t base_id, int32_t item_id) {
         if (owner_base >= 0 && (uint8_t)game().bases[owner_base].faction_id == faction_id) old_project = false;
     }
     if (!new_project && !old_project) return;
-    if ((GameState & 1) && !(GameState & 8)) return;
+    if ((GameState & STATE_GAME_DONE) && !(GameState & STATE_FINAL_SCORE_DONE)) return;
     int32_t current_fac = std::abs(current);
     int32_t current_sp = current_fac - 70;
     int32_t offset, mask;
@@ -701,7 +703,7 @@ void GAMEAPI base_change(int32_t base_id, int32_t item_id) {
         PluralDefault = m.is_noun_plural;
         parse_says(2, m.noun_faction, -1, -1);
         parse_say(3, Facility[current_fac].name, -1, -1);
-        wave_it((game().factions[CurrentPlayerFaction].diplo_status[faction_id] & 1) ? 0x24 : 0x26);
+        wave_it((game().factions[CurrentPlayerFaction].diplo_status[faction_id] & DIPLO_PACT) ? 0x24 : 0x26);
         popp(ScriptFileName, "BEGINPROJECT", 0, "secproj_sm.pcx", 0);
         f.secret_project_intel[offset] |= (uint32_t)mask;
     }
@@ -752,7 +754,7 @@ void GAMEAPI base_reset(int32_t base_id, int32_t has_gov) {
     base_change(base_id, base_build(base_id, nullptr, nullptr, nullptr));
     if (!(bit & FactionStatus[0]) || !(base.governor_flags & GOV_ACTIVE) || old <= -70) return;
     int32_t current = base.queue_items[0];
-    if (current > -70 || MultiplayerActive || (GameState & 1)) return;
+    if (current > -70 || MultiplayerActive || (GameState & STATE_GAME_DONE)) return;
     // A human's governor chose a secret project: ask.
     int32_t fac = current < 0 ? -current : current;
     int32_t choice;
@@ -780,7 +782,7 @@ void GAMEAPI bases_reset(int32_t region, int32_t faction_id, int32_t no_units) {
         if (region >= 0 && map_tile(base.x, base.y)->region != region) continue;
         if (no_units) {
             MAP* sq = map_tile(base.x, base.y);
-            if ((sq->items & 2) && (sq->val2 & 0xF) < 8) continue;
+            if ((sq->items & BIT_VEH_IN_TILE) && (sq->val2 & 0xF) < 8) continue;
         }
         if ((bit & FactionStatus[0]) && (cur_base().state_flags & BSTATE_UNK_80000000)) continue;
         base_reset(i, 0);
@@ -848,7 +850,7 @@ int32_t GAMEAPI has_fac(int32_t facility_id, int32_t base_id, int32_t queue_coun
 
 namespace {
 // Base tile as the yield functions see it: the base bit with a unit owner nibble below 8.
-bool tile_is_base(const MAP* sq) { return (sq->items & 1) && (sq->val2 & 0xF) < 8; }
+bool tile_is_base(const MAP* sq) { return (sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8; }
 // Fungus yield: the faction's fungus tech value lowered by a negative PLANET rating (at most -3).
 int32_t fungus_yield(int32_t tech_value, int32_t planet) {
     int32_t adjust = planet < -3 ? -3 : (planet > 0 ? 0 : planet);
@@ -1200,7 +1202,8 @@ void GAMEAPI farm_compute() {
             add_goal(faction_id, 0, 1, x, y, -1);
         }
         MAP* sq = map_tile(x, y);
-        if (!(game().factions[faction_id].player_flags & 0x200) && !(sq->visibility & (uint8_t)(1 << faction_id))) {
+        if (!(game().factions[faction_id].player_flags & PFLAG_MAP_REVEALED) &&
+            !(sq->visibility & (uint8_t)(1 << faction_id))) {
             BaseTileFlags[i] = BR_NOT_VISIBLE;
             continue;
         }
@@ -1213,12 +1216,13 @@ void GAMEAPI farm_compute() {
                 int32_t owner = game().vehs[veh_id].faction_id;
                 if (owner == faction_id) continue;
                 if (!(game().vehs[veh_id].visibility & (uint8_t)(1 << faction_id))) continue;
-                if (!(game().factions[faction_id].diplo_status[owner] & 3)) BaseTileFlags[i] |= BR_VEH_IN_TILE;
+                if (!(game().factions[faction_id].diplo_status[owner] & (DIPLO_PACT | DIPLO_TREATY)))
+                    BaseTileFlags[i] |= BR_VEH_IN_TILE;
             }
         }
         int32_t owner = whose_territory(faction_id, x, y, nullptr, 0);
         if (owner >= 0 && owner != faction_id &&
-            ((game().factions[faction_id].diplo_status[owner] & 3) || veh_id < 0 ||
+            ((game().factions[faction_id].diplo_status[owner] & (DIPLO_PACT | DIPLO_TREATY)) || veh_id < 0 ||
              game().vehs[veh_id].faction_id != faction_id))
             BaseTileFlags[i] |= BR_FOREIGN_TILE;
     }
@@ -1497,12 +1501,12 @@ void GAMEAPI base_support() {
         if (v.faction_id != faction_id) continue;
         if (v.home_base_id != CurrentBaseID) {
             // Supply convoys of other bases delivering here.
-            if (Units[v.unit_id].plan == 10 && v.x == cur_base().x && v.y == cur_base().y && v.order == 3 &&
+            if (Units[v.unit_id].plan == 10 && v.x == cur_base().x && v.y == cur_base().y && v.order == ORDER_CONVOY &&
                 v.home_base_id >= 0)
                 convoy_to(v.order_auto_type)++;
             continue;
         }
-        if (Units[v.unit_id].plan == 10 && !tile_is_base(map_tile(v.x, v.y)) && v.order == 3) {
+        if (Units[v.unit_id].plan == 10 && !tile_is_base(map_tile(v.x, v.y)) && v.order == ORDER_CONVOY) {
             int32_t value;
             switch (v.order_auto_type) {
             case 0: value = crop_yield(faction_id, CurrentBaseID, v.x, v.y, 0); break;
@@ -1521,7 +1525,7 @@ void GAMEAPI base_support() {
         }
         v.state &= 0xFF9FFFEF;
         plan = Units[v.unit_id].plan;
-        if (plan == 10 && v.order == 3 && tile_is_base(map_tile(v.x, v.y))) convoy_from(v.order_auto_type)++;
+        if (plan == 10 && v.order == ORDER_CONVOY && tile_is_base(map_tile(v.x, v.y))) convoy_from(v.order_auto_type)++;
         if ((uint8_t)plan > 9) continue;
         if (!has_abil(v.unit_id, ABL_CLEAN_REACTOR)) {
             // Native life on fungus needs no support.
@@ -1537,7 +1541,7 @@ void GAMEAPI base_support() {
                 if (BaseForcesSupported > free_units[index] && !has_abil(v.unit_id, ABL_CLEAN_REACTOR)) {
                     BaseForcesMaintCount++;
                     BaseForcesMaintCost += (support <= -4) + 1;
-                    v.state |= 0x10;
+                    v.state |= VSTATE_REQUIRES_SUPPORT;
                 }
             }
             if (BaseUpkeepState == 1) {
@@ -1562,7 +1566,7 @@ void GAMEAPI base_support() {
         if (police == -3) {
             v.state |= BaseVehPacifismCount == 1 ? 0x400000 : 0x200000;
         } else if (f.SE_police_pending + (base_fac(CurrentBaseID, FAC_BROOD_PIT) ? 2 : 0) < -3) {
-            v.state |= 0x200000;
+            v.state |= VSTATE_PACIFISM_DRONE;
         }
     }
 }
@@ -1675,8 +1679,9 @@ BASE_MINERALS_DEF {
         }
     }
     if (cur_base().eco_damage < 0) cur_base().eco_damage = 0;
-    if (SecretProjects[FAC_VOICE_OF_PLANET - 70] != -1 && (GameRules & 0x800)) cur_base().eco_damage *= 2;
-    if (GameState & 0x100000) cur_base().eco_damage *= 2;
+    if (SecretProjects[FAC_VOICE_OF_PLANET - 70] != -1 && (GameRules & RULES_VICTORY_TRANSCENDENCE))
+        cur_base().eco_damage *= 2;
+    if (GameState & STATE_PERIHELION_ACTIVE) cur_base().eco_damage *= 2;
     int32_t diff;
     if (FactionStatus[0] & bit) {
         diff = f.diff_level == 0 ? 2 : (f.diff_level <= 3 ? 3 : 5);
@@ -1957,7 +1962,8 @@ BASE_ENERGY_DEF {
         BaseCommerceImport[i] = 0;
         BaseCommerceExport[i] = 0;
         if (i == faction_id) continue;
-        if (!(f.diplo_status[i] & 2) && !(game().factions[i].diplo_status[faction_id] & 2)) continue;
+        if (!(f.diplo_status[i] & DIPLO_TREATY) && !(game().factions[i].diplo_status[faction_id] & DIPLO_TREATY))
+            continue;
         if (!game().factions[i].base_count) continue;
         int32_t partner = base_rank(i, rank);
         if (partner < 0) continue;
@@ -1966,7 +1972,7 @@ BASE_ENERGY_DEF {
         int32_t techs = TechCommerceCount + 1;
         int32_t exported = ((game().factions[i].tech_commerce_bonus + 1) * value + techs / 2) / techs;
         value = ((f.tech_commerce_bonus + 1) * value + techs / 2) / techs;
-        if (!(f.diplo_status[i] & 1)) {
+        if (!(f.diplo_status[i] & DIPLO_PACT)) {
             value /= 2;
             exported /= 2;
         }
@@ -2225,14 +2231,15 @@ void GAMEAPI base_energy_costs() {
     // Energy convoys stop when the base runs an energy deficit.
     for (int32_t veh_id = 0; veh_id < game().veh_count; veh_id++) {
         VEH& v = game().vehs[veh_id];
-        if (v.faction_id != faction_id || Units[v.unit_id].plan != 10 || v.order != 3 || v.order_auto_type != 2)
+        if (v.faction_id != faction_id || Units[v.unit_id].plan != 10 || v.order != ORDER_CONVOY ||
+            v.order_auto_type != ORDERA_TERRA_AUTO_MAGTUBE)
             continue;
-        if (tile_is_base(map_tile(v.x, v.y))) v.order = 0;
+        if (tile_is_base(map_tile(v.x, v.y))) v.order = ORDER_NONE;
     }
 }
 
 void GAMEAPI base_research() {
-    if (GameRules & 0x4000000) return;  // scenario: no tech advances
+    if (GameRules & RULES_SCN_NO_TECH_ADVANCES) return;  // scenario: no tech advances
     int32_t faction_id = (uint8_t)cur_base().faction_id;
     Faction& f = game().factions[faction_id];
     int32_t labs = cur_base().labs_total;
@@ -2278,8 +2285,8 @@ void GAMEAPI base_maint() {
         if (has_sp(FAC_SELF_AWARE_COLONY - 70, faction_id)) {
             // Half maintenance; the odd halves alternate through player flag 0x20.
             maint += (f.player_flags >> 5) & 1;
-            if (maint & 1) f.player_flags |= 0x20;
-            else f.player_flags &= ~0x20u;
+            if (maint & 1) f.player_flags |= PFLAG_SELF_AWARE_COLONY_LOST_MAINT;
+            else f.player_flags &= ~PFLAG_SELF_AWARE_COLONY_LOST_MAINT;
             maint /= 2;
         }
         f.energy_credits -= maint;
@@ -2316,7 +2323,7 @@ int32_t GAMEAPI upgrade_cost(int32_t faction_id, int32_t new_unit_id, int32_t ol
     UNIT& n = Units[new_unit_id];
     UNIT& o = Units[old_unit_id];
     int32_t cost = n.cost;
-    if (new_unit_id >= 64 && !(n.unit_flags & 4)) {  // prototype not built yet
+    if (new_unit_id >= 64 && !(n.unit_flags & UNIT_PROTOTYPED)) {  // prototype not built yet
         int32_t c = cost + (cost + 1) / 2;
         cost = c * (c + 1);
     }
@@ -2351,14 +2358,14 @@ int32_t GAMEAPI base_growth() {
     bool alien = (game().mfactions[faction_id].rule_flags & RFLAG_ALIEN) != 0;
     if (cur_base().nutrients_accumulated < 0) {
         // Starvation.
-        if (!(GameState & 1) || (GameState & 8)) {
+        if (!(GameState & STATE_GAME_DONE) || (GameState & STATE_FINAL_SCORE_DONE)) {
             if (BaseResourceConvoyFrom[0]) {
                 for (int32_t veh_id = 0; veh_id < game().veh_count; veh_id++) {
                     VEH& v = game().vehs[veh_id];
-                    if (v.home_base_id != CurrentBaseID || Units[v.unit_id].plan != 10 || v.order != 3 ||
-                        v.order_auto_type != 0)
+                    if (v.home_base_id != CurrentBaseID || Units[v.unit_id].plan != 10 || v.order != ORDER_CONVOY ||
+                        v.order_auto_type != ORDERA_TERRA_AUTO_FULL)
                         continue;
-                    if (tile_is_base(map_tile(v.x, v.y))) v.order = 0;
+                    if (tile_is_base(map_tile(v.x, v.y))) v.order = ORDER_NONE;
                 }
             }
             if (alien) popb("STARVE", 0x4000, 14, "al_starv_sm.pcx", 0);
@@ -2492,8 +2499,8 @@ void GAMEAPI do_upgrade(int32_t faction_id, int32_t new_unit_id, int32_t old_uni
         for (int32_t j = 0; j <= base.queue_size; j++)
             if (items[j] == old_unit_id) items[j] = new_unit_id;
     }
-    if (new_unit_id >= 64 && cost) Units[new_unit_id].unit_flags |= 4;
-    if (old_unit_id >= 64) Units[old_unit_id].unit_flags &= ~1;
+    if (new_unit_id >= 64 && cost) Units[new_unit_id].unit_flags |= UNIT_PROTOTYPED;
+    if (old_unit_id >= 64) Units[old_unit_id].unit_flags &= ~UNIT_ACTIVE;
     if (FactionStatus[0] & (uint8_t)(1 << faction_id)) draw_map(1);
     if (faction_id == CurrentPlayerFaction) Console_update_data(&MainConsole, 0);
 }
@@ -2516,7 +2523,7 @@ void say_unit_upgrade(int32_t unit_id) {
 }  // namespace
 
 int32_t GAMEAPI upgrade_prototype(int32_t faction_id, int32_t new_unit_id, int32_t old_unit_id, int32_t automatic) {
-    if ((GameState & 1) && !(GameState & 8)) return 0;
+    if ((GameState & STATE_GAME_DONE) && !(GameState & STATE_FINAL_SCORE_DONE)) return 0;
     Faction& f = game().factions[faction_id];
     int32_t cost = upgrade_cost(faction_id, new_unit_id, old_unit_id) * f.units_active[old_unit_id] * 10;
     uint8_t bit = (uint8_t)(1 << faction_id);
@@ -2541,11 +2548,11 @@ int32_t GAMEAPI upgrade_prototype(int32_t faction_id, int32_t new_unit_id, int32
             parse_num(0, cost);
             parse_num(1, f.energy_credits);
             parse_num(2, f.units_active[old_unit_id]);
-            bool built = (Units[new_unit_id].unit_flags & 4) != 0;
+            bool built = (Units[new_unit_id].unit_flags & UNIT_PROTOTYPED) != 0;
             int32_t triad = Chassis[Units[new_unit_id].chassis_id].triad;
             bool alien = (game().mfactions[faction_id].rule_flags & RFLAG_ALIEN) != 0;
             if (cost > f.energy_credits) {
-                if (automatic && !(GameWarnings & 4)) return 0;
+                if (automatic && !(GameWarnings & WARN_STOP_PROTOTYPE_COMPLETE)) return 0;
                 const char* pcx = triad == 2 ? (alien ? "alair_sm.pcx" : "air_sm.pcx")
                                              : (triad == 1 ? "navun_sm.pcx" : (alien ? "alunit_sm.pcx" : "unit_sm.pcx"));
                 popp(ScriptFileName, built ? "UPGRADEPROTOCOST" : "UPGRADEPROTOCOST2", 0, pcx, 0);
@@ -2578,7 +2585,7 @@ void GAMEAPI upgrade_prototypes(int32_t faction_id, int32_t unit_id) {
         int32_t old_id = k < 64 ? k : (k % 64) + faction_id * 64;
         if (old_id == unit_id) continue;
         UNIT& o = Units[old_id];
-        if (!(o.unit_flags & 1) || !(o.obsolete_factions & (1 << faction_id))) continue;
+        if (!(o.unit_flags & UNIT_ACTIVE) || !(o.obsolete_factions & (1 << faction_id))) continue;
         if (o.plan != u.plan || o.group_id != u.group_id) continue;
         if (Chassis[o.chassis_id].triad != Chassis[u.chassis_id].triad) continue;
         if (!game().factions[faction_id].units_active[old_id]) continue;
@@ -2599,7 +2606,8 @@ void GAMEAPI upgrade_prototypes(int32_t faction_id, int32_t unit_id) {
 
 void GAMEAPI upgrade_any_prototypes(int32_t faction_id) {
     UpgradeAllProtos = 0;
-    if ((FactionStatus[0] & (uint8_t)(1 << faction_id)) && !(GameMorePreferences & 0x100000)) return;
+    if ((FactionStatus[0] & (uint8_t)(1 << faction_id)) && !(GameMorePreferences & MPREF_BSC_AUTO_PRUNE_OBS_VEH))
+        return;
     for (int32_t k = 0; k < 128; k++) {
         int32_t unit_id = k < 64 ? k : (k % 64) + faction_id * 64;
         uint16_t flags = Units[unit_id].unit_flags;
@@ -2634,7 +2642,8 @@ int32_t GAMEAPI base_connect(int32_t priority) {
                 if (skip) continue;
             }
         } else {
-            if (dist > 5 || !(game().factions[faction_id].diplo_status[(uint8_t)other.faction_id] & 1)) continue;
+            if (dist > 5 || !(game().factions[faction_id].diplo_status[(uint8_t)other.faction_id] & DIPLO_PACT))
+                continue;
             dist += game().map.x;
         }
         if (dist >= best) continue;
@@ -2660,12 +2669,12 @@ int32_t GAMEAPI base_connect(int32_t priority) {
                 ok = has_tech(Rules.tech_preq_build_road_fungus, f) || has_tech(Terraform[10].preq_tech, f);
             if (ok && (sq->items & BIT_VEH_IN_TILE)) {
                 uint32_t owner = sq->val2 & 0xF;
-                ok = owner > 7 || owner == (uint32_t)f || (game().factions[f].diplo_status[owner] & 1);
+                ok = owner > 7 || owner == (uint32_t)f || (game().factions[f].diplo_status[owner] & DIPLO_PACT);
             }
             if (ok) ok = zoc_sea(x, y, f) < 1;
             if (ok) {
                 int32_t owner = whose_territory(f, x, y, nullptr, 0);
-                ok = owner < 0 || owner == f || (game().factions[owner].diplo_status[f] & 1);
+                ok = owner < 0 || owner == f || (game().factions[owner].diplo_status[f] & DIPLO_PACT);
             }
             if (ok) {
                 uint32_t items = map_tile(x, y)->items;
@@ -2683,7 +2692,7 @@ int32_t GAMEAPI base_connect(int32_t priority) {
     }
     int32_t x = cur_base().x, y = cur_base().y;
     uint8_t bit = (uint8_t)(1 << (uint8_t)cur_base().faction_id);
-    bool allowed = !(bit & FactionStatus[0]) || (GameMorePreferences & 0x20);
+    bool allowed = !(bit & FactionStatus[0]) || (GameMorePreferences & MPREF_AUTO_FORMER_BUILD_SENSORS);
     if (goal_y < 0 || goal_y >= game().map.y || goal_x < 0 || goal_x >= game().map.x) {
         if (!allowed) return 0;
         if (Path_sensors(&Paths, (uint8_t)cur_base().faction_id, &x, &y)) return 0;
@@ -2713,10 +2722,12 @@ void GAMEAPI base_check_support() {
             int32_t plan = Units[v.unit_id].plan;
             int32_t score;
             if (plan == 10) {
-                if (v.order != 3 || v.order_auto_type != 1 || !tile_is_base(map_tile(v.x, v.y))) continue;
+                if (v.order != ORDER_CONVOY || v.order_auto_type != ORDERA_TERRA_AUTO_ROAD ||
+                    !tile_is_base(map_tile(v.x, v.y)))
+                    continue;
                 score = 99999;  // mineral convoys first
             } else {
-                if (!(v.state & 0x10) || (uint8_t)plan > 9) continue;
+                if (!(v.state & VSTATE_REQUIRES_SUPPORT) || (uint8_t)plan > 9) continue;
                 score = base_dist(v.x, v.y, cur_base());
             }
             if (score > best) {
@@ -2728,7 +2739,7 @@ void GAMEAPI base_check_support() {
         VEH& v = game().vehs[best_id];
         int32_t plan = Units[v.unit_id].plan;
         if (plan == 10) {
-            v.order = 0;
+            v.order = ORDER_NONE;
             BaseForcesMaintCost--;
             continue;
         }
@@ -2736,7 +2747,7 @@ void GAMEAPI base_check_support() {
             parse_says(1, Units[v.unit_id].name, -1, -1);
             popb("NOSUPPORT", 0x8000, 13, "genwarning_sm.pcx", 0);
         } else if (plan == 8) {
-            v.state &= ~0x10u;
+            v.state &= ~VSTATE_REQUIRES_SUPPORT;
             int32_t support = f.SE_support_pending;
             BaseForcesMaintCost -= has_abil(v.unit_id, ABL_CLEAN_REACTOR) ? 0 : (support <= -4) + 1;
         }
@@ -2756,12 +2767,15 @@ void GAMEAPI base_check_support() {
         int32_t best = -1, best_id = -1;
         for (int32_t veh_id = 0; veh_id < game().veh_count; veh_id++) {
             VEH& v = game().vehs[veh_id];
-            if (v.faction_id != faction_id || v.home_base_id != CurrentBaseID || !(v.state & 0x200000)) continue;
+            if (v.faction_id != faction_id || v.home_base_id != CurrentBaseID || !(v.state & VSTATE_PACIFISM_DRONE))
+                continue;
             if (FactionStatus[0] & bit) {
                 uint32_t state = v.state;
                 if (!(state & 0x200) || (state & 0x1000200) == 0x1000200) continue;
                 if ((state & 0x2000200) == 0x2000200 && v.patrol_current_point < v.waypoint_count) continue;
-                if (v.order_auto_type == 11 || v.order_auto_type == 10 || v.order_auto_type) continue;
+                if (v.order_auto_type == ORDERA_ON_ALERT || v.order_auto_type == ORDERA_BOMBING_RUN ||
+                    v.order_auto_type)
+                    continue;
             }
             int32_t m = f.AI_fight + 2;
             if (m - 1 > 0 && game_rand() % m) continue;
@@ -2976,7 +2990,7 @@ void GAMEAPI drone_riot() {
                 game().factions[target].units_active[v.unit_id]++;
                 owner_set(x2, y2, target);
                 if (Chassis[Units[v.unit_id].chassis_id].range) v.movement_turns = 0;
-                if (v.order != 2) v.order = 0;
+                if (v.order != ORDER_HOLD) v.order = ORDER_NONE;
                 v.state &= 0xFCFFBDFF;
             }
         }
@@ -3009,7 +3023,8 @@ void GAMEAPI drone_riot() {
         draw_map(1);
         parse_says(0, cur_base().name, -1, -1);
         parse_says(2, game().mfactions[target].adj_name_faction, -1, -1);
-        if (!(GameState & 1) || (GameState & 8)) popp(ScriptFileName, "DRONEREVOLT", 0, "baseobl_sm.pcx", 0);
+        if (!(GameState & STATE_GAME_DONE) || (GameState & STATE_FINAL_SCORE_DONE))
+            popp(ScriptFileName, "DRONEREVOLT", 0, "baseobl_sm.pcx", 0);
     }
 }
 
@@ -3117,11 +3132,12 @@ int32_t new_unit_morale(int32_t unit_id, int32_t faction_id, bool new_proto) {
     if (psi) {
         if (has_sp(8, faction_id)) morale = 1;
         if (has_sp(16, faction_id)) morale++;
-        if (has_project(31, faction_id)) morale++;
+        if (has_project(FAC_VOICE_OF_PLANET - SP_ID_First, faction_id)) morale++;
         if (has_fac(FAC_CENTAURI_PRESERVE, base_id, 0)) morale++;
         if (has_fac(FAC_TEMPLE_OF_PLANET, base_id, 0)) morale++;
         if (has_fac(FAC_BIOLOGY_LAB, base_id, 0)) morale++;
-        if (has_fac(FAC_BIOENHANCEMENT_CENTER, base_id, 0) || has_project(17, faction_id)) morale++;
+        if (has_fac(FAC_BIOENHANCEMENT_CENTER, base_id, 0) || has_project(FAC_CYBORG_FACTORY - SP_ID_First, faction_id))
+            morale++;
     } else {
         morale = morale_mod(base_id, faction_id, Chassis[u.chassis_id].triad);
         if (u.weapon_id == 0x15) {
@@ -3197,20 +3213,22 @@ void GAMEAPI base_production() {
     // The original's [ebp-0x10]: the last facility bitmask offset of this call, else stack residue.
     // UNINIT(original): read uninitialised by the Voice of Planet attempt counter; taken as 0.
     int32_t slot10 = 0;
-    cur_base().state_flags &= ~0x800000;
+    cur_base().state_flags &= ~BSTATE_PRODUCTION_DONE;
     int32_t best = cur_base().mineral_intake_2 + cur_base().mineral_surplus * 2;
     if (f.best_mineral_output > best) best = f.best_mineral_output;
     f.best_mineral_output = best;
     if (cur_base().nutrients_accumulated < 0) return;
-    if (cur_base().mineral_surplus >= 0 && cur_base().queue_items[0] != -69 && !(cur_base().state_flags & 2))
+    if (cur_base().mineral_surplus >= 0 && cur_base().queue_items[0] != -69 &&
+        !(cur_base().state_flags & BSTATE_DRONE_RIOTS_ACTIVE))
         cur_base().minerals_accumulated += cur_base().mineral_surplus;
     {
         BASE& base = cur_base();
         bool human = is_human();
         if (!human || (gov_active(base) && !(base.state_flags & (int32_t)0x80000000))) {
             MAP* sq = map_tile(base.x, base.y);
-            bool own_unit = (sq->items & 2) && (sq->val2 & 0xF) < 8;
-            if ((base.state_flags & 8) || (!own_unit && !human)) base_reset(CurrentBaseID, 0);
+            bool own_unit = (sq->items & BIT_VEH_IN_TILE) && (sq->val2 & 0xF) < 8;
+            if ((base.state_flags & BSTATE_COMBAT_LOSS_LAST_TURN) || (!own_unit && !human))
+                base_reset(CurrentBaseID, 0);
         }
     }
     int32_t fac = 0, sp = -1, cost = 0;
@@ -3283,7 +3301,7 @@ void GAMEAPI base_production() {
                 return;
             }
             if (gov_active(cur_base())) return;
-            if ((GameState & 1) && !(GameState & 8)) return;
+            if ((GameState & STATE_GAME_DONE) && !(GameState & STATE_FINAL_SCORE_DONE)) return;
             parse_says(0, cur_base().name, -1, -1);
             parse_says(1, Units[unit_id].name, -1, -1);
             StrBuffer[0] = 0;
@@ -3344,12 +3362,12 @@ void GAMEAPI base_production() {
         }
         VEH& veh = game().vehs[veh_id];
         if (is_human() && (cur_base().governor_flags & 0x80) && (cur_base().governor_flags & (int32_t)0x80000000)) {
-            veh.state |= 0x200;
-            veh.order_auto_type = 0;
+            veh.state |= VSTATE_ON_ALERT;
+            veh.order_auto_type = ORDERA_TERRA_AUTO_FULL;
         }
         if (unit_id == 8 && faction_id == CurrentPlayerFaction && !(GameInterludeState & 0x10)) {
             interlude(4, (int32_t)(CurrentBasePtr + offsetof(BASE, name)), 1, 0);
-            veh.state |= 0x800000;
+            veh.state |= VSTATE_ASSISTANT_WORM;
         }
         veh.morale = (uint8_t)new_unit_morale(unit_id, faction_id, new_proto);
         veh.state |= 0x2000;
@@ -3365,7 +3383,7 @@ void GAMEAPI base_production() {
                 return;
             }
         }
-        cur_base().state_flags |= 0x800000;
+        cur_base().state_flags |= BSTATE_PRODUCTION_DONE;
         cur_base().state_flags &= 0x7FFFFFFF;
         if (!is_human()) {
             base_reset(CurrentBaseID, 0);
@@ -3373,9 +3391,9 @@ void GAMEAPI base_production() {
             int32_t queued = base_queue(CurrentBaseID);
             parse_says(1, Units[unit_id].name, -1, -1);
             int32_t flags;
-            bool gw4 = new_proto && (GameWarnings & 4);
+            bool gw4 = new_proto && (GameWarnings & WARN_STOP_PROTOTYPE_COMPLETE);
             if (queued || gov_active(cur_base())) {
-                if (!gw4 && !(GameWarnings & 0x2000)) {
+                if (!gw4 && !(GameWarnings & WARN_STOP_BUILT_VIA_GOV_QUEUE)) {
                     StrBuffer[0] = 0;
                     crt_strcat(StrBuffer, "PRODUCE");
                     flags = 0;
@@ -3403,7 +3421,7 @@ void GAMEAPI base_production() {
                 Units[unit_id].unit_flags |= 0x100;
             } else {
                 UpgradeAllProtos = 0;
-                if (!is_human() || (GameMorePreferences & 0x100000)) {
+                if (!is_human() || (GameMorePreferences & MPREF_BSC_AUTO_PRUNE_OBS_VEH)) {
                     for (int32_t k = 0; k < 128; k++) {
                         int32_t id = k < 64 ? k : (k % 64) + faction_id * 64;
                         uint16_t flags = Units[id].unit_flags;
@@ -3445,7 +3463,7 @@ void GAMEAPI base_production() {
         if (base->minerals_accumulated > limit && is_human())
             base->minerals_accumulated = limit < 0 ? 0 : (exempt < base->mineral_surplus ? exempt : base->mineral_surplus);
         base->minerals_accumulated_2 = base->minerals_accumulated;
-        base->state_flags |= 0x800000;
+        base->state_flags |= BSTATE_PRODUCTION_DONE;
         base->state_flags &= 0x7FFFFFFF;
     }
     if (fac == FAC_HEADQUARTERS) {
@@ -3461,7 +3479,7 @@ void GAMEAPI base_production() {
         SecretProjects[sp] = CurrentBaseID;
     } else if (is_sat) {
         (&f.satellites_nutrient)[fac - 65]++;
-        if (!(f.player_flags & 0x200)) {
+        if (!(f.player_flags & PFLAG_MAP_REVEALED)) {
             // The first satellite reveals the map.
             MAP* sq = &game().map.tiles[0];
             for (int32_t i = 0; i < game().map.tile_count; i++, sq++) {
@@ -3472,8 +3490,8 @@ void GAMEAPI base_production() {
                 game().bases[i].visibility |= bit;
                 game().bases[i].factions_pop_size_intel[faction_id] = game().bases[i].pop_size;
             }
-            f.player_flags |= 0x200;
-            if (faction_id == CurrentPlayerFaction && !(GameState & 1)) {
+            f.player_flags |= PFLAG_MAP_REVEALED;
+            if (faction_id == CurrentPlayerFaction && !(GameState & STATE_GAME_DONE)) {
                 popp(ScriptFileName, "SEEMAP", 0, "space_sm.pcx", 0);
                 set_dirty();
                 draw_map(1);
@@ -3487,9 +3505,9 @@ void GAMEAPI base_production() {
         game().bases[CurrentBaseID].facilities_built[offset] |= (uint8_t)mask;
     }
     if (fac == FAC_NETWORK_NODE) {
-        cur_base().state_flags &= ~0xC00;
+        cur_base().state_flags &= ~(BSTATE_ARTIFACT_LINKED | BSTATE_ARTIFACT_ALREADY_LINKED);
         for (int32_t v = stack_fix(veh_at(cur_base().x, cur_base().y)); v >= 0; v = game().vehs[v].next_veh_id_stack) {
-            if (Units[game().vehs[v].unit_id].plan == 12) game().vehs[v].order = 0;
+            if (Units[game().vehs[v].unit_id].plan == 12) game().vehs[v].order = ORDER_NONE;
         }
     }
     draw_tile(cur_base().x, cur_base().y, 2);
@@ -3514,14 +3532,14 @@ void GAMEAPI base_production() {
                     int32_t offset, mask;
                     bitmask(fac, &offset, &mask);
                     slot10 = (f.facility_announced[offset] & (uint8_t)mask) != 0;
-                    blurb = !slot10 && !(GameState & 1) && (GameWarnings & 1);
+                    blurb = !slot10 && !(GameState & STATE_GAME_DONE) && (GameWarnings & WARN_STOP_NEW_FAC_BUILT);
                 }
                 char num[80];
                 if (blurb) {
                     // First facility of its kind: blurb, voice clip and message.
                     parse_says(0, cur_base().name, -1, -1);
                     ui_production_popup_open(500);
-                    if (GameWarnings & 1) {
+                    if (GameWarnings & WARN_STOP_NEW_FAC_BUILT) {
                         StrBuffer[0] = 0;
                         if (sp >= 0) {
                             crt_strcat(StrBuffer, "PROJECT");
@@ -3547,7 +3565,8 @@ void GAMEAPI base_production() {
                         crt_strcat(StrBuffer, num);
                     }
                     crt_strcat(StrBuffer, ".mp3");
-                    if ((GameMorePreferences & 0x4000) && faction_id == CurrentPlayerFaction && is_human()) {
+                    if ((GameMorePreferences & MPREF_AV_VOLUME_VOICE_TOGGLE) && faction_id == CurrentPlayerFaction &&
+                        is_human()) {
                         Wave_unload(&FacilityVoice);
                         Wave_load(&FacilityVoice, StrBuffer);
                         Wave_play_2(&FacilityVoice);
@@ -3556,7 +3575,9 @@ void GAMEAPI base_production() {
                     crt_strcat(StrBuffer, "PRODUCEX");
                     say_queue_suffix(queued);
                     popb(StrBuffer, 1, -1, (m.rule_flags & 0x80) ? "alfacblt_sm.pcx" : "facblt_sm.pcx", 0);
-                    if ((GameMorePreferences & 0x4000) && (GameMorePreferences & 0x20000)) Sound_fade_2(&FacilityVoice, 2000);
+                    if ((GameMorePreferences & MPREF_AV_VOLUME_VOICE_TOGGLE) &&
+                        (GameMorePreferences & MPREF_AV_VOICEOVER_STOP_CLOSE_POPUP))
+                        Sound_fade_2(&FacilityVoice, 2000);
                 } else {
                     StrBuffer[0] = 0;
                     crt_strcat(StrBuffer, "PRODUCE");
@@ -3567,7 +3588,8 @@ void GAMEAPI base_production() {
                     else
                         pcx = is_sat ? "space_sm.pcx" : (fac >= 70 ? "secproj_sm.pcx" : "facblt_sm.pcx");
                     int32_t flags = 1;
-                    if ((queued || gov_active(cur_base())) && !(GameWarnings & 0x2000)) flags = 0;
+                    if ((queued || gov_active(cur_base())) && !(GameWarnings & WARN_STOP_BUILT_VIA_GOV_QUEUE))
+                        flags = 0;
                     popb(StrBuffer, flags, -1, pcx, 0);
                 }
             }
@@ -3581,9 +3603,9 @@ void GAMEAPI base_production() {
             crt_itoa(sp, num, 10);
             crt_strcat(StrBuffer, num);
             ui_production_popup_blurb(true);
-            if (!(GameState & 1) || (GameState & 8)) ui_production_popup_exec();
+            if (!(GameState & STATE_GAME_DONE) || (GameState & STATE_FINAL_SCORE_DONE)) ui_production_popup_exec();
         } else if (fac == FAC_SUBSPACE_GENERATOR) {
-            if (!(GameState & 1) || (GameState & 8)) {
+            if (!(GameState & STATE_GAME_DONE) || (GameState & STATE_FINAL_SCORE_DONE)) {
                 if (!(game().mfactions[CurrentPlayerFaction].rule_flags & 0x80))
                     interlude(0x1A, (int32_t)(CurrentBasePtr + offsetof(BASE, name)), 1, 0);
                 int32_t extra;
@@ -3605,7 +3627,7 @@ void GAMEAPI base_production() {
             }
         } else {
             parse_says(0, cur_base().name, -1, -1);
-            if (!(GameState & 1) || (GameState & 8))
+            if (!(GameState & STATE_GAME_DONE) || (GameState & STATE_FINAL_SCORE_DONE))
                 popp(ScriptFileName, is_sat ? "PRODUCE3" : "PRODUCE2", 0, is_sat ? "space_sm.pcx" : "secproj_sm.pcx", 0);
         }
     }
@@ -3623,7 +3645,7 @@ void GAMEAPI base_production() {
     }
     if (sp >= 0) {
         if (sp == 31) interlude(0xC, 0, 1, 0);
-        if (GamePreferences & 0x10000000) {
+        if (GamePreferences & PREF_AV_SECRET_PROJECT_MOVIES) {
             if (!MultiplayerActive && faction_id == CurrentPlayerFaction) amovie_project(sp);
             if (!MultiplayerActive && faction_id != CurrentPlayerFaction && sp == 32) amovie_project_name("theyTranscend");
         }
@@ -3641,10 +3663,11 @@ void GAMEAPI base_production() {
         if (sp == 32) {
             // Ascent to Transcendence: the game ends.
             mon_winning_trans(faction_id, -1);
-            if (GameRules & 0x1000) {
+            if (GameRules & RULES_VICTORY_COOPERATIVE) {
                 for (int32_t i = 1; i < 8; i++) {
-                    if (i == faction_id || !(f.diplo_status[i] & 1)) continue;
-                    if (!(game().factions[i].diplo_status[faction_id] & 0x2000000) || (FactionStatus[0] & (1 << i)))
+                    if (i == faction_id || !(f.diplo_status[i] & DIPLO_PACT)) continue;
+                    if (!(game().factions[i].diplo_status[faction_id] & DIPLO_HAVE_SURRENDERED) ||
+                        (FactionStatus[0] & (1 << i)))
                         mon_winning_trans(i, faction_id);
                 }
             }
@@ -3663,7 +3686,7 @@ void GAMEAPI base_production() {
                 else
                     interlude(0x12, 0, 3, 0);
             }
-            GameState |= 1;
+            GameState |= STATE_GAME_DONE;
             return;
         }
         if (sp == 20) {
@@ -3750,7 +3773,7 @@ void GAMEAPI base_hurry() {
         if (u.plan == 8 && cur_base().pop_size < 2) return;
         if ((sq->items & BIT_VEH_IN_TILE) && (sq->val2 & 0xF) < 8 && !(cur_base().state_flags & BSTATE_COMBAT_LOSS_LAST_TURN) &&
             !at_goal(faction_id, 0x10, x, y)) {
-            if (item >= 64 && !(u.unit_flags & 4)) {
+            if (item >= 64 && !(u.unit_flags & UNIT_PROTOTYPED)) {
                 spend = f.energy_credits / ((f.AI_wealth + 2) * 10);
             } else {
                 uint8_t plan = (uint8_t)u.plan;
@@ -3768,7 +3791,8 @@ void GAMEAPI base_hurry() {
         }
         if (planet_buster2(item) && !f.planet_busters) {
             for (int32_t i = 1; i < 8; i++) {
-                if (i == faction_id || !(f.diplo_status[i] & 0x10) || !game().factions[i].major_atrocities) continue;
+                if (i == faction_id || !(f.diplo_status[i] & DIPLO_VENDETTA) || !game().factions[i].major_atrocities)
+                    continue;
                 if (f.major_atrocities <= game().factions[i].major_atrocities) spend = f.energy_credits / 10;
             }
         }
@@ -3786,7 +3810,8 @@ void GAMEAPI base_hurry() {
         int32_t credits = f.energy_credits;
         spend = credits / 50;
         for (int32_t i = 1; i < 8; i++) {
-            if (i == faction_id || !(f.diplo_status[i] & 0x40030)) continue;
+            if (i == faction_id || !(f.diplo_status[i] & (DIPLO_VENDETTA | DIPLO_WANT_REVENGE | DIPLO_ATROCITY_VICTIM)))
+                continue;
             // BUG(original): the byte tested is region_total_bases[i] of faction i.
             if (game().factions[i].region_total_bases[i] || (FactionStatus[0] & (1u << i))) spend = credits / 10;
         }
@@ -3829,7 +3854,8 @@ void GAMEAPI base_hurry() {
             f.energy_credits += refund - spend;
         }
     }
-    if (FactionStatus[0] & bit || fac < 70 || SecretProjects[fac - 70] != -1 || SunspotDuration > 0 || (GameState & 1))
+    if (FactionStatus[0] & bit || fac < 70 || SecretProjects[fac - 70] != -1 || SunspotDuration > 0 ||
+        (GameState & STATE_GAME_DONE))
         return;
     if (cost_factor((uint8_t)cur_base().faction_id, 1, -1) * Facility[fac].cost >
         cur_base().mineral_surplus + cur_base().minerals_accumulated)
@@ -3849,9 +3875,9 @@ void GAMEAPI base_ecology() {
     else if (div > 99) div = 99;
     f.unk_47 += (cur_base().eco_damage << 2) / div;
     int32_t roll = game_rand() % 100;
-    if (roll >= cur_base().eco_damage / ((GameState & 0x100000) ? 2 : 1)) return;
-    if (GameRules & 0x200000) return;
-    if ((GameState & 1) && !(GameState & 8)) return;
+    if (roll >= cur_base().eco_damage / ((GameState & STATE_PERIHELION_ACTIVE) ? 2 : 1)) return;
+    if (GameRules & RULES_SCN_NO_NATIVE_LIFE) return;
+    if ((GameState & STATE_GAME_DONE) && !(GameState & STATE_FINAL_SCORE_DONE)) return;
     // Pick the tile where fungus grows: next to fungus, near this base.
     int32_t best = 0, best_idx = -1;
     for (int32_t i = 1; i < 49; i++) {
@@ -3925,8 +3951,9 @@ void GAMEAPI base_ecology() {
         bit_set(x, y, BIT_FUNGUS, 1);
         bit_set(x, y, FungusClearItems, 0);
         if ((map_tile(x, y)->climate & 0xE0) < 0x40) world_alt_set(x, y, 2, 0);
-        if ((game().factions[CurrentPlayerFaction].player_flags & 0x200) ||
-            (map_tile(x, y)->visibility & (uint8_t)(1 << CurrentPlayerFaction)) || (GameState & 0x80)) {
+        if ((game().factions[CurrentPlayerFaction].player_flags & PFLAG_MAP_REVEALED) ||
+            (map_tile(x, y)->visibility & (uint8_t)(1 << CurrentPlayerFaction)) ||
+            (GameState & STATE_OMNISCIENT_VIEW)) {
             shown = true;
             if (faction_id == CurrentPlayerFaction) {
                 Console_focus(&MainConsole, x, y, faction_id);
@@ -3977,7 +4004,8 @@ void GAMEAPI base_ecology() {
     if (f.clean_minerals_modifier < 7 || SecretProjects[FAC_VOICE_OF_PLANET - 70] != -1) return;
     // Planet strikes back: native life around the fungus.
     if (faction_id == CurrentPlayerFaction) interlude(8, 0, 1, 0);
-    if (!(game_rand() % 4) && ExpansionEnabled && (map_tile(tx, ty)->climate & 0xE0) >= 0x60) veh_init(19, 0, tx, ty);
+    if (!(game_rand() % 4) && ExpansionEnabled && (map_tile(tx, ty)->climate & 0xE0) >= 0x60)
+        veh_init(BSC_FUNGAL_TOWER, 0, tx, ty);
     int32_t spawned = 0, natives = 0;
     for (int32_t k = 0; k < (f.clean_minerals_modifier < 9 ? f.clean_minerals_modifier : 9); k++) {
         int32_t x = wrap_x(tx + TableOffsetX[k]);
@@ -4013,7 +4041,8 @@ void GAMEAPI base_ecology() {
         draw_tile(x, y, 2);
     }
     MAP* target = map_tile(tx, ty);
-    if (!(target->items & 3) || (target->val2 & 0xF) >= 8 || (target->val2 & 0xF) <= 0) {
+    if (!(target->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) || (target->val2 & 0xF) >= 8 ||
+        (target->val2 & 0xF) <= 0) {
         int32_t unit_id = f.region_total_bases[target->region] ? (target->region >= 0x40 ? 9 : 8) : 10;
         while (natives < f.clean_minerals_modifier / 3 && natives < cur_base().pop_size) {
             if (unit_id == 8 && !(game_rand() % 5) && ExpansionEnabled) unit_id = 15;
@@ -4054,7 +4083,7 @@ void GAMEAPI base_ecology() {
             return;
         }
     }
-    if (f.clean_minerals_modifier < 10 || (GameState & 0x20000)) return;
+    if (f.clean_minerals_modifier < 10 || (GameState & STATE_VOLCANO_ERUPTED)) return;
     // Volcano at a random ocean tile with no units around.
     int32_t rx = game().map.x - 1 > 0 ? game_rand() % game().map.x : 0;
     int32_t ry = game().map.y - 1 > 0 ? game_rand() % game().map.y : 0;
@@ -4070,13 +4099,13 @@ void GAMEAPI base_ecology() {
         int32_t y = ry + TableOffsetY[k];
         if (y < 0 || y >= game().map.y || x < 0 || x >= game().map.x) continue;
         MAP* sq = map_tile(x, y);
-        if ((sq->items & 3) && (sq->val2 & 0xF) < 8) break;
+        if ((sq->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) && (sq->val2 & 0xF) < 8) break;
     }
     if (k != 49) return;
-    if ((game().factions[CurrentPlayerFaction].player_flags & 0x200) ||
+    if ((game().factions[CurrentPlayerFaction].player_flags & PFLAG_MAP_REVEALED) ||
         (vsq->visibility & (uint8_t)(1 << CurrentPlayerFaction)))
         Console_focus(&MainConsole, vx, ry, CurrentPlayerFaction);
-    GameState |= 0x20000;
+    GameState |= STATE_VOLCANO_ERUPTED;
     world_volcano(vx, ry, 1);
     world_climate();
     draw_map(1);
@@ -4088,7 +4117,7 @@ void GAMEAPI base_ecology() {
     PluralDefault = 0;
     GenderDefault = game().mfactions[CurrentPlayerFaction].is_leader_female;
     parse_says(1, game().mfactions[CurrentPlayerFaction].name_leader, -1, -1);
-    if ((game().factions[CurrentPlayerFaction].player_flags & 0x200) ||
+    if ((game().factions[CurrentPlayerFaction].player_flags & PFLAG_MAP_REVEALED) ||
         (map_tile(vx, ry)->visibility & (uint8_t)(1 << CurrentPlayerFaction)))
         popp(ScriptFileName, "VOLCANO", 0, "volc_sm.pcx", 0);
 }
@@ -4126,7 +4155,7 @@ int32_t GAMEAPI base_upkeep(int32_t base_id) {
         base_doctors();
         if ((uint8_t)cur_base().faction_id != faction_id) return 1;
         base_energy_costs();
-        if (CurrentTurn > 5 || MultiplayerActive || !(GamePreferences & 0x20)) base_research();
+        if (CurrentTurn > 5 || MultiplayerActive || !(GamePreferences & PREF_BSC_TUTORIAL_MSGS)) base_research();
     }
     CurrentBaseID = base_id;
     CurrentBasePtr = base_ptr;
@@ -4156,7 +4185,7 @@ int32_t GAMEAPI base_upkeep(int32_t base_id) {
     }
     if (CurrentTurn > 1) base_maint();
     base_terraform(0);
-    if ((cur_base().state_flags & BSTATE_RENAME_BASE) && !(game_rand() % 3) && !(GameState & 1)) {
+    if ((cur_base().state_flags & BSTATE_RENAME_BASE) && !(game_rand() % 3) && !(GameState & STATE_GAME_DONE)) {
         // A captured base takes a name of its new owner.
         BASE& b = game().bases[CurrentBaseID];
         if ((uint8_t)b.faction_id == CurrentPlayerFaction || (b.visibility & (uint8_t)(1 << CurrentPlayerFaction))) {
@@ -4180,7 +4209,7 @@ int32_t GAMEAPI base_upkeep(int32_t base_id) {
     }
     ComputeBaseID = -1;
     if (CurrentBaseID == BaseUpkeepDrawID) BaseWin_on_redraw(&BaseWin);
-    if (BaseUpkeepFlag && (!(GameState & 1) || (GameState & 8))) {
+    if (BaseUpkeepFlag && (!(GameState & STATE_GAME_DONE) || (GameState & STATE_FINAL_SCORE_DONE))) {
         log_say_values("UPKEEP zoom-to-base", base_id, 0, 0);
         BaseWin_zoom(&BaseWin, base_id, 1);
         log_say_values("FINISHED zoom-to-base", base_id, 0, 0);

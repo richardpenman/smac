@@ -584,7 +584,7 @@ void THISCALL TutWin_tour(uint8_t* self) {
             if (!(alt < 0x61 || mwi(win, kMwOriginY) + 2 <= (int32_t)((ty - (uint32_t)(sq->climate >> 5)) + 3))) continue;
             if (!in_view(win, tx, ty, 2)) continue;
             if (!((Factions[CurrentPlayerFaction].player_flags & 0x200) || (sq->visibility & (1 << (CurrentPlayerFaction & 31))) ||
-                  (GameState & 0x80)))
+                  (GameState & STATE_OMNISCIENT_VIEW)))
                 continue;
             if (alt < 0x60) {
                 int32_t score = ((sq->items & 0x20) && alt >= 0x40) ? 1 : 2;

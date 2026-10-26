@@ -195,7 +195,7 @@ void apply_observer_prefs() {
     // A human player's turn ends with Enter / ctrl+Enter only ("pause at end of turn"), so that
     // scripted keys stay in step with the turns.
     if (g_opt.human > 0) {
-        GamePreferences |= 1;
+        GamePreferences |= PREF_BSC_PAUSE_END_TURN;
         AlphaIniPrefs.preferences |= 1;
     }
     // Test aid: SMACX_PREFS_SET=BITS sets GamePreferences bits afterwards (e.g. 0x20 the tutorial
@@ -377,7 +377,8 @@ void new_game(std::string args) {
     MapNativeLifeForms = natives;
     DiffLevel = diff;
     GameRules = (int32_t)(((uint32_t)GameRules & 0xFFFF0000u) | (rules_set ? rules : default_rules()));
-    GameState = (int32_t)((uint32_t)GameState & ~0x1800000u);
+    GameState =
+        (int32_t)((uint32_t)GameState & ~(STATE_RAND_FAC_LEADER_PERSONALITIES | STATE_RAND_FAC_LEADER_SOCIAL_AGENDA));
     if (random_leaders & 1) GameState |= STATE_RAND_FAC_LEADER_PERSONALITIES;
     if (random_leaders & 2) GameState |= STATE_RAND_FAC_LEADER_SOCIAL_AGENDA;
     for (int i = 1; i < 8; i++) {

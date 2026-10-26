@@ -382,7 +382,7 @@ void DesignWinState::check_abil() {
 
 void DesignWinState::suggest_abil(uint32_t flag) {
     check_abil();
-    if (!(GamePreferences & 0x4000)) return;
+    if (!(GamePreferences & PREF_BSC_AUTO_DESIGN_VEH)) return;
     if (!has_tech(Ability[abil_index(flag)].preq_tech, faction)) return;
     if (!abil_cond(abil_index(flag), chassis, weapon, armor)) return;
     if (bit_count(abil) > 1) return;
@@ -750,7 +750,7 @@ void DesignWinState::on_button(int32_t id) {
         center_stack();
         break;
     case 2:  // scenario editor: the prototype flag
-        if (GameState & 0x40) {
+        if (GameState & STATE_SCENARIO_EDITOR) {
             result = design_it();
             setup_veh(unit, 0);
             center_stack();
@@ -758,7 +758,7 @@ void DesignWinState::on_button(int32_t id) {
         }
         break;
     case 3:  // scenario editor: RETIRE ALL
-        if (GameState & 0x40) {
+        if (GameState & STATE_SCENARIO_EDITOR) {
             int32_t r = popp(ScriptFileName, "RETIREALL", 0, unit_pcx(f), 0);
             if (!r) break;
             for (int32_t g = 1; g < 8; g++) {
@@ -1251,7 +1251,7 @@ void DesignWinState::redraw() {
     Buffer_set_clip(c, &all);
     if (back_px.size() == (size_t)c->stride * c->height) std::memcpy(c->data, back_px.data(), back_px.size());
     for (BaseButton* b : win_buttons)
-        if (b->id == 2 || b->id == 3) b->shown = (GameState & 0x40) != 0;
+        if (b->id == 2 || b->id == 3) b->shown = (GameState & STATE_SCENARIO_EDITOR) != 0;
     for (int32_t k = 0; k < 6; k++) draw_component(c, k);
     draw_vehicle(c);
     sw_restore_iface(this);

@@ -286,7 +286,7 @@ void THISCALL BattleWin_battle_report(uint8_t*, int32_t atk, int32_t def, int32_
             GenderDefault = MFactions[vf].noun_gender;
             s += std::string(" (") + MFactions[vf].noun_faction + ")";
         }
-        if (GameState & 0x80) s += "(" + std::to_string(v) + ")";
+        if (GameState & STATE_OMNISCIENT_VIEW) s += "(" + std::to_string(v) + ")";
         Buffer_set_font(c, find_font(big ? 0x10 : 0xC, 1), nullptr, nullptr, nullptr);
         int32_t cf = dside ? fd : fa;
         Buffer_set_text_color(c, FactionColorText[cf], FactionColorShadow[cf], 1, 1);

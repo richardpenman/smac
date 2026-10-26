@@ -19,14 +19,14 @@ void GAMEAPI interlude(int32_t id, int32_t, int32_t, int32_t) {
     } else {
         if ((GameInterludeState & (1 << ((id - 0x20) & 31))) || !alien_viewer) return;
     }
-    if ((GameState & 0x10) || (GameRules & 0x200000)) return;
+    if ((GameState & STATE_IS_SCENARIO) || (GameRules & RULES_SCN_NO_NATIVE_LIFE)) return;
     StrBuffer[0] = 0;
     crt_strcat(StrBuffer, game().mfactions[CurrentPlayerFaction].filename);
     win32::CharUpperA(StrBuffer);
     if (!crt_strcmp(StrBuffer, "FUNGBOY")) return;
     if (id < 0x20) GameInterludeState |= 1 << id;
     if (id == 6) GameInterludeState |= 0x12;
-    if (GamePreferences & 0x40000) return;
+    if (GamePreferences & PREF_AV_INTERLUDES_DISABLED) return;
     // Shown interlude (texts not built headless): alien interludes record their bit now.
     if (id >= 0x20) {
         id -= 0x20;

@@ -256,7 +256,7 @@ int32_t run_menu(std::vector<std::string> items, std::string caption, int32_t ac
     // The column's sound (a Wave of its own: fx\menu out.wav) as it slides in.
     static uint8_t menu_out[0x6C];
     Wave_load(menu_out, "fx\\menu out.wav");
-    if (GamePreferences & 0x400) Wave_play_2(menu_out);
+    if (GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE) Wave_play_2(menu_out);
     // The slide (SetupWin_do_menu_rightside): frames 0..5 of every item's frame, at least 10 ms
     // each, then the texts; on leaving, frames 6..11 (not for unattended runs).
     auto slide = [&](int32_t from, int32_t to) {
@@ -392,13 +392,13 @@ int32_t GAMEAPI top_menu(int32_t hotseat) {
     prefs_use();
     // The opening menu's music (fx\opening menu.wav looping on 0x945780, music preference 0x800).
     uint8_t* music = mem::host(0x945780);
-    if (!hotseat && (GamePreferences & 0x800)) {
+    if (!hotseat && (GamePreferences & PREF_AV_VOLUME_MUSIC_TOGGLE)) {
         Wave_load_3(music, "fx\\opening menu.wav", 2);
         Wave_play_2(music);
     }
     // Leaving the menu fades it out over 3 seconds.
     auto music_end = [&]() {
-        if ((hotseat || (GamePreferences & 0x800)) && Wave_is_playing(music)) {
+        if ((hotseat || (GamePreferences & PREF_AV_VOLUME_MUSIC_TOGGLE)) && Wave_is_playing(music)) {
             Sound_fade_2(music, 3000);
             Wave_unload(music);
         }
@@ -499,7 +499,7 @@ int32_t GAMEAPI top_menu(int32_t hotseat) {
                 parse_says(0, StrBuffer, -1, -1);
                 parse_num(0, ObjectiveReqVictory);
                 parse_num(1, ObjectivesSuddenDeathVictory);
-                parse_num(2, num_objectives(CurrentPlayerFaction, GameRules & 0x1000));
+                parse_num(2, num_objectives(CurrentPlayerFaction, GameRules & RULES_VICTORY_COOPERATIVE));
                 parse_num(3, EndingMissionYear);
                 X_pop_2("SCENARIO", "INTRO", 0);
                 Console_set_move(&MainConsole, 1);

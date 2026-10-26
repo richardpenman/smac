@@ -292,7 +292,7 @@ void labs_draw(ScreenWin* s, Buffer* c, bool dl, int32_t faction, const UiRect& 
         Buffer_set_text_color3(c, 0xE1, -1, 1, 1);
         std::string s1 = "[";
         box(c, left, top, right, top_bottom, 3);
-        bool blind = !(GameState & 0x80) && (GameRules & 0x200);
+        bool blind = !(GameState & STATE_OMNISCIENT_VIEW) && (GameRules & RULES_BLIND_RESEARCH);
         int32_t tx = r2.left + 3, ty = top + 3 + 5;
         if (blind) {
             r2.left = left + 3;

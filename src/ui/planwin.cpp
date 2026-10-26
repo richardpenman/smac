@@ -68,7 +68,7 @@ bool surroundings_in_view(int32_t x, int32_t y, int32_t count) {
 }
 // A base the viewer knows: omniscient, or its tile seen and the base its own or seen by it.
 bool base_known(int32_t i, int32_t viewer) {
-    if (GameState & 0x80) return true;
+    if (GameState & STATE_OMNISCIENT_VIEW) return true;
     const BASE& b = Bases[i];
     if (!(Factions[viewer].player_flags & 0x200) && !(map_tile(b.x, b.y)->visibility & (1 << viewer))) return false;
     return (uint8_t)b.faction_id == viewer || (b.visibility & (1 << viewer));

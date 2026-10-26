@@ -29,7 +29,8 @@ int32_t se_planet_raw(int32_t faction_id) {
 }
 // Whether faction_id owns the Xenoempathy Dome (secret project 8).
 bool owns_xenoempathy(int32_t faction_id) {
-    return SecretProjects[8] >= 0 && (uint8_t)game().bases[SecretProjects[8]].faction_id == (uint32_t)faction_id;
+    return SecretProjects[FAC_XENOEMPATHY_DOME - SP_ID_First] >= 0 &&
+           (uint8_t)game().bases[SecretProjects[FAC_XENOEMPATHY_DOME - SP_ID_First]].faction_id == (uint32_t)faction_id;
 }
 }  // namespace
 
@@ -90,10 +91,10 @@ void GAMEAPI quick_zoc(int32_t x, int32_t y, int32_t faction_id, int32_t x2, int
         int32_t ny = y + NearOffsetY[i];
         if (!map_in_bounds(nx, ny)) continue;
         const MAP* sq = map_tile(nx, ny);
-        if (!(sq->items & 2)) continue;
+        if (!(sq->items & BIT_VEH_IN_TILE)) continue;
         int32_t owner = sq->val2 & 0xF;
         if (owner >= 8 || owner == faction_id || map_is_ocean(nx, ny) != ocean) continue;
-        if (game().factions[faction_id].diplo_status[owner] & 1) continue;
+        if (game().factions[faction_id].diplo_status[owner] & DIPLO_PACT) continue;
         int32_t dist = veh_vector_dist(nx, ny, x2, y2);
         if (dist >= best) {
             best = dist;
@@ -115,7 +116,7 @@ int32_t GAMEAPI supply_options(int32_t veh_id, int32_t base_id) {
     // Only human players are asked.
     if (!(FactionStatus[0] & (uint8_t)(1u << (faction_id & 31)))) return 0;
     int8_t order = (int8_t)veh.order;
-    if (order == 0x1B || order == 0x1C || order == 0x19 || (veh.state & 0x4000)) return 0;
+    if (order == 0x1B || order == 0x1C || order == 0x19 || (veh.state & VSTATE_EXPLORE)) return 0;
     if (order == 0x18) {
         // Moving somewhere else: only ask when the destination is next to this base.
         int32_t dx = std::abs(veh.x - veh.waypoint_x[0]);
@@ -124,7 +125,7 @@ int32_t GAMEAPI supply_options(int32_t veh_id, int32_t base_id) {
     }
     BASE& base = game().bases[base_id];
     uint32_t owner = (uint8_t)base.faction_id;
-    if ((uint32_t)faction_id != owner && !(game().factions[faction_id].diplo_status[owner] & 1)) return 0;
+    if ((uint32_t)faction_id != owner && !(game().factions[faction_id].diplo_status[owner] & DIPLO_PACT)) return 0;
     parse_says(1, Units[veh.unit_id].name, -1, -1);
     parse_says(2, base.name, -1, -1);
     if (veh.home_base_id >= 0) parse_says(3, game().bases[veh.home_base_id].name, -1, -1);
@@ -148,7 +149,7 @@ int32_t GAMEAPI supply_options(int32_t veh_id, int32_t base_id) {
     item = base.queue_items[0];
     if (item >= 0) {
         cost = veh_cost(item, base_id, nullptr) * cost_factor(faction_id, 1, -1);
-        if (item >= 64 && !(Units[item].unit_flags & 4)) {
+        if (item >= 64 && !(Units[item].unit_flags & UNIT_PROTOTYPED)) {
             parse_says(0, Units[item].name, -1, -1);
             items++;
         }
@@ -165,7 +166,7 @@ int32_t GAMEAPI supply_options(int32_t veh_id, int32_t base_id) {
     }
     if ((VehAttackFlags & 1) && !(VehAttackFlags & 2)) return 1;
     if (choice != 1) {
-        veh.order = 3;  // convoy
+        veh.order = ORDER_CONVOY;  // convoy
         veh.order_auto_type = (uint8_t)(choice - 2);
         return 0;
     }

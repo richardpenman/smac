@@ -372,7 +372,7 @@ void draw_hq(Buffer* mi) {
     UiRect t{box.left + 1, box.top + 1, box.right - 1, box.top + 0x15};
     int32_t i = 0;
     for (; i < BaseCount; i++)
-        if (Bases[i].faction_id == g_faction && has_fac(1, i, 0)) break;
+        if (Bases[i].faction_id == g_faction && has_fac(FAC_HEADQUARTERS, i, 0)) break;
     StrBuffer[0] = 0;
     crt_strcat(StrBuffer, i == BaseCount ? label_get(0xEA4 / 4) : Bases[i].name);
     win32::CharUpperA(StrBuffer);
@@ -569,11 +569,11 @@ void GAMEAPI commlink_attempt(int32_t fw) {
         X_pops_11("ALIENHATRED2", 0x100000, FactionPortraits[fw], kPopWait);
         return;
     }
-    if (alien_f && !has_tech(0x4E, fw) && !has_tech(4, f)) {
+    if (alien_f && !has_tech(TECH_PrPsych, fw) && !has_tech(TECH_Psych, f)) {
         NetMsg_pop(&NetMsg, "WENEEDHUMANPSYCH", -5000, 0, "Alopdir.pcx");
         return;
     }
-    if (alien_w && !has_tech(0x4E, f) && !has_tech(4, fw)) {
+    if (alien_w && !has_tech(TECH_PrPsych, f) && !has_tech(TECH_Psych, fw)) {
         NetMsg_pop(&NetMsg, "WENEEDALIENPSYCH", -5000, 0, "talent_sm.pcx");
         return;
     }
@@ -713,7 +713,7 @@ int32_t GAMEAPI proposal_menu(int32_t f, int32_t fw) {
         uint32_t c = ds(f, i) & 8;
         if (c) known++;
         if (!c) {
-            int32_t p = SecretProjects[4];
+            int32_t p = SecretProjects[FAC_EMPATH_GUILD - SP_ID_First];
             if (p < 0 || (uint8_t)Bases[p].faction_id != f) unknown++;
         }
     }
@@ -734,7 +734,7 @@ int32_t GAMEAPI proposal_menu(int32_t f, int32_t fw) {
         true,
         (s & 2) && !(s & 1),
         !(s & 2),
-        !(GameRules & 0x2000000),
+        !(GameRules & RULES_SCN_NO_TECH_TRADING),
         false,
         unknown != 0,
         true,
@@ -793,7 +793,7 @@ int32_t GAMEAPI proposal_menu(int32_t f, int32_t fw) {
         DiploProposalFaction = p;
         if (p < 0) goto none;
         if (!(ds(fw, p) & 8)) {
-            int32_t sp = SecretProjects[4];
+            int32_t sp = SecretProjects[FAC_EMPATH_GUILD - SP_ID_First];
             if (sp < 0 || (uint8_t)Bases[sp].faction_id != fw) {
                 const MFaction& m = MFactions[p];
                 PluralDefault = 0;
@@ -852,7 +852,7 @@ int32_t GAMEAPI proposal_menu(int32_t f, int32_t fw) {
             p != 1,
             p != 1 && !(s & 1),
             p != 1 && (s & 1),
-            !(GameRules & 0x2000000),
+            !(GameRules & RULES_SCN_NO_TECH_TRADING),
             p == 1,
             p != 6,
             Factions[f].base_count > 1 && !MultiplayerActive && (p == 9 || p == 1),
@@ -960,12 +960,14 @@ void GAMEAPI make_a_proposal(int32_t f, int32_t fw, int32_t direct) {
     // COUNCILMATTER: a vote asked of faction_id_with.
     ui_diplo_menu_start("COUNCILMATTER", 0x100040);
     for (int32_t i = 0; i < 11; i++) {
-        if (!has_tech(Proposal[i].preq_tech, f) && !((GameState & 0x80) && (GameState & 0x1000))) continue;
-        if (i == 1 && !(GameRules & 8)) continue;
+        if (!has_tech(Proposal[i].preq_tech, f) &&
+            !((GameState & STATE_OMNISCIENT_VIEW) && (GameState & STATE_DEBUG_MODE)))
+            continue;
+        if (i == 1 && !(GameRules & RULES_VICTORY_DIPLOMATIC)) continue;
         bool ok = true;
         switch (i) {
         case 1:
-            ok = !(GameState & 1) && !ProposalPassCount[1] && eligible(f);
+            ok = !(GameState & STATE_GAME_DONE) && !ProposalPassCount[1] && eligible(f);
             break;
         case 2:
         case 5:

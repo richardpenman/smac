@@ -270,8 +270,8 @@ int32_t GAMEAPI InfoWin_state_valid(int32_t s) {
         return 0;
     case 4:
     case 5:
-    case 6: return CurrentTurn > 0x13 || (GameState & 0x10);
-    case 7: return (GameState & 0x80) && (GameState & 0x40);
+    case 6: return CurrentTurn > 0x13 || (GameState & STATE_IS_SCENARIO);
+    case 7: return (GameState & STATE_OMNISCIENT_VIEW) && (GameState & STATE_SCENARIO_EDITOR);
     default: return 0;
     }
 }
@@ -307,7 +307,7 @@ void THISCALL InfoWin_setup_text(uint8_t*) {
         cat(s, "}");
         set_line(pane, 0, s);
         energy_compute(viewer, 0);
-        if (me.tech_research_id >= 0 && ((GameState & 0x80) || !(GameRules & 0x200))) {
+        if (me.tech_research_id >= 0 && ((GameState & STATE_OMNISCIENT_VIEW) || !(GameRules & RULES_BLIND_RESEARCH))) {
             s[0] = 0;
             cat(s, label_get(0x6A));
             cat(s, ": {");

@@ -121,8 +121,9 @@ int32_t GAMEAPI has_abil(int32_t unit_id, uint32_t ability_flag) {
             if (has_tech(preq, faction_id) && (ability_flag & (1u << (m.faction_bonus_val1[i] & 31)))) return 1;
         }
     }
-    if (Units[unit_id].weapon_id == 21 && ability_flag == 0x10000000 && SecretProjects[34] >= 0 &&
-        (uint8_t)game().bases[SecretProjects[34]].faction_id == faction_id)
+    if (Units[unit_id].weapon_id == 21 && ability_flag == 0x10000000 &&
+        SecretProjects[FAC_NETHACK_TERMINUS - SP_ID_First] >= 0 &&
+        (uint8_t)game().bases[SecretProjects[FAC_NETHACK_TERMINUS - SP_ID_First]].faction_id == faction_id)
         return 1;
     return 0;
 }
@@ -218,7 +219,7 @@ int32_t GAMEAPI do_unity_crash(int32_t x, int32_t y, int32_t faction_id) {
 }
 
 int32_t GAMEAPI is_sensor(int32_t x, int32_t y) {
-    if (map_tile(x, y)->items & 0x80000000) return 1;
+    if (map_tile(x, y)->items & BIT_SENSOR) return 1;
     int32_t base_id = base_find(x, y);
     if (base_id != -1) {
         BASE& base = game().bases[base_id];
@@ -249,13 +250,13 @@ int32_t GAMEAPI has_temple(int32_t faction_id) {
 }
 
 int32_t GAMEAPI veh_at(int32_t x, int32_t y) {
-    if (y < 0 || y >= game().map.y || x < 0 || x >= game().map.x || (map_tile(x, y)->items & 2)) {
+    if (y < 0 || y >= game().map.y || x < 0 || x >= game().map.x || (map_tile(x, y)->items & BIT_VEH_IN_TILE)) {
         for (int32_t veh_id = 0; veh_id < game().veh_count; veh_id++) {
             if (game().vehs[veh_id].x == x && game().vehs[veh_id].y == y) return stack_top(veh_id);
         }
         if (y >= 0 && y < game().map.y && x >= 0 && x < game().map.x) {
             if (!VehBitError) log_say_values("Vehicle Bit Error  (x, y)", x, y, 0);
-            if ((GameState & 0x40) || (GameState & 0x1000) || MultiplayerActive) {
+            if ((GameState & STATE_SCENARIO_EDITOR) || (GameState & STATE_DEBUG_MODE) || MultiplayerActive) {
                 if (VehBitError) return -1;
                 VehBitError = 1;
             }
@@ -297,7 +298,7 @@ int32_t GAMEAPI veh_drop(int32_t veh_id, int32_t x, int32_t y) {
     VehDropLiftVehID = -1;
     if (top < 0) {
         if (y < 0) return veh_id;
-        if (y < game().map.y && x >= 0 && x < game().map.x && !(map_tile(x, y)->items & 1))
+        if (y < game().map.y && x >= 0 && x < game().map.x && !(map_tile(x, y)->items & BIT_BASE_IN_TILE))
             owner_set(x, y, veh.faction_id);
     } else {
         game().vehs[top].prev_veh_id_stack = (int16_t)veh_id;
@@ -310,7 +311,7 @@ int32_t GAMEAPI veh_drop(int32_t veh_id, int32_t x, int32_t y) {
 }
 
 void GAMEAPI sleep(int32_t veh_id) {
-    game().vehs[veh_id].order = 1;
+    game().vehs[veh_id].order = ORDER_SENTRY_BOARD;
     game().vehs[veh_id].waypoint_x[0] = -1;
     game().vehs[veh_id].waypoint_y[0] = 0;
 }
@@ -350,7 +351,7 @@ void GAMEAPI veh_clear(int32_t veh_id, int32_t unit_id, int32_t faction_id) {
     veh.prev_veh_id_stack = -1;
     veh.waypoint_count = 0;
     veh.patrol_current_point = 0;
-    veh.order = 0;
+    veh.order = ORDER_NONE;
     for (int32_t i = 0; i < 4; i++) {
         veh.waypoint_x[i] = -1;
         veh.waypoint_y[i] = -1;
@@ -358,7 +359,7 @@ void GAMEAPI veh_clear(int32_t veh_id, int32_t unit_id, int32_t faction_id) {
     veh.state = 0;
     veh.moves_spent = 0;
     veh.damage_taken = 0;
-    veh.order_auto_type = 0;
+    veh.order_auto_type = ORDERA_TERRA_AUTO_FULL;
     veh.movement_turns = 0;
     veh.iter_count = 0;
     veh.status_icon = 0;
@@ -381,7 +382,7 @@ int32_t GAMEAPI veh_init(int32_t unit_id, int32_t faction_id, int32_t x, int32_t
     veh_clear(veh_id, unit_id, faction_id);
     int32_t base_id = base_find(x, y);
     if (Units[unit_id].plan == 12) {  // artifact
-        if (GameState & 0x40000) game().vehs[veh_id].flags |= 0x20;
+        if (GameState & STATE_SCN_VICT_ALL_ARTIFACTS_OBJ_UNIT) game().vehs[veh_id].flags |= VFLAG_IS_OBJECTIVE;
     } else if (base_id >= 0 && (uint8_t)game().bases[base_id].faction_id == (uint32_t)faction_id) {
         game().vehs[veh_id].home_base_id = (int16_t)base_id;
         if (ComputeBaseID == base_id) ComputeBaseID = -1;
@@ -399,7 +400,7 @@ int32_t GAMEAPI veh_init(int32_t unit_id, int32_t faction_id, int32_t x, int32_t
     int32_t best = 0;
     for (int32_t i = 1; i < 8; i++) {
         // BUG(original): compares the faction's own base count in the region, not the enemy's
-        if (i != faction_id && (f.diplo_status[i] & 0x10) && f.region_total_bases[region] > best) {
+        if (i != faction_id && (f.diplo_status[i] & DIPLO_VENDETTA) && f.region_total_bases[region] > best) {
             best = f.region_total_bases[region];
             enemy_id = i;
         }
@@ -463,9 +464,9 @@ void GAMEAPI veh_kill(int32_t veh_id) {
         VEH& veh = game().vehs[i];
         if (veh_id < veh.prev_veh_id_stack) veh.prev_veh_id_stack--;
         if (veh_id < veh.next_veh_id_stack) veh.next_veh_id_stack--;
-        if (veh.order == 1) {  // sentry/board: waypoint_x[0] is the transport
+        if (veh.order == ORDER_SENTRY_BOARD) {  // sentry/board: waypoint_x[0] is the transport
             if (veh.waypoint_x[0] == veh_id) {
-                veh.order = 0;
+                veh.order = ORDER_NONE;
             } else if (veh_id < veh.waypoint_x[0]) {
                 veh.waypoint_x[0]--;
             }
@@ -552,7 +553,9 @@ int32_t GAMEAPI SHADOWABLE(morale_veh)(int32_t veh_id, int32_t check_drone_riot,
     if (Units[unit_id].plan == 11) {  // probe team
         int32_t level = game().factions[faction_id].SE_probe;
         level = level < 0 ? 0 : level > 3 ? 3 : level;
-        if (SecretProjects[30] >= 0 && (uint8_t)game().bases[SecretProjects[30]].faction_id == faction_id) level += 2;
+        if (SecretProjects[FAC_TELEPATHIC_MATRIX - SP_ID_First] >= 0 &&
+            (uint8_t)game().bases[SecretProjects[FAC_TELEPATHIC_MATRIX - SP_ID_First]].faction_id == faction_id)
+            level += 2;
         for (int32_t tech_id = 0; tech_id < 89; tech_id++) {
             if ((Tech[tech_id].flags & 2) && has_tech(tech_id, faction_id)) level++;
         }
@@ -572,7 +575,7 @@ int32_t GAMEAPI SHADOWABLE(morale_veh)(int32_t veh_id, int32_t check_drone_riot,
     }
     if (m.rule_morale > 0) bonus += m.rule_morale;
     if ((m.rule_flags & 0x8000) && bonus < 0) bonus = 0;
-    if (check_drone_riot && home_base_id >= 0 && (game().bases[home_base_id].state_flags & 2) &&
+    if (check_drone_riot && home_base_id >= 0 && (game().bases[home_base_id].state_flags & BSTATE_DRONE_RIOTS_ACTIVE) &&
         !(m.rule_flags & 0x8000)) {
         bonus--;
         bonus = bonus < 0 ? 0 : bonus > 6 ? 6 : bonus;
@@ -625,7 +628,9 @@ int32_t GAMEAPI SHADOWABLE(speed_proto)(int32_t unit_id) {
     }
     if (Chassis[u.chassis_id].triad == 2) {
         if (has_abil(unit_id, 0x8000000)) value += 2;  // fuel nanocells
-        if (SecretProjects[35] >= 0 && (uint8_t)game().bases[SecretProjects[35]].faction_id == unit_id / 64) value += 2;
+        if (SecretProjects[FAC_CLOUDBASE_ACADEMY - SP_ID_First] >= 0 &&
+            (uint8_t)game().bases[SecretProjects[FAC_CLOUDBASE_ACADEMY - SP_ID_First]].faction_id == unit_id / 64)
+            value += 2;
         if (has_abil(unit_id, 0x20)) value = value * 4 / 5;  // air superiority
         if (Weapon[u.weapon_id].mode == 7) value /= 2;
     }
@@ -661,8 +666,8 @@ static void speed_note_stack_residue(int32_t veh_id) {
 int32_t GAMEAPI SHADOWABLE(speed)(int32_t veh_id, int32_t skip_morale) {
     VEH& veh = game().vehs[veh_id];
     int32_t value = speed_proto(veh.unit_id);
-    if (veh_triad(veh_id) == 1 && SecretProjects[10] >= 0 &&
-        game().bases[SecretProjects[10]].faction_id == (int8_t)veh.faction_id)
+    if (veh_triad(veh_id) == 1 && SecretProjects[FAC_MARITIME_CONTROL_CENTER - SP_ID_First] >= 0 &&
+        game().bases[SecretProjects[FAC_MARITIME_CONTROL_CENTER - SP_ID_First]].faction_id == (int8_t)veh.faction_id)
         value += Rules.move_rate_roads * 2;
     speed_note_stack_residue(veh_id);
     if (morale_veh(veh_id, 1, 0) == 6 && !skip_morale && (veh.unit_id >= 64 || !unit_psi_weapon(veh.unit_id)))
@@ -708,7 +713,7 @@ int32_t GAMEAPI veh_cost(int32_t unit_id, int32_t base_id, int32_t* has_proto_co
     // BUG(original): the Brood Pit check reads Bases[-1] without a base
     if (unit_is_native(unit_id) && base_has_fac(base_id, 0x23)) cost = (cost * 3) >> 2;
     if (Units[unit_id].plan == 8 && base_id >= 0) cost = cost < 1 ? 1 : cost > 999 ? 999 : cost;  // colony pod
-    if (unit_id < 64 || (Units[unit_id].unit_flags & 4)) {
+    if (unit_id < 64 || (Units[unit_id].unit_flags & UNIT_PROTOTYPED)) {
         if (has_proto_cost) *has_proto_cost = 0;
         return cost;
     }
@@ -735,7 +740,7 @@ namespace {
 bool veh_is_viewers(int32_t veh_id) {
     VEH& veh = game().vehs[veh_id];
     return veh.y >= 0 && veh.y < game().map.y && veh.x >= 0 && veh.x < game().map.x &&
-           veh.faction_id == CurrentPlayerFaction && (!(veh.flags & 0x40) || !(veh.flags & 0x400));
+           veh.faction_id == CurrentPlayerFaction && (!(veh.flags & VFLAG_LURKER) || !(veh.flags & VFLAG_INVISIBLE));
 }
 }  // namespace
 
@@ -744,7 +749,7 @@ int32_t GAMEAPI veh_selectable(int32_t veh_id) {
     VEH& veh = game().vehs[veh_id];
     if (veh.y < 0 || veh.y >= game().map.y || veh.x < 0 || veh.x >= game().map.x) return 0;
     if (veh.faction_id != CurrentPlayerFaction) return 0;
-    if ((veh.flags & 0x40) && (veh.flags & 0x400)) return 0;
+    if ((veh.flags & VFLAG_LURKER) && (veh.flags & VFLAG_INVISIBLE)) return 0;
     return veh_jail(veh_id) == 0;
 }
 
@@ -752,7 +757,7 @@ int32_t GAMEAPI veh_unmoved(int32_t veh_id) {
     if (veh_id < 0 || !veh_is_viewers(veh_id) || veh_jail(veh_id)) return 0;
     VEH& veh = game().vehs[veh_id];
     int8_t order = (int8_t)veh.order;
-    if ((veh.state & 0x4000000) || order < 4 || order > 23) {
+    if ((veh.state & VSTATE_WORKING) || order < 4 || order > 23) {
         int32_t moves = speed(veh_id, 0);
         int32_t left = moves - veh.moves_spent;
         if (left < 0 || (left < 1000 && moves == veh.moves_spent)) return 0;
@@ -763,7 +768,9 @@ int32_t GAMEAPI veh_unmoved(int32_t veh_id) {
 int32_t GAMEAPI veh_ready(int32_t veh_id) {
     if (veh_id < 0 || !veh_is_viewers(veh_id) || veh_jail(veh_id)) return 0;
     VEH& veh = game().vehs[veh_id];
-    if (!(veh.state & 0x4200) && (veh.order == 1 || veh.order == 2 || veh.order == 3)) return 0;
+    if (!(veh.state & (VSTATE_ON_ALERT | VSTATE_EXPLORE)) &&
+        (veh.order == ORDER_SENTRY_BOARD || veh.order == ORDER_HOLD || veh.order == ORDER_CONVOY))
+        return 0;
     int32_t moves = speed(veh_id, 0);
     int32_t left = moves - veh.moves_spent;
     return left >= 0 && (left > 999 || moves != veh.moves_spent);
@@ -771,9 +778,12 @@ int32_t GAMEAPI veh_ready(int32_t veh_id) {
 
 int32_t GAMEAPI veh_jail(int32_t veh_id) {
     VEH& veh = game().vehs[veh_id];
-    if (veh_triad(veh_id) == 0 && veh.order == 1 && veh.waypoint_x[0] >= 0 && veh_triad(veh.waypoint_x[0]) == 2) {
+    if (veh_triad(veh_id) == 0 && veh.order == ORDER_SENTRY_BOARD && veh.waypoint_x[0] >= 0 &&
+        veh_triad(veh.waypoint_x[0]) == 2) {
         MAP* sq = map_tile(veh.x, veh.y);
-        if ((!(sq->items & 1) || (sq->val2 & 0xF) > 7 || (sq->val2 & 0xF) == 0) && !(sq->items & 0x40000)) return 1;
+        if ((!(sq->items & BIT_BASE_IN_TILE) || (sq->val2 & 0xF) > 7 || (sq->val2 & 0xF) == 0) &&
+            !(sq->items & BIT_AIRBASE))
+            return 1;
     }
     return 0;
 }
@@ -788,7 +798,7 @@ int32_t GAMEAPI veh_fake(int32_t unit_id, int32_t faction_id) {
 int32_t GAMEAPI veh_wake(int32_t veh_id) {
     VEH& veh = game().vehs[veh_id];
     int8_t order = (int8_t)veh.order;
-    if (order > 3 && order < 24 && !(veh.state & 0x4000000)) {  // terraforming
+    if (order > 3 && order < 24 && !(veh.state & VSTATE_WORKING)) {  // terraforming
         veh.moves_spent = (uint8_t)(speed(veh_id, 0) - Rules.move_rate_roads);
         uint8_t turns = veh.movement_turns;
         if (turns) {
@@ -797,8 +807,9 @@ int32_t GAMEAPI veh_wake(int32_t veh_id) {
             veh.movement_turns = (uint8_t)left;
         }
     }
-    if ((veh.state & 0x200) && veh.order_auto_type == 11 && !(veh.state & 4)) veh.moves_spent = 0;
-    veh.order = 0;
+    if ((veh.state & VSTATE_ON_ALERT) && veh.order_auto_type == ORDERA_ON_ALERT && !(veh.state & VSTATE_HAS_MOVED))
+        veh.moves_spent = 0;
+    veh.order = ORDER_NONE;
     veh.state &= 0xF4FFBDFF;
     return veh_id;
 }

@@ -174,7 +174,8 @@ void THISCALL MapWin_dest_line(uint8_t* win, int32_t x1, int32_t y1, int32_t x2,
         for (;;) {
             uint32_t flags = patrol ? 0x80 : 0xC0;
             if (!Weapon[Units[unit_id].weapon_id].offense_value &&
-                (SecretProjects[8] < 0 || Bases[SecretProjects[8]].faction_id != faction_id))
+                (SecretProjects[FAC_XENOEMPATHY_DOME - SP_ID_First] < 0 ||
+                 Bases[SecretProjects[FAC_XENOEMPATHY_DOME - SP_ID_First]].faction_id != faction_id))
                 flags |= 0x10;
             if ((x_dist(x - x2) + std::abs(y - y2) & ~1) > 2) {
                 dir = Path_find(&Paths, x, y, x2, y2, unit_id, faction_id, (int32_t)flags, dir);
@@ -198,8 +199,8 @@ void THISCALL MapWin_dest_line(uint8_t* win, int32_t x1, int32_t y1, int32_t x2,
             }
             if (nx == x2 && ny == y2) break;
             if (!(Factions[faction_id].player_flags & 0x200) &&
-                !(map_tile(nx, ny)->visibility & (1 << (faction_id & 31))) && !(GameState & 0x80) &&
-                !(GameRules & 0x100))
+                !(map_tile(nx, ny)->visibility & (1 << (faction_id & 31))) && !(GameState & STATE_OMNISCIENT_VIEW) &&
+                !(GameRules & RULES_NO_UNITY_SURVEY))
                 direct = true;
             if (++steps > MapAreaX * 2) {
                 direct = true;

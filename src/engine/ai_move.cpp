@@ -84,7 +84,7 @@ inline bool sq_ocean(const MAP* sq) { return (sq->climate & 0xE0) < 0x60; }
 inline int32_t sq_ocean_i(const MAP* sq) { return sq_ocean(sq) ? 1 : 0; }
 inline int32_t tile_region(int32_t x, int32_t y) { return map_tile(x, y)->region; }
 inline int32_t base_region(int32_t base_id) { return tile_region(game().bases[base_id].x, game().bases[base_id].y); }
-inline bool sq_has_base(const MAP* sq) { return (sq->items & 1) && (sq->val2 & 0xF) < 8; }
+inline bool sq_has_base(const MAP* sq) { return (sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8; }
 // Preq tech of a terraform (sea: the ocean variant).
 inline int32_t tf_preq(int32_t terraform_id, int32_t sea) {
     return sea ? Terraform[terraform_id].preq_tech_sea : Terraform[terraform_id].preq_tech;
@@ -238,7 +238,7 @@ Flow em_step(EM& m) {
         VEH& v = m.v();
         int32_t tx = map_wrap_x(m.x + NearOffsetX[m.best_dir]);
         int32_t ty = NearOffsetY[m.best_dir] + m.y;
-        v.order = 0x58;
+        v.order = ORDER_AI_GO_TO;
         v.waypoint_x[0] = (int16_t)tx;
         m.tx = tx;
         m.ty = ty;
@@ -252,7 +252,7 @@ Flow em_step(EM& m) {
 Flow em_clear_order(EM& m) {
     VEH& v = m.v();
     v.state &= ~0x10000u;
-    v.order = 0;
+    v.order = ORDER_NONE;
     return F_578f46;
 }
 
@@ -260,17 +260,17 @@ Flow em_clear_order(EM& m) {
 // on a waypoint order check their next step for adjacent enemies.
 int32_t em_finish(EM& m) {
     VEH& v = m.v();
-    if ((int8_t)v.order < 0x18) v.state &= ~0x10000u;
-    if (v.order == 0 || v.order == 2) {
-        if (m.triad == TRIAD_AIR && m.dist_own != 0 && !(sq_at(m.x, m.y)->items & 0x40000)) {
+    if ((int8_t)v.order < ORDER_MOVE_TO) v.state &= ~0x10000u;
+    if (v.order == ORDER_NONE || v.order == ORDER_HOLD) {
+        if (m.triad == TRIAD_AIR && m.dist_own != 0 && !(sq_at(m.x, m.y)->items & BIT_AIRBASE)) {
             action_home(m.veh, 0);
         } else {
-            v.order = (!m.human() || (v.state & 0x200)) ? 2 : 0;
+            v.order = (!m.human() || (v.state & VSTATE_ON_ALERT)) ? 2 : 0;
             veh_skip(m.veh);
         }
     }
-    if (v.order == 0x18 && v.waypoint_x[0] == m.x && v.waypoint_y[0] == m.y) {
-        v.order = 0;
+    if (v.order == ORDER_MOVE_TO && v.waypoint_x[0] == m.x && v.waypoint_y[0] == m.y) {
+        v.order = ORDER_NONE;
         veh_skip(m.veh);
     }
     uint8_t order = v.order;
@@ -278,7 +278,7 @@ int32_t em_finish(EM& m) {
         int32_t faction = (order & 0x40) ? -1 : (int32_t)v.faction_id;
         int32_t dir = Path_move(&Paths, m.veh, faction);
         if (dir < 0) {
-            v.order = 0;
+            v.order = ORDER_NONE;
             return 0;
         }
         m.tx = map_wrap_x(m.x + NearOffsetX[dir]);
@@ -296,7 +296,7 @@ int32_t em_finish(EM& m) {
             int32_t of = game().vehs[m.other].faction_id;
             if (of == m.fac || !(dstat(m.fac, of) & 0x10)) continue;
             if (veh_offense(m.other) != 0 || stack_check(m.other, 0xE, -1, -1, -1)) {
-                v.order = 0;
+                v.order = ORDER_NONE;
                 return 0;
             }
         }
@@ -365,18 +365,18 @@ Flow em_setup(EM& m, int32_t veh_id) {
     m.dist_own = BaseFindDist;
     m.s60 = whose_territory(m.fac, m.x, m.y, nullptr, 0);
     m.s4c = m.s60 == m.fac;
-    m.st4000 = v.state & 0x4000;
+    m.st4000 = v.state & VSTATE_EXPLORE;
     return m.s6c ? F_57138d : F_56b970;
 }
 
 // 0x578DE9: waypoint lists (patrols and queued waypoints).
 Flow em_waypoint_list(EM& m) {
     VEH& v = m.v();
-    if (v.order == 0x18) return F_578f46;
+    if (v.order == ORDER_MOVE_TO) return F_578f46;
     uint32_t state = v.state;
     if ((state & 0x2000200) == 0x2000200 && v.patrol_current_point < v.waypoint_count &&
         (state & 0x1000200) != 0x1000200) {
-        v.order = 0x18;
+        v.order = ORDER_MOVE_TO;
         wp_shift(v);
         if (--v.waypoint_count == 0) v.state &= 0xFDFEFDFFu;
         return F_578f46;
@@ -389,10 +389,10 @@ Flow em_waypoint_list(EM& m) {
     wp_set(v, v.waypoint_count + 4, (int16_t)wy);
     v.state &= ~0x10000u;
     if (v.waypoint_x[0] == wx && v.waypoint_y[0] == wy && v.waypoint_count == 1) {
-        v.order = 0;
+        v.order = ORDER_NONE;
         v.state &= 0xFEFFFDFFu;
     } else {
-        v.order = 0x18;
+        v.order = ORDER_MOVE_TO;
     }
     return F_578f46;
 }
@@ -401,7 +401,7 @@ Flow em_waypoint_list(EM& m) {
 // from an attack target, waypoint lists).
 Flow em_orders(EM& m) {
     VEH& v = m.v();
-    if ((v.flags & 0x440) && !m.human()) {
+    if ((v.flags & (VFLAG_LURKER | VFLAG_INVISIBLE)) && !m.human()) {
         veh_skip(m.veh);
         return RET0;
     }
@@ -414,7 +414,9 @@ Flow em_orders(EM& m) {
         // Terraforming or similar: stay unless an enemy zone of control threatens.
         if (m.zocv == 0) return F_578f46;
         if (m.zocv > 1 && (!m.human() || !(dstat(m.fac, m.zocv - 1) & 0x10))) return F_578f46;
-        if ((v.state & 0x200) && (v.order_auto_type == 4 || v.order_auto_type == 5)) return F_56c2d1;
+        if ((v.state & VSTATE_ON_ALERT) &&
+            (v.order_auto_type == ORDERA_TERRA_FARM_SOLAR_ROAD || v.order_auto_type == ORDERA_TERRA_FARM_MINE_ROAD))
+            return F_56c2d1;
         for (int32_t dir = 0; dir < 8; dir++) {
             int32_t tx = map_wrap_x(m.x + NearOffsetX[dir]);
             int32_t ty = NearOffsetY[dir] + m.y;
@@ -423,7 +425,7 @@ Flow em_orders(EM& m) {
             if (ty < 0 || ty >= game().map.y || tx < 0 || tx >= game().map.x) continue;
             if (m.triad != TRIAD_AIR && sq_ocean_i(sq_at(tx, ty)) != (m.triad == TRIAD_SEA)) continue;
             MAP* sq = sq_at(tx, ty);
-            if (!(sq->items & 3)) {
+            if (!(sq->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE))) {
                 m.s70 = -1;
             } else {
                 int32_t owner = sq->val2 & 0xF;
@@ -439,7 +441,7 @@ Flow em_orders(EM& m) {
             m.best_dir = dir;
             return F_578b29;
         }
-        if (v.state & 0x200) return F_56c9c2;
+        if (v.state & VSTATE_ON_ALERT) return F_56c9c2;
     }
     // L_56bbd5: a stack that reached its attack target wakes up when an enemy is adjacent.
     bool reached = false;
@@ -478,7 +480,7 @@ Flow em_orders(EM& m) {
         return em_waypoint_list(m);
     m.s68 = 1 << m.fac;
     if (!m.human() && (v.flags & 0x800)) {
-        if (has_tech(Terraform[6].preq_tech, m.fac)) v.order_auto_type = 2;
+        if (has_tech(Terraform[6].preq_tech, m.fac)) v.order_auto_type = ORDERA_TERRA_AUTO_MAGTUBE;
         return em_auto_roads(m);
     }
     if (!(state & 0x200) || m.plan != PLAN_TERRAFORM) return F_56c9e1;
@@ -488,8 +490,8 @@ Flow em_orders(EM& m) {
 // L_56c2d1 / L_56c9c2: the automation gives up.
 Flow em_drop_automation(EM& m) {
     VEH& v = m.v();
-    v.order = 0;
-    v.state &= ~0x200u;
+    v.order = ORDER_NONE;
+    v.state &= ~VSTATE_ON_ALERT;
     return RET0;
 }
 
@@ -497,13 +499,13 @@ Flow em_drop_automation(EM& m) {
 // flags 0x800): connect the nearest base of the region whose road (tube) link is incomplete.
 Flow em_auto_roads(EM& m) {
     VEH& v = m.v();
-    if (v.order == 0x1B || v.order == 0x1C) {
+    if (v.order == ORDER_ROAD_TO || v.order == ORDER_MAGTUBE_TO) {
         int32_t b = base_at(v.waypoint_x[0], v.waypoint_y[0]);
         if (b >= 0 && base_faction(b) == m.fac) return F_578f46;
-        v.order = 0;
+        v.order = ORDER_NONE;
     }
     m.best = 9999;
-    m.s30 = (v.order_auto_type == 2) + 0x1B;
+    m.s30 = (v.order_auto_type == ORDERA_TERRA_AUTO_MAGTUBE) + 0x1B;
     m.best_idx = -1;
     m.base_id = 0;
     for (; m.base_id < game().base_count; m.base_id++) {
@@ -533,7 +535,9 @@ Flow em_auto_roads(EM& m) {
             if (px == bx && py == m.s58) break;
             MAP* sq = sq_at(px, py);
             if (!sq_has_base(sq)) {
-                if (!(sq->items & 4) || (!(sq->items & 8) && v.order_auto_type == 2)) m.s54 = 0;
+                if (!(sq->items & BIT_ROAD) ||
+                    (!(sq->items & BIT_MAGTUBE) && v.order_auto_type == ORDERA_TERRA_AUTO_MAGTUBE))
+                    m.s54 = 0;
             }
             if (++m.s2c > 100) break;
             if (!m.s54) {
@@ -559,12 +563,12 @@ Flow em_auto_roads(EM& m) {
         return F_578f46;
     }
     if (!m.human() && (v.flags & 0x800)) return F_56c9e1;
-    v.order = 0;
-    v.state &= ~0x200u;
+    v.order = ORDER_NONE;
+    v.state &= ~VSTATE_ON_ALERT;
     veh_skip(m.veh);
     if (m.fac != CurrentPlayerFaction) return RET0;
     Console_focus(&MainConsole, m.x, m.y, m.fac);
-    X_pop(v.order_auto_type == 1 ? "AUTOROADSDONE" : "AUTOTUBESDONE", 0);
+    X_pop(v.order_auto_type == ORDERA_TERRA_AUTO_ROAD ? "AUTOROADSDONE" : "AUTOTUBESDONE", 0);
     return RET0;
 }
 
@@ -574,49 +578,50 @@ Flow em_auto_improve(EM& m) {
     MAP* sq = sq_at(m.x, m.y);
     if ((sq->climate & 0xE0) < 0x40) return F_56c9c2;
     m.s4c = (int32_t)sq->items;
-    if (sq->items & 0x2000) return F_56c9c2;
-    if ((sq->items & 1) && (sq->val2 & 0xF) < 8) return F_56c9c2;
+    if (sq->items & BIT_MONOLITH) return F_56c9c2;
+    if ((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8) return F_56c9c2;
     uint32_t items = (uint32_t)m.s4c;
     if (items & 0x20) {
         if (has_tech(tf_preq(10, m.at_sea), m.fac)) {
-            v.order = 0xE;
+            v.order = ORDER_REMOVE_FUNGUS;
             return F_578f46;
         }
     } else if (!m.at_sea && !(items & 0x8000) && (sq->val3 & 0xC0) < 0x80 &&
                ((sq->climate & 0x18) < 0x10 || (m.sa4 - 2 >= 0 && m.sa4 - 2 > 1))) {
         if (has_tech(Terraform[0].preq_tech, m.fac)) {
-            v.order = 4;
+            v.order = ORDER_FARM;
             return F_578f46;
         }
     }
     sq = sq_at(m.x, m.y);
-    if (!(sq->items & 0x20) || (sq->climate & 0xE0) < 0x40 || has_tech(Rules.tech_preq_improv_fungus, m.fac)) {
-        if (v.order_auto_type == 4 && !(sq_at(m.x, m.y)->items & 0x40) &&
+    if (!(sq->items & BIT_FUNGUS) || (sq->climate & 0xE0) < 0x40 || has_tech(Rules.tech_preq_improv_fungus, m.fac)) {
+        if (v.order_auto_type == ORDERA_TERRA_FARM_SOLAR_ROAD && !(sq_at(m.x, m.y)->items & BIT_SOLAR) &&
             energy_yield(m.fac, -1, m.x, m.y, 1) && has_tech(tf_preq(3, m.at_sea), m.fac)) {
-            v.order = 7;
+            v.order = ORDER_SOLAR_COLLECTOR;
             return F_578f46;
         }
-        if (v.order_auto_type == 5 && !(sq_at(m.x, m.y)->items & 0x10) && has_tech(tf_preq(2, m.at_sea), m.fac)) {
-            v.order = 6;
+        if (v.order_auto_type == ORDERA_TERRA_FARM_MINE_ROAD && !(sq_at(m.x, m.y)->items & BIT_MINE) &&
+            has_tech(tf_preq(2, m.at_sea), m.fac)) {
+            v.order = ORDER_MINE;
             return F_578f46;
         }
     }
     sq = sq_at(m.x, m.y);
-    if (!(sq->items & 4)) {
+    if (!(sq->items & BIT_ROAD)) {
         if (m.at_sea) return F_56c9c2;
-        if ((!(sq->items & 0x20) || (sq->climate & 0xE0) < 0x40 ||
+        if ((!(sq->items & BIT_FUNGUS) || (sq->climate & 0xE0) < 0x40 ||
              has_tech(Rules.tech_preq_build_road_fungus, m.fac)) &&
             has_tech(Terraform[5].preq_tech, m.fac)) {
-            v.order = 9;
+            v.order = ORDER_ROAD;
             return F_578f46;
         }
     } else if (m.at_sea) {
         return F_56c9c2;
     }
     sq = sq_at(m.x, m.y);
-    if ((sq->items & 0x8000) || (sq->val3 & 0xC0) >= 0x80 || !has_tech(Terraform[0].preq_tech, m.fac))
+    if ((sq->items & BIT_FARM) || (sq->val3 & 0xC0) >= 0x80 || !has_tech(Terraform[0].preq_tech, m.fac))
         return F_56c9c2;
-    v.order = 4;
+    v.order = ORDER_FARM;
     return F_578f46;
 }
 
@@ -637,20 +642,21 @@ Flow em_auto_former(EM& m, uint32_t state) {
     if (at == 4 || at == 5) return em_auto_improve(m);
     if (at == 1) return em_auto_roads(m);
     if (at == 2) {
-        if (!has_tech(Terraform[6].preq_tech, m.fac)) v.order_auto_type = 1;
+        if (!has_tech(Terraform[6].preq_tech, m.fac)) v.order_auto_type = ORDERA_TERRA_AUTO_ROAD;
         return em_auto_roads(m);
     }
-    if (at != 6 && !(has_abil(v.unit_id, ABL_FUNGICIDAL) && v.order_auto_type == 0 && (GameMorePreferences & 8))) {
-        if (v.order_auto_type != 7) return F_56c9e1;
+    if (at != 6 && !(has_abil(v.unit_id, ABL_FUNGICIDAL) && v.order_auto_type == ORDERA_TERRA_AUTO_FULL &&
+                     (GameMorePreferences & MPREF_AUTO_FORMER_REMOVE_FUNGUS))) {
+        if (v.order_auto_type != ORDERA_TERRA_AUTO_SENSOR) return F_56c9e1;
         if (good_sensor(m.fac, m.x, m.y)) {
-            v.order = 0xD;
+            v.order = ORDER_SENSOR_ARRAY;
             return F_578f46;
         }
         m.tx = m.x;
         m.ty = m.y;
         if (Path_sensors(&Paths, m.fac, &m.tx, &m.ty)) return F_56c2d1;
         if (m.tx == m.x && m.ty == m.y) {
-            v.order = 0xD;
+            v.order = ORDER_SENSOR_ARRAY;
             return F_578f46;
         }
         go_to(m.veh, 0x73, m.tx, m.ty);
@@ -658,21 +664,21 @@ Flow em_auto_former(EM& m, uint32_t state) {
     }
     // L_56bf5f: fungus removal.
     if (!has_tech(tf_preq(10, m.triad == TRIAD_SEA), m.fac) && !has_abil(v.unit_id, ABL_FUNGICIDAL) &&
-        v.order_auto_type == 6)
+        v.order_auto_type == ORDERA_TERRA_AUTO_FUNGUS_REM)
         return F_56c2d1;
-    if (v.order == 0x18) return F_578f46;
+    if (v.order == ORDER_MOVE_TO) return F_578f46;
     MAP* sq = sq_at(m.x, m.y);
-    if ((sq->items & 0x20) && (sq->climate & 0xE0) >= 0x40) {
-        v.order = 0xE;
+    if ((sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40) {
+        v.order = ORDER_REMOVE_FUNGUS;
         return F_578f46;
     }
     if (m.triad == TRIAD_SEA && !sq_ocean(sq)) return F_57717f;
     m.best = 99999;
     m.s48 = 2;
     for (;;) {
-        int32_t limit = v.order_auto_type == 6 ? 6 : 3;
+        int32_t limit = v.order_auto_type == ORDERA_TERRA_AUTO_FUNGUS_REM ? 6 : 3;
         if (m.s48 > limit) break;
-        if (v.order == 0x18) return F_578f46;
+        if (v.order == ORDER_MOVE_TO) return F_578f46;
         for (m.base_id = 0; m.base_id < game().base_count; m.base_id++) {
             const BASE& base = game().bases[m.base_id];
             if (base_faction(m.base_id) != m.fac) continue;
@@ -687,8 +693,8 @@ Flow em_auto_former(EM& m, uint32_t state) {
                 m.ty = ty;
                 if (ty < 0 || ty >= game().map.y || tx < 0 || tx >= game().map.x) continue;
                 MAP* t = sq_at(tx, ty);
-                if (t->region != m.region || !(t->items & 0x20) || (t->climate & 0xE0) < 0x40) continue;
-                if (!(t->items & 3)) {
+                if (t->region != m.region || !(t->items & BIT_FUNGUS) || (t->climate & 0xE0) < 0x40) continue;
+                if (!(t->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE))) {
                     m.s70 = -1;
                 } else {
                     int32_t owner = t->val2 & 0xF;
@@ -703,7 +709,7 @@ Flow em_auto_former(EM& m, uint32_t state) {
                 int32_t d = vdist(m.x, m.y, tx, ty);
                 if (!zoc_move(tx, ty, m.fac) && d < m.best) {
                     m.best = d;
-                    v.order = 0x18;
+                    v.order = ORDER_MOVE_TO;
                     v.status_icon = 0x66;
                     v.waypoint_x[0] = (int16_t)tx;
                     v.waypoint_y[0] = (int16_t)ty;
@@ -713,8 +719,8 @@ Flow em_auto_former(EM& m, uint32_t state) {
         }
         m.s48++;
     }
-    if (v.order == 0x18) return F_578f46;
-    if (v.order_auto_type == 6) return F_56c2d1;
+    if (v.order == ORDER_MOVE_TO) return F_578f46;
+    if (v.order_auto_type == ORDERA_TERRA_AUTO_FUNGUS_REM) return F_56c2d1;
     return F_56c9e1;
 }
 
@@ -730,24 +736,24 @@ Flow em_plan(EM& m) {
         int32_t bf = base_faction(ba);
         if (bf != m.fac && m.triad != TRIAD_AIR && veh_offense(m.veh) != 0) {
             MAP* bsq = sq_at(game().bases[ba].x, game().bases[ba].y);
-            bool defended = (bsq->items & 2) && (bsq->val2 & 0xF) < 8;
+            bool defended = (bsq->items & BIT_VEH_IN_TILE) && (bsq->val2 & 0xF) < 8;
             if (!defended && !(dstat(m.fac, bf) & 7) && sq_ocean_i(bsq) == (m.triad == TRIAD_SEA) &&
                 m.plan <= PLAN_TERRAFORM) {
                 // An empty base of a faction without any treaty: attack it.
                 m.s84 = 1;
                 m.dmg = 0;
-                v.order = 0;
+                v.order = ORDER_NONE;
             }
         }
     }
     if (ba != m.base_own) {
         int32_t bf = base_faction(ba);
         uint32_t d = dstat(m.fac, bf);
-        if ((d & 2) && !m.at_sea && !(d & 1) && v.order != 0x18) {
+        if ((d & 2) && !m.at_sea && !(d & 1) && v.order != ORDER_MOVE_TO) {
             // In a treaty partner's territory: go home (or step aside onto an own stack).
             if (whose_territory(m.fac, m.x, m.y, nullptr, 0) == bf && m.f().diplo_friction[bf] < 10 &&
                 !(dstat(m.fac, bf) & 0xC00) &&
-                ((v.faction_id == (uint32_t)bf && (v.flags & 0x440) != 0x440) ||
+                ((v.faction_id == (uint32_t)bf && (v.flags & (VFLAG_LURKER | VFLAG_INVISIBLE)) != 0x440) ||
                  (v.visibility & (uint8_t)(1u << bf)))) {
                 if (m.base_own >= 0 && base_region(m.base_own) == m.region) {
                     go_to(m.veh, 0x77, game().bases[m.base_own].x, game().bases[m.base_own].y);
@@ -770,13 +776,13 @@ Flow em_plan(EM& m) {
         }
     }
     // L_56cd0c
-    if ((v.state & 0x200) && v.order_auto_type == 0xB && m.triad != TRIAD_AIR) {
+    if ((v.state & VSTATE_ON_ALERT) && v.order_auto_type == ORDERA_ON_ALERT && m.triad != TRIAD_AIR) {
         m.stay = 1;
         return F_57707f;
     }
     if (v.status_icon == 0x46) {
-        if (v.order != 0x18) v.status_icon = 0x2D;
-        if ((v.state & 0x100) && m.plan == PLAN_DEFENSE) {
+        if (v.order != ORDER_MOVE_TO) v.status_icon = 0x2D;
+        if ((v.state & VSTATE_MONOLITH_UPGRADED) && m.plan == PLAN_DEFENSE) {
             // Garrison unit called home.
             v.status_icon = 0x2D;
             if (v.home_base_id >= 0) {
@@ -794,7 +800,7 @@ Flow em_plan(EM& m) {
     }
     // L_56cfc4
     if (m.plan == PLAN_ARTIFACT) {
-        if (!(v.flags & 0x20)) {
+        if (!(v.flags & VFLAG_IS_OBJECTIVE)) {
             if (m.dist_own == 0) {
                 if (m.mp_own) {
                     veh_skip(m.veh);
@@ -802,8 +808,8 @@ Flow em_plan(EM& m) {
                     return RET1;
                 }
                 int32_t b = m.base_own;
-                if (((has_fac(FAC_NETWORK_NODE, b, 0) && !(game().bases[b].state_flags & 0x400)) ||
-                     SecretProjects[20] == b) &&
+                if (((has_fac(FAC_NETWORK_NODE, b, 0) && !(game().bases[b].state_flags & BSTATE_ARTIFACT_LINKED)) ||
+                     SecretProjects[FAC_UNIVERSAL_TRANSLATOR - SP_ID_First] == b) &&
                     study_artifact(m.veh))
                     return RET1;
             }
@@ -826,10 +832,10 @@ Flow em_plan(EM& m) {
             if (base_faction(m.base_id) != m.fac) continue;
             if (tile_region(base.x, base.y) != m.region) continue;
             int32_t d = vdist(m.x, m.y, base.x, base.y);
-            if (SecretProjects[20] != m.base_id &&
+            if (SecretProjects[FAC_UNIVERSAL_TRANSLATOR - SP_ID_First] != m.base_id &&
                 (base.queue_items[0] >= -70 || base.minerals_accumulated < 100 || m.human())) {
                 if (!has_fac(FAC_NETWORK_NODE, m.base_id, 0)) d += 1000;
-                if (base.state_flags & 0x400) {
+                if (base.state_flags & BSTATE_ARTIFACT_LINKED) {
                     d += 2000;
                 } else {
                     int32_t n = stack_check(veh_at(base.x, base.y), 2, PLAN_ARTIFACT, -1, -1);
@@ -876,19 +882,19 @@ Flow em_plan(EM& m) {
         }
     }
     // L_56d3d1
-    if (v.order == 3) {
+    if (v.order == ORDER_CONVOY) {
         // Convoying: ask for formers to improve the tile.
         MAP* sq = sq_at(m.x, m.y);
         switch (v.order_auto_type) {
         case 0:
-            if (sq->items & 0x8000) return F_578f46;
+            if (sq->items & BIT_FARM) return F_578f46;
             if ((sq->val3 & 0xC0) >= 0x80) return F_578f46;
             break;
         case 1:
-            if (sq->items & 0x10) return F_578f46;
+            if (sq->items & BIT_MINE) return F_578f46;
             break;
         case 2:
-            if (sq->items & 0x40) return F_578f46;
+            if (sq->items & BIT_SOLAR) return F_578f46;
             if (m.sa4 - 2 <= 0) return F_578f46;
             break;
         default:
@@ -897,7 +903,7 @@ Flow em_plan(EM& m) {
         add_goal(m.fac, 9, 1, m.x, m.y, -1);
         return F_578f46;
     }
-    if (v.order == 0x18) return F_57707f;
+    if (v.order == ORDER_MOVE_TO) return F_57707f;
     m.best = 0;
     for (m.s44 = 0; m.s44 < 0x484; m.s44 += 4) {
         int32_t i = m.s44 / 4;
@@ -944,7 +950,7 @@ Flow em_plan(EM& m) {
             m.best = score;
             go_to(m.veh, 0x76, m.tx, m.ty);
             if (m.s44 == 0) {
-                v.order = 3;
+                v.order = ORDER_CONVOY;
                 v.order_auto_type = (uint8_t)m.best_idx;
                 return F_578f46;
             }
@@ -968,7 +974,7 @@ Flow em_gift(EM& m) {
     if (!(d & 3)) return em_damaged(m);
     if (game().factions[t].integrity_blemishes > 2) return em_damaged(m);
     m.s70 = t;
-    if (v.order == 0x18) {
+    if (v.order == ORDER_MOVE_TO) {
         int32_t t2 = whose_territory(m.fac, v.waypoint_x[0], v.waypoint_y[0], nullptr, 0);
         if (t2 != m.fac && t2 != t && t2 > 0 && m.plan <= PLAN_COMBAT && m.triad == TRIAD_LAND &&
             (game().factions[t].ranking < m.f().ranking ||
@@ -1004,7 +1010,7 @@ Flow em_damaged(EM& m) {
     int32_t dmg = m.dmg;
     if (dmg == 0 || (m.st6 && dmg <= 3)) return F_56e011;
     int32_t ba = m.base_any;
-    if (m.dist_any == 0 || (m.triad == TRIAD_AIR && (sq_at(m.x, m.y)->items & 0x40000))) {
+    if (m.dist_any == 0 || (m.triad == TRIAD_AIR && (sq_at(m.x, m.y)->items & BIT_AIRBASE))) {
         if ((!(v.state & 8) && !(game().bases[ba].state_flags & 0x200000)) ||
             (dmg >= 4 && veh_moves(m.veh) <= Rules.move_rate_roads)) {
             v.status_icon = 0x64;
@@ -1044,7 +1050,7 @@ Flow em_damaged(EM& m) {
             m.ty = TableOffsetY[i] + m.y;
             if (!on_map(m.tx, m.ty)) continue;
             MAP* sq = sq_at(m.tx, m.ty);
-            if (sq_ocean(sq) || !(sq->items & 0x2000)) continue;
+            if (sq_ocean(sq) || !(sq->items & BIT_MONOLITH)) continue;
             if (ExpansionEnabled && (v.unit_id == BSC_BATTLE_OGRE_MK1 || v.unit_id == BSC_BATTLE_OGRE_MK2 ||
                                      v.unit_id == BSC_BATTLE_OGRE_MK3))
                 continue;
@@ -1124,7 +1130,7 @@ Flow em_damaged(EM& m) {
     // L_56df59
     if (m.dmg >= 3 && m.triad != TRIAD_LAND) {
         action_home(m.veh, 2);
-        if (v.order == 0x18) {
+        if (v.order == ORDER_MOVE_TO) {
             v.status_icon = 0x64;
             return m.triad == TRIAD_SEA ? F_574a88 : F_57707f;
         }
@@ -1146,8 +1152,8 @@ Flow em_probe(EM& m) {
     VEH& v = m.v();
     if (m.plan != PLAN_PROBE) return F_56e507;
     if (m.mp_own) {
-        v.order = 0;
-        v.state &= ~0x200u;
+        v.order = ORDER_NONE;
+        v.state &= ~VSTATE_ON_ALERT;
         synch_veh(m.veh);
         NetDaemon_await_synch(&NetState);
         NetDaemon_unlock_veh(&NetState);
@@ -1190,8 +1196,8 @@ Flow em_probe(EM& m) {
             int32_t n = stack_check(veh_at(base.x, base.y), 2, PLAN_PROBE, -1, -1);
             score += ((n + (score != 0)) * 64 + BaseFindDist) * 64;
         } else {
-            if (has_project(15, bf)) continue;  // Hunter-Seeker Algorithm
-            if (base.state_flags & 0x40) {
+            if (has_project(FAC_HUNTER_SEEKER_ALGORITHM - SP_ID_First, bf)) continue;  // Hunter-Seeker Algorithm
+            if (base.state_flags & BSTATE_RESEARCH_DATA_STOLEN) {
                 m.s4c = bf;
                 uint32_t d = dstat(m.fac, bf);
                 if (d & 7) {
@@ -1225,7 +1231,7 @@ Flow em_probe(EM& m) {
             go_to(m.veh, 0x70, base.x, base.y);
         }
     }
-    if (v.order != 0x18) {
+    if (v.order != ORDER_MOVE_TO) {
         kill(m.veh);
         return RET1;
     }
@@ -1241,11 +1247,12 @@ Flow em_land(EM& m) {
     if (m.triad != TRIAD_LAND) return F_56ed87;
     VEH& v = m.v();
     if (has_abil(v.unit_id, ABL_DROP_POD) && v.moves_spent == 0 && veh_offense(m.veh) != 0 &&
-        stack_check(m.veh, 2, 2, -1, -1) && !(v.state & 0x20) && !m.human() && m.dmg < 4) {
-        if (m.dist_any == 0 || (sq_at(m.x, m.y)->items & 0x40000)) {
+        stack_check(m.veh, 2, 2, -1, -1) && !(v.state & VSTATE_MADE_AIRDROP) && !m.human() && m.dmg < 4) {
+        if (m.dist_any == 0 || (sq_at(m.x, m.y)->items & BIT_AIRBASE)) {
             Flow f = em_drop_pod(m);
             if (f != F_56e62d) return f;
-        } else if (whose_territory(m.fac, m.x, m.y, nullptr, 0) == m.fac && v.order != 0x18 && m.base_own >= 0) {
+        } else if (whose_territory(m.fac, m.x, m.y, nullptr, 0) == m.fac && v.order != ORDER_MOVE_TO &&
+                   m.base_own >= 0) {
             go_to(m.veh, 0x49, game().bases[m.base_own].x, game().bases[m.base_own].y);
         }
     }
@@ -1271,7 +1278,7 @@ Flow em_drop_pod(EM& m) {
         uint32_t d = dstat(m.fac, bf);
         if ((d & 1) || !(d & 0xC10)) continue;
         if (has_fac(FAC_AEROSPACE_COMPLEX, b, 0)) continue;
-        if (has_project(35, base_faction(b))) continue;  // Cloudbase Academy
+        if (has_project(FAC_CLOUDBASE_ACADEMY - SP_ID_First, base_faction(b))) continue;  // Cloudbase Academy
         if (veh_who(game().bases[b].x, game().bases[b].y) >= 0) continue;
         m.s60 = m.x;
         m.s58 = game().bases[b].x;
@@ -1318,7 +1325,7 @@ Flow em_drop_pod(EM& m) {
     // L_56e9aa: no target in range: drop next to any enemy base.
     // BUG(original): `best` is not reset (still 99999 from the search above), so no tile ever
     // scores higher and this search never drops.
-    v.order = 0;
+    v.order = ORDER_NONE;
     if (m.f().units_active[m.unit] <= 1) return F_56e62d;
     m.s58 = -1;
     m.s60 = -1;
@@ -1331,7 +1338,7 @@ Flow em_drop_pod(EM& m) {
         uint32_t d = dstat(m.fac, bf);
         if ((d & 1) || !(d & 0xC10)) continue;
         if (has_fac(FAC_AEROSPACE_COMPLEX, m.base_id, 0)) continue;
-        if (has_project(35, base_faction(m.base_id))) continue;
+        if (has_project(FAC_CLOUDBASE_ACADEMY - SP_ID_First, base_faction(m.base_id))) continue;
         m.val = base.pop_size;
         uint8_t rp = game().factions[bf].region_base_plan[m.region];
         if (rp == 7) m.val = m.val * 3;
@@ -1387,7 +1394,7 @@ Flow em_drop_pod(EM& m) {
 // L_56ed87: air units (and automated sea units on "air patrol") are moved by air_power.
 Flow em_air(EM& m) {
     VEH& v = m.v();
-    if (!((m.plan == PLAN_NAVAL_SUPERIORITY && (v.state & 0x200) && v.order_auto_type == 0xB) ||
+    if (!((m.plan == PLAN_NAVAL_SUPERIORITY && (v.state & VSTATE_ON_ALERT) && v.order_auto_type == ORDERA_ON_ALERT) ||
           m.triad == TRIAD_AIR))
         return F_56ef2f;
     if (planet_buster(m.veh) && m.triad == TRIAD_AIR) {
@@ -1418,9 +1425,9 @@ Flow em_air(EM& m) {
         return F_57707f;
     }
     if (r == -3) {
-        if ((v.state & 0x200) && v.order_auto_type == 0xA) {
-            v.order = 0;
-            v.state &= ~0x200u;
+        if ((v.state & VSTATE_ON_ALERT) && v.order_auto_type == ORDERA_BOMBING_RUN) {
+            v.order = ORDER_NONE;
+            v.state &= ~VSTATE_ON_ALERT;
             return RET0;
         }
         return F_578b29;
@@ -1434,7 +1441,7 @@ Flow em_naval(EM& m) {
     VEH& v = m.v();
     if (m.st4000) return F_57460a;
     if (m.plan == PLAN_NAVAL_SUPERIORITY) {
-        m.best = v.order == 0x18 ? hdist(m.x, m.y, v.waypoint_x[0], v.waypoint_y[0]) : 9999;
+        m.best = v.order == ORDER_MOVE_TO ? hdist(m.x, m.y, v.waypoint_x[0], v.waypoint_y[0]) : 9999;
         for (m.s2c = 0; m.s2c < TableRange[range(veh_moves(m.veh) / Rules.move_rate_roads, 1, 8)]; m.s2c++) {
             m.tx = map_wrap_x(m.x + TableOffsetX[m.s2c]);
             m.ty = TableOffsetY[m.s2c] + m.y;
@@ -1513,7 +1520,7 @@ Flow em_naval(EM& m) {
                 !(items & 0x80000000))
                 continue;
             if (!(items & 0x80001000)) continue;
-            if (!(items & 0x80000000) && m.triad == TRIAD_SEA && v.order == 0x18) continue;
+            if (!(items & 0x80000000) && m.triad == TRIAD_SEA && v.order == ORDER_MOVE_TO) continue;
             if (!(items & 0x81208854)) continue;
             int32_t score = (items & 0x80000000) ? 32 : 2;
             if (score <= m.best) continue;
@@ -1539,7 +1546,7 @@ Flow em_naval(EM& m) {
                     break;
                 }
             }
-            if (v.order == 0x18) continue;
+            if (v.order == ORDER_MOVE_TO) continue;
         }
         if (m.zocv == 0 || m.s2c < 9) score += stack_check(m.other, 4, -1, -1, -1);
         m.s60 = m.x;
@@ -1587,7 +1594,7 @@ Flow em_naval(EM& m) {
     // L_56f841: lone artillery in a base of a contested region stays.
     if (m.dist_own == 0 && !m.st6 && m.region_plan != 0 && stack_check(m.veh, 0xF, -1, -1, -1) <= 1 &&
         m.triad != TRIAD_SEA) {
-        if ((sq_at(m.x, m.y)->items & 0x4000) || m.region_plan != 2) return F_578b34;
+        if ((sq_at(m.x, m.y)->items & BIT_CANAL_COAST) || m.region_plan != 2) return F_578b34;
     }
     return F_56f8ad;
 }
@@ -1604,7 +1611,7 @@ Flow em_colony(EM& m) {
     if (m.at_sea != m.s48) return F_570002;
     if (m.plan == PLAN_COLONY) del_site(m.fac, PLAN_COLONY, m.x, m.y, 1);
     m.base_id = 0;  // best site value
-    if (m.plan == PLAN_COLONY && v.order == 0x18 && vdist(m.x, m.y, v.waypoint_x[0], v.waypoint_y[0]) > 2)
+    if (m.plan == PLAN_COLONY && v.order == ORDER_MOVE_TO && vdist(m.x, m.y, v.waypoint_x[0], v.waypoint_y[0]) > 2)
         m.base_id = site_at(v.waypoint_x[0], v.waypoint_y[0], 0) - 1;
     for (m.s2c = 0; m.s2c < 25; m.s2c++) {
         m.tx = map_wrap_x(m.x + TableOffsetX[m.s2c]);
@@ -1613,10 +1620,10 @@ Flow em_colony(EM& m) {
         MAP* sq = sq_at(m.tx, m.ty);
         int32_t alt = sq->climate & 0xE0;
         if ((alt < 0x60 ? 1 : 0) != m.s48) continue;
-        if ((sq->items & 0x20) && alt >= 0x40) continue;
+        if ((sq->items & BIT_FUNGUS) && alt >= 0x40) continue;
         if ((sq->val3 & 0xC0) > 0x40 && alt >= 0x60) continue;
         if (sq->region != m.region) continue;
-        if (sq->items & 0x2000) continue;
+        if (sq->items & BIT_MONOLITH) continue;
         if (base_territory(m.fac, m.tx, m.ty) >= 0) continue;
         if (m.triad == TRIAD_LAND) {
             if (!(m.f().region_flags[m.region] & 0x80) && !is_coast(m.tx, m.ty, 0) &&
@@ -1656,7 +1663,7 @@ Flow em_colony(EM& m) {
             int32_t thr = m.region_plan != 8 ? 4 : 1;
             if ((int32_t)m.f().region_unk_6[m.region] > thr) thr = m.f().region_unk_6[m.region];
             if (site < thr) {
-                if (m.plan != PLAN_COLONY || v.order == 0x18 ||
+                if (m.plan != PLAN_COLONY || v.order == ORDER_MOVE_TO ||
                     Continents[m.region].open_terrain >= (m.f().region_total_bases[m.region] + 1) * 6)
                     accept = false;
             }
@@ -1724,7 +1731,7 @@ Flow em_colony_next(EM& m) {
 // L_57000c: sea colony pods scan the whole region for the best reachable ocean site.
 Flow em_sea_sites(EM& m) {
     VEH& v = m.v();
-    if (m.triad == TRIAD_SEA && v.order != 0x18 && m.at_sea) {
+    if (m.triad == TRIAD_SEA && v.order != ORDER_MOVE_TO && m.at_sea) {
         m.best = 0;
         for (m.ty = 0; m.ty < game().map.y; m.ty++) {
             for (m.tx = m.ty & 1; m.tx < game().map.x; m.tx += 2) {
@@ -1732,7 +1739,7 @@ Flow em_sea_sites(EM& m) {
                 if (tile_region(m.tx, m.ty) != m.region) continue;
                 if (anything_at(m.tx, m.ty) >= 0) continue;
                 MAP* sq = sq_at(m.tx, m.ty);
-                if ((sq->items & 0x20) && (sq->climate & 0xE0) >= 0x40) continue;
+                if ((sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40) continue;
                 int32_t site = site_at(m.tx, m.ty, 0);
                 m.val = (site * 10000) / (vdist(m.x, m.y, m.tx, m.ty) + 1);
                 m.base_id = base_find(m.tx, m.ty);
@@ -1771,7 +1778,7 @@ Flow em_sea_sites(EM& m) {
 // L_5702f7: land scouts and colony pods: exploration and base sites of the whole region.
 Flow em_explore_sites(EM& m) {
     VEH& v = m.v();
-    if (v.order == 0x18 && m.dist_any != 0) return F_570c89;
+    if (v.order == ORDER_MOVE_TO && m.dist_any != 0) return F_570c89;
     if (m.triad != TRIAD_LAND || m.at_sea) return F_570c89;
     m.s30 = 0;  // matching sites in the region
     m.s48 = 0;  // good ones
@@ -1788,7 +1795,7 @@ Flow em_explore_sites(EM& m) {
             if (site_at(site.x, site.y, 0) >= thr) m.s48++;
         }
     }
-    m.s2c = v.order == 0x18;
+    m.s2c = v.order == ORDER_MOVE_TO;
     if (m.s30 == 0 || ((m.fac + CurrentTurn) & (m.s48 ? 15 : 3)) == 0 || m.dist_any == 0) {
         m.best = 0;
         for (m.ty = 0; m.ty < game().map.y; m.ty++) {
@@ -1809,8 +1816,8 @@ Flow em_explore_sites(EM& m) {
                 MAP* sq = sq_at(m.tx, m.ty);
                 int32_t alt = sq->climate & 0xE0;
                 if (alt < 0x60) continue;
-                if ((sq->items & 0x20) && alt >= 0x40) continue;
-                if (sq->items & 0x2000) continue;
+                if ((sq->items & BIT_FUNGUS) && alt >= 0x40) continue;
+                if (sq->items & BIT_MONOLITH) continue;
                 if ((sq->val3 & 0xC0) > 0x40) continue;
                 if (m.s54 == m.fac || m.s54 < 0) {
                     if (!is_known(m.tx, m.ty, m.fac)) {
@@ -1855,11 +1862,11 @@ Flow em_explore_sites(EM& m) {
                     if (!on_map(ax, ay)) continue;
                     MAP* a = sq_at(ax, ay);
                     if (a->region != m.region) continue;
-                    if ((a->items & 0x20) && (a->climate & 0xE0) >= 0x40) continue;
-                    if (a->items & 0x2000) continue;
+                    if ((a->items & BIT_FUNGUS) && (a->climate & 0xE0) >= 0x40) continue;
+                    if (a->items & BIT_MONOLITH) continue;
                     if ((a->val3 & 0xC0) > 0x40) continue;
                     if (base_territory(m.fac, ax, ay) >= 0) continue;
-                    if (sq_at(ax, ay)->items & 0x1000) continue;
+                    if (sq_at(ax, ay)->items & BIT_BASE_RADIUS) continue;
                     int32_t s2 = site_at(ax, ay, 0);
                     if (s2 < m.val) continue;
                     if (s2 == m.val && !at_site(m.fac, 8, ax, ay)) continue;
@@ -1891,11 +1898,11 @@ Flow em_explore_sites(EM& m) {
         // L_570ad4
         if (m.plan != PLAN_RECON && m.s2c == 0) {
             int32_t found = m.s30;
-            if (v.order == 0x18) {
+            if (v.order == ORDER_MOVE_TO) {
                 if (found == 0) found = 1;
                 add_site(m.fac, 3, 2, v.waypoint_x[0], v.waypoint_y[0]);
                 if (!is_known(v.waypoint_x[0], v.waypoint_y[0], m.fac) && (DiffLevel <= 3 || m.human())) {
-                    v.order = 0;
+                    v.order = ORDER_NONE;
                 } else {
                     del_site(m.fac, 8, m.tx, m.ty, 2);
                     add_site(m.fac, 8, 3, v.waypoint_x[0], v.waypoint_y[0]);
@@ -1913,7 +1920,7 @@ Flow em_explore_sites(EM& m) {
         }
     }
     // L_570bdb: colony pods in a treaty partner's territory go home.
-    if (m.plan == PLAN_COLONY && v.order != 0x18) {
+    if (m.plan == PLAN_COLONY && v.order != ORDER_MOVE_TO) {
         m.s70 = whose_territory(m.fac, m.x, m.y, nullptr, 0);
         if (m.s70 >= 0 && m.s70 != m.fac && (dstat(m.fac, m.s70) & 3)) {
             m.base_id = base_find_filtered(m.x, m.y, m.fac, m.region, -1, -1);
@@ -1933,7 +1940,7 @@ Flow em_explore_sites(EM& m) {
 Flow em_destroy(EM& m) {
     VEH& v = m.v();
     int32_t ba = m.base_any;
-    bool skip_first = speed(m.veh, 0) > Rules.move_rate_roads || !(sq_at(m.x, m.y)->items & 0x800000) ||
+    bool skip_first = speed(m.veh, 0) > Rules.move_rate_roads || !(sq_at(m.x, m.y)->items & BIT_ECH_MIRROR) ||
                       veh_triad_of(m.veh) == TRIAD_AIR || ba < 0;
     if (!skip_first) {
         // A sensor next to an enemy base (the original looks 6 columns to the east).
@@ -1956,7 +1963,7 @@ Flow em_destroy(EM& m) {
         }
     }
     // L_570df9
-    if (speed(m.veh, 0) <= Rules.move_rate_roads && (sq_at(m.x, m.y)->items & 0x400000) &&
+    if (speed(m.veh, 0) <= Rules.move_rate_roads && (sq_at(m.x, m.y)->items & BIT_CONDENSER) &&
         veh_triad_of(m.veh) != TRIAD_AIR && ba >= 0 && m.dist_any <= 2 && base_faction(ba) != m.fac &&
         m.dist_own > 3 && (dstat(m.fac, base_faction(ba)) & 0x10)) {
         if (m.mp_own) {
@@ -2025,8 +2032,8 @@ Flow em_destroy(EM& m) {
         return F_57137d;
     m.s54 = (m.plan == PLAN_RECON || m.triad == TRIAD_SEA) ? 0x31 : 0x19;
     if (m.plan == PLAN_NAVAL_TRANSPORT && (stack_check(m.veh, 2, 8, -1, -1) || m.dmg > 1)) m.s54 = 9;
-    if (CurrentTurn >= (m.plan != PLAN_NAVAL_SUPERIORITY ? 100 : 400) && v.order == 0x18 && v.status_icon != 0x58 &&
-        m.plan != PLAN_RECON)
+    if (CurrentTurn >= (m.plan != PLAN_NAVAL_SUPERIORITY ? 100 : 400) && v.order == ORDER_MOVE_TO &&
+        v.status_icon != 0x58 && m.plan != PLAN_RECON)
         m.s54 = 9;
     m.s2c = 1;
     if (m.s54 > 1) {
@@ -2054,7 +2061,8 @@ Flow em_defend(EM& m) {
     VEH& v = m.v();
     m.s68 = 1 << m.fac;
     if (!m.human() && m.dist_own == 0 && m.s6c == 0 && m.zocv != 0 && !is_objective(m.base_own) &&
-        (m.region_plan == 2 || m.f().region_total_bases[m.region] == 1 || (m.f().player_flags & 0x2000000))) {
+        (m.region_plan == 2 || m.f().region_total_bases[m.region] == 1 ||
+         (m.f().player_flags & PFLAG_OBLITERATE_CAPTURED_BASES))) {
         // Obliterate an own base (captured from a human) about to be lost.
         BASE& b = game().bases[m.base_own];
         int32_t former = (uint8_t)b.faction_id_former;
@@ -2132,7 +2140,7 @@ Flow em_defend(EM& m) {
             if (!keep && n > 1 && (m.s44 == 0 || m.zocv == 0)) goto L_571977;
             // L_5718ba: stay as a garrison.
             if (m.dist_own == 0 && v.home_base_id >= 0 && !m.human()) v.home_base_id = (int16_t)m.base_own;
-            v.order = 0;
+            v.order = ORDER_NONE;
             m.stay = 1;
             m.defend = (n <= 1) + 1;
             if (m.s6c) return RET1;
@@ -2154,8 +2162,8 @@ L_571977:
 // attack targets and sieges.
 Flow em_cover(EM& m) {
     VEH& v = m.v();
-    if (v.order != 0x18 && (m.s44 || m.plan == PLAN_DEFENSE)) {
-        v.order = 0;
+    if (v.order != ORDER_MOVE_TO && (m.s44 || m.plan == PLAN_DEFENSE)) {
+        v.order = ORDER_NONE;
         for (m.s6c = 0; m.s6c < 0x484; m.s6c += 4) {
             int32_t i = m.s6c / 4;
             m.tx = map_wrap_x(m.x + TableOffsetX[i]);
@@ -2167,7 +2175,8 @@ Flow em_cover(EM& m) {
             bool go = false;
             if (m.other < 0 || game().vehs[m.other].faction_id == (uint32_t)m.fac) {
                 // L_571b51: a monolith.
-                if ((sq_at(m.tx, m.ty)->items & 0x2000) && !(v.state & 0x100) && want_monolith(m.veh)) {
+                if ((sq_at(m.tx, m.ty)->items & BIT_MONOLITH) && !(v.state & VSTATE_MONOLITH_UPGRADED) &&
+                    want_monolith(m.veh)) {
                     m.s38 += 1000;
                     go = true;
                 }
@@ -2192,7 +2201,7 @@ Flow em_cover(EM& m) {
                 go_to(m.veh, type, m.tx, m.ty);
             }
         }
-        if (v.order == 0x18) {
+        if (v.order == ORDER_MOVE_TO) {
             m.stay = 0;
             m.defend = 0;
             return F_57707f;
@@ -2219,12 +2228,12 @@ Flow em_cover(EM& m) {
     // L_571d57: psi gates to a region with the same plan.
     int32_t bo = m.base_own;
     if (m.plan != m.region_plan && m.region_plan > 2 && m.dist_own == 0 && has_fac(FAC_PSI_GATE, bo, 0) &&
-        !(game().bases[bo].state_flags & 0x20000000)) {
+        !(game().bases[bo].state_flags & BSTATE_PSI_GATE_USED)) {
         for (m.base_id = 0; m.base_id < game().base_count; m.base_id++) {
             const BASE& base = game().bases[m.base_id];
             if (base_faction(m.base_id) != m.fac) continue;
             if (!has_fac(FAC_PSI_GATE, bo, 0)) continue;  // BUG(original): tests the own base again
-            if (base.state_flags & 0x20000000) continue;
+            if (base.state_flags & BSTATE_PSI_GATE_USED) continue;
             int32_t r = tile_region(base.x, base.y);
             if (r == m.region) continue;
             uint8_t rp = m.f().region_base_plan[r];
@@ -2247,7 +2256,7 @@ Flow em_cover(EM& m) {
             !has_abil(v.unit_id, ABL_DROP_POD))
             v.state |= 0x40000;
     }
-    if ((m.plan > PLAN_COMBAT && !m.st6) || v.order != 0x18) return F_572922;
+    if ((m.plan > PLAN_COMBAT && !m.st6) || v.order != ORDER_MOVE_TO) return F_572922;
     m.s4c = std::abs(m.y - v.waypoint_y[0]);
     if ((hdist2(m.x, m.y, v.waypoint_x[0], v.waypoint_y[0]) & ~1) != 4) return F_572922;
     m.base_id = base_at(v.waypoint_x[0], v.waypoint_y[0]);
@@ -2377,11 +2386,12 @@ Flow em_siege(EM& m) {
             if (stack_check(m.other, 4, -1, -1, -1)) m.val /= 2;
         }
         int32_t score = m.val;
-        if (v.moves_spent == 0 && (sq_at(m.x, m.y)->items & 4) && (sq_at(m.tx, m.ty)->items & 4))
+        if (v.moves_spent == 0 && (sq_at(m.x, m.y)->items & BIT_ROAD) && (sq_at(m.tx, m.ty)->items & BIT_ROAD))
             score += Chassis[unit_of(m.veh).chassis_id].speed > 1 ? 0x100 : 8;
         MAP* t = sq_at(m.tx, m.ty);
-        if ((t->items & 0x20) && (t->climate & 0xE0) >= 0x40) {
-            if (!has_project(8, m.fac) && (veh_offense(m.veh) >= 0 || m.unit >= 0x40)) {  // Xenoempathy Dome
+        if ((t->items & BIT_FUNGUS) && (t->climate & 0xE0) >= 0x40) {
+            if (!has_project(FAC_XENOEMPATHY_DOME - SP_ID_First, m.fac) &&
+                (veh_offense(m.veh) >= 0 || m.unit >= 0x40)) {  // Xenoempathy Dome
                 if (!has_tech(Rules.tech_preq_ease_fungus_mov, m.fac)) score -= 0x100;
             } else if (v.unit_id < 0x40 && (veh_offense(m.veh) < 0 || v.unit_id == BSC_SPORE_LAUNCHER)) {
                 score += 0x100;
@@ -2420,10 +2430,13 @@ Flow em_former(EM& m) {
     VEH& v = m.v();
     if (m.st4000 || (m.plan & 0xF) != 9) return F_5741cf;
     if (m.zocv == 1 || (m.zocv != 0 && m.human() && (dstat(m.fac, m.zocv - 1) & 0x10))) return F_57707f;
-    m.s30 = ((v.state & 0x200) && unit_plan(m.veh) == PLAN_TERRAFORM && v.order_auto_type == 3) ? 1 : 0;
+    m.s30 = ((v.state & VSTATE_ON_ALERT) && unit_plan(m.veh) == PLAN_TERRAFORM &&
+             v.order_auto_type == ORDERA_TERRA_AUTOIMPROVE_BASE)
+                ? 1
+                : 0;
     m.s4c = 0;
     int32_t b;  // edi: the base whose area is worked
-    if (v.order == 0x18) {
+    if (v.order == ORDER_MOVE_TO) {
         b = m.base_id;
     } else {
         bool check_home;
@@ -2467,7 +2480,7 @@ Flow em_former(EM& m) {
                 m.s60 = m.x;
                 if ((hdist2(m.x, m.y, g.x, g.y) & ~1) == 0) {
                     // At the goal.
-                    v.order = 0;
+                    v.order = ORDER_NONE;
                     m.s4c = 1;
                     if (m.dist_own == 0) return F_578b34;
                     goto L_572cd6;
@@ -2488,13 +2501,13 @@ Flow em_former(EM& m) {
 L_572cd6:
     if (m.s30 && !m.s4c) {
         m.s4c = std::abs(m.y - game().bases[b].y);
-        if (((m.s4c + x_dist(m.x, game().bases[b].x)) & ~1) > 4 && v.order != 0x18) {
+        if (((m.s4c + x_dist(m.x, game().bases[b].x)) & ~1) > 4 && v.order != ORDER_MOVE_TO) {
             go_to(m.veh, 0x68, game().bases[b].x, game().bases[b].y);
-            if (v.order == 0x18) return F_57707f;
+            if (v.order == ORDER_MOVE_TO) return F_57707f;
         }
     }
 L_572d66:
-    if (m.triad == TRIAD_SEA && v.order != 0x18) {
+    if (m.triad == TRIAD_SEA && v.order != ORDER_MOVE_TO) {
         // Sea formers: the best shelf tile around an own base.
         m.best = 9999999;
         m.base_id = 0;
@@ -2557,27 +2570,27 @@ L_572d66:
         int32_t sea = m.at_sea;
         del_site(m.fac, sea ? 0x19 : 9, m.x, m.y, 0);
         if (at_goal(m.fac, 0x79, m.x, m.y) && !is_sensor(m.x, m.y)) {
-            v.order = 0xD;
+            v.order = ORDER_SENSOR_ARRAY;
             return F_578f46;
         }
         if (at_goal(m.fac, 0x29, m.x, m.y) && !m.s30 && m.sa4 <= 5) {
             // Raise the land (paid from the reserves).
             int32_t cost = range(terraform_cost(m.x, m.y, m.fac), 0, m.f().energy_credits / 4);
             m.f().energy_credits = range(m.f().energy_credits - cost, 0, 99999);
-            v.order = 0x14;
+            v.order = ORDER_TERRAFORM_UP;
             del_site(m.fac, 8, m.x, m.y, 1);
             return F_578f46;
         }
         if (at_goal(m.fac, 0x49, m.x, m.y) && terrain_avail(12, sea, m.fac)) {
-            v.order = 0x10;
+            v.order = ORDER_CONDENSER;
             return F_578f46;
         }
         if (at_goal(m.fac, 0xD, m.x, m.y) && terrain_avail(13, sea, m.fac)) {
-            v.order = 0x11;
+            v.order = ORDER_ECHELON_MIRROR;
             return F_578f46;
         }
         if (at_goal(m.fac, 0x69, m.x, m.y) && terrain_avail(14, sea, m.fac)) {
-            v.order = 0x12;
+            v.order = ORDER_THERMAL_BOREHOLE;
             return F_578f46;
         }
         if (!sea && !m.s30 && !m.human() && terrain_avail(16, sea, m.fac)) {
@@ -2594,7 +2607,7 @@ L_572d66:
                     }
                 }
                 if (!high) {
-                    v.order = 0x14;
+                    v.order = ORDER_TERRAFORM_UP;
                     return F_578f46;
                 }
             }
@@ -2606,8 +2619,8 @@ L_572d66:
             uint32_t items = sq->items;
             if (((items & 0x10) || (items & 0x200000)) && !(items & 4) &&
                 !((items & 0x20) && (sq->climate & 0xE0) >= 0x40) && !m.at_sea &&
-                (!m.human() || !(GameMorePreferences & 0x400000))) {
-                v.order = 9;
+                (!m.human() || !(GameMorePreferences & MPREF_AUTO_FORMER_CANT_BUILD_ROADS))) {
+                v.order = ORDER_ROAD;
                 return F_578f46;
             }
             m.s54 = radius_move_tiles(game().bases[bo].x, game().bases[bo].y, m.x, m.y, 0x15);
@@ -2621,19 +2634,19 @@ L_572d66:
         else
             m.s2c = 0;
         MAP* sq = sq_at(m.x, m.y);
-        if ((sq->items & 0x20) && (sq->climate & 0xE0) >= 0x40 && m.s44 &&
+        if ((sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40 && m.s44 &&
             (has_abil(v.unit_id, ABL_FUNGICIDAL) || has_tech(tf_preq(10, sq_ocean_i(sq_at(m.x, m.y))), m.fac)) &&
             (m.s2c || (m.dist_own <= 2 && (game().bases[bo].eco_damage != 0 || game().bases[bo].pop_size >= 6)))) {
-            v.order = 0xE;
+            v.order = ORDER_REMOVE_FUNGUS;
             return F_578f46;
         }
         if (m.s44 == 4 && (m.s2c || (m.s54 != 0 && game().bases[bo].worked_tiles != 0))) {
-            v.order = 4;
+            v.order = ORDER_FARM;
             v.status_icon = 0x2B;
             return F_578f46;
         }
         bool to_762 = true;
-        if (!m.at_sea && (!m.human() || !(GameMorePreferences & 0x400000))) {
+        if (!m.at_sea && (!m.human() || !(GameMorePreferences & MPREF_AUTO_FORMER_CANT_BUILD_ROADS))) {
             bool to_6cb = false;
             if (m.s2c) {
                 to_6cb = true;
@@ -2645,7 +2658,7 @@ L_572d66:
                     to_762 = false;  // L_5737ad
                 } else {
                     MAP* t = sq_at(m.x, m.y);
-                    to_6cb = !((t->items & 0x20) && (t->climate & 0xE0) >= 0x40);
+                    to_6cb = !((t->items & BIT_FUNGUS) && (t->climate & 0xE0) >= 0x40);
                 }
             }
             if (to_6cb) {
@@ -2654,13 +2667,13 @@ L_572d66:
                 uint32_t it = t->items;
                 if (it & 4) {
                     if (has_tech(Terraform[6].preq_tech, m.fac) && m.s2c && !(it & 8)) {
-                        v.order = 9;
+                        v.order = ORDER_ROAD;
                         v.status_icon = 0x52;
                         return F_578f46;
                     }
                 } else if (!((it & 0x20) && (t->climate & 0xE0) >= 0x40) ||
                            has_tech(Rules.tech_preq_improv_fungus, m.fac)) {
-                    v.order = 9;
+                    v.order = ORDER_ROAD;
                     v.status_icon = 0x72;
                     return F_578f46;
                 }
@@ -2668,21 +2681,22 @@ L_572d66:
         }
         if (to_762) {
             // L_573762
-            if (m.s44 && (m.dist_own <= 2 || stack_check(m.veh, 9, 3, -1, -1)) && (m.s2c || v.order == 0)) {
+            if (m.s44 && (m.dist_own <= 2 || stack_check(m.veh, 9, 3, -1, -1)) && (m.s2c || v.order == ORDER_NONE)) {
                 v.order = (uint8_t)m.s44;
                 v.status_icon = 0x2B;
                 return F_578f46;
             }
         }
         // L_5737ad: sensors.
-        if ((!m.human() || (GameMorePreferences & 0x20)) && (m.s2c || v.order == 0)) {
+        if ((!m.human() || (GameMorePreferences & MPREF_AUTO_FORMER_BUILD_SENSORS)) &&
+            (m.s2c || v.order == ORDER_NONE)) {
             if (is_sensor(m.x, m.y) && whose_territory(m.fac, m.x, m.y, nullptr, 0) == m.fac && m.dist_own > 1 &&
                 !(sq_at(m.x, m.y)->items & 0x800) && has_tech(Terraform[7].preq_tech, m.fac)) {
-                v.order = 0xB;
+                v.order = ORDER_BUNKER;
                 return F_578f46;
             }
             if (good_sensor(m.fac, m.x, m.y)) {
-                v.order = 0xD;
+                v.order = ORDER_SENSOR_ARRAY;
                 return F_578f46;
             }
             if (m.dist_own > 1 && m.dist_own <= 3) {
@@ -2698,7 +2712,7 @@ L_572d66:
                         }
                     }
                     if (!near_bunker) {
-                        v.order = 0xB;
+                        v.order = ORDER_BUNKER;
                         return F_578f46;
                     }
                 }
@@ -2708,14 +2722,14 @@ L_572d66:
                 m.ty = m.y;
                 m.s4c = 1;
                 if (!Path_sensors(&Paths, m.fac, &m.tx, &m.ty) && m.x == m.tx && m.y == m.ty) {
-                    v.order = 0xD;
+                    v.order = ORDER_SENSOR_ARRAY;
                     return F_578f46;
                 }
             }
         }
     }
     // L_5739aa: a tile near a base to improve.
-    if (v.order == 0x18 || m.s84) return F_5741cf;
+    if (v.order == ORDER_MOVE_TO || m.s84) return F_5741cf;
     // BUG(original): the base may be -1 (no home base, no own base): Bases[-1] (see base_raw).
     if (m.s30) {
         m.base_id = v.home_base_id;
@@ -2723,7 +2737,7 @@ L_572d66:
         m.s58 = base_y_raw(m.base_id);
     } else {
         m.base_id = m.base_own;
-        if (v.state & 0x200) {
+        if (v.state & VSTATE_ON_ALERT) {
             m.sa4 = base_x_raw(m.base_id);
             m.s58 = base_y_raw(m.base_id);
         } else {
@@ -2793,7 +2807,7 @@ L_572d66:
             if (d > 2) continue;
             if (!(base.worked_tiles & (1u << (m.s2c & 31)))) {
                 MAP* t = sq_at(m.tx, m.ty);
-                if (!((t->items & 0x20) && (t->climate & 0xE0) >= 0x40)) {
+                if (!((t->items & BIT_FUNGUS) && (t->climate & 0xE0) >= 0x40)) {
                     d *= 3;
                     m.val = d;
                 }
@@ -2803,15 +2817,15 @@ L_572d66:
             m.best = d;
             go_to(m.veh, 0x77, m.tx, m.ty);
         }
-        if (v.order == 0x18) return F_57707f;
+        if (v.order == ORDER_MOVE_TO) return F_57707f;
     }
     // L_573f61: a sensor site.
-    if (m.s4c == 0 && (!m.human() || (GameMorePreferences & 0x20))) {
+    if (m.s4c == 0 && (!m.human() || (GameMorePreferences & MPREF_AUTO_FORMER_BUILD_SENSORS))) {
         m.tx = m.x;
         m.ty = m.y;
         if (!Path_sensors(&Paths, m.fac, &m.tx, &m.ty)) {
             if (m.tx == m.x && m.ty == m.y) {
-                v.order = 0xD;
+                v.order = ORDER_SENSOR_ARRAY;
                 return F_578f46;
             }
             if (!(m.s30 && vdist(m.x, m.y, m.tx, m.ty) > 2) && !former_taken(m, m.tx, m.ty)) {
@@ -2834,9 +2848,9 @@ L_572d66:
             }
         }
     }
-    if (m.s30 && v.order == 0) {
-        v.state &= ~0x200u;
-        v.order = 0;
+    if (m.s30 && v.order == ORDER_NONE) {
+        v.state &= ~VSTATE_ON_ALERT;
+        v.order = ORDER_NONE;
         return RET0;
     }
     return F_5741cf;
@@ -2853,7 +2867,7 @@ Flow em_patrol(EM& m) {
     VEH& v = m.v();
     if (m.region_plan > 2 &&
         m.f().region_visible_tiles[m.region] >= Continents[m.region].tile_count &&
-        m.plan <= PLAN_RECON && m.triad == TRIAD_LAND && v.order != 0x18 && !m.at_sea) {
+        m.plan <= PLAN_RECON && m.triad == TRIAD_LAND && v.order != ORDER_MOVE_TO && !m.at_sea) {
         if (coast_or_border(m.x, m.y, m.x, m.y, m.fac)) {
             int32_t d = rem8(v.rotate_angle + 4);
             m.tx = map_wrap_x(m.x + NearOffsetX[d]);
@@ -2927,7 +2941,7 @@ Flow em_patrol(EM& m) {
 // searched ring by ring.
 Flow em_explore(EM& m) {
     VEH& v = m.v();
-    if (m.triad == TRIAD_AIR || (v.order == 0x18 && v.status_icon == 0x2F)) return F_574a7e;
+    if (m.triad == TRIAD_AIR || (v.order == ORDER_MOVE_TO && v.status_icon == 0x2F)) return F_574a7e;
     m.s4c = 0;
     m.best = 0;
     m.s60 = 0;
@@ -2960,7 +2974,7 @@ Flow em_explore(EM& m) {
                 }
             }
             MAP* sq = sq_at(m.tx, m.ty);
-            if ((sq->items & 0x20) && (sq->climate & 0xE0) >= 0x40 && m.f().SE_planet_pending <= 0) score /= 2;
+            if ((sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40 && m.f().SE_planet_pending <= 0) score /= 2;
             m.sa4 = score;
             if (m.base_own >= 0) {
                 const BASE& bo = game().bases[m.base_own];
@@ -2987,10 +3001,10 @@ Flow em_explore(EM& m) {
             m.s4c = m.sa4;
             go_to(m.veh, 0x2F, m.tx, m.ty);
         }
-        if (v.order == 0x18 && m.s44 < m.s60 && m.s4c >= 0x10) break;
+        if (v.order == ORDER_MOVE_TO && m.s44 < m.s60 && m.s4c >= 0x10) break;
         m.s60 = m.s44;
     }
-    if (v.order == 0x18) return F_57707f;
+    if (v.order == ORDER_MOVE_TO) return F_57707f;
     return F_574a7e;
 }
 
@@ -3102,18 +3116,19 @@ Flow em_transport(EM& m) {
     }
     if (count == 0) {
         // L_574ca7: nothing to carry.
-        if (v.order == 0x18 &&
+        if (v.order == ORDER_MOVE_TO &&
             (v.status_icon == 0x4A || v.status_icon == 0x72 || v.status_icon == 0x49 || v.status_icon == 0x45))
-            v.order = 0;
+            v.order = ORDER_NONE;
     }
     // L_574e50
     if ((m.s2c & 0xF) || (m.s2c & 0x800)) {
         m.s30 = 2;
         if ((m.s2c & 0x100) && !(m.s2c & 3)) m.s30 = 1;
     }
-    if ((v.status_icon == 0x45 || v.status_icon == 0x72 || v.status_icon == 0x49) && (m.s30 == 0 || v.order != 0x18))
+    if ((v.status_icon == 0x45 || v.status_icon == 0x72 || v.status_icon == 0x49) &&
+        (m.s30 == 0 || v.order != ORDER_MOVE_TO))
         v.status_icon = 0x2D;
-    if (m.stay == 0 && !(v.order == 0x18 && v.status_icon == 0x64)) {
+    if (m.stay == 0 && !(v.order == ORDER_MOVE_TO && v.status_icon == 0x64)) {
         if (((m.s2c & 0x1000) && m.dist_any != 0) ||
             (m.s54 != 0 && m.s54 >= count && (m.dist_any <= 8 || CurrentTurn < 50))) {
             // Damaged passengers: to the nearest port.
@@ -3124,7 +3139,7 @@ Flow em_transport(EM& m) {
                 int32_t d = vdist(m.x, m.y, base.x, base.y);
                 m.s38 = d;
                 if (d == 0) return F_578b34;
-                if (base.state_flags & 0x400) {
+                if (base.state_flags & BSTATE_ARTIFACT_LINKED) {
                     d += 1000;
                     m.s38 = d;
                 }
@@ -3159,7 +3174,7 @@ Flow em_transport(EM& m) {
                     if (stack_check(veh_at(base.x, base.y), 2, PLAN_NAVAL_TRANSPORT, -1, -1) >= need) continue;
                 } else {
                     if (base.ai_plan_status != 0 &&
-                        !(v.order == 0x18 && v.waypoint_x[0] == base.x && v.waypoint_y[0] == base.y)) {
+                        !(v.order == ORDER_MOVE_TO && v.waypoint_x[0] == base.x && v.waypoint_y[0] == base.y)) {
                         if (m.dist_own != 0 || m.base_own != m.base_id ||
                             stack_check(m.veh, 2, PLAN_NAVAL_TRANSPORT, -1, -1) > 1)
                             continue;
@@ -3270,7 +3285,8 @@ Flow em_transport(EM& m) {
             if (to_77c && m.s54 == 0) continue;
             // L_575787
             if (!(m.s2c & (1 << (f.region_base_plan[rr] & 31))) && m.dmg <= 2 && !(GameState & 0x100) &&
-                (v.order != 0x18 || tile_region(v.waypoint_x[0], v.waypoint_y[0]) != rr || v.status_icon == 0x65)) {
+                (v.order != ORDER_MOVE_TO || tile_region(v.waypoint_x[0], v.waypoint_y[0]) != rr ||
+                 v.status_icon == 0x65)) {
                 // A passenger going home to this region.
                 bool home_here = false;
                 for (m.other = veh_top(m.veh); m.other >= 0;) {
@@ -3326,7 +3342,7 @@ Flow em_transport_unload(EM& m, int32_t found) {
         }
     }
     for (m.other = veh_top(m.veh); m.other >= 0; m.other = game().vehs[m.other].next_veh_id_stack) {
-        if (veh_triad_of(m.other) == TRIAD_LAND) game().vehs[m.other].order = 0;
+        if (veh_triad_of(m.other) == TRIAD_LAND) game().vehs[m.other].order = ORDER_NONE;
     }
     v.status_icon = 0x75;
     if (m.sb8) return RET0;
@@ -3339,7 +3355,7 @@ Flow em_transport_routes(EM& m) {
     VEH& v = m.v();
     if (m.sb8) return RET0;
     if (m.stay) return F_57717f;
-    if (v.order == 0x18) {
+    if (v.order == ORDER_MOVE_TO) {
         if (v.status_icon == 0x64) return F_57717f;
     } else if ((m.s2c & 0x100) && m.s30 < 1) {
         // Only colony pods aboard: the nearest large empty landmass (by its coast in the polar
@@ -3383,7 +3399,7 @@ Flow em_transport_routes(EM& m) {
         if (m.best_idx >= 0) set_course(m.veh, 0x63, m.xs[m.best_idx], m.ys[m.best_idx]);
     }
     // L_575dbb
-    if (v.order != 0x18 && m.s30 != 0) {
+    if (v.order != ORDER_MOVE_TO && m.s30 != 0) {
         // Combat units aboard: a port in a region to defend.
         m.best = 9999;
         for (m.base_id = 0; m.base_id < game().base_count; m.base_id++) {
@@ -3414,7 +3430,7 @@ Flow em_transport_routes(EM& m) {
                 go_to(m.veh, 0x45, base.x, base.y);
             }
         }
-        if (v.order != 0x18 && m.s30 > 1) {
+        if (v.order != ORDER_MOVE_TO && m.s30 > 1) {
             // An enemy base to land next to.
             m.best = 9999;
             for (m.base_id = 0; m.base_id < game().base_count; m.base_id++) {
@@ -3422,7 +3438,7 @@ Flow em_transport_routes(EM& m) {
                 const BASE& base = game().bases[m.base_id];
                 int32_t bf = base_faction(m.base_id);
                 if (bf == m.fac) continue;
-                if (!is_objective(m.base_id) && !(m.f().player_flags & 0x200000) &&
+                if (!is_objective(m.base_id) && !(m.f().player_flags & PFLAG_STRAT_ATK_ENEMY_HQ) &&
                     m.f().base_id_attack_target != m.base_id && ((CurrentTurn + m.base_id) & 3))
                     continue;
                 m.s30 = m.fac * 0x833;
@@ -3460,7 +3476,7 @@ Flow em_transport_routes(EM& m) {
                 }
                 if (has_fac(FAC_HEADQUARTERS, m.base_id, 0)) {
                     score /= 2;
-                    if (m.f().player_flags & 0x200000) score /= 2;
+                    if (m.f().player_flags & PFLAG_STRAT_ATK_ENEMY_HQ) score /= 2;
                     m.s38 = score;
                     if (CurrentTurn < game().factions[bf].corner_market_turn) {
                         score /= 8;
@@ -3470,7 +3486,7 @@ Flow em_transport_routes(EM& m) {
                 if (is_objective(m.base_id)) {
                     score /= 2;
                     m.s38 = score;
-                    if (m.f().player_flags & 0x80000000u) {
+                    if (m.f().player_flags & PFLAG_STRAT_ATK_OBJECTIVES) {
                         score /= 2;
                         m.s38 = score;
                     }
@@ -3505,7 +3521,7 @@ Flow em_transport_routes(EM& m) {
                     weak = m.s4c < garrison_check(m.base_id);
                 }
                 if (weak && is_human(bf) &&
-                    (game().factions[bf].diff_level >= 4 || (m.f().player_flags & 0x200) ||
+                    (game().factions[bf].diff_level >= 4 || (m.f().player_flags & PFLAG_MAP_REVEALED) ||
                      (dstat(m.fac, bf) & 0x1000))) {
                     score /= 2;
                     m.s38 = score;
@@ -3518,7 +3534,7 @@ Flow em_transport_routes(EM& m) {
         }
     }
     // L_576448: colony pods / formers aboard: an own port in another region with that plan.
-    if (v.order != 0x18) {
+    if (v.order != ORDER_MOVE_TO) {
         m.best = 9999;
         for (m.base_id = 0; m.base_id < game().base_count; m.base_id++) {
             const BASE& base = game().bases[m.base_id];
@@ -3538,7 +3554,7 @@ Flow em_transport_routes(EM& m) {
         }
     }
     // L_57657b: a coast of an empty region two tiles out.
-    if (v.order != 0x18) {
+    if (v.order != ORDER_MOVE_TO) {
         for (int32_t i = 1; i < 0x121; i++) {
             m.tx = map_wrap_x(m.x + TableOffsetX[i] * 2);
             m.ty = m.y + TableOffsetY[i] * 2;
@@ -3560,7 +3576,7 @@ Flow em_transport_routes(EM& m) {
 // L_57666a: other sea units: escort transports, raid enemy ports, explore the sea.
 Flow em_sea(EM& m) {
     VEH& v = m.v();
-    if (v.order == 0x18 && v.status_icon == 0x64) return F_577071;
+    if (v.order == ORDER_MOVE_TO && v.status_icon == 0x64) return F_577071;
     if (m.plan == PLAN_NAVAL_SUPERIORITY) {
         if (unit_of(m.veh).group_id == 0x15) {
             // Escort: the nearest own transport at sea.
@@ -3583,12 +3599,12 @@ Flow em_sea(EM& m) {
                     go_to(m.veh, 0x43, m.tx, m.ty);
                 }
             }
-            if (v.order == 0x18) {
+            if (v.order == ORDER_MOVE_TO) {
                 // BUG(original): EDI holds [ebp-0x38] here; on the paths where no transport was
                 // examined in this call that slot was never written (uninitialised read #3).
                 return m.s38 ? F_577071 : F_578b34;
             }
-        } else if (v.order == 0x18 && v.status_icon != 0x36) {
+        } else if (v.order == ORDER_MOVE_TO && v.status_icon != 0x36) {
             goto L_576a95;
         }
         // L_576847: raiding factions: enemy ports.
@@ -3620,12 +3636,12 @@ Flow em_sea(EM& m) {
             }
             if (m.best_idx >= 0 &&
                 (hdist2(m.x, m.y, game().bases[m.best_idx].x, game().bases[m.best_idx].y) & ~1) <= 2) {
-                v.order = 0;
+                v.order = ORDER_NONE;
                 return F_577071;
             }
         }
     L_576a95:
-        if (v.order != 0x18 && ((m.veh + CurrentTurn) & 3) == 0) {
+        if (v.order != ORDER_MOVE_TO && ((m.veh + CurrentTurn) & 3) == 0) {
             // Coasts between a well settled region and a weak enemy one: bombardment sites.
             m.best = -9999;
             for (m.ty = 0; m.ty < game().map.y; m.ty++) {
@@ -3674,8 +3690,8 @@ Flow em_sea(EM& m) {
         }
     }
     // L_576daf: sea exploration.
-    if ((v.order != 0x18 ||
-         ((m.f().player_flags & 0x20000000) && stack_check(m.veh, 1, -1, -1, -1) == 1)) &&
+    if ((v.order != ORDER_MOVE_TO ||
+         ((m.f().player_flags & PFLAG_STRAT_SEARCH_OBJECTIVES) && stack_check(m.veh, 1, -1, -1, -1) == 1)) &&
         ((m.veh + CurrentTurn) & 3) == 0) {
         m.best = -9999;
         for (m.ty = 0; m.ty < game().map.y; m.ty++) {
@@ -3685,7 +3701,7 @@ Flow em_sea(EM& m) {
                 if (!sq_ocean(sq)) continue;
                 if (m.dist_own == 0 ? !base_on_sea(m.base_own, sq->region) : sq->region != m.region) continue;
                 m.val = 0;
-                if (m.f().player_flags & 0x20000000) {
+                if (m.f().player_flags & PFLAG_STRAT_SEARCH_OBJECTIVES) {
                     uint32_t items = sq_at(m.tx, m.ty)->items;
                     if (!(items & 0x100000)) {
                         m.val = 1;
@@ -3697,7 +3713,8 @@ Flow em_sea(EM& m) {
                     int32_t ax = map_wrap_x(m.tx + NearOffsetX[i]);
                     int32_t ay = NearOffsetY[i] + m.ty;
                     if (!on_map(ax, ay)) continue;
-                    if ((m.f().player_flags & 0x20000000) && !(sq_at(ax, ay)->items & 0x100000)) {
+                    if ((m.f().player_flags & PFLAG_STRAT_SEARCH_OBJECTIVES) &&
+                        !(sq_at(ax, ay)->items & BIT_SUPPLY_REMOVE)) {
                         // counted without the knowledge test
                     } else if (is_known(ax, ay, m.fac)) {
                         continue;
@@ -3752,7 +3769,7 @@ Flow em_coast_goal(EM& m, bool land_only) {
 // L_57717f: units on a waypoint order follow it (Path_move) unless an enemy blocks the way.
 Flow em_follow(EM& m) {
     VEH& v = m.v();
-    if (v.order != 0x18) return F_577361;
+    if (v.order != ORDER_MOVE_TO) return F_577361;
     if (veh_offense(m.veh) != 0 &&
         (v.moves_spent == 0 || speed(m.veh, 0) <= Rules.move_rate_roads || m.plan != PLAN_OFFENSE || m.triad != TRIAD_LAND))
         return F_577361;
@@ -3763,7 +3780,7 @@ Flow em_follow(EM& m) {
     m.best_dir = dir;
     if (dir < 0) {
         if (m.zocv == 1) {
-            v.order = 0;
+            v.order = ORDER_NONE;
             v.state &= 0xFCFFBDFFu;
         }
         return F_577361;
@@ -3778,7 +3795,7 @@ Flow em_follow(EM& m) {
             veh_moves(m.veh) - hex_cost(m.unit, m.fac, m.x, m.y, m.tx, m.ty, 0) >= 1)
             return F_577361;
     }
-    if (m.zocv == 0 || (m.plan != PLAN_PROBE && veh_offense(m.veh) == 0)) v.order = 0;
+    if (m.zocv == 0 || (m.plan != PLAN_PROBE && veh_offense(m.veh) == 0)) v.order = ORDER_NONE;
     if (m.zocv != 0) return F_577361;
     return F_578b34;
 }
@@ -3787,14 +3804,15 @@ Flow em_follow(EM& m) {
 // one is taken. Attacks, captures and probe actions are scored with the real battle odds.
 Flow em_move(EM& m) {
     VEH& v = m.v();
-    if (v.order == 0x18 && m.s84 == 0 && m.stay == 0) {
+    if (v.order == ORDER_MOVE_TO && m.s84 == 0 && m.stay == 0) {
         if (!zoc_veh(m.x, m.y, m.fac)) return F_578f46;
         m.s4c = std::abs(m.y - v.waypoint_y[0]);
         if (((m.s4c + x_dist(m.x, v.waypoint_x[0])) & ~1) == 2) {
             m.s70 = anything_at(v.waypoint_x[0], v.waypoint_y[0]);
-            if (m.s70 >= 0 && m.s70 != m.fac && !(dstat(m.fac, m.s70) & 1) && v.status_icon != 0x70) v.order = 0;
+            if (m.s70 >= 0 && m.s70 != m.fac && !(dstat(m.fac, m.s70) & 1) && v.status_icon != 0x70)
+                v.order = ORDER_NONE;
         }
-        if (v.order == 0x18) m.keep_wp = 1;
+        if (v.order == ORDER_MOVE_TO) m.keep_wp = 1;
     }
     m.best = -9999;
     m.sa4 = 0;
@@ -3893,7 +3911,7 @@ Flow em_move(EM& m) {
             } else if (m.coast_goal && m.s2c == 0) {
                 m.val += 8;
             }
-            if (m.f().player_flags & 0x20000000) {
+            if (m.f().player_flags & PFLAG_STRAT_SEARCH_OBJECTIVES) {
                 MAP* t = sq_at(m.tx, m.ty);
                 uint32_t items = t->items;
                 if (!(items & 0x100000)) {
@@ -4000,7 +4018,8 @@ Flow em_move(EM& m) {
                     break;
                 case 8:
                     if (m.at_sea && zoc_sea(m.tx, m.ty, m.fac)) continue;
-                    if (m.s70 >= 0 && m.s70 != m.fac && (dstat(m.fac, m.s70) & 3) && v.order != 0x18) m.val -= 0x10;
+                    if (m.s70 >= 0 && m.s70 != m.fac && (dstat(m.fac, m.s70) & 3) && v.order != ORDER_MOVE_TO)
+                        m.val -= 0x10;
                     if (m.at_sea && m.f().region_base_plan[m.s68] == 8) {
                         m.val += Continents[m.s68].open_terrain + 0x10;
                         uint16_t fl = m.f().region_flags[m.s68];
@@ -4025,7 +4044,7 @@ Flow em_move(EM& m) {
                 int32_t of = game().vehs[m.other].faction_id;
                 m.s70 = of;
                 if (m.triad == TRIAD_AIR && Chassis[unit_of(m.veh).chassis_id].range != 0 && v.movement_turns != 0 &&
-                    v.order == 0x18 && !(v.waypoint_x[0] == m.tx && v.waypoint_y[0] == m.ty))
+                    v.order == ORDER_MOVE_TO && !(v.waypoint_x[0] == m.tx && v.waypoint_y[0] == m.ty))
                     continue;
                 if (stack_check(m.other, 1, -1, -1, -1) == 1 && !(dstat(m.fac, of) & 0x11) &&
                     unit_plan(m.other) == PLAN_ARTIFACT && veh_offense(m.veh) != 0 && m.base_id < 0) {
@@ -4077,7 +4096,7 @@ Flow em_move(EM& m) {
                 // L_578404
                 if (m.at_sea && m.triad == TRIAD_LAND && !has_abil(v.unit_id, ABL_AMPHIBIOUS)) continue;
                 if (stack_check(m.other, 3, 2, -1, -1) && !has_abil(v.unit_id, ABL_AIR_SUPERIORITY) && m.base_id < 0 &&
-                    !(sq_at(m.tx, m.ty)->items & 0x40000) && !stack_check(m.other, 6, 0x80, -1, -1))
+                    !(sq_at(m.tx, m.ty)->items & BIT_AIRBASE) && !stack_check(m.other, 6, 0x80, -1, -1))
                     continue;
                 if (m.plan == PLAN_PROBE) {
                     if (stack_check(m.other, 1, -1, -1, -1) > 1) continue;
@@ -4125,7 +4144,8 @@ Flow em_move(EM& m) {
                 int32_t bf = base_faction(m.base_id);
                 uint32_t d = dstat_raw(m.fac, m.s70);  // BUG(original): the territory owner, not bf
                 if (!(d & 1)) {
-                    if (m.plan == PLAN_PROBE && !(unit_of(m.veh).ability_flags & 0x10000000) && has_project(15, bf))
+                    if (m.plan == PLAN_PROBE && !(unit_of(m.veh).ability_flags & 0x10000000) &&
+                        has_project(FAC_HUNTER_SEEKER_ALGORITHM - SP_ID_First, bf))
                         continue;
                     d = dstat_raw(m.fac, m.s70);
                     if ((d & 7) && !(d & 0x800)) {
@@ -4141,7 +4161,7 @@ Flow em_move(EM& m) {
                 }
             }
             // L_578801
-            if ((sq_at(m.tx, m.ty)->items & 0x2000) && want_monolith(m.veh)) m.val += 0x63;
+            if ((sq_at(m.tx, m.ty)->items & BIT_MONOLITH) && want_monolith(m.veh)) m.val += 0x63;
         L_57883f:
             if ((m.st4 || m.st4000) && m.s2c != 0 &&
                 (m.triad == TRIAD_AIR || m.s84 == (m.triad == TRIAD_SEA))) {
@@ -4159,7 +4179,7 @@ Flow em_move(EM& m) {
                         int32_t ax = map_wrap_x(m.s4c + NearOffsetX[m.s58 / 4]);
                         int32_t ay = NearOffsetY[m.s58 / 4] + m.s60;
                         if (!on_map(ax, ay)) continue;
-                        if (m.f().player_flags & 0x20000000) {
+                        if (m.f().player_flags & PFLAG_STRAT_SEARCH_OBJECTIVES) {
                             MAP* t = sq_at(ax, ay);
                             uint32_t items = t->items;
                             if (!(items & 0x100000)) {
@@ -4193,10 +4213,10 @@ Flow em_move(EM& m) {
     if (m.sa4 == 0) {
         if (m.stay) {
             m.best_dir = -1;
-            v.order = 0;
+            v.order = ORDER_NONE;
         }
-        if (m.keep_wp && v.order == 0x18) return F_578f46;
-        if (can_arty(m.unit, 1) && v.order == 0 &&
+        if (m.keep_wp && v.order == ORDER_MOVE_TO) return F_578f46;
+        if (can_arty(m.unit, 1) && v.order == ORDER_NONE &&
             (m.triad == TRIAD_SEA || !sq_ocean(sq_at(m.x, m.y)) || m.dist_any == 0)) {
             // Artillery against enemy improvements.
             for (m.s4c = 0; m.s4c < 0x64; m.s4c += 4) {
@@ -4224,7 +4244,7 @@ Flow em_move(EM& m) {
         }
     } else if (planet_buster(m.veh)) {
         m.best_dir = -1;
-        v.order = 0;
+        v.order = ORDER_NONE;
     }
     v.status_icon = 0x78;
     return F_578b29;

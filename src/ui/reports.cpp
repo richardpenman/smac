@@ -271,7 +271,7 @@ const uint32_t kSortLabels[9] = {0, 0xA0, 0xA4, 0xE4, 0xAAC, 0xAB0, 0xAB4, 0xFC,
 
 std::string governor_text(int32_t base_id) {
     const BASE& b = Bases[base_id];
-    if (is_objective(base_id) && !(GameRules & 0x20000000)) return up(sw_label(0xE08));
+    if (is_objective(base_id) && !(GameRules & RULES_SCN_VICT_ALL_BASE_COUNT_OBJ)) return up(sw_label(0xE08));
     if (!(b.governor_flags & 0x80000000)) return sw_label(0xBFC);
     for (int32_t i = 0; i < 4; i++)
         if (b.governor_flags & (0x1000000 << i)) return sw_label(0x824 + i * 4);
@@ -348,7 +348,9 @@ void ReportScreen::draw_ops() {
         // The name: red with drone riots coming (drones > talents), "(!)" for a golden age.
         std::string name = b.name;
         int32_t color = 0xE1;
-        if (b.talent_total < b.drone_total && (SecretProjects[0x23] < 0 || Bases[SecretProjects[0x23]].faction_id != faction)) {
+        if (b.talent_total < b.drone_total &&
+            (SecretProjects[FAC_CLOUDBASE_ACADEMY - SP_ID_First] < 0 ||
+             Bases[SecretProjects[FAC_CLOUDBASE_ACADEMY - SP_ID_First]].faction_id != faction)) {
             color = 0xF9;
         } else if (b.drone_total == 0 && b.pop_size > 2 && (b.pop_size + 1) / 2 <= b.talent_total) {
             name += "(!)";
@@ -841,7 +843,8 @@ void ReportScreen::draw_energy() {
     }
     if (g_energy_subject == -1) return;
     std::vector<Row> rows;
-    bool half = SecretProjects[25] >= 0 && Bases[SecretProjects[25]].faction_id == faction;
+    bool half = SecretProjects[FAC_SELF_AWARE_COLONY - SP_ID_First] >= 0 &&
+                Bases[SecretProjects[FAC_SELF_AWARE_COLONY - SP_ID_First]].faction_id == faction;
     int32_t total = 0;
     auto cost = [&](int32_t m) {
         total += m;
@@ -893,7 +896,8 @@ void ReportScreen::iface_energy() {
     Font* f10 = find_font(10, 0);
     Font* f12 = find_font(12, 0);
     int32_t lh = line_h12();
-    bool half = SecretProjects[25] >= 0 && Bases[SecretProjects[25]].faction_id == faction;
+    bool half = SecretProjects[FAC_SELF_AWARE_COLONY - SP_ID_First] >= 0 &&
+                Bases[SecretProjects[FAC_SELF_AWARE_COLONY - SP_ID_First]].faction_id == faction;
     auto pane = [&](const UiRect& p, const std::string& head, std::vector<Row>& rows, int32_t sel_id, int32_t sel_pos,
                     int32_t& top, int32_t type, const char* tag) {
         int32_t x = p.left + 6, y = p.top + 6, w = (p.right - p.left) - 12, h = (p.bottom - p.top) - 12;
@@ -1102,7 +1106,7 @@ int32_t g_sat_kind = -1;    // DAT_0089E648: the satellite kind's button (0x41..
 int32_t sat_pods(int32_t f) {
     int32_t n = 0;
     for (int32_t b = 0; b < BaseCount; b++)
-        if (Bases[b].faction_id == f && has_fac(41, b, 0)) n++;
+        if (Bases[b].faction_id == f && has_fac(FAC_GEOSYNC_SURVEY_POD, b, 0)) n++;
     return n;
 }
 int32_t sat_count(int32_t f, int32_t k) {
@@ -1292,7 +1296,7 @@ void ReportScreen::draw_sat() {
         int32_t pods = 0;
         if (f)
             for (int32_t b = 0; b < BaseCount; b++)
-                if (Bases[b].faction_id == f && has_fac(41, b, 0)) pods++;
+                if (Bases[b].faction_id == f && has_fac(FAC_GEOSYNC_SURVEY_POD, b, 0)) pods++;
         for (int32_t k = 0; k < ncol; k++, x += colw) {
             UiRect cell{x, y, x + colw, y + rh};
             if (!f) {
@@ -1544,7 +1548,8 @@ void ReportScreen::draw_score() {
         if (!table[i] || i == 5) continue;
         std::string label = TextBufferGetPtr;
         if (i == 6) {
-            int32_t own = num_objectives(faction, 0), all = num_objectives(faction, GameRules & 0x1000);
+            int32_t own = num_objectives(faction, 0),
+                    all = num_objectives(faction, GameRules & RULES_VICTORY_COOPERATIVE);
             if (own < all) {
                 sw_font(c, f_text, 0x99);
                 sw_text(this, c, num(own) + " " + sw_label(0xE0C), x, y);
@@ -1556,10 +1561,10 @@ void ReportScreen::draw_score() {
                 label = num(own) + " " + label;
             }
         } else if (i == 7) {
-            if (GameState & 0x200000) label = sw_label(0xE70);
-            else if (GameState & 0x400000) label = sw_label(0xE88);
+            if (GameState & STATE_VICTORY_DIPLOMATIC) label = sw_label(0xE70);
+            else if (GameState & STATE_VICTORY_ECONOMIC) label = sw_label(0xE88);
             else if (f.player_flags & 0x100000) label = sw_label(0x1198);
-            else if (!(GameState & 0x2000)) label = sw_label(0xE10);
+            else if (!(GameState & STATE_VICTORY_CONQUER)) label = sw_label(0xE10);
         }
         std::string v = (table[i] < 0 ? "- " : "+ ") + num(std::abs(table[i]));
         sw_font(c, f_text, 0x99);
@@ -1577,7 +1582,7 @@ void ReportScreen::draw_score() {
         state.push_back("score " + label + " " + v);
         y += line_h();
     }
-    if ((GameRules & 0x400) && !(GameState & 0x20)) {
+    if ((GameRules & RULES_IRONMAN) && !(GameState & STATE_SCENARIO_CHEATED_FLAG)) {
         sw_text(this, c, sw_label(0x1044), x, y);
         y += line_h();
     }
@@ -1834,7 +1839,8 @@ void locator_start(int32_t base_id);
 void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool right, bool dbl) {
     // ReportWin_on_right_click in the satellites table with the editor's omniscient view: sat_edit
     // (0x4A0810), a satellite more (shift: fewer; the ODPs used then kept at most all of them).
-    if (parent == 0 && right && type >= 81 && type <= 87 && kind() == kSat && (GameState & 0x40) && (GameState & 0x80)) {
+    if (parent == 0 && right && type >= 81 && type <= 87 && kind() == kSat && (GameState & STATE_SCENARIO_EDITOR) &&
+        (GameState & STATE_OMNISCIENT_VIEW)) {
         int32_t f = type - 80, k = index;
         if (k < 4 && faction != 0) {
             Faction& fa = Factions[f];
@@ -1911,8 +1917,9 @@ void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t
         // ReportWin_on_left_click: the research at the tree's centre, then the research choice
         // (blind research: the priorities).
         int32_t r = Factions[faction].tech_research_id;
-        if (r >= 0 && ((GameState & 0x80) || !(GameRules & 0x200))) labs_tree_tech() = r;
-        if (!(GameRules & 0x200)) Console_set_tech(&MainConsole, CurrentPlayerFaction);
+        if (r >= 0 && ((GameState & STATE_OMNISCIENT_VIEW) || !(GameRules & RULES_BLIND_RESEARCH)))
+            labs_tree_tech() = r;
+        if (!(GameRules & RULES_BLIND_RESEARCH)) Console_set_tech(&MainConsole, CurrentPlayerFaction);
         else Console_set_ai(&MainConsole, CurrentPlayerFaction);
         return;
     }
@@ -2177,7 +2184,7 @@ void open_reports(int32_t k) {
     s->energy_top = s->energy_itop[0] = s->energy_itop[1] = 0;
     {
         int32_t r = Factions[s->faction].tech_research_id;
-        bool blind = !(GameState & 0x80) && (GameRules & 0x200);
+        bool blind = !(GameState & STATE_OMNISCIENT_VIEW) && (GameRules & RULES_BLIND_RESEARCH);
         labs_tree_tech() = (blind || r < 0 || r > 0x59) ? 0 : r;
     }
     sw_run(s);

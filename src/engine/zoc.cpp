@@ -21,7 +21,8 @@ int32_t zoc_owner(int32_t x, int32_t y, uint32_t items, int32_t faction_id) {
     MAP* sq = map_tile(x, y);
     if (!(sq->items & items)) return -1;
     uint32_t owner = sq->val2 & 0xF;
-    if (owner >= 8 || owner == (uint32_t)faction_id || (game().factions[faction_id].diplo_status[owner] & 1)) return -1;
+    if (owner >= 8 || owner == (uint32_t)faction_id || (game().factions[faction_id].diplo_status[owner] & DIPLO_PACT))
+        return -1;
     return (int32_t)owner;
 }
 }  // namespace
@@ -50,15 +51,15 @@ int32_t GAMEAPI zoc_sea(int32_t x, int32_t y, int32_t faction_id) {
         int32_t y2 = y + NearOffsetY[i];
         if (!map_in_bounds(x2, y2)) continue;
         MAP* sq = map_tile(x2, y2);
-        if (!(sq->items & 2)) continue;
+        if (!(sq->items & BIT_VEH_IN_TILE)) continue;
         uint32_t owner = sq->val2 & 0xF;
         if (owner >= 8 || owner == (uint32_t)faction_id || map_is_ocean(x2, y2) != ocean ||
-            (game().factions[faction_id].diplo_status[owner] & 1))
+            (game().factions[faction_id].diplo_status[owner] & DIPLO_PACT))
             continue;
         for (int32_t v = veh_at(x2, y2); v >= 0; v = game().vehs[v].next_veh_id_stack) {
             VEH& veh = game().vehs[v];
-            if (veh.faction_id != faction_id &&
-                ((veh.visibility & (uint8_t)(1 << (faction_id & 31))) || (!MultiplayerActive && !(veh.flags & 0x400))))
+            if (veh.faction_id != faction_id && ((veh.visibility & (uint8_t)(1 << (faction_id & 31))) ||
+                                                 (!MultiplayerActive && !(veh.flags & VFLAG_INVISIBLE))))
                 return (int32_t)owner + 1;
         }
     }
@@ -67,6 +68,6 @@ int32_t GAMEAPI zoc_sea(int32_t x, int32_t y, int32_t faction_id) {
 
 int32_t GAMEAPI zoc_move(int32_t x, int32_t y, int32_t faction_id) {
     MAP* sq = map_tile(x, y);
-    if ((sq->items & 1) && (sq->val2 & 0xF) < 8) return 0;
+    if ((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8) return 0;
     return zoc_sea(x, y, faction_id);
 }

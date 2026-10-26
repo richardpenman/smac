@@ -456,7 +456,7 @@ int32_t GAMEAPI config_game(uint32_t mode) {
 L_589da1:  // DIFFICULTY
     for (;;) {
         int32_t def = DefaultPrefs.difficulty, diff = DiffLevel;
-        if (!(GameRules & 0x1000000)) {
+        if (!(GameRules & RULES_SCN_FORCE_CURRENT_DIFF_LEVEL)) {
             Popup_start(pop, ScriptFileName, "DIFFICULTY", -1, nullptr, 0);
             for (int32_t i = 0; i < 6; i++) {
                 StrBuffer[0] = 0;
@@ -495,7 +495,7 @@ L_589da1:  // DIFFICULTY
                                              : ((uint32_t)AlphaIniPrefs.rules & 0xFFFF);
                 GameRules = (int32_t)(hi | lo);
                 GameState = (int32_t)(((uint32_t)GameState & 0xFE7FFFFFu) | (uint32_t)AlphaIniPrefs.semaphore);
-                if (MultiplayerActive) GameRules |= 0x200;
+                if (MultiplayerActive) GameRules |= RULES_BLIND_RESEARCH;
             };
             if (r == 1) {
                 current();
@@ -520,24 +520,26 @@ L_589da1:  // DIFFICULTY
                     uint32_t d = (uint32_t)DialogChoices;
                     for (int32_t i = 0; i < 16; i++)
                         if (i == 11 ? !(d & (1u << i)) : (d & (1u << i)) != 0) GameRules |= (int32_t)kBits[i];
-                    if (d & 0x10000) GameState |= 0x800000;
-                    if (d & 0x20000) GameState |= 0x1000000;
-                    AlphaIniPrefs.semaphore = GameState & 0x1800000;
+                    if (d & 0x10000) GameState |= STATE_RAND_FAC_LEADER_PERSONALITIES;
+                    if (d & 0x20000) GameState |= STATE_RAND_FAC_LEADER_SOCIAL_AGENDA;
+                    AlphaIniPrefs.semaphore =
+                        GameState & (STATE_RAND_FAC_LEADER_PERSONALITIES | STATE_RAND_FAC_LEADER_SOCIAL_AGENDA);
                     AlphaIniPrefs.rules = GameRules;
                     g_show_datalinks = 0;
                     goto L_58a551;
                 }
                 // Standard Rules
                 AlphaIniPrefs.rules = (int32_t)((uint32_t)GameRules | default_rules());
-                AlphaIniPrefs.semaphore = GameState & 0x1800000;
+                AlphaIniPrefs.semaphore =
+                    GameState & (STATE_RAND_FAC_LEADER_PERSONALITIES | STATE_RAND_FAC_LEADER_SOCIAL_AGENDA);
                 GameRules = AlphaIniPrefs.rules;
             }
         }
-        if (GameRules & 0x1000000) return quit(1);
+        if (GameRules & RULES_SCN_FORCE_CURRENT_DIFF_LEVEL) return quit(1);
     }
 
 L_58a551:  // the factions
-    if ((GameRules & 0x100000) && !PbemActive) {  // the scenario's faction
+    if ((GameRules & RULES_SCN_FORCE_PLAYER_PLAY_CURRENT_FACT) && !PbemActive) {  // the scenario's faction
         pick = CurrentPlayerFaction;
         goto L_58a56e;
     }
@@ -615,7 +617,7 @@ L_58a551:  // the factions
         }
     }
     // The faction's voice (voices\<filename>.mp3 on FacilityVoice) while its leader is named.
-    if (GameMorePreferences & 0x4000) {
+    if (GameMorePreferences & MPREF_AV_VOLUME_VOICE_TOGGLE) {
         std::string voice = std::string("voices\\") + MFactions[pick].filename + ".mp3";
         Wave_unload(&FacilityVoice);
         Wave_load(&FacilityVoice, voice.c_str());
@@ -629,7 +631,7 @@ L_58a551:  // the factions
         if (action == 0x105) crt_strcat(StrBuffer, "3");
         int32_t r = X_pop_ask(StrBuffer, 0x17, action == 0x105 ? "" : MFactions[pick].name_leader, 0, 0);
         pick_close();
-        if (GameMorePreferences & 0x4000) Sound_fade_2(&FacilityVoice, 2000);
+        if (GameMorePreferences & MPREF_AV_VOLUME_VOICE_TOGGLE) Sound_fade_2(&FacilityVoice, 2000);
         if (r != 0) goto L_58a551;
         crt_strcpy(MFactions[pick].name_leader, ParseStrBuffer[0]);
         if (DialogToggle == 0) break;
@@ -719,7 +721,7 @@ L_58b34a:  // the rivals
         }
         load_flags();
         if (ExpansionEnabled && !MultiplayerActive && !PbemActive && (MFactions[pick].rule_flags & RFLAG_ALIEN))
-            GameRules = (int32_t)(((uint32_t)GameRules & ~0x200u) | 0x140);
+            GameRules = (int32_t)(((uint32_t)GameRules & ~RULES_BLIND_RESEARCH) | 0x140);
         if (!(mode & 1)) ui_invalidate();
         if (PbemActive) {
             // Hotseat / PBEM (HOTSEATADD0/1, not reconstructed): the picked faction plays.

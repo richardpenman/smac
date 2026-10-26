@@ -221,7 +221,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 5 | Rename remaining weak names: `_2`/`_3` suffixes where a better name is clear, 36 `dword_`/`DAT_` globals | M | done (see note 5) |
 | 6 | One-time reformat (if approved) | S (mechanical) | |
 | 7 | `GameState` view + `game()`; migrate module by module (map, factions, bases, vehs) | M ×4 | done (see note 7) |
-| 8 | Magic numbers → named constants/enums, module by module | M | |
+| 8 | Magic numbers → named constants/enums, module by module | M | first pass done (see note 8) |
 | 9 | `compat.h`: name and isolate all 173 `BUG(original)` sites | M | |
 | 10 | Split `base_production` / yields + unit tests | M | |
 | 11 | Split combat (`battle_fight_2`, odds) + unit tests | M | |
@@ -270,3 +270,23 @@ Notes on the increments:
    the view but their uses are not migrated yet (they were not among the four modules).
    Lines that grew over 120 columns were wrapped with the target clang-format style
    (`--lines`, those lines only). tests/unit/test_game_state.cpp pins the aliasing.
+
+8. First pass: the named enums of engine/types (ported from Thinker) replace literals where the
+   context fixes the meaning, never in comments or strings:
+   * masks on the flag words `GameState`, `GameRules`, `GameMoreRules`, `GamePreferences`,
+     `GameMorePreferences`, `GameWarnings` (engine and UI), and in the engine on `diplo_status[]`,
+     `player_flags`, `player_flags_ext`, tile `items`, vehicle `state`/`flags`, unit `unit_flags`,
+     base `state_flags` (`v.state & 0x200` → `v.state & VSTATE_ON_ALERT`; a multi-bit mask becomes
+     `(A | B)` when every bit has a name);
+   * vehicle `order` / `order_auto_type` compared with or set to a literal (`ORDER_*`, `ORDERA_*`);
+   * literal ids passed to `has_fac`, `set_fac`, `has_fac_built` (`FAC_*`), `has_project` and
+     `SecretProjects[]` (`FAC_* - SP_ID_First`), `has_tech` (`TECH_*`), `veh_init` (`BSC_*`).
+   Enumerators named `*_UNK_*` are not used (they say no more than the number), so those masks
+   stay literal until the bit is understood. Proof: the gate; besides, the id pass leaves every
+   engine object's disassembly identical (`-g0`, `objdump -dr`). The mask pass changes the code
+   of 4 objects (ai, base_misc, move_order, probe) without changing behaviour: most of these enums
+   have a 0x80000000 member, so their type is unsigned and `int & ENUM` is computed unsigned,
+   which only moves basic blocks. Every replaced mask is used as a truth value, assigned, or
+   combined bitwise (checked by script: none feeds arithmetic or an ordering comparison).
+   Remaining: other literal ids (weapons, chassis, abilities, plans, terrain values such as
+   `climate & 0xE0`), and the UI's own fields.

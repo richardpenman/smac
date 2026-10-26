@@ -95,7 +95,7 @@ void THISCALL MapWin_right_menu(uint8_t* win, int32_t x, int32_t y, int32_t px, 
     }
     if (MapWinInVehMode && is_air(active)) PullDown_add_item(&pd, 0x6E, label_get(0xB18 / 4));
     PullDown_add_item(&pd, 2, label_get(0x8D4 / 4));
-    if ((GameState & 0x40) && veh_id >= 0) {
+    if ((GameState & STATE_SCENARIO_EDITOR) && veh_id >= 0) {
         PullDown_add_item(&pd, 0x29A, label_get(0xDFC / 4));
         PullDown_add_item(&pd, 0x29B, label_get(0x104C / 4));
     }
@@ -107,10 +107,10 @@ void THISCALL MapWin_right_menu(uint8_t* win, int32_t x, int32_t y, int32_t px, 
     PullDown_add_separator(&pd, 99);
     if (base_id >= 0) {
         int32_t owner = Bases[base_id].faction_id;
-        if ((GameState & 0x80) || owner == CurrentPlayerFaction || spying(owner) ||
+        if ((GameState & STATE_OMNISCIENT_VIEW) || owner == CurrentPlayerFaction || spying(owner) ||
             (Factions[CurrentPlayerFaction].diplo_status[owner] & 1))
             PullDown_add_item(&pd, 5, label_get(0x894 / 4));
-        if (owner == CurrentPlayerFaction || (GameState & 0x80)) {
+        if (owner == CurrentPlayerFaction || (GameState & STATE_OMNISCIENT_VIEW)) {
             PullDown_add_item(&pd, 0x33, indented(0x898));
             int32_t item = Bases[base_id].queue_items[0];
             const char* prod = item < 0 ? Strings_get(&StringTable, Facility[-item].name) : Units[item].name;
@@ -120,7 +120,7 @@ void THISCALL MapWin_right_menu(uint8_t* win, int32_t x, int32_t y, int32_t px, 
             PullDown_add_item(&pd, 0x36, indented(0x8A4));
             PullDown_add_item(&pd, 0x37, indented(0x8A8));
             PullDown_add_item(&pd, 0x38, indented(0x8AC));
-            if (GameMorePreferences & 0x400) PullDown_add_item(&pd, 0x39, indented(0x8B0));
+            if (GameMorePreferences & MPREF_ADV_DETAIL_RIGHT_CLICK_MENUS) PullDown_add_item(&pd, 0x39, indented(0x8B0));
             PullDown_add_separator(&pd, 99);
         }
     }
@@ -128,7 +128,7 @@ void THISCALL MapWin_right_menu(uint8_t* win, int32_t x, int32_t y, int32_t px, 
         PullDown_add_item(&pd, 1, label_get(0x8B4 / 4));
         const VEH& v = Vehs[active];
         if (x != v.x || y != v.y) {
-            if (GameMorePreferences & 0x400) {
+            if (GameMorePreferences & MPREF_ADV_DETAIL_RIGHT_CLICK_MENUS) {
                 PullDown_add_item(&pd, 0x69, label_get(0x8B8 / 4));
                 if (is_air(active) && Weapon[Units[v.unit_id].weapon_id].offense_value != 0)
                     PullDown_add_item(&pd, 0x6A, label_get(0x8BC / 4));
@@ -153,7 +153,7 @@ void THISCALL MapWin_right_menu(uint8_t* win, int32_t x, int32_t y, int32_t px, 
         PullDown_add_item(&pd, 6, label_get((n == 1 ? 0x8E0 : 0x8E4) / 4));
     }
     PullDown_add_item(&pd, 8, label_get(0x8E8 / 4));
-    if (GameMorePreferences & 0x400) {
+    if (GameMorePreferences & MPREF_ADV_DETAIL_RIGHT_CLICK_MENUS) {
         PullDown_add_separator(&pd, 99);
         if (find_landmark(x, y, 1) < 0) {
             PullDown_add_item(&pd, 9, label_get(0x8F4 / 4));
@@ -318,7 +318,7 @@ void THISCALL Console_name_landmark(uint8_t* console, int32_t x, int32_t y) {
         y = MapWinCursorY[MapWinCursorIndex];
     }
     int32_t lm = find_landmark(x, y, 1);
-    if (!(GameState & 0x80)) {
+    if (!(GameState & STATE_OMNISCIENT_VIEW)) {
         int32_t lx = x, ly = y;
         if (lm >= 0) lx = Landmarks[lm].x, ly = Landmarks[lm].y;
         if (!valid_landmark(lx, ly, CurrentPlayerFaction)) {
@@ -364,7 +364,7 @@ void THISCALL Console_erase_landmark(uint8_t* console, int32_t x, int32_t y) {
         NetMsg_pop(&NetMsg, "LANDMARKNONE", 5000, 0, nullptr);
         return;
     }
-    if (!(GameState & 0x80) && !valid_landmark(x, y, CurrentPlayerFaction)) {
+    if (!(GameState & STATE_OMNISCIENT_VIEW) && !valid_landmark(x, y, CurrentPlayerFaction)) {
         NetMsg_pop(&NetMsg, "LANDMARKNO", 5000, 0, nullptr);
         return;
     }

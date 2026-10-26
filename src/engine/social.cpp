@@ -486,8 +486,10 @@ void GAMEAPI social_ai(int32_t faction_id, int32_t growth, int32_t tech, int32_t
 }
 
 void GAMEAPI social_select(int32_t faction_id) {
-    if (!(GameState & 0xC0) && (GameMoreRules & 8)) return;
-    if (GameState & 0x80) {
+    if (!(GameState & (STATE_SCENARIO_EDITOR | STATE_OMNISCIENT_VIEW)) &&
+        (GameMoreRules & MRULES_NO_SOCIAL_ENGINEERING))
+        return;
+    if (GameState & STATE_OMNISCIENT_VIEW) {
         faction_id = Console_editor_who(&MainConsole, faction_id, 1);
         if (faction_id < 0) return;
     }

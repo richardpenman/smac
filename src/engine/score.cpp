@@ -55,7 +55,7 @@ int32_t GAMEAPI num_objectives(int32_t faction_id, int32_t incl_pact) {
     int32_t score = f.unk_101;
     for (int32_t i = 0; i < game().veh_count; i++) {
         const VEH& veh = game().vehs[i];
-        if (veh.faction_id != (uint32_t)faction_id || !(veh.flags & 0x20)) continue;
+        if (veh.faction_id != (uint32_t)faction_id || !(veh.flags & VFLAG_IS_OBJECTIVE)) continue;
         if (!(GameRules & RULES_SCN_VICT_OBJ_UNITS_REACH_FRIEND_OBJ_BASE)) {
             if (GameRules & RULES_SCN_VICT_OBJ_UNITS_REACH_FRIEND_HQ_BASE) {
                 // Objective units count at a headquarters base (own, or a pact partner's with
@@ -170,7 +170,7 @@ void GAMEAPI rankings(int32_t full) {
     int32_t best_weapon = 1;
     for (int32_t unit_id = 64; unit_id < 512; unit_id++) {
         const UNIT& u = Units[unit_id];
-        if ((u.unit_flags & 1) && (u.unit_flags & 4)) {
+        if ((u.unit_flags & UNIT_ACTIVE) && (u.unit_flags & UNIT_PROTOTYPED)) {
             int32_t offense = Weapon[u.weapon_id].offense_value;
             if (best_weapon <= offense && offense < 99) best_weapon = offense;
         }
