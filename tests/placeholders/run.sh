@@ -138,4 +138,22 @@ if [ -f "$ROOT/work/saves_late/turn_200.sav" ]; then
     nocrash anim_off
 fi
 
+# 9. The tutorial (tutwin.cpp; SMACX_PREFS_SET=0x20: the tutorial hints preference). LANDFALL's
+#    TOUR button starts the first turn's tour (TutWin_tour kind 0: TOUR1 .. TOURDATEINFO,
+#    TOUROVER, each with Continue); in a second game the base window's BASECONTROL and the unit
+#    hints of Console_give_hints (the foil on a fungus sea: FUNGUSSEA).
+K=$(printf 'ENTER,%.0s' $(seq 1 16))
+SMACX_PREFS_SET=0x20 run tour $NEW --keys "ENTER,CLICK:135x735,INFOSTATE,${K}UNITS"
+check tour "LANDFALL (a hint with the TOUR button)" "popup LANDFALL shown"
+check tour "the tour's first window" "tutwin TOUR1: kind 2"
+check tour "the ocean near the cursor" "tutwin TOUROCEAN: kind 2"
+check tour "the interface's windows" "tutwin TOURDATEINFO: kind 2"
+check tour "the end of the tour" "tutwin TOUROVER: kind 0"
+nocrash tour
+SMACX_PREFS_SET=0x20 run hints $NEW --keys "ENTER,ENTER,INFOSTATE,KP6,ENTER,KP6,ENTER,KP3,ENTER,KP2,ENTER,KP2,ENTER,UNITS"
+check hints "the base window's hint" "tutwin BASECONTROL: kind 0"
+check hints "a unit hint (Console_give_hints)" "tutwin FUNGUSSEA: kind 0"
+nocheck hints "no placeholder" "not reconstructed: Console_give_hints"
+nocrash hints
+
 exit $FAIL

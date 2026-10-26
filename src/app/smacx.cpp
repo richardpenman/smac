@@ -48,6 +48,7 @@
 // state from that seed (load_daemon reseeds it only under GameRules 0x400): without a fixed seed
 // the same save and keys play differently. --seed clock seeds from the clock as the original.
 // SMACX_TRACE=1 logs the generators and the logic clock at every scripted key and popup.
+// SMACX_PREFS_SET=BITS: GamePreferences bits set after the test preferences (e.g. 0x20 tutorial hints).
 // SMACX_SOUNDLOG=1 logs the sound, voice, music and movie calls ("sound: T<turn> FX_play 15"; ui/sound.h).
 // --nosound: no audio device (the calls still run and are logged); SDL_AUDIODRIVER chooses the
 // device otherwise (the test scripts use "dummy").
@@ -176,6 +177,13 @@ void apply_observer_prefs() {
     if (g_opt.human > 0) {
         GamePreferences |= 1;
         AlphaIniPrefs.preferences |= 1;
+    }
+    // Test aid: SMACX_PREFS_SET=BITS sets GamePreferences bits afterwards (e.g. 0x20 the tutorial
+    // hints).
+    if (const char* e = std::getenv("SMACX_PREFS_SET")) {
+        uint32_t bits = (uint32_t)std::strtoul(e, nullptr, 0);
+        GamePreferences = (int32_t)((uint32_t)GamePreferences | bits);
+        AlphaIniPrefs.preferences = (int32_t)((uint32_t)AlphaIniPrefs.preferences | bits);
     }
 }
 

@@ -391,6 +391,7 @@ public:
     Sprite picture;                    // +0x2118 (+0x2144 when loaded)
     bool has_picture = false;
     int32_t pic_scale_d = 1, pic_scale_s = 1;  // +0x3104 / +0x3108
+    std::string ok_text = "OK", cancel_text = "Cancel";  // BasePop_set_ok_text / set_cancel_text
     // ---- dialog (item group) geometry: +0x21D0 virtual base ----
     int32_t dlg_flags = 0;             // +0x21F0 bits 0/1: fixed height/width
     int32_t dlg_width = 0;             // +0x21FC (#xs)
@@ -475,6 +476,8 @@ void basepop_init(BasePop* p, uint32_t flags) {
     p->owned.clear();
     p->caption = nullptr;
     p->has_picture = false;
+    p->ok_text = "OK";
+    p->cancel_text = "Cancel";
     p->flags = flags;
     p->mode = 0;
     p->choice = 0;
@@ -685,6 +688,17 @@ void BasePop_set_loc(BasePop* self, int32_t x, int32_t y) {
 
 void BasePop_set_width(BasePop* self, int32_t w) { self->dlg_width = scaled(self, w); }
 void BasePop_set_max_rows(BasePop* self, int32_t rows) { self->max_rows = rows; }  // as #listbox N
+
+void BasePop_set_ok_text(BasePop* self, const char* text) { self->ok_text = text ? text : ""; }
+void BasePop_set_cancel_text(BasePop* self, const char* text) { self->cancel_text = text ? text : ""; }
+void BasePop_set_picture_sprite(BasePop* self, const Sprite* s) {
+    self->has_picture = s && s->width;
+    if (self->has_picture) self->picture = *s;
+}
+void BasePop_size(BasePop* self, int32_t* w, int32_t* h) {
+    *w = self->width;
+    *h = self->height;
+}
 
 void BasePop_set_picture(BasePop* self, const char* pcx) {
     if (!pcx || !*pcx) return;
@@ -1167,7 +1181,7 @@ void place_buttons(BasePop* p) {
             else ox = x + (p->vspace + p->button_w) * (int32_t)p->buttons.size();
         }
         int32_t l = at(ox);
-        p->btns.push_back({{l, y, l + p->button_w, y + p->button_h}, -1, "OK"});
+        p->btns.push_back({{l, y, l + p->button_w, y + p->button_h}, -1, p->ok_text.c_str()});
     }
     int32_t ex = x;
     if (x < 0) ex = x - (p->vspace + p->button_w) * (p->n_buttons - 1);
@@ -1179,7 +1193,7 @@ void place_buttons(BasePop* p) {
     if (p->flags & 0x40) {
         int32_t cx = x >= 0 ? x + (p->vspace + p->button_w) * (p->n_buttons - 1) : x;
         int32_t l = at(cx);
-        p->btns.push_back({{l, y, l + p->button_w, y + p->button_h}, -2, "Cancel"});
+        p->btns.push_back({{l, y, l + p->button_w, y + p->button_h}, -2, p->cancel_text.c_str()});
     }
 }
 

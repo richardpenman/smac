@@ -80,6 +80,13 @@ void BasePop_set_max_rows(BasePop* self, int32_t rows);
 int32_t BasePop_exec_3(BasePop* self, int32_t no_display, int32_t a2);
 // The picture shown left of the text (a PCX file; null for none).
 void BasePop_set_picture(BasePop* self, const char* pcx);
+// The picture from a sprite (TutWin's unit / tile / base pictures).
+void BasePop_set_picture_sprite(BasePop* self, const Sprite* s);
+// BasePop_set_ok_text / set_cancel_text: the OK and Cancel buttons' labels.
+void BasePop_set_ok_text(BasePop* self, const char* text);
+void BasePop_set_cancel_text(BasePop* self, const char* text);
+// The window's size after BasePop_exec_3 (also with no_display: the dimensions are computed).
+void BasePop_size(BasePop* self, int32_t* w, int32_t* h);
 // The pressed #button (0: OK / an item) and the check box state bits after exec.
 int32_t BasePop_button_pressed(BasePop* self);
 int32_t BasePop_check_state(BasePop* self);

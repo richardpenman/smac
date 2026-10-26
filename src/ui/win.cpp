@@ -1,5 +1,6 @@
 // Window layer of smacx (see win.h): screen, message pump, keyboard, placeholder console panel.
 #include "ui/infowin.h"
+#include "ui/tutwin.h"
 #include "ui/diplowin.h"
 #include "ui/win.h"
 #include "ui/pulldown.h"
@@ -432,6 +433,7 @@ void ui_present() {
     basewin_compose(&g_canvas);  // the base window over the console frame
     console_menu_draw(&g_canvas);
     pulldown_draw_windows(&g_canvas);
+    tutwin_draw_lines(&g_canvas);  // TutWin's pointer lines (Win_window_line_raw on the screen)
     popup_draw_windows(&g_canvas);
     console_draw_cursor(&g_canvas);
     set_layers();

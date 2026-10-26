@@ -3,6 +3,7 @@
 // FlatButton), the clickable spots, input (mouse, the console's base window keys) and the
 // composition of its canvases on the screen. The panes are drawn by basewin_draw.cpp, the commands
 // that change the base are in basewin_cmd.cpp.
+#include "ui/tutwin.h"
 #include "ui/slide.h"
 #include "ui/basewin.h"
 #include "ui/sound.h"
@@ -623,6 +624,11 @@ void bw_hide() {
     }
 }
 
+void basewin_client_to_screen(int32_t* x, int32_t* y) {
+    *x += g_bw.x;
+    *y += g_bw.y;
+}
+
 int32_t THISCALL Win_is_visible(uint8_t* win) { return win == &BaseWin && g_bw.visible ? 1 : 0; }
 
 void THISCALL GraphicWin_redraw(uint8_t* win) {
@@ -652,30 +658,40 @@ void THISCALL BaseWin_zoom(uint8_t* self, int32_t base_id, int32_t wait) {
     BaseWin_on_redraw(self);  // vtable + 0xF8 (when already visible), then GraphicWin_redraw
     ui_invalidate();
     bwf(0x1E670) = 0;  // in_ECX[0x799C]
-    // Tutorial hints (BASECONTROL, DRONERIOTS, LOWNUTRIENT, SUPPORT, LOWMINERALS, INEFFICIENCY):
-    // the tutorial windows are not reconstructed. tut_check / tut_check2 still mark the hints as
-    // given, as the original does.
+    // Tutorial hints (TutWin_tut_win / TutWin_do_base, tutwin.cpp): BASECONTROL, DRONERIOTS,
+    // LOWNUTRIENT, SUPPORT, LOWMINERALS(2), INEFFICIENCY(HQ).
     BASE& b = cur_base();
     if ((uint8_t)b.faction_id == CurrentPlayerFaction && Factions[CurrentPlayerFaction].base_count == 1 &&
         tut_check(2)) {
         TutorialArrowShown = 1;
         parse_says(0, b.name, -1, -1);
-        console_not_reconstructed_quiet("TutWin_tut_win (BASECONTROL)");
+        int32_t x = 0, y = 0;
+        TutWin_base_rect(&bw_rect(0x40DAC), &x, &y);
+        TutWin_tut_win(&TutWin, MapWins[0], "BASECONTROL", x, y, nullptr, 0x100, -1, -1);
     } else if ((b.state_flags & 2) && tut_check2(0x10) && (b.governor_flags & 0x80000040) != 0x80000040) {
         TutorialArrowShown = 6;
         parse_says(0, b.name, -1, -1);
-        console_not_reconstructed_quiet("TutWin_tut_win (DRONERIOTS)");
+        int32_t x = 0, y = 0;
+        TutWin_base_rect(&bw_rect(0x40DAC), &x, &y);
+        TutWin_tut_win(&TutWin, MapWins[0], "DRONERIOTS", x, y, nullptr, 0x100, -1, -1);
     } else {
-        // LOWNUTRIENT .. INEFFICIENCY (TutWin_do_base): only the hint bits are recorded.
+        const char* label = nullptr;
+        uint32_t rect = 0;
         if (b.nutrient_surplus < 0 && tut_check2(0x20) && b.specialist_total &&
             (b.governor_flags & 0x80000040) != 0x80000040) {
             parse_says(0, b.name, -1, -1);
+            label = "LOWNUTRIENT";
+            rect = 0x40B8C;
         } else if (b.mineral_surplus < (b.pop_size + 1) / 2 && BaseForcesMaintCost > 0 &&
                    (b.pop_size > 3 || b.mineral_surplus < 1) && tut_check2(0x200)) {
             parse_says(0, b.name, -1, -1);
+            label = "SUPPORT";
+            rect = 0x40CDC;
         } else if (b.mineral_surplus < 2 && BaseForcesMaintCost < b.pop_size / 2 && b.pop_size > 2 &&
                    tut_check2(0x40)) {
             parse_says(0, b.name, -1, -1);
+            label = (map_tile(b.x, b.y)->climate & 0xE0) > 0x5F ? "LOWMINERALS" : "LOWMINERALS2";
+            rect = 0x40CDC;
         } else if (b.energy_inefficiency > b.energy_surplus && !(b.governor_flags & 0x80000000)) {
             bool hq = false;
             for (int32_t i = 0; i < BaseCount; i++) {
@@ -687,11 +703,16 @@ void THISCALL BaseWin_zoom(uint8_t* self, int32_t base_id, int32_t wait) {
             if (!hq && tut_check2(0x400)) {
                 parse_says(0, b.name, -1, -1);
                 BaseWin_draw_expenses(self, 2);
+                label = "INEFFICIENCYHQ";
+                rect = 0x40CBC;
             } else if (tut_check2(0x80)) {
                 parse_says(0, b.name, -1, -1);
                 BaseWin_draw_expenses(self, 2);
+                label = "INEFFICIENCY";
+                rect = 0x40CBC;
             }
         }
+        if (label) TutWin_do_base(&TutWin, &bw_rect(rect), label, 0);
     }
     if (wait) {
         while (bwf(kBwOpen) && Win_is_visible(self) && !ControlTurnA) wait_task();
