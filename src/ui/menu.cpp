@@ -16,7 +16,15 @@
 #include <string>
 #include <vector>
 
+#include "engine/base.h"
+#include "engine/action.h"
+#include "engine/globals.h"
+#include "engine/map.h"
+#include "engine/net.h"
 #include "engine/rules.h"
+#include "engine/tech.h"
+#include "engine/ui_bridge.h"
+#include "engine/veh.h"
 #include "engine/strings.h"
 #include "engine/text.h"
 #include "platform/ui_platform.h"
@@ -283,7 +291,7 @@ const int32_t kHidden[] = {0x106, 0x107, 0x301, 0x309, 0x30A, 0x310, 0x306, 0x30
 struct Item {
     std::string text, shortcut, raw;  // raw: the menu.txt line ('&', "|shortcut")
     int32_t id = 0, key = 0;
-    bool separator = false, hidden = false, checked = false;
+    bool separator = false, hidden = false, checked = false, disabled = false;
     char accel = 0;
 };
 struct Menu {
@@ -461,6 +469,7 @@ void close_menus() {
 }
 
 void choose(const Item& it) {
+    if (it.disabled) return;  // (Menu_menu_event: a disabled item does nothing)
     close_menus();
     std::fprintf(stderr, "menu item %03X %s\n", it.id, it.text.c_str());
     Console_menu_proc(&MainConsole, it.id);  // Menu_menu_event -> Console_menu_daemon
@@ -624,6 +633,7 @@ void console_menu_popup(int32_t index, int32_t x, int32_t y) {
             if (it.separator) PullDown_add_separator(&pd, 99);
             else PullDown_add_item(&pd, it.id, it.raw.c_str());
             if (it.hidden) PullDown_hide_item(&pd, it.separator ? 99 : it.id);
+            if (it.disabled && !it.separator) PullDown_disable_item(&pd, it.id);
             if (it.checked) PullDown_check_item(&pd, it.id);
         }
         int32_t sel = PullDown_show(&pd, x, y);
@@ -669,7 +679,7 @@ void console_menu_draw(Buffer* s) {
             UiRect h = {r.left + 2, y, r.right - 2, y + kItemH};
             Buffer_fill_3(s, &h, color(40, 60, 40));
         }
-        Buffer_set_text_color(s, (int32_t)i == g_sel ? hi : text, -1, 1, 1);
+        Buffer_set_text_color(s, it.disabled ? dim : ((int32_t)i == g_sel ? hi : text), -1, 1, 1);
         Buffer_write_l_3(s, it.text.c_str(), r.left + 10, y + 1, (int32_t)it.text.size());
         if (it.checked) {  // the check mark of Menu_check_menu_item
             int32_t cx = r.left + 3, cy = y + kItemH / 2;
@@ -680,4 +690,192 @@ void console_menu_draw(Buffer* s) {
         Buffer_write_l_3(s, it.shortcut.c_str(), r.right - 10 - sw, y + 1, (int32_t)it.shortcut.size());
         y += kItemH;
     }
+}
+
+// ---- pfncMainMenuUpdateVisible (0x460DD0) ----
+
+namespace {
+Item* menu_item(int32_t index, int32_t id) {
+    build();
+    for (Menu& m : g_menus)
+        if (m.index == index)
+            for (Item& it : m.items)
+                if (!it.separator && it.id == id) return &it;
+    return nullptr;
+}
+void show_item(int32_t index, int32_t id) {  // Menu_show_menu_item
+    if (Item* it = menu_item(index, id)) it->hidden = false;
+}
+void hide_item(int32_t index, int32_t id) {  // Menu_hide_menu_item
+    if (Item* it = menu_item(index, id)) it->hidden = true;
+}
+void enable_item(int32_t index, int32_t id) {  // Menu_enable_menu_item
+    if (Item* it = menu_item(index, id)) it->disabled = false;
+}
+void disable_item(int32_t index, int32_t id) {  // Menu_disable_menu_item
+    if (Item* it = menu_item(index, id)) it->disabled = true;
+}
+void rename_item(int32_t index, int32_t id, const std::string& raw) {  // pfncMainMenuRenameMenuItem
+    if (Item* it = menu_item(index, id)) {
+        it->raw = raw;
+        size_t bar = raw.find('|');
+        it->text = strip_amp(raw.substr(0, bar), &it->accel);
+        it->shortcut = bar != std::string::npos ? raw.substr(bar + 1) : "";
+    }
+}
+void show_if(int32_t index, int32_t id, bool on) { on ? show_item(index, id) : hide_item(index, id); }
+void enable_if(int32_t index, int32_t id, bool on) { on ? enable_item(index, id) : disable_item(index, id); }
+}  // namespace
+
+// The menus' items for the game's state and the unit veh_id (-1 none): the items of the
+// "detailed menus" preference (GameMorePreferences 0x200000), the save / iron man items, the
+// scenario objectives, the economic victory's items, the view mode's, the unit's orders (Action:
+// enabled with a unit; its abilities, its chassis and weapon, its tile: base, territory), the
+// terraforming orders (renamed with their turns for a terraformer, shown when available), the
+// editor's items (enabled in the scenario editor). (Multiplayer's items as the single player's.)
+void THISCALL pfncMainMenuUpdateVisible(uint8_t*, int32_t veh) {
+    build();
+    bool detail = GameMorePreferences & 0x200000;
+    show_if(0, detail ? 0x52 : 0x51, true);
+    hide_item(0, detail ? 0x51 : 0x52);
+    if (!MultiplayerActive && !PbemActive && !(GameRules & 0x400)) {
+        show_item(0, 0x5C);
+        show_item(0, 0x5A);
+    } else {
+        if (!(!MultiplayerActive && !PbemActive)) hide_item(0, 0x5C);
+        show_if(0, 0x5A, GameState & 0x1000);
+    }
+    static const int32_t kDetail2[] = {0x205, 0x206, 0x207, 0x208, 0x20C, 0x215, 0x211, 0x212};
+    static const int32_t kDetail3[] = {0x31B, 0x324, 0x306, 0x304, 0x319, 0x31A, 0x317, 799, 800, 0x307, 0x322};
+    static const int32_t kDetail9[] = {0x9F8, 0x9F9, 0x9F6, 0x9F5, 0x9F4, 0x9F3, 0x9F1, 0x9F0, 5, 6, 7};
+    if (detail) {
+        for (int32_t id : kDetail2) show_item(2, id);
+        for (int32_t id : kDetail3) show_item(3, id);
+        for (int32_t id : kDetail9) show_item(9, id);
+    }
+    show_if(1, 0x115, (GameState & 0x10) || ObjectiveReqVictory < 1000 || ObjectivesSuddenDeathVictory < 1000);
+    show_item(8, 0x807);  // (multiplayer: 0x808 during the others' turns)
+    hide_item(8, 0x808);
+    show_if(1, 0x105, (GameState & 0xC0) || !(GameMoreRules & 8));
+    show_item(1, (GameRules & 0x200) ? 0x106 : 0x107);
+    hide_item(1, (GameRules & 0x200) ? 0x107 : 0x106);
+    bool econ = (has_tech(Rules.tech_preq_economic_victory, CurrentPlayerFaction) && (GameRules & 4)) ||
+                ((GameState & 0x1000) && (GameState & 0x40));
+    show_if(1, 0x114, econ);
+    show_if(1, 9, econ);
+    show_item(2, MapWinInVehMode ? 0x201 : 0x200);
+    hide_item(2, MapWinInVehMode ? 0x200 : 0x201);
+    if (!MapWinInVehMode || veh < 0) {
+        for (int32_t id = 0x300; id < 0x325; id++) enable_if(3, id, id == 0x313);
+    } else {
+        for (int32_t id = 0x300; id < 0x325; id++) enable_item(3, id);
+        const VEH& v = Vehs[veh];
+        int32_t u = v.unit_id;
+        const UNIT& un = Units[u];
+        int32_t triad = Chassis[un.chassis_id].triad;
+        int32_t offense = Weapon[un.weapon_id].offense_value;
+        MAP* sq = map_tile(v.x, v.y);
+        show_if(3, 0x309, has_abil(u, 0x10));
+        int32_t ter = whose_territory(CurrentPlayerFaction, v.x, v.y, nullptr, 0);
+        uint32_t ds = ter >= 0 ? Factions[CurrentPlayerFaction].diplo_status[ter] : 0;
+        bool probe_out = (ter < 0 || ter == CurrentPlayerFaction || !(ds & 8) || (ds & 0x10)) &&
+                         (u > 0x3F || ((int8_t)Weapon[un.weapon_id].offense_value >= 0 && u != 0xF));
+        show_if(3, 799, !probe_out);
+        show_if(3, 0x30A, Chassis[un.chassis_id].missile && (un.weapon_id == 0x18 || un.weapon_id == 0x19));
+        int32_t b = base_at(v.x, v.y);
+        show_if(3, 0x310, b >= 0 && (Bases[b].facilities_built[0x21 >> 3] & (1 << (0x21 & 7))));
+        show_if(3, 0x31D, veh_cargo(veh) || has_abil(u, 0x80));
+        bool air_combat = triad == 2 && offense != 0;
+        show_if(3, 0x306, air_combat);
+        show_if(3, 0x304, air_combat);
+        show_if(3, 0x305, can_arty(u, 1));
+        show_if(3, 0x308, un.plan == 10);
+        enable_if(3, 0x308, un.plan == 10);
+        bool base_tile = (sq->items & 1) && (sq->val2 & 0xF) <= 7;
+        int32_t owner = base_tile ? (sq->val2 & 0xF) : -1;
+        if (un.plan == 8) {
+            enable_item(3, 0x300);
+            enable_item(3, 0x301);
+            show_item(3, 2);
+            show_if(3, 0x301, base_tile);
+            show_if(3, 0x300, !base_tile);
+            hide_item(3, 0x302);
+        } else {
+            disable_item(3, 0x300);
+            disable_item(3, 0x301);
+            hide_item(3, 0x300);
+            hide_item(3, 0x301);
+            bool attack_base = offense != 0 && owner == (int32_t)v.faction_id && triad != 2;
+            show_if(3, 0x302, attack_base);
+            enable_if(3, 0x302, attack_base);
+            hide_item(3, 2);
+        }
+        show_if(3, 800, offense != 0);
+        show_if(3, 0x311, offense != 0);
+        int32_t sea = (triad == 1 || (triad == 2 && (sq->climate & 0xE0) < 0x60)) ? 1 : 0;
+        if (un.plan == 9) {
+            for (int32_t t = 0; t < 0x13; t++) {
+                bool blocked = (t == 1 && !(sq->items & 0x8000)) || (t == 6 && !(sq->items & 4));
+                const char* name = sea ? Order[4 + t].order_sea : Order[4 + t].order;
+                std::string sc = Terraform[t].shortcuts ? Terraform[t].shortcuts : "";
+                if (blocked || !terrain_avail(t, sea, CurrentPlayerFaction)) {
+                    rename_item(9, 0x900 + t, std::string(Order[4 + t].order) + "|" + sc);
+                    disable_item(9, 0x900 + t);
+                    hide_item(9, 0x900 + t);
+                } else {
+                    int32_t turns = action_terraform(veh, t, 0);
+                    std::string l = std::string(name) + " (" + std::to_string(turns + 1) + " " +
+                                    label_get((turns == 1 ? 0xC0 : 0xC4) / 4) + ")|" + sc;
+                    rename_item(9, 0x900 + t, l);
+                    show_item(9, 0x900 + t);
+                    enable_item(9, 0x900 + t);
+                }
+            }
+            show_if(9, 0x9F8, triad != 1);
+            show_if(9, 0x9F9, triad != 1);
+            if (triad != 1) {
+                enable_item(9, 0x9F8);
+                enable_item(9, 0x9F9);
+            }
+            enable_item(9, 0x9F7);
+            enable_item(9, 0x9F2);
+            enable_if(9, 0x9F6, has_tech((&Terraform[10].preq_tech)[sea], CurrentPlayerFaction));
+            bool t5 = has_tech((&Terraform[5].preq_tech)[sea], CurrentPlayerFaction);
+            enable_if(9, 0x9F0, t5);
+            enable_if(9, 0x9F3, t5);
+            bool t6 = has_tech((&Terraform[6].preq_tech)[sea], CurrentPlayerFaction);
+            show_if(9, 0x9F1, t6);
+            show_if(9, 0x9F4, t6);
+            if (t6) {
+                enable_item(9, 0x9F1);
+                enable_item(9, 0x9F4);
+            }
+            bool t9 = has_tech((&Terraform[9].preq_tech)[sea], CurrentPlayerFaction);
+            show_if(9, 0x9F5, t9);
+            if (t9) enable_item(9, 0x9F5);
+        } else {
+            for (int32_t t = 0; t < 0x13; t++) {
+                const char* name = sea ? Order[4 + t].order_sea : Order[4 + t].order;
+                std::string sc = Terraform[t].shortcuts ? Terraform[t].shortcuts : "";
+                rename_item(9, 0x900 + t, std::string(name) + "|" + sc);
+                if (!terrain_avail(t, sea, CurrentPlayerFaction)) {
+                    hide_item(9, 0x900 + t);
+                } else {
+                    show_item(9, 0x900 + t);
+                    disable_item(9, 0x900 + t);
+                }
+            }
+            for (int32_t id : {0x9F8, 0x9F9, 0x9F0, 0x9F1, 0x9F6, 0x9F3, 0x9F4, 0x9F5, 0x9F7, 0x9F2}) disable_item(9, id);
+        }
+        show_if(3, 0x317, !base_tile);
+        show_if(3, 0x316, base_tile);
+    }
+    for (int32_t id = 0x601; id < 0x61C; id++) enable_if(6, id, GameState & 0x40);
+    for (int32_t id = 0xA00; id < 0xA55; id++) enable_if(10, id, GameState & 0x40);
+    if (!detail) {
+        for (int32_t id : kDetail2) hide_item(2, id);
+        for (int32_t id : {0x31B, 0x324, 0x306, 0x304, 0x319, 0x31A, 0x317, 800, 799, 0x307, 0x322}) hide_item(3, id);
+        for (int32_t id : kDetail9) hide_item(9, id);
+    }
+    ui_invalidate();
 }

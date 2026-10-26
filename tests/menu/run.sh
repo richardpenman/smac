@@ -118,4 +118,14 @@ ini=$(grep "^Preferences=" "$OUT/prefs/Alpha Centauri.Ini" | sed 's/Preferences=
 [ -n "$saved" ] && [ "$(( (16#$saved >> 5) & 1 ))" == "$after" ] || c=1
 check prefs $c "tutorial box $before -> $after, saved $saved, ini $ini"
 
+# 6. The gamma correction dialog (Preferences' GAMMA CORRECTION, FUN_005C8E60): Right twice and the
+#    scroll bar's right button raise it to 1.03; OK keeps it (the ini's Gamma Correction).
+run gamma --new size=0 --human 1 --seed 1,2 --keys "ENTER,C-p,CLICK:253x323,SCREENSTATE,RIGHT,RIGHT,CLICK:618x454,SCREENSTATE,CLICK:452x483,ESC"
+c=0
+has gamma "screenstate gamma" || c=1
+has gamma "gammastate pos 103 old 100" || c=1
+has gamma "gamma: 103 (OK)" || c=1
+grep -q "^Gamma Correction=103" "$OUT/gamma/Alpha Centauri.Ini" || c=1
+check gamma $c "see $OUT/gamma.log"
+
 exit $FAIL

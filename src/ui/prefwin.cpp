@@ -19,9 +19,11 @@
 // once); the button states make GamePreferences 0x800 / 0x400 and GameMorePreferences 0x4000 on OK,
 // and PrefWin_destroy writes Main / Voice / Music / SFX Volume to the preferences.
 // Approximated: the layout (measured on the original's screen at 1024x768, not PrefWin_init's
-// rectangles; the volume rows below the page's check boxes), the gamma correction dialog (not
-// reconstructed), the sliding animation.
+// rectangles; the volume rows below the page's check boxes). The gamma correction dialog:
+// GammaWin below.
 #include <algorithm>
+#include <cmath>
+#include <cstring>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -88,6 +90,134 @@ const Page kPages[6] = {
     {"AUDIOVISUALPREFS", 754, {0x40, 0x41, 0x42, 0x47, 0x43, 0x44, 0x45, 0x16}},
     {"MAPPREFS", 1077, {0x48, 0x49, 0x4e, 0x4a, 0x4b, 0x4c, 0x4d, 0x4f}},
 };
+
+// The gamma correction dialog (FUN_005C8E60 with FUN_005C9420 / 5C9520 / 5C95E0, PrefWin button
+// 6): a full-screen window of colour 0xF8, centred: the ramp of the game colours 10..245 (one
+// pixel each, 0xEC x 0x20), below it the value ("%f"), below that the scroll bar (range 1..400,
+// the gamma in hundredths: no sprites, buttons of colour 7, a two-pixel bevel 7 / 0) and OK /
+// CANCEL (BasePop's texts, colour 0xF8, black text). While it is open the window's colours 10..245
+// are the grey ramp corrected by the scroll's gamma (FUN_005C9520: pow(i / 235, 1 / gamma)); OK
+// keeps the gamma (prefs "Gamma Correction", the game palette reloaded with it), CANCEL the old
+// one. Approximated: the scroll bar's thumb is not dragged (its buttons and track are clicked;
+// Left / Right step it).
+struct GammaWin : ScreenWin {
+    int32_t pos = 100, old = 100;
+    bool ok = false;
+    UiRect ramp{}, text{}, bar{}, okr{}, cancelr{};
+    Palette pal{};
+    Font font{};
+
+    void layout() {
+        int32_t w = 0xEC, h = 0x20, x0 = (ScreenWidth - w) / 2, y0 = (ScreenHeight - h) / 2;
+        ramp = {x0, y0, x0 + w, y0 + h};
+        text = {x0, y0 + h + 3, x0 + w, y0 + 2 * h + 3};
+        bar = {x0, text.bottom + 3 + 4, x0 + w, text.bottom + 3 + h - 4};
+        int32_t by = bar.bottom + 3 + 4;
+        okr = {x0, by, (w + 3) / 2 - 3 + x0, by + 0x14};
+        cancelr = {okr.right + 3, by, x0 + w, by + 0x14};
+    }
+    void set_palette() {  // FUN_005C9520
+        pal = GamePalette;
+        double g = pos * 0.01;
+        for (int32_t i = 0; i < 0xEC; i++) {
+            double v = std::pow(i * 0.00425531914893617, 1.0 / g);
+            v = v < 0 ? 0 : (v > 1 ? 1 : v);
+            uint8_t c = (uint8_t)(int32_t)(v * 235.99);
+            pal.rgb[10 + i][0] = pal.rgb[10 + i][1] = pal.rgb[10 + i][2] = c;
+        }
+        ui_set_layer_palette(3, &pal);
+    }
+    void bevel_box(const UiRect& r, int32_t fill) {
+        UiRect rr = r;
+        Buffer_fill_3(&canvas, &rr, fill);
+        for (int32_t i = 0; i < 2; i++) {
+            Buffer_box_2(&canvas, &rr, 7, 0);
+            rr = {rr.left + 1, rr.top + 1, rr.right - 1, rr.bottom - 1};
+        }
+    }
+    void redraw() override {
+        UiRect all{0, 0, canvas.width, canvas.height};
+        Buffer_set_clip(&canvas, &all);
+        Buffer_fill_3(&canvas, &all, 0xF8);
+        for (int32_t i = 10; i < 0xF6; i++) Buffer_line_2(&canvas, ramp.left + i - 10, ramp.top, ramp.left + i - 10, ramp.bottom, i);
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "%f", pos * 0.01);
+        sw_font(&canvas, &font, 0);
+        Buffer_write_cent_l_7(&canvas, buf, &text, (int32_t)std::strlen(buf));
+        texts.push_back(buf);
+        // The scroll bar: the track, the buttons at both ends, the thumb (squares of its height).
+        int32_t h = bar.bottom - bar.top;
+        UiRect track = bar;
+        Buffer_fill_3(&canvas, &track, 0xF8);
+        bevel_box({bar.left, bar.top, bar.left + h, bar.bottom}, 7);
+        bevel_box({bar.right - h, bar.top, bar.right, bar.bottom}, 7);
+        int32_t tx = bar.left + h + 1 + ((pos - 1) * ((bar.right - bar.left) - 3 * h - 1)) / 399;
+        bevel_box({tx, bar.top, tx + h, bar.bottom}, 7);
+        for (const UiRect* r : {&okr, &cancelr}) {
+            bevel_box(*r, 0xF8);
+            std::string t = r == &okr ? "OK" : sw_upper(label_get(102));
+            sw_font(&canvas, &font, 0);
+            Buffer_write_cent_l_7(&canvas, t.c_str(), r, (int32_t)t.size());
+        }
+        spot_init(&spots[0], 8);
+        spot_add(&spots[0], 1, 0, bar.left, bar.top, h, h);
+        spot_add(&spots[0], 2, 0, bar.right - h, bar.top, h, h);
+        spot_add(&spots[0], 3, 0, bar.left + h, bar.top, tx - bar.left - h, h);
+        spot_add(&spots[0], 4, 0, tx + h, bar.top, bar.right - h - tx - h, h);
+        spot_add(&spots[0], 5, 0, okr.left, okr.top, okr.right - okr.left, okr.bottom - okr.top);
+        spot_add(&spots[0], 6, 0, cancelr.left, cancelr.top, cancelr.right - cancelr.left, cancelr.bottom - cancelr.top);
+    }
+    void step(int32_t d) {
+        pos = std::max(1, std::min(400, pos + d));
+        set_palette();
+    }
+    void on_click(int32_t, int32_t index, int32_t, int32_t, int32_t, bool right, bool) override {
+        if (right) return;
+        switch (index) {
+        case 1: step(-1); break;
+        case 2: step(1); break;
+        case 3: step(-10); break;
+        case 4: step(10); break;
+        case 5: ok = true; sw_close(this); break;
+        case 6: sw_close(this); break;
+        default: break;
+        }
+    }
+    void on_key(int32_t key) override {
+        int32_t vk = key & 0xFFFF;
+        if (vk == 0x25) step(-1);
+        else if (vk == 0x27) step(1);
+        else if (vk == 0xD) {
+            ok = true;
+            sw_close(this);
+        } else if (vk == 0x1B) {
+            sw_close(this);
+        }
+    }
+    void log_state() override { std::fprintf(stderr, "gammastate pos %d old %d\n", pos, old); }
+};
+
+// PrefWin button 6: the dialog, then the gamma kept (DAT_006846A8, "Gamma Correction").
+void gamma_dialog() {
+    GammaWin w;
+    w.name = "gamma";
+    w.old = w.pos = std::max(1, std::min(400, (int32_t)prefs_get_2("Gamma Correction", 100, 0)));
+    Font_ctor(&w.font);
+    Font_init(&w.font, "Arial", 0xE, 1);
+    w.layout();
+    sw_init(&w, 0, 0, ScreenWidth, ScreenHeight, false);
+    w.layer = 3;
+    w.set_palette();
+    sw_run(&w);
+    ui_set_layer_palette(3, nullptr);
+    int32_t g = w.ok ? w.pos : w.old;
+    std::fprintf(stderr, "gamma: %d%s\n", g, w.ok ? " (OK)" : " (cancelled)");
+    if (w.ok) {
+        prefs_put_2("Gamma Correction", (uint32_t)g, 0);
+        load_palette();
+    }
+    ui_invalidate();
+}
 
 struct PrefWin : ScreenWin {
     int32_t page = 0;            // +0xA14
@@ -298,7 +428,7 @@ struct PrefWin : ScreenWin {
         if (id >= 0 && id < 6) {
             show_page(id);
         } else if (id == 6) {
-            console_not_reconstructed("PrefWin: gamma correction");
+            gamma_dialog();
         } else if (id >= 0x55 && id <= 0x58) {
             volume_button(id);
         } else if (id == 0x5A) {  // Restore Defaults

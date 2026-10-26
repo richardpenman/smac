@@ -731,7 +731,7 @@ tests/placeholders/compare.sh (orig_rmenu.steps; orig_basewin.steps by eye).
 | City map cursor texture | pfncDrawCityMap's Texture_draw_trans_3 | done | — |
 | Menu commands | Console_menu_proc, Console_next_cursor, the display toggles and their keys | done (console_menu.cpp) | — |
 | Menu items without a function | Console_survey, Console_zoom_to_upkeep_base, Console_show_scen_objectives, Console_corner_the_market | done | — |
-| Menu bar look and item visibility | Menu_on_redraw, PullDown_pulldown_update, pfncMainMenuUpdateVisible | approximated (menu.cpp) | M |
+| Menu bar look and item visibility | Menu_on_redraw, PullDown_pulldown_update, pfncMainMenuUpdateVisible | item visibility done (menu.cpp: pfncMainMenuUpdateVisible's shown / hidden / disabled items, the terraforming orders renamed with their turns); the look approximated (bar and pull-downs drawn with the interface's box tile, not Menu_on_redraw's colours: no reference screenshot of the original's bar, its XTEST Alt does not open it) | S |
 | Status panes | StatusWin_draw_status, StatusWin_draw_active, say_morale, StatusWin_set_loc / redraw / reset | done (maininfc.cpp) | — |
 | World map pane | WorldWin_on_redraw, MapWin_gen_bases_only, WorldWin_draw_box, WorldWin_tile_to_pixel | done (nearest-pixel stretch for maps larger than the pane) | — |
 | Date box, TURN COMPLETE, globe buttons | MainInterface_set_date, MainInterface_redraw_complete, MainInterface_init's geometry | done (turn.flc not decoded) | — |
@@ -746,10 +746,10 @@ tests/placeholders/compare.sh (orig_rmenu.steps; orig_basewin.steps by eye).
 | Move / turn animations | vehdraw_turn*, veh_scoot (sliding) | done (scoot.cpp, vehdraw.cpp. Approximated: the saved background (MapWin_compute_clip), the slide's terrain tilt through the tiles' mean) | — |
 | Interface arms, slide sounds | slide_show, slide_hide, scroll_show / hide | slide_show / slide_hide done for the base window, the console's slide (battle) and the screens (screenwin.cpp's `slide`: the datalinks, reports, design workshop, social engineering, preferences); not for the diplomacy and council windows; scroll_show / scroll_hide (the popups' and reports' scrolling in: the right arm rising, then the window unrolled over the popup tiles) not reconstructed | M |
 | Tutorial windows and hints | TutWin_tour, TutWin_tour1 / 5 / 6 / 7, TutWin_tut_win, Console_give_hints, TutWin_draw_arrow, the SOCWIN / DESWIN hints | done (tutwin.cpp: every unit and base window hint, the TUTOR windows with their pointer lines and buttons, the first turn's tour (kind 0), the terraforming lessons (kind 3: the tiles scored as the original, TOURRAIN .. TOURFORMDONE), the base window's (1), social engineering's (5), drone riots' (6) and design workshop's (7) tours with their windows opened or shown for them (the Help menu's tours). Approximated: the pictures are drawn into a picture, not the sprite box callbacks) | — |
-| Time controls | Console_time_controls, Console_use_time_bonus (multiplayer), time_controls_dialog | not reconstructed | M |
+| Time controls | Console_time_controls, Console_use_time_bonus (multiplayer), time_controls_dialog | done for single player (Console_time_controls does nothing outside multiplayer); the dialog, HOSTTIME and the time bonus are multiplayer's (out of scope) | — |
 | Assemble | Console_assemble | done (console_orders.cpp) | — |
-| Gamma dialog | FUN_005C8E60 / FUN_005C9520 / FUN_005C95E0 (PrefWin button 6) | not reconstructed | M |
-| Custom faction | Console_custom_my_faction | not reconstructed | M |
+| Gamma dialog | FUN_005C8E60 / FUN_005C9520 / FUN_005C95E0 (PrefWin button 6) | done (prefwin.cpp GammaWin: the ramp in its own palette layer, the value, the scroll bar, OK / CANCEL, the preference and the palette reloaded; tests/menu case 6. Approximated: the scroll bar's thumb is not dragged) | — |
+| Custom faction | Console_custom_my_faction | done (console_placeholders.cpp: EDITORWHO in the editor, CUSTOMNAMES, the names and gender kept; the multiplayer synchronisation out of scope) | — |
 | Scenario / map editor | MapWin_editor, Console_editor_* (Scenario and Edit Map menus, keys), BaseWin_base_editor, Console_editor_edit_veh / kill_veh | not reconstructed | L |
 | Base window details | help bubbles (right clicks on panes), the panes' scroll arrows, the production pane's 3D model | not reconstructed | M |
 | Diplomacy panes | DiploPop_draw_info, DiploPop_draw_hq, DiploPop's popup look | not reconstructed | M |

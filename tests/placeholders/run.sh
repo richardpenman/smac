@@ -87,7 +87,9 @@ run menuproc $NEW --keys "ENTER,S-RCLICK:530x200,UP,UP,UP,UP,UP,UP,UP,ENTER,DOWN
 check menuproc "a sub-menu item chosen" "menu item [0-9A-F]+ "
 check menuproc "run by Console_menu_proc" "^menu command [0-9A-F]+$"
 nocrash menuproc
-D13=$(printf 'DOWN,%.0s' $(seq 1 13))
+# (Terrain Survey is the 13th shown item of the Map menu: pfncMainMenuUpdateVisible shows one of
+# the view / unit mode items 0x200 / 0x201.)
+D13=$(printf 'DOWN,%.0s' $(seq 1 12))
 run survey $NEW --keys "ENTER,A-m,${D13}ENTER,SHOT:survey1.bmp,A-m,${D13}ENTER,SHOT:survey2.bmp"
 check survey "Map menu: Terrain Survey (0x20F)" "^menu command 20F$"
 nocrash survey
@@ -246,5 +248,13 @@ for t in 15 16 17 18 19; do
     nocheck tour$t "no placeholder" "not reconstructed: TutWin_tour"
     nocrash tour$t
 done
+
+# 15. Console_custom_my_faction ("+"): the CUSTOMNAMES fields of the viewer's faction; the
+#     leader's name edited (Deirdre -> Bob) and OK.
+run custom $NEW --keys "ENTER,+,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,B,o,b,ENTER"
+check custom "the dialog" "popup CUSTOMNAMES shown"
+check custom "the name kept" "custom faction 1: Lady Bob, Gaia's Stepdaughters / Gaians / Gaian \\(female\\)"
+nocheck custom "no placeholder" "not reconstructed: Console_custom_my_faction"
+nocrash custom
 
 exit $FAIL
