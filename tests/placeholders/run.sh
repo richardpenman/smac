@@ -156,4 +156,13 @@ check hints "a unit hint (Console_give_hints)" "tutwin FUNGUSSEA: kind 0"
 nocheck hints "no placeholder" "not reconstructed: Console_give_hints"
 nocrash hints
 
+# 10. Console_assemble (shift+J): the ASSEMBLEGROUP dialog with the "Vehicle Groups" preference's
+#     kinds (default 7: near the cursor, not sentried / held, not in a base); the units chosen join
+#     the group (state bit 0x8000000).
+run assemble $NEW --keys "ENTER,S-j,ENTER,UNITS"
+check assemble "the dialog" "popup ASSEMBLEGROUP shown"
+check assemble "the scout in the group" "unit 4 f1 Scout Patrol .* state 0C000000"
+nocheck assemble "no placeholder" "not reconstructed: Console_assemble"
+nocrash assemble
+
 exit $FAIL

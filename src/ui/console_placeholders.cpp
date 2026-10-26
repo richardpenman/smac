@@ -17,7 +17,6 @@ void GAMEAPI draw_cursor() {
 void THISCALL MapWin_draw_cursor(uint8_t*) { ui_invalidate_map(); }
 void THISCALL WorldWin_set_world_map(uint8_t*) {}
 void THISCALL pfncMainMenuUpdateVisible(uint8_t*, int32_t) {}
-void THISCALL Console_assemble(uint8_t*) { console_not_reconstructed("Console_assemble"); }
 void THISCALL Console_time_controls(uint8_t*) { console_not_reconstructed("Console_time_controls"); }
 void THISCALL Console_custom_my_faction(uint8_t*) { console_not_reconstructed("Console_custom_my_faction"); }
 void THISCALL Console_editor_edit_veh(uint8_t*, int32_t) { console_not_reconstructed("Console_editor_edit_veh"); }

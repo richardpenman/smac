@@ -1395,3 +1395,76 @@ shown:
     }
     pfncMainMenuUpdateVisible(self + 0x22A2C, mw(self, kConVeh));
 }
+
+// ---- Console_assemble (0x4D95F0) ---------------------------------------------------------------
+
+// Console_clear_group (0x50F650): no unit in the group.
+static void console_clear_group(uint8_t* self) {
+    mw(self, kCon23D1C) = 0;
+    for (int32_t i = 0; i < VehCount; i++) Vehs[i].state &= ~0x8000000u;
+}
+
+// Console_assemble (0x4D95F0): the ASSEMBLEGROUP dialog (its check boxes kept as the "Vehicle
+// Groups" preference): the faction's units of the chosen kinds join the group (bit 0x8000000);
+// the dialog's first button sends the last of them to the cursor (go-to, the group follows it),
+// the second wakes them all.
+void THISCALL Console_assemble(uint8_t* self) {
+    uint32_t prefs = (uint32_t)prefs_get_2("Vehicle Groups", 7, 0);
+    for (int32_t i = 0; i < 0xC; i++) {
+        uint32_t bit = 1u << i;
+        if (prefs & bit) DialogChoices |= (int32_t)bit;
+        else DialogChoices &= ~(int32_t)bit;
+    }
+    if (X_pop_6("ASSEMBLEGROUP", 0x41, 0) < 0) return;
+    console_clear_group(self);
+    uint32_t kinds = 0;
+    for (int32_t i = 0; i < 0xC; i++)
+        if (DialogChoices & (1 << i)) kinds |= 1u << i;
+    mw(self, kCon23D1C) = 1;
+    int32_t last = -1;
+    int32_t cx = MapWinCursorX[MapWinCursorIndex], cy = MapWinCursorY[MapWinCursorIndex];
+    for (int32_t i = 0; i < VehCount; i++) {
+        VEH& v = Vehs[i];
+        if ((uint32_t)v.faction_id != (uint32_t)mw(self, kConFaction)) continue;
+        if (kinds & 1) {  // near the cursor
+            int32_t dx = std::abs(v.x - cx);
+            if (!(MapToggleFlat & 1) && MapHalfX < dx) dx = MapAreaX - dx;
+            int32_t dy = std::abs(v.y - cy);
+            if (4 < (int32_t)((uint32_t)(dy + dx) & 0xFFFFFFFEu)) continue;
+        }
+        const UNIT& u = Units[v.unit_id];
+        int32_t triad = Chassis[u.chassis_id].triad;
+        int32_t plan = u.plan;
+        if ((kinds & 2) && (v.order == 1 || v.order == 2)) continue;
+        if ((kinds & 4) && ((v.state & 0x1000200) == 0x1000200 || (v.state & 0x4200))) continue;
+        if ((kinds & 8) && triad == 0) continue;
+        if ((kinds & 0x10) && triad == 1) continue;
+        if ((kinds & 0x20) && triad == 2) continue;
+        if ((kinds & 0x40) && (plan == 0 || plan == 1 || plan == 5 || plan == 6)) continue;
+        if ((kinds & 0x80) && (plan == 2 || plan == 4)) continue;
+        if ((kinds & 0x100) && plan == 9) continue;
+        if ((kinds & 0x200) && plan == 0xB) continue;
+        if ((kinds & 0x400) && (plan == 8 || plan == 10 || plan == 7 || plan == 0xC)) continue;
+        v.state |= 0x8000000;
+        last = i;
+    }
+    if (DialogToggle == 1 && last >= 0) {
+        VEH& v = Vehs[last];
+        v.order = 0x18;
+        v.waypoint_x[0] = (int16_t)cx;
+        v.waypoint_y[0] = (int16_t)cy;
+        v.state &= 0xFCFFBDFF;
+        Console_group(self, last);
+    }
+    if (DialogToggle == 2) {
+        for (int32_t i = 0; i < VehCount; i++) {
+            VEH& v = Vehs[i];
+            if ((uint32_t)v.faction_id == (uint32_t)mw(self, kConFaction) && (v.state & 0x8000000)) {
+                v.order = 0;
+                v.state &= 0xFCFFBDFF;
+            }
+        }
+    }
+    draw_map(1);
+    prefs_put_2("Vehicle Groups", kinds, 0);
+}

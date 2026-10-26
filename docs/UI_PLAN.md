@@ -117,6 +117,12 @@ src/app/smacx.cpp the native game executable
   | `help` | help_topic, help_project (Datalink_exec) | help.cpp, datalink.cpp |
   | `diplomacy` | communicate, diplomacy_menu, proposal_menu, make_a_proposal, battle_plans, commlink_attempt, commlink_attempter, DiploPop_start/stop/draw_info, InfoWin_set_state, GraphicWin_soft_update_3, get_he_she | diplo_comm.cpp, diplowin.cpp |
   | `council` | ui_councilwin_* (the council window's operations, engine/council.h) | councilwin.cpp |
+  | `messagewin` | MessageWin_clear (the info pane's message list) | infowin.cpp |
+  | `battle` | SubInterface_set_iface_mode, BattleWin_clear / pulse_timer / stop_timer, StatusWin_draw / redraw / reset, tut_check2 | battlewin.cpp, maininfc.cpp |
+  | `boom` | boom (the combat animation) | boom.cpp |
+  | `scoot` | veh_scoot (the move animation) | scoot.cpp |
+  | `move` | say_morale_2, ui_ctrl_pressed | battlewin.cpp |
+  | `action` | TutWin_tut_map, ReportIf_on_redraw | tutwin.cpp |
 
   To replace another function: move its headless definition into an area file of its own (or
   into the area it belongs to, if smacx implements the whole area), then define it in src/ui
@@ -732,7 +738,7 @@ tests/placeholders/compare.sh (orig_rmenu.steps; orig_basewin.steps by eye).
 | Map cursor and blinking | MapWin_draw_radius's cursor texture, Texture_draw_trans_3, blink_timer | done (no edge scrolling) | — |
 | Info pane | InfoWin_setup_text, InfoWin_draw_text, InfoWin timer / set_state, the M / I / X buttons, InfoWin_right_menu, MessageWin (the M mode's list), MainInterface_set_message | done (infowin.cpp; the message list's ListBox look approximated; control_turn's faction boxes in the pane during the computer players' turns not drawn) | — |
 | Clicks on the interface panes | StatusWin_on_left_click / on_right_click, StatusWin_arrow_left / right, WorldWin_click / right_menu, the stack scroll arrows | done (maininfc.cpp; the world map window of a shift click / the menu's item 4 not reconstructed: the view is centred) | — |
-| Labs report and the Datalinks tech tree | ReportWin_draw_labs, ReportIf_draw_labs, the Datalinks tree view | approximated / missing | L |
+| Labs report and the Datalinks tech tree | ReportWin_draw_labs (9.9 KB, ReportWin_labs_line 2.2 KB: one function for both, the Datalinks' when InfcList's top is 8: the prerequisites' buttons 0x379 / 0x37A, the technology with its picture and what it allows, the technologies it leads to 0x37B..), ReportIf_draw_labs (5.2 KB) | approximated / missing | L |
 | Energy report's two columns | ReportWin_draw_energy, ReportIf_draw_energy | approximated | M |
 | Base locator map, report pictures, satellite FLC, hover help | ReportWin_draw_ops / sat, ReportIf_* | approximated | L |
 | Scroll bars | Scroll (ctor, init, on_redraw, compute_thumb_rect, mouse / keys) and its users (picker, list popups, base window panes, reports) | not reconstructed (keys and positions work) | M |
@@ -741,7 +747,7 @@ tests/placeholders/compare.sh (orig_rmenu.steps; orig_basewin.steps by eye).
 | Interface arms, slide sounds | slide_show, slide_hide, scroll_show / hide | slide_show / slide_hide done for the base window and the console's slide (battle); not for the other windows (design workshop, reports, diplomacy); scroll_show / scroll_hide (the popups' and reports' scrolling in) not reconstructed | M |
 | Tutorial windows and hints | TutWin_tour, TutWin_tut_win, Console_give_hints, TutWin_draw_arrow | done (tutwin.cpp: every unit and base window hint, the TUTOR windows with their pointer lines and buttons, the first turn's tour (kind 0). Not reconstructed: the terraforming lessons after TOURMAP (kind 3), the base window's, social engineering's, drone riots' and design workshop's tours (TutWin_tour1 / 5 / 6 / 7); the pictures are drawn into a picture, not the sprite box callbacks) | M |
 | Time controls | Console_time_controls, Console_use_time_bonus (multiplayer), time_controls_dialog | not reconstructed | M |
-| Assemble | Console_assemble | not reconstructed | S |
+| Assemble | Console_assemble | done (console_orders.cpp) | — |
 | Gamma dialog | FUN_005C8E60 / FUN_005C9520 / FUN_005C95E0 (PrefWin button 6) | not reconstructed | M |
 | Custom faction | Console_custom_my_faction | not reconstructed | M |
 | Scenario / map editor | MapWin_editor, Console_editor_* (Scenario and Edit Map menus, keys), BaseWin_base_editor, Console_editor_edit_veh / kill_veh | not reconstructed | L |
