@@ -325,7 +325,7 @@ void popup_art_init() {
     g_art_ok = true;
     // Loading art and reading preferences use StrBuffer, which callers may be passing as a label.
     std::string saved(StrBuffer);
-    int32_t main = prefs_get_2("MainFontSize", 16, 0);
+    int32_t main = prefs_get_int("MainFontSize", 16, 0);
     if (ScreenWidth == 800) main -= 2;
     g_main_font = closest_size(main);
     g_button_font = closest_size(16);
@@ -925,7 +925,7 @@ int32_t calculate(BasePop* p) {
     if (p->has_picture) {
         int32_t w = p->total_w ? p->total_w : p->dlg_width;
         w += p->picture.full_width * p->pic_scale_d / p->pic_scale_s + p->hpad;
-        if (dword_9469FC) w = 0x2BC;  // the faction picker's text box (thumb_routine)
+        if (ThumbRoutineActive) w = 0x2BC;  // the faction picker's text box (thumb_routine)
         else if (ScreenWidth == 800) w = std::min(w, 0x1EE);
         else if (ScreenWidth - 0x16E <= w) w = ScreenWidth - 0x16E;
         p->dlg_width = w;

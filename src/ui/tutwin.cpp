@@ -881,7 +881,7 @@ void THISCALL Console_give_hints(uint8_t* self) {
         if (triad(v) == 0 && Chassis[U(v).chassis_id].speed == 2 && Weapon[U(v).weapon_id].offense_value != 0 &&
             tut_check(0x2000000)) {
             StrBuffer[0] = 0;
-            say_stats_3(StrBuffer, Vehs[v].unit_id);
+            say_stats_short(StrBuffer, Vehs[v].unit_id);
             parse_says(1, StrBuffer, -1, -1);
             parse_says(0, U(v).name, -1, -1);
             tut_map(&TutWin, "FASTUNIT", x, y, v, nullptr, 0, -1, -1);
@@ -890,7 +890,7 @@ void THISCALL Console_give_hints(uint8_t* self) {
         if (triad(v) == 0 && Chassis[U(v).chassis_id].speed == 1 && Weapon[U(v).weapon_id].offense_value > 1 &&
             !can_arty(Vehs[v].unit_id, 1) && tut_check(0x40000000)) {
             StrBuffer[0] = 0;
-            say_stats_3(StrBuffer, Vehs[v].unit_id);
+            say_stats_short(StrBuffer, Vehs[v].unit_id);
             parse_says(1, StrBuffer, -1, -1);
             parse_says(0, U(v).name, -1, -1);
             tut_map(&TutWin, "BIGUNIT", x, y, v, nullptr, 0, -1, -1);
@@ -924,7 +924,7 @@ void THISCALL Console_give_hints(uint8_t* self) {
              Factions[F].units_active[Vehs[v].unit_id] > 1) &&
             enemy_move(-1 - v) && !(TutHintsDone & 0x800000)) {
             StrBuffer[0] = 0;
-            say_stats_3(StrBuffer, Vehs[v].unit_id);
+            say_stats_short(StrBuffer, Vehs[v].unit_id);
             parse_says(2, StrBuffer, -1, -1);
             parse_says(0, Bases[b].name, -1, -1);
             parse_says(1, U(v).name, -1, -1);
@@ -1042,7 +1042,7 @@ void THISCALL Console_give_hints(uint8_t* self) {
     const Sprite* pic = nullptr;
     uint32_t bits = 0;
     if (U(v).plan == 9 && sea == 0) {
-        int32_t b = base_find_2(x, y, F);
+        int32_t b = base_find_faction(x, y, F);
         if (b < 0) return;
         if (BaseFindDist <= 2) {
             if (at_goal(F, 0x29, x, y) && !(TutHintsDone & 0x200000)) {

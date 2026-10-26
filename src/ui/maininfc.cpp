@@ -394,7 +394,7 @@ void THISCALL StatusWin_draw_active(uint8_t* self, int32_t veh_id, int32_t base_
             y = wrap_cent4(c, s, x0, y, w);
         }
         char stats[256] = "(";
-        say_stats_3(stats + 1, v.unit_id);
+        say_stats_short(stats + 1, v.unit_id);
         s = stats;
         if (v.state & 0x80) s += "#";
         for (int32_t a = 0; a < 29; a++) {
@@ -765,7 +765,7 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
             if (order < 4 || order > 0x17 ||
                 (u.faction_id != CurrentPlayerFaction && !(GameState & 0x80) && !pact(u.faction_id))) {
                 char st[128] = "";
-                say_stats_3(st, u.unit_id);
+                say_stats_short(st, u.unit_id);
                 s = st;
                 if (u.state & 0x80) s += "#";
                 if ((GameState & 0x40) && (GameState & 0x1000)) s += " (" + num(v) + ")";

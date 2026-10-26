@@ -358,9 +358,9 @@ Flow em_setup(EM& m, int32_t veh_id) {
     if (m.unit == BSC_BATTLE_OGRE_MK1 || m.unit == BSC_BATTLE_OGRE_MK2 || m.unit == BSC_BATTLE_OGRE_MK3) m.dmg = 0;
     m.zocm = zoc_move(m.x, m.y, m.fac);
     m.zocv = zoc_veh(m.x, m.y, m.fac);
-    m.base_any = base_find_3(m.x, m.y, -1, m.triad ? -1 : m.region, -1, -1);
+    m.base_any = base_find_filtered(m.x, m.y, -1, m.triad ? -1 : m.region, -1, -1);
     m.dist_any = BaseFindDist;
-    m.base_own = base_find_3(m.x, m.y, m.fac, m.triad ? -1 : m.region, -1, -1);
+    m.base_own = base_find_filtered(m.x, m.y, m.fac, m.triad ? -1 : m.region, -1, -1);
     m.dist_own = BaseFindDist;
     m.s60 = whose_territory(m.fac, m.x, m.y, nullptr, 0);
     m.s4c = m.s60 == m.fac;
@@ -912,7 +912,7 @@ Flow em_plan(EM& m) {
             if ((t->val3 & 0xC0) < 0x80 && (t->climate & 0xE0) < 0xC0) continue;
         }
         if (whose_territory(m.fac, m.tx, m.ty, nullptr, 0) != m.fac) continue;
-        base_find_2(m.tx, m.ty, m.fac);
+        base_find_faction(m.tx, m.ty, m.fac);
         if (BaseFindDist <= 2) continue;
         bool taken = false;
         int32_t o = 0;
@@ -1183,7 +1183,7 @@ Flow em_probe(EM& m) {
         int32_t bf = base_faction(m.base_id);
         if (bf == m.fac) {
             // Own bases: those with few probe teams nearby.
-            base_find_3(base.x, base.y, -1, -1, m.fac, -1);
+            base_find_filtered(base.x, base.y, -1, -1, m.fac, -1);
             int32_t n = stack_check(veh_at(base.x, base.y), 2, PLAN_PROBE, -1, -1);
             score += ((n + (score != 0)) * 64 + BaseFindDist) * 64;
         } else {
@@ -1556,22 +1556,22 @@ Flow em_naval(EM& m) {
         if (hdist(m.x, m.y, m.tx, m.ty) <= Rules.artillery_max_rng) {
             if (anything_at(m.tx, m.ty) < 0) {
                 if (m.mp_own) {
-                    log_say_2("Auto sending DESTROY2 message", m.veh, m.tx, m.ty);
+                    log_say_values("Auto sending DESTROY2 message", m.veh, m.tx, m.ty);
                     message_data(0x2413, m.veh, m.tx, m.ty, 0, 0);
                     NetDaemon_await_exec(&NetState, 1);
                     return RET1;
                 }
-                log_say_2("Enemy doing ARTY destroy 1...", m.veh, m.tx, m.ty);
+                log_say_values("Enemy doing ARTY destroy 1...", m.veh, m.tx, m.ty);
                 action_destroy(m.veh, 0, m.tx, m.ty);
                 return RET1;
             }
             if (i >= 9 || (m.triad == TRIAD_SEA && !sq_ocean(sq_at(m.tx, m.ty)))) {
                 if (m.mp_own) {
-                    log_say_2("Auto sending ARTY message", m.veh, m.fac, 0);
+                    log_say_values("Auto sending ARTY message", m.veh, m.fac, 0);
                     message_veh(0x2402, m.veh, i, 0);
                     return F_578d67;
                 }
-                log_say_2("Enemy doing ARTY...", m.veh, i, 0);
+                log_say_values("Enemy doing ARTY...", m.veh, i, 0);
                 battle_fight(m.veh, i, 1, 1, 0);
                 return RET1;
             }
@@ -1673,7 +1673,7 @@ Flow em_colony(EM& m) {
     if (m.plan == PLAN_COLONY) {
         if (m.best_dir == 0) {
             if (m.mp_own) {
-                log_say_2("Auto sending BUILD BASE message", m.veh, m.fac, 0);
+                log_say_values("Auto sending BUILD BASE message", m.veh, m.fac, 0);
                 message_base(0x2408, m.veh, NetBaseName, 0);
                 return F_578d67;
             }
@@ -1912,7 +1912,7 @@ Flow em_explore_sites(EM& m) {
     if (m.plan == PLAN_COLONY && v.order != 0x18) {
         m.s70 = whose_territory(m.fac, m.x, m.y, nullptr, 0);
         if (m.s70 >= 0 && m.s70 != m.fac && (dstat(m.fac, m.s70) & 3)) {
-            m.base_id = base_find_3(m.x, m.y, m.fac, m.region, -1, -1);
+            m.base_id = base_find_filtered(m.x, m.y, m.fac, m.region, -1, -1);
             if (m.base_id >= 0) {
                 go_to(m.veh, 0x6B, Bases[m.base_id].x, Bases[m.base_id].y);
                 return F_57717f;
@@ -1943,7 +1943,7 @@ Flow em_destroy(EM& m) {
         }
         if (destroy) {
             if (m.mp_own) {
-                log_say_2("Auto sending DESTROY message", m.veh, 0x800000, 0);
+                log_say_values("Auto sending DESTROY message", m.veh, 0x800000, 0);
                 message_data(0x2406, m.veh, 0x800000, 0, 0, 0);
                 return F_578d67;
             }
@@ -1956,7 +1956,7 @@ Flow em_destroy(EM& m) {
         veh_triad_of(m.veh) != TRIAD_AIR && ba >= 0 && m.dist_any <= 2 && base_faction(ba) != m.fac &&
         m.dist_own > 3 && (dstat(m.fac, base_faction(ba)) & 0x10)) {
         if (m.mp_own) {
-            log_say_2("Auto sending DESTROY message", m.veh, 0x400000, 0);
+            log_say_values("Auto sending DESTROY message", m.veh, 0x400000, 0);
             message_data(0x2406, m.veh, 0x400000, 0, 0, 0);
             return F_578d67;
         }
@@ -1971,11 +1971,11 @@ Flow em_destroy(EM& m) {
         uint32_t items = sq_at(m.x, m.y)->items;
         if ((items & 0x81208850) || ((items & 4) && m.f().region_total_bases[m.region] == 0)) {
             if (m.mp_own) {
-                log_say_2("Auto sending DESTROY message", m.veh, 0, 0);
+                log_say_values("Auto sending DESTROY message", m.veh, 0, 0);
                 message_data(0x2406, m.veh, 0, 0, 0, 0);
                 return F_578d67;
             }
-            log_say_2("Enemy doing DESTROY", m.veh, m.x, m.y);
+            log_say_values("Enemy doing DESTROY", m.veh, m.x, m.y);
             action_destroy(m.veh, 0, -1, -1);
             return F_578f46;
         }
@@ -2061,7 +2061,7 @@ Flow em_defend(EM& m) {
             if ((d & 0x20) && !(d & 3) &&
                 ((d & 0x40000) || Factions[former].integrity_blemishes > 5 ||
                  m.f().diplo_betrayed[former] > 3 - m.f().AI_fight * 2)) {
-                log_say_2("Enemy doing OBLIT", m.veh, m.x, m.y);
+                log_say_values("Enemy doing OBLIT", m.veh, m.x, m.y);
                 action_oblit(m.veh, m.base_own);
                 return RET1;
             }
@@ -2225,7 +2225,7 @@ Flow em_cover(EM& m) {
             uint8_t rp = m.f().region_base_plan[r];
             if (!(rp == m.plan || (m.plan <= 2 && rp <= 2))) continue;
             if (!m.mp_own) {
-                log_say_2("Enemy doing GATE", m.veh, m.base_id, 0);
+                log_say_values("Enemy doing GATE", m.veh, m.base_id, 0);
                 action_gate(m.veh, m.base_id);
                 return RET1;
             }
@@ -2603,7 +2603,7 @@ L_572d66:
                 v.order = 9;
                 return F_578f46;
             }
-            m.s54 = radius_move_2(Bases[bo].x, Bases[bo].y, m.x, m.y, 0x15);
+            m.s54 = radius_move_tiles(Bases[bo].x, Bases[bo].y, m.x, m.y, 0x15);
         } else {
             m.s54 = 0;
         }
@@ -3872,7 +3872,7 @@ Flow em_move(EM& m) {
                 if (!is_coast(m.tx, m.ty, 0)) pen -= 0x20;
                 if (m.s2c == 0 && pen == 0) {
                     m.val += m.coast_goal ? 0x20 : 8;
-                    base_find_2(m.tx, m.ty, m.fac);
+                    base_find_faction(m.tx, m.ty, m.fac);
                     if (BaseFindDist <= m.dist_own) m.val += 8;
                 }
                 m.val += pen;
@@ -4133,7 +4133,7 @@ Flow em_move(EM& m) {
                 (m.triad == TRIAD_AIR || m.s84 == (m.triad == TRIAD_SEA))) {
                 // Exploring: count unknown tiles along the direction.
                 if (m.st4000) {
-                    base_find_2(m.tx, m.ty, m.fac);
+                    base_find_faction(m.tx, m.ty, m.fac);
                     m.val += BaseFindDist * 2;
                 }
                 for (m.s30 = 0; m.s30 < 8; m.s30++) {
@@ -4199,11 +4199,11 @@ Flow em_move(EM& m) {
                 uint32_t items = sq_at(m.x, m.y)->items;
                 if (!(items & 0x1000) || !(items & 0x81208854)) continue;
                 if (m.mp_own) {
-                    log_say_2("Auto sending DESTROY2 message", m.veh, m.tx, m.ty);
+                    log_say_values("Auto sending DESTROY2 message", m.veh, m.tx, m.ty);
                     message_data(0x2413, m.veh, m.tx, m.ty, 0, 0);
                     return F_578d67;
                 }
-                log_say_2("Enemy doing ARTY DESTROY 2", m.veh, m.tx, m.ty);
+                log_say_values("Enemy doing ARTY DESTROY 2", m.veh, m.tx, m.ty);
                 action_destroy(m.veh, 0, m.tx, m.ty);
                 return RET1;
             }

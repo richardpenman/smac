@@ -505,7 +505,7 @@ int32_t THISCALL Console_human_turn(uint8_t* self) {
     ConsoleTurnFlag = 0;
     WorldWin_set_world_map(&WorldWin);
     GameState &= ~0x400;
-    dword_93A940 = 1;
+    ControlTurnStarted = 1;
     mw(self, kCon23D1C) = 0;
     for (int32_t i = 0; i < VehCount; i++) Vehs[i].state &= ~0x8000000u;
     if (!ControlTurnMove) {
@@ -892,7 +892,7 @@ void THISCALL Console_new_base(uint8_t* self, int32_t veh_id) {
                 } else {
                     int32_t new_id;
                     if (!MultiplayerActive) {
-                        log_say_2("Manually building base", 0, 0, 0);
+                        log_say_values("Manually building base", 0, 0, 0);
                         new_id = action_build(veh_id, name);
                         if (new_id < 0) return;
                     } else {
@@ -1114,7 +1114,7 @@ void THISCALL Console_terraform(uint8_t* self, int32_t veh_id, int32_t type) {
         } else if (!a) {
             NetMsg_pop(&NetMsg, "SEATOOLOW", 5000, 0, nullptr);  // BUG(original): the order is given anyway
         }
-        log_say_2("Want to terraform", faction_id, 0, 0);
+        log_say_values("Want to terraform", faction_id, 0, 0);
         int32_t cost = 0;
         if (!stack_check(veh_id, 9, type + 4, -1, -1)) {
             cost = terraform_cost(x, y, faction_id);
@@ -1126,12 +1126,12 @@ void THISCALL Console_terraform(uint8_t* self, int32_t veh_id, int32_t type) {
                 crt_strcat(StrBuffer, type == FORMER_LOWER_LAND ? "DOWN" : "UP");
                 // Popup_start(TERRACOST..), Popup_start(TERRAPAY) when affordable, BasePop_exec_3.
                 bool affordable = Factions[faction_id].energy_credits >= cost;
-                if (affordable) log_say_2("Offering option to pay", 0, 0, 0);
+                if (affordable) log_say_values("Offering option to pay", 0, 0, 0);
                 if (!ui_script_popup(ScriptFileName, StrBuffer, affordable ? "TERRAPAY" : nullptr)) {
-                    log_say_2("Didn't or couldn't pay; returning", 0, 0, 0);
+                    log_say_values("Didn't or couldn't pay; returning", 0, 0, 0);
                     return;
                 }
-                log_say_2("Took option to pay", 0, 0, 0);
+                log_say_values("Took option to pay", 0, 0, 0);
                 Factions[faction_id].energy_credits -= cost;  // synch_energy: multiplayer only
                 Console_update_data(self, 0);
             }
@@ -1194,11 +1194,11 @@ void THISCALL Console_terraform(uint8_t* self, int32_t veh_id, int32_t type) {
             }
         }
     }
-    if (NetLockHeld) log_say_2("I think I've already got my lock", 0, 0, 0);
+    if (NetLockHeld) log_say_values("I think I've already got my lock", 0, 0, 0);
     if (!NetLockHeld && net_lock_veh(&veh_id, 0)) return;
     Vehs[veh_id].order = (uint8_t)(type + 4);
     net_synch_veh(veh_id);
-    log_say_2("Issuing Vehicle Orders", veh_id, type + 4, 0);
+    log_say_values("Issuing Vehicle Orders", veh_id, type + 4, 0);
     if (MultiplayerActive) {
         int32_t left = speed(veh_id, 0) - Vehs[veh_id].moves_spent;
         if (left >= 0 && (left > 999 || left)) net_action(veh_id, 1);
@@ -1206,7 +1206,7 @@ void THISCALL Console_terraform(uint8_t* self, int32_t veh_id, int32_t type) {
     } else {
         net_unlock_veh();
     }
-    log_say_2("Finished issuing orders", veh_id, type + 4, 0);
+    log_say_values("Finished issuing orders", veh_id, type + 4, 0);
     mw(self, kConWaiting) = 0;
 }
 
@@ -1355,7 +1355,7 @@ void THISCALL Console_cursor_key(uint8_t* self, int32_t, int32_t key, int32_t) {
         if (!NetLocked) Console_activate(self, cx, cy, 1);
         break;
     case 'b': {
-        int32_t base_id = base_find_2(cx, cy, CurrentPlayerFaction);
+        int32_t base_id = base_find_faction(cx, cy, CurrentPlayerFaction);
         if (base_id >= 0) BaseWin_zoom(&BaseWin, base_id, 0);
         break;
     }
@@ -1434,7 +1434,7 @@ void THISCALL Console_turn_hints(uint8_t* self) {
     if (!(GamePreferences & 0x20) || MultiplayerActive || TutorialWinActive) return;
     int32_t cx = MapWinCursorX[MapWinCursorIndex], cy = MapWinCursorY[MapWinCursorIndex];
     if (CurrentTurn == 1 && tut_check(1)) {
-        int32_t base_id = base_find_2(cx, cy, f);
+        int32_t base_id = base_find_faction(cx, cy, f);
         if (base_id >= 0) {
             parse_says(0, Bases[base_id].name, -1, -1);
             if (mw(self, kConVeh) >= 0) {
@@ -1449,7 +1449,7 @@ void THISCALL Console_turn_hints(uint8_t* self) {
     if (CurrentTurn < 0x14 || fa.base_count != 1 || fa.pop_total < 2 || fa.units_active[0] || fa.units_queue[0] ||
         !tut_check(0x100000)) {
         if (CurrentTurn - fa.last_base_turn > 0x17 && !fa.units_active[0] && fa.base_count < 6 && fa.base_count > 1) {
-            int32_t base_id = base_find_2(cx, cy, f);
+            int32_t base_id = base_find_faction(cx, cy, f);
             if (base_id >= 0) {
                 TutWin_tut_map(&TutWin, "BUILDMORE", Bases[base_id].x, Bases[base_id].y, -2 - base_id, nullptr, 0, -1,
                                -1);
@@ -1457,7 +1457,7 @@ void THISCALL Console_turn_hints(uint8_t* self) {
             }
         }
     } else {
-        int32_t base_id = base_find_2(cx, cy, f);
+        int32_t base_id = base_find_faction(cx, cy, f);
         if (base_id >= 0) {
             Console_focus(self, Bases[base_id].x, Bases[base_id].y, f);
             parse_says(0, Bases[base_id].name, -1, -1);
@@ -1514,7 +1514,7 @@ bool confirm_quit() {
     if ((GameRules & 0x400) && !PbemActive) auto_save();
     if (MultiplayerActive) console_not_reconstructed("Console_on_key_click: multiplayer hang up");
     ControlTurnA = 1;
-    log_say_2("Quit ------------------------------", 0, 0, 0);
+    log_say_values("Quit ------------------------------", 0, 0, 0);
     return true;
 }
 }  // namespace
@@ -1532,7 +1532,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     default: break;
     }
     AlphaMenu_hide_main();
-    if (!dword_93A940) {
+    if (!ControlTurnStarted) {
         ConsoleNotReady = 1;
         return 1;
     }

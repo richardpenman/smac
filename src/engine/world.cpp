@@ -932,7 +932,7 @@ void GAMEAPI world_rainfall() {
                         int32_t base_id = base_find(x, y);
                         if (base_id >= 0) RainfallBaseFaction = (uint8_t)Bases[base_id].faction_id;
                     }
-                    int32_t base_id = base_find_2(x, y, viewer);
+                    int32_t base_id = base_find_faction(x, y, viewer);
                     if (base_id >= 0 && BaseFindDist <= 2) RainfallViewerBaseID = base_id;
                 }
             }
@@ -1110,7 +1110,7 @@ void GAMEAPI world_polar_caps() {
 
 void GAMEAPI world_climate() {
     do_checksums(2);
-    log_say_2("-- ADJUSTING WORLD CLIMATE --", 0, 0, 0);
+    log_say_values("-- ADJUSTING WORLD CLIMATE --", 0, 0, 0);
     world_shorelines();
     world_temperature();
     world_rivers();
@@ -1120,7 +1120,7 @@ void GAMEAPI world_climate() {
     if (!WorldSkipTerritory) reset_territory();
     game_reseed(engine_logic_time());  // the original reseeds from timeGetTime()
     redraw_terrain();
-    log_say_2("-- WORLD CLIMATE COMPLETE --", 0, 0, 0);
+    log_say_values("-- WORLD CLIMATE COMPLETE --", 0, 0, 0);
     do_checksums(3);
 }
 

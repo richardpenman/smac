@@ -97,8 +97,8 @@ int32_t GAMEAPI terraform_cost(int32_t x, int32_t y, int32_t faction_id) {
         cost = c * 4;
         if (!TechOwners[39]) cost = c << 3;
     }
-    int32_t b = base_find_2(x, y, faction_id);
-    int32_t b3 = base_find_3(x, y, -1, -1, faction_id, -1);
+    int32_t b = base_find_faction(x, y, faction_id);
+    int32_t b3 = base_find_filtered(x, y, -1, -1, faction_id, -1);
     if (b >= 0) {
         int32_t dist = map_dist(x, y, Bases[b].x, Bases[b].y);
         if (dist < 1) dist = 1;
@@ -124,8 +124,8 @@ int32_t GAMEAPI action_build(int32_t veh_id, const char* name) {
     int32_t faction_id = v.faction_id;
     int32_t y = v.y;
     int32_t x = v.x;
-    log_say_2("Action Base", x, y, faction_id);
-    log_say_2("Action Base Turn", CurrentTurn, 0, 0);
+    log_say_values("Action Base", x, y, faction_id);
+    log_say_values("Action Base Turn", CurrentTurn, 0, 0);
     if ((map_tile(x, y)->val3 & 0xC0) > 0x40) rocky_set(x, y, 1);
     if (faction_id == CurrentPlayerFaction ||
         (v.faction_id == CurrentPlayerFaction && (v.flags & 0x440) != 0x440) ||
@@ -307,7 +307,7 @@ int32_t GAMEAPI action_terraform(int32_t veh_id, int32_t terraform_id, int32_t i
     }
     }
     if (Terraform[t].bit & 0x1208050) {
-        int32_t b = base_find_2(x, y, faction_id);
+        int32_t b = base_find_faction(x, y, faction_id);
         if (b >= 0 && BaseFindDist < 3) Bases[b].state_flags |= 0x100;
         if (t == 14 && faction_id == CurrentPlayerFaction && b >= 0 && (uint8_t)Bases[b].faction_id == faction_id) {
             parse_says(0, Bases[b].name, -1, -1);
@@ -320,7 +320,7 @@ int32_t GAMEAPI action_terraform(int32_t veh_id, int32_t terraform_id, int32_t i
     } else if (t != 16) {
         // forest cleared: minerals for the home (or nearest) base
         int32_t home = v.home_base_id;
-        if (home >= 0 || (home = base_find_2(x, y, faction_id)) >= 0) {
+        if (home >= 0 || (home = base_find_faction(x, y, faction_id)) >= 0) {
             int32_t m = Bases[home].minerals_accumulated + Rules.minerals_harvesting_forest;
             Bases[home].minerals_accumulated = m;
             Bases[home].minerals_accumulated_2 = m;
@@ -343,8 +343,8 @@ int32_t GAMEAPI action_terraform(int32_t veh_id, int32_t terraform_id, int32_t i
             if (!((uint8_t)dstat(rf, faction_id) & 0x20)) cause_friction(rf, faction_id, 5);
             else set_treaty(rf, faction_id, 0x400, 1);
         }
-        if (dword_9B22E0 >= 0) {
-            parse_says(0, Bases[dword_9B22E0].name, -1, -1);
+        if (RainfallChangedBase >= 0) {
+            parse_says(0, Bases[RainfallChangedBase].name, -1, -1);
             parse_says(1, MFactions[faction_id].adj_name_faction, -1, -1);
             NetMsg_pop(&NetMsg, faction_id == CurrentPlayerFaction ? "TERRAMINE" : "TERRAYOURS", 5000, 0, nullptr);
         }
@@ -399,8 +399,8 @@ int32_t GAMEAPI action_terraform(int32_t veh_id, int32_t terraform_id, int32_t i
             if (label) TutWin_tut_map(&TutWin, label, x, y, veh, image, 1, -1, -1);
         }
     }
-    if (faction_id == CurrentPlayerFaction && v.order == 0 && !(v.state & 0x200) && !dword_90DB84) {
-        dword_90DB84 = 1;
+    if (faction_id == CurrentPlayerFaction && v.order == 0 && !(v.state & 0x200) && !TerraformDoneSoundPlayed) {
+        TerraformDoneSoundPlayed = 1;
         wave_it(0x14);
         ambience(0xCF);
     }
@@ -531,7 +531,7 @@ void GAMEAPI action_destroy(int32_t veh_id, int32_t items, int32_t x, int32_t y)
                 if ((!(Factions[CurrentPlayerFaction].player_flags & 0x200) &&
                      !(map_tile(x, y)->visibility & (uint8_t)(1 << (CurrentPlayerFaction & 31)))) ||
                     who != CurrentPlayerFaction ||
-                    (b = base_find_3(x, y, -1, -1, -1, CurrentPlayerFaction)) < 0 ||
+                    (b = base_find_filtered(x, y, -1, -1, -1, CurrentPlayerFaction)) < 0 ||
                     (uint8_t)Bases[b].faction_id != CurrentPlayerFaction)
                     goto done;
                 parse_says(0, Bases[b].name, -1, -1);
@@ -560,7 +560,7 @@ void GAMEAPI action_destroy(int32_t veh_id, int32_t items, int32_t x, int32_t y)
                 synch_bit(x, y, who);
                 add_goal(who, 0, 5, v.x, v.y, -1);
                 if (who != CurrentPlayerFaction) goto done;
-                int32_t b = base_find_3(x, y, -1, -1, -1, CurrentPlayerFaction);
+                int32_t b = base_find_filtered(x, y, -1, -1, -1, CurrentPlayerFaction);
                 set_faction_noun(0, faction_id);
                 parse_says(1, Bases[b].name, -1, -1);
                 parse_says(3, MFactions[faction_id].adj_name_faction, -1, -1);
@@ -568,7 +568,7 @@ void GAMEAPI action_destroy(int32_t veh_id, int32_t items, int32_t x, int32_t y)
             }
             goto pop;
         }
-        log_say_2("Arty Failed The Hard Way", (int32_t)removed, (int32_t)found, 0);
+        log_say_values("Arty Failed The Hard Way", (int32_t)removed, (int32_t)found, 0);
         if (bombard) {
             if (faction_id != CurrentPlayerFaction) goto done;
             msg = "ARTYBOMBFAILED";
@@ -979,7 +979,7 @@ int32_t GAMEAPI action_airdrop(int32_t veh_id, int32_t x, int32_t y, int32_t fla
     }
     if (dir < 0) return 0;
     if (seen && faction_id != CurrentPlayerFaction) {
-        int32_t b = base_find_3(x, y, -1, -1, -1, 1);
+        int32_t b = base_find_filtered(x, y, -1, -1, -1, 1);
         parse_says(0, Bases[b].name, -1, -1);
         set_faction_noun(1, faction_id);
         const char* label;
@@ -1072,7 +1072,7 @@ void GAMEAPI action_arty(int32_t veh_id, int32_t x, int32_t y) {
         return;
     }
     if (Vehs[s].faction_id == Vehs[veh_id].faction_id || (dstat(Vehs[veh_id].faction_id, Vehs[s].faction_id) & 1)) return;
-    int32_t dir = radius_move_2(Vehs[veh_id].x, Vehs[veh_id].y, x, y, TableRange[Rules.artillery_max_rng]);
+    int32_t dir = radius_move_tiles(Vehs[veh_id].x, Vehs[veh_id].y, x, y, TableRange[Rules.artillery_max_rng]);
     if (dir < 0) return;
     if (!MultiplayerActive) {
         VehAttackFlags = 3;
@@ -1297,7 +1297,7 @@ int32_t GAMEAPI shoot_it(int32_t faction_id_atk, int32_t faction_id_def, int32_t
             return 0;
         }
     }
-    int32_t b = base_find_2(x, y, faction_id_def);
+    int32_t b = base_find_faction(x, y, faction_id_def);
     if (b < 0) b = base_find(x, y);
     parse_says(0, Bases[b].name, -1, -1);
     parse_num(0, def.satellites_ODP);
@@ -1533,7 +1533,7 @@ void GAMEAPI action_give(int32_t veh_id, int32_t faction_id) {
             w.unit_id = (int16_t)unit_id;
             w.order = 0;
             w.state &= 0xFCFFBDFF;
-            int32_t home = base_find_2(x, y, faction_id);
+            int32_t home = base_find_faction(x, y, faction_id);
             if (home < 0) home = -1;
             w.home_base_id = (int16_t)home;
             MAP* sq = map_tile(x, y);

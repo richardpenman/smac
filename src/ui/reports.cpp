@@ -507,7 +507,7 @@ void ops_governor(ReportScreen* s, int32_t id) {
         return;
     }
     if (id >= 0xCF0 && id <= 0xCF3) {
-        log_say_2("Global EDBC base set", 0, 0, 0);
+        log_say_values("Global EDBC base set", 0, 0, 0);
         for (int32_t i = 0; i < BaseCount; i++) {
             if (Bases[i].faction_id != CurrentPlayerFaction || !(s->selected[i >> 5] & (1u << (i & 31)))) continue;
             if (bw_lock_base(i)) continue;
@@ -522,7 +522,7 @@ void ops_governor(ReportScreen* s, int32_t id) {
     }
     if (id == 0xCF4) {  // ADVANCED SETTINGS: the governor dialog of the first selected base, then
                         // its settings (Faction.base_governor_adv) for every selected base
-        log_say_2("Global governor advanced set", 0, 0, 0);
+        log_say_values("Global governor advanced set", 0, 0, 0);
         bool asked = false;
         for (int32_t i = 0; i < BaseCount; i++) {
             if (Bases[i].faction_id != CurrentPlayerFaction || !(s->selected[i >> 5] & (1u << (i & 31)))) continue;
@@ -541,7 +541,7 @@ void ops_governor(ReportScreen* s, int32_t id) {
         return;
     }
     if (id == 0xCF5) {  // TURN GOVERNOR OFF
-        log_say_2("Global governor off", 0, 0, 0);
+        log_say_values("Global governor off", 0, 0, 0);
         for (int32_t i = 0; i < BaseCount; i++) {
             if (Bases[i].faction_id != CurrentPlayerFaction || !(s->selected[i >> 5] & (1u << (i & 31)))) continue;
             if (bw_lock_base(i)) continue;

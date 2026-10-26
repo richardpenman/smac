@@ -415,7 +415,7 @@ void GAMEAPI tech_achieved(int32_t faction_id, int32_t tech_id, int32_t from, in
         parse_say(0, Reactor[upgraded - 1].name, -1, -1);
         X_pop("REACTORUPGRADE", 0);
     }
-    dword_68F0F0 = -1;
+    NewDesignUnitID = -1;
     if (MultiplayerActive) {
         f.player_flags |= 2;
     } else if (!(FactionStatus[0] & bit) || (GamePreferences & 0x4000)) {
@@ -426,11 +426,11 @@ void GAMEAPI tech_achieved(int32_t faction_id, int32_t tech_id, int32_t from, in
         consider_designs(faction_id);
         if (faction_id == CurrentPlayerFaction) {
             for (int32_t i = 0; i < 512; i++)
-                if ((Units[i].unit_flags & 1) && tech_id == Units[i].preq_tech && dword_68F0F0 < 0) dword_68F0F0 = i;
+                if ((Units[i].unit_flags & 1) && tech_id == Units[i].preq_tech && NewDesignUnitID < 0) NewDesignUnitID = i;
         }
     }
-    dword_7591A4 = -1;
-    dword_7591A8 = -1;
+    HelpChassisShown = -1;
+    HelpWeaponShown = -1;
     // announcement
     if (faction_id == CurrentPlayerFaction || (GameState & 0x80)) {
         StrBuffer[0] = 0;
@@ -469,7 +469,7 @@ void GAMEAPI tech_achieved(int32_t faction_id, int32_t tech_id, int32_t from, in
         ui_tech_popup_show(tech_id, flags, faction_id, faction_id == CurrentPlayerFaction);
         FX_play(&Sounds, 0x33);
         if (faction_id == CurrentPlayerFaction) {
-            if (MultiplayerActive && (DiploWinState || dword_7492CC || ControlWaitLoop)) {
+            if (MultiplayerActive && (DiploWinState || NetCommlinkActive || ControlWaitLoop)) {
                 parse_say(0, Tech[tech_id].name, -1, -1);
                 NetMsg_pop(&NetMsg, "TECHOBTAINED", 5000, 0, nullptr);
             } else {
@@ -508,11 +508,11 @@ void GAMEAPI tech_achieved(int32_t faction_id, int32_t tech_id, int32_t from, in
             parse_say(0, Tech[tech_id].name, -1, -1);
             X_pop_2("TUTOR", "TREETIME", 0);
         }
-        if ((GamePreferences & 0x4000) && dword_68F0F0 >= 0 && !MultiplayerActive) {
+        if ((GamePreferences & 0x4000) && NewDesignUnitID >= 0 && !MultiplayerActive) {
             // offer to look at the new designs
             int32_t ask = 0;
-            dword_90EA3C = 0;
-            dword_73396C = 1;
+            UpgradeAllConfirmed = 0;
+            DesignWinMode = 1;
             for (int32_t i = 0; i < 512; i++) {
                 if (!(Units[i].unit_flags & 1) || tech_id != Units[i].preq_tech ||
                     Weapon[Units[i].weapon_id].offense_value < 0 || i == 15)

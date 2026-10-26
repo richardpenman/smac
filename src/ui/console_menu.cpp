@@ -64,7 +64,7 @@ void quit_question(bool wimp_test_mp) {
         if ((GameRules & 0x400) && !PbemActive) auto_save();
         if (MultiplayerActive) console_not_reconstructed("NetDaemon_hang_up");
         ControlTurnA = 1;
-        log_say_2("Quit                            ", 0, 0, 0);
+        log_say_values("Quit                            ", 0, 0, 0);
     }
 }
 
@@ -230,7 +230,7 @@ void THISCALL Console_next_cursor(uint8_t* self) {
 
 void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
     std::fprintf(stderr, "menu command %03X\n", id);
-    if (!dword_93A940) {
+    if (!ControlTurnStarted) {
         ConsoleMenuPending = 1;
         return;
     }
@@ -256,7 +256,7 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
     if (MultiplayerActive) {
         uint32_t menu = ((uint32_t)id >> 8) & 0xFF;
         if ((ControlTurnC || NetLocked || NetSessionState[2]) && menu != 0 && menu != 7 && menu != 8) return;
-        log_say_hex_2("Menu Event", id, 0, 0);
+        log_say_hex("Menu Event", id, 0, 0);
     }
     if (MapWinInVehMode) {
         if (Console_edit_lock(self)) {

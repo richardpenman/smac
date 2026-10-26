@@ -279,7 +279,7 @@ void THISCALL MapWin_on_left_down(uint8_t* win, int32_t px, int32_t py) {
         if (pfncPtToTile(win, px, py, &x, &y) || y < 0 || y >= MapAreaY || x < 0 || x >= MapAreaX) return;
     }
     if (mw(win, kMwOptions) & 0x40000) {
-        mw(win, kMwDragBase) = base_find_2(x, y, CurrentPlayerFaction);
+        mw(win, kMwDragBase) = base_find_faction(x, y, CurrentPlayerFaction);
         if (mw(win, kMwDragBase) < 0) return;
     }
     MapWinMouseIndex = mw(win, kMwIndex);
@@ -463,7 +463,7 @@ void THISCALL MapWin_click(uint8_t* win, int32_t px, int32_t py, int32_t right) 
         // Dragging a base's rally point: asked for which triad.
         set_base(drag_base);
         if (NetDaemon_lock_base(CurrentBaseID, 0, -1, -1)) return;
-        int32_t target = base_find_3(x, y, CurrentPlayerFaction, -1, -2, -1);
+        int32_t target = base_find_filtered(x, y, CurrentPlayerFaction, -1, -2, -1);
         parse_says(0, Bases[drag_base].name, -1, -1);
         parse_says(1, Bases[target].name, -1, -1);
         BasePop* pop = popup_new();

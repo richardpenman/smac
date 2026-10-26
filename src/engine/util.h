@@ -14,7 +14,7 @@ ADDR(0x628950) int32_t GAMEAPI stoi(const char* str);
 // Exchanges two 32-bit values (xor swap: both pointers must differ).
 ADDR(0x628A50) void GAMEAPI swap(int32_t* a, int32_t* b);
 // Exchanges two bytes (xor swap).
-ADDR(0x628A80) void GAMEAPI swap_2(uint8_t* a, uint8_t* b);
+ADDR(0x628A80) void GAMEAPI swap_bytes(uint8_t* a, uint8_t* b);
 // Number of significant bits (arithmetic shifts: never ends for negative values).
 ADDR(0x628AB0) int32_t GAMEAPI bit_count_signed(int32_t value);
 // 16.16 fixed-point division: (a << 16) / b.

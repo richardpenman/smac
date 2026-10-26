@@ -334,10 +334,10 @@ int32_t sound_group_volume(int32_t group) { return group >= 0 && group < 16 ? g_
 int32_t sound_master_volume() { return g_master; }
 
 void sound_apply_volume_prefs() {
-    sound_set_master_volume(prefs_get_2("Main Volume", 0x7F, 0));
-    sound_set_group_volume(0, prefs_get_2("Voice Volume", 0x55, 0));
-    sound_set_group_volume(1, prefs_get_2("SFX Volume", 0x5F, 0));
-    if (music_loaded()) music_set_volume(prefs_get_2("Music Volume", 0x3F, 0));
+    sound_set_master_volume(prefs_get_int("Main Volume", 0x7F, 0));
+    sound_set_group_volume(0, prefs_get_int("Voice Volume", 0x55, 0));
+    sound_set_group_volume(1, prefs_get_int("SFX Volume", 0x5F, 0));
+    if (music_loaded()) music_set_volume(prefs_get_int("Music Volume", 0x3F, 0));
 }
 
 void sound_enable_group(int32_t group, bool on) {

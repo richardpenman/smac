@@ -276,7 +276,7 @@ int32_t GAMEAPI shoot(int32_t faction_id_atk, int32_t faction_id_def, int32_t x,
         int32_t count = --def.satellites_ODP;
         if (count - def.ODP_deployed < 0) def.ODP_deployed = count;
     }
-    int32_t base_id = base_find_2(x, y, faction_id_def);
+    int32_t base_id = base_find_faction(x, y, faction_id_def);
     if (base_id < 0) base_id = base_find(x, y);
     parse_says(0, Bases[base_id].name, -1, -1);
     parse_num(0, def.satellites_ODP);
@@ -354,7 +354,7 @@ void GAMEAPI planet_busting(int32_t veh_id, int32_t x, int32_t y) {
     int32_t victim = -1;
     for (int32_t n = power; n > 0; n--) world_lower_alt(x, y);
     world_climate();
-    dword_9B22E0 = -1;
+    RainfallChangedBase = -1;
     FX_play(&Sounds, 0x3B);
     PlanetBusterBoomSize = power;
     boom(x, y, 0x20);
@@ -1092,7 +1092,7 @@ int32_t GAMEAPI battle_kill(int32_t veh_id, int32_t* kill_count, int32_t* captur
     if ((Vehs[veh_id].state & VSTATE_ASSISTANT_WORM) && veh_id_killer >= 0 && !(GamePreferences & 0x40000)) {
         int32_t base_id = Vehs[veh_id_killer].home_base_id;
         if (base_id >= 0 ||
-            (base_id = base_find_2(Vehs[veh_id_killer].x, Vehs[veh_id_killer].y, Vehs[veh_id_killer].faction_id)) >= 0) {
+            (base_id = base_find_faction(Vehs[veh_id_killer].x, Vehs[veh_id_killer].y, Vehs[veh_id_killer].faction_id)) >= 0) {
             PluralDefault = 0;
             uint32_t killer = Vehs[veh_id_killer].faction_id;
             Bases[base_id].state_flags |= 0x40000;
@@ -1537,7 +1537,7 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
         offense += offense / 2;
         bat_line(0, 50, label(0x554));
     }
-    if (MultiplayerActive) log_say_2("Battle Resolution!", veh_id, veh_id_def, 0);
+    if (MultiplayerActive) log_say_values("Battle Resolution!", veh_id, veh_id_def, 0);
     int32_t atk_unit_saved = Vehs[veh_id].unit_id;
     int32_t def_unit_saved = Vehs[veh_id_def].unit_id;
     if ((atk_f == (uint32_t)CurrentPlayerFaction || def_f == (uint32_t)CurrentPlayerFaction) && !MultiplayerActive &&
@@ -1903,7 +1903,7 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
                 parse_says(1, MFactions[captured].adj_name_faction, -1, -1);
                 popp(ScriptFileName, "THEYMARINEDETACH", 0, "navun_sm.pcx", 0);
             }
-            log_say_2("Detachment", 0, 0, 0);
+            log_say_values("Detachment", 0, 0, 0);
             captured = 1;
             break;
         }
@@ -1951,7 +1951,7 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
     // ---- outcome ----
     int32_t atk_left = veh_hp(veh_id);
     if (display || visible) {
-        draw_tile_fixup_2(ax, ay, x, y, 2, 2);
+        draw_tile_fixup_pair(ax, ay, x, y, 2, 2);
         if (disengaged && (ax != rx || ay != ry) && (x != rx || y != ry)) draw_tile_fixup(rx, ry, 2, 2);
         if (display) {
             bat_status(veh_id, veh_id_def, offense, defense, arty);
@@ -1987,14 +1987,14 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
         if (MultiplayerActive && def_f == (uint32_t)CurrentPlayerFaction) {
             parse_says(0, Units[Vehs[veh_id_def].unit_id].name, -1, -1);
             StrBuffer[0] = 0;
-            say_stats_3(StrBuffer, veh_id_def);
+            say_stats_short(StrBuffer, veh_id_def);
             parse_says(1, StrBuffer, -1, -1);
             parse_says(2, MFactions[atk_f].adj_name_faction, -1, -1);
             parse_says(3, Units[Vehs[veh_id].unit_id].name, -1, -1);
             StrBuffer[0] = 0;
-            say_stats_3(StrBuffer, Vehs[veh_id].unit_id);
+            say_stats_short(StrBuffer, Vehs[veh_id].unit_id);
             parse_says(4, StrBuffer, -1, -1);
-            int32_t b = base_find_3(x, y, -1, -1, -1, CurrentPlayerFaction);
+            int32_t b = base_find_filtered(x, y, -1, -1, -1, CurrentPlayerFaction);
             if (b >= 0) parse_says(5, Bases[b].name, -1, -1);
             bat_msg("COMBATSURVIVE", nullptr);
         }
@@ -2053,28 +2053,28 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
                 if (PbemActive && (FactionStatus[0] & (uint8_t)(1 << (def_f & 31)))) {
                     parse_says(0, Units[Vehs[veh_id_def].unit_id].name, -1, -1);
                     clear();
-                    say_stats_3(StrBuffer, Vehs[veh_id_def].unit_id);
+                    say_stats_short(StrBuffer, Vehs[veh_id_def].unit_id);
                     parse_says(1, StrBuffer, -1, -1);
                     parse_says(2, MFactions[atk_f].adj_name_faction, -1, -1);
                     parse_says(3, Units[Vehs[veh_id].unit_id].name, -1, -1);
                     clear();
-                    say_stats_3(StrBuffer, Vehs[veh_id].unit_id);
+                    say_stats_short(StrBuffer, Vehs[veh_id].unit_id);
                     parse_says(4, StrBuffer, -1, -1);
-                    int32_t b = base_find_3(x, y, -1, -1, -1, def_f);
+                    int32_t b = base_find_filtered(x, y, -1, -1, -1, def_f);
                     if (b >= 0) parse_says(5, Bases[b].name, -1, -1);
                     POP3("COMBATWIN", 0, def_f, x, y);
                 }
             } else {
                 parse_says(0, Units[Vehs[veh_id_def].unit_id].name, -1, -1);
                 clear();
-                say_stats_3(StrBuffer, Vehs[veh_id_def].unit_id);
+                say_stats_short(StrBuffer, Vehs[veh_id_def].unit_id);
                 parse_says(1, StrBuffer, -1, -1);
                 parse_says(2, MFactions[atk_f].adj_name_faction, -1, -1);
                 parse_says(3, Units[Vehs[veh_id].unit_id].name, -1, -1);
                 clear();
-                say_stats_3(StrBuffer, Vehs[veh_id].unit_id);
+                say_stats_short(StrBuffer, Vehs[veh_id].unit_id);
                 parse_says(4, StrBuffer, -1, -1);
-                int32_t b = base_find_3(x, y, -1, -1, -1, CurrentPlayerFaction);
+                int32_t b = base_find_filtered(x, y, -1, -1, -1, CurrentPlayerFaction);
                 if (b >= 0) parse_says(5, Bases[b].name, -1, -1);
                 bat_msg("COMBATWIN", nullptr);
             }
@@ -2093,28 +2093,28 @@ int32_t GAMEAPI battle_fight_2(int32_t veh_id, int32_t dir, int32_t x, int32_t y
                 if (PbemActive && (FactionStatus[0] & (uint8_t)(1 << (def_f & 31)))) {
                     parse_says(0, Units[Vehs[veh_id_def].unit_id].name, -1, -1);
                     StrBuffer[0] = 0;
-                    say_stats_3(StrBuffer, Vehs[veh_id_def].unit_id);
+                    say_stats_short(StrBuffer, Vehs[veh_id_def].unit_id);
                     parse_says(1, StrBuffer, -1, -1);
                     parse_says(2, MFactions[atk_f].adj_name_faction, -1, -1);
                     parse_says(3, Units[Vehs[veh_id].unit_id].name, -1, -1);
                     StrBuffer[0] = 0;
-                    say_stats_3(StrBuffer, Vehs[veh_id].unit_id);
+                    say_stats_short(StrBuffer, Vehs[veh_id].unit_id);
                     parse_says(4, StrBuffer, -1, -1);
-                    int32_t b = base_find_3(x, y, -1, -1, -1, def_f);
+                    int32_t b = base_find_filtered(x, y, -1, -1, -1, def_f);
                     if (b >= 0) parse_says(5, Bases[b].name, -1, -1);
                     POP3("COMBATLOSS", 0, def_f, x, y);
                 }
             } else {
                 parse_says(0, Units[Vehs[veh_id_def].unit_id].name, -1, -1);
                 StrBuffer[0] = 0;
-                say_stats_3(StrBuffer, Vehs[veh_id_def].unit_id);
+                say_stats_short(StrBuffer, Vehs[veh_id_def].unit_id);
                 parse_says(1, StrBuffer, -1, -1);
                 parse_says(2, MFactions[atk_f].adj_name_faction, -1, -1);
                 parse_says(3, Units[Vehs[veh_id].unit_id].name, -1, -1);
                 StrBuffer[0] = 0;
-                say_stats_3(StrBuffer, Vehs[veh_id].unit_id);
+                say_stats_short(StrBuffer, Vehs[veh_id].unit_id);
                 parse_says(4, StrBuffer, -1, -1);
-                int32_t b = base_find_3(x, y, -1, -1, -1, CurrentPlayerFaction);
+                int32_t b = base_find_filtered(x, y, -1, -1, -1, CurrentPlayerFaction);
                 if (b >= 0) parse_says(5, Bases[b].name, -1, -1);
                 NetMsg_pop(&NetMsg, "COMBATLOSS", 5000, 0, nullptr);
             }

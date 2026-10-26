@@ -58,7 +58,7 @@ void GAMEAPI swap(int32_t* a, int32_t* b) {
     *a ^= *b;
 }
 
-void GAMEAPI swap_2(uint8_t* a, uint8_t* b) {
+void GAMEAPI swap_bytes(uint8_t* a, uint8_t* b) {
     *a ^= *b;
     *b ^= *a;
     *a ^= *b;

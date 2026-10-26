@@ -28,7 +28,7 @@ ADDR(0x5A58B0) void GAMEAPI space();
 // Sets the parse defaults (GenderDefault, PluralDefault).
 ADDR(0x5A58E0) void GAMEAPI parse_set(int32_t gender, int32_t plural);
 // Distance measure between two tiles (vector_dist of the wrapped deltas).
-ADDR(0x5A5910) int32_t GAMEAPI vector_dist_2(int32_t x1, int32_t y1, int32_t x2, int32_t y2);
+ADDR(0x5A5910) int32_t GAMEAPI tile_distance(int32_t x1, int32_t y1, int32_t x2, int32_t y2);
 
 // Probe state shared with success_rates: ProbeHasAlgoEnhancement, ProbeTargetFactionID,
 // ProbeTargetHasHSA (globals.h).

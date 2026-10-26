@@ -25,7 +25,7 @@ ADDR(0x50DDC0) int32_t GAMEAPI sea_coast(int32_t region_land, int32_t region_sea
 // Whether a port base can reach the coast of land region region by sea.
 ADDR(0x50E030) int32_t GAMEAPI port_to_coast(int32_t base_id, int32_t region);
 // Small wrappers at the start of the module: POP3 with no picture, the next vehicle of veh_id's
-// stack (-1 for -1; FUN_0050B8F0), say_stats_3 into StrBuffer, NetMsg_pop with a 5 s delay
+// stack (-1 for -1; FUN_0050B8F0), say_stats_short into StrBuffer, NetMsg_pop with a 5 s delay
 // (FUN_0050B9C0).
 ADDR(0x50B8D0) int32_t GAMEAPI POP3_2(const char* label, int32_t faction_id, int32_t x, int32_t y);
 ADDR(0x50B8F0) int32_t GAMEAPI veh_stack_next(int32_t veh_id);

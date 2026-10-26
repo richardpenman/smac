@@ -1,6 +1,6 @@
 // Map geometry of the original: distances, wrapping, directions and the radius table. All are
-// fcompare entries (harness/oracle/fcompare_table.h: x_dist, vector_dist, vector_dist_2,
-// compass_index, radius_move, radius_move_2, round_down), i.e. proven equal to the original on the
+// fcompare entries (harness/oracle/fcompare_table.h: x_dist, vector_dist, tile_distance,
+// compass_index, radius_move, radius_move_tiles, round_down), i.e. proven equal to the original on the
 // harness scenarios' states; the values here are worked out by hand from the original's code.
 // Coordinates are the original's: x steps by 2 along a row, rows alternate odd/even x.
 #include <algorithm>
@@ -52,8 +52,8 @@ TEST_CASE("x_dist: horizontal distance, wrapped on round maps") {
     }
 }
 
-TEST_CASE("vector_dist_2 and veh_vector_dist: the same wrapped distance") {
-    // veh_vector_dist is the distance the original inlines; vector_dist_2 (0x5A5910) is the function.
+TEST_CASE("tile_distance and veh_vector_dist: the same wrapped distance") {
+    // veh_vector_dist is the distance the original inlines; tile_distance (0x5A5910) is the function.
     // Both must agree on every pair of tiles (a candidate for merging in the cleanup).
     for (bool flat : {false, true}) {
         MapDims dims(40, 20, flat);
@@ -61,7 +61,7 @@ TEST_CASE("vector_dist_2 and veh_vector_dist: the same wrapped distance") {
             for (int32_t y1 = 0; y1 < 20; y1 += 2) {
                 for (int32_t x2 = 0; x2 < 40; x2++) {
                     for (int32_t y2 = 0; y2 < 20; y2++) {
-                        int32_t d = vector_dist_2(x1, y1, x2, y2);
+                        int32_t d = tile_distance(x1, y1, x2, y2);
                         REQUIRE(d == veh_vector_dist(x1, y1, x2, y2));
                         REQUIRE(d == vector_dist(x_dist(x1, x2), y1 - y2));
                     }
@@ -70,8 +70,8 @@ TEST_CASE("vector_dist_2 and veh_vector_dist: the same wrapped distance") {
         }
     }
     MapDims dims(40, 20, false);
-    CHECK(vector_dist_2(0, 0, 39, 1) == 1);  // across the date line
-    CHECK(vector_dist_2(0, 0, 4, 0) == 3);
+    CHECK(tile_distance(0, 0, 39, 1) == 1);  // across the date line
+    CHECK(tile_distance(0, 0, 4, 0) == 3);
 }
 
 TEST_CASE("compass_index: direction of a delta, by sign only (NearOffset order)") {
@@ -98,12 +98,12 @@ TEST_CASE("radius_move: index of a delta in the radius table (TableOffset order)
     for (int32_t i = 0; i < 289; i++) REQUIRE(radius_move(TableOffsetX[i], TableOffsetY[i], 289) == i);
 }
 
-TEST_CASE("radius_move_2: radius index between two tiles, wrapped") {
+TEST_CASE("radius_move_tiles: radius index between two tiles, wrapped") {
     MapDims dims(40, 20, false);
-    CHECK(radius_move_2(10, 10, 10, 10, 9) == 0);
-    CHECK(radius_move_2(10, 10, 11, 9, 9) == 1);
-    CHECK(radius_move_2(0, 10, 39, 9, 9) == 7);  // dx -1 across the date line: NW
-    CHECK(radius_move_2(10, 10, 30, 10, 289) == -1);
+    CHECK(radius_move_tiles(10, 10, 10, 10, 9) == 0);
+    CHECK(radius_move_tiles(10, 10, 11, 9, 9) == 1);
+    CHECK(radius_move_tiles(0, 10, 39, 9, 9) == 7);  // dx -1 across the date line: NW
+    CHECK(radius_move_tiles(10, 10, 30, 10, 289) == -1);
 }
 
 TEST_CASE("round_down: quotient truncated toward zero, times step") {

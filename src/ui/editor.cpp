@@ -1295,7 +1295,7 @@ void GAMEAPI Console_editor_view() {
         PopupDialogState = 0;
     }
     CurrentPlayerFaction = r;
-    if (base_find_2(cur_x(), cur_y(), r) >= 0) Console_focus(&MainConsole, cur_x(), cur_y(), CurrentPlayerFaction);
+    if (base_find_faction(cur_x(), cur_y(), r) >= 0) Console_focus(&MainConsole, cur_x(), cur_y(), CurrentPlayerFaction);
     Console_set_view(&MainConsole, 1);
     draw_map(1);
     std::fprintf(stderr, "editor: view faction %d (humans %02X)\n", r, FactionStatus[0]);

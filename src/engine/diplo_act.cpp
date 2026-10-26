@@ -441,7 +441,7 @@ void GAMEAPI capture_base(int32_t base_id, int32_t faction_id, int32_t is_probe)
         for (int32_t i = VehCount - 1; i >= 0; i--) {
             if (i >= VehCount || Vehs[i].faction_id != (uint32_t)old || Vehs[i].home_base_id != base_id) continue;
             Bases[base_id].faction_id = (int8_t)0xFF;
-            int32_t home = base_find_2(x, y, old);
+            int32_t home = base_find_faction(x, y, old);
             Bases[base_id].faction_id = (int8_t)faction_id;
             if (home >= 0) {
                 int32_t dx = std::abs(x - Vehs[i].x);
@@ -577,7 +577,7 @@ void GAMEAPI capture_base(int32_t base_id, int32_t faction_id, int32_t is_probe)
                 parse_says(2, Bases[i].name, -1, -1);
             }
         }
-        int32_t near = base_find_2(x, y, old);
+        int32_t near = base_find_faction(x, y, old);
         int32_t label;
         if (near < 0) {
             label = 403;
@@ -623,7 +623,7 @@ int32_t GAMEAPI POP3_2(const char* label, int32_t faction_id, int32_t x, int32_t
 
 int32_t GAMEAPI veh_stack_next(int32_t veh_id) { return veh_id >= 0 ? Vehs[veh_id].next_veh_id_stack : veh_id; }
 
-void GAMEAPI say_stats_3_2(int32_t unit_id) { say_stats_3(StrBuffer, unit_id); }
+void GAMEAPI say_stats_3_2(int32_t unit_id) { say_stats_short(StrBuffer, unit_id); }
 
 int32_t GAMEAPI NetMsg_pop_3(const char* label, const char* pcx) { return NetMsg_pop(&NetMsg, label, 5000, 0, pcx); }
 

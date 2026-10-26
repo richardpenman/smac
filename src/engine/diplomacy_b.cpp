@@ -1009,7 +1009,7 @@ void GAMEAPI give_a_base(int32_t base_id, int32_t faction_id) {
                         (unit_triad(veh.unit_id) == 1 && (dist == 0 || land));
         if (!transfer) {
             base.faction_id = (uint8_t)faction_id;
-            int32_t nb = base_find_2(bx, by, old);
+            int32_t nb = base_find_faction(bx, by, old);
             base.faction_id = old;
             if (nb >= 0) {
                 int32_t ndx = std::abs(Bases[nb].x - bx);

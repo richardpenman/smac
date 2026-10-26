@@ -89,7 +89,7 @@ int32_t GAMEAPI base_at(int32_t x, int32_t y) {
     if (y < 0 || y >= MapAreaY || x < 0 || x >= MapAreaX || !(map_tile(x, y)->items & 1)) return -1;
     for (int32_t i = 0; i < BaseCount; i++)
         if (Bases[i].x == x && Bases[i].y == y) return i;
-    if (!BaseBitErrorShown) log_say_2("Base Bits Error  (x, y)", x, y, 0);
+    if (!BaseBitErrorShown) log_say_values("Base Bits Error  (x, y)", x, y, 0);
     if (!(GameState & 0x1000)) {
         rebuild_base_bits();
         return -1;
@@ -123,7 +123,7 @@ int32_t GAMEAPI base_find(int32_t x, int32_t y) {
     return found;
 }
 
-int32_t GAMEAPI base_find_2(int32_t x, int32_t y, int32_t faction_id) {
+int32_t GAMEAPI base_find_faction(int32_t x, int32_t y, int32_t faction_id) {
     int32_t best = 9999, found = -1;
     for (int32_t i = 0; i < BaseCount; i++) {
         if ((uint8_t)Bases[i].faction_id != (uint32_t)faction_id) continue;
@@ -137,7 +137,7 @@ int32_t GAMEAPI base_find_2(int32_t x, int32_t y, int32_t faction_id) {
     return found;
 }
 
-int32_t GAMEAPI base_find_3(int32_t x, int32_t y, int32_t faction_id, int32_t region, int32_t faction_id_2,
+int32_t GAMEAPI base_find_filtered(int32_t x, int32_t y, int32_t faction_id, int32_t region, int32_t faction_id_2,
                             int32_t faction_id_3) {
     int32_t best = 9999, found = -1;
     BaseFindDist = 9999;
@@ -176,7 +176,7 @@ int32_t GAMEAPI whose_territory(int32_t faction_id, int32_t x, int32_t y, int32_
     if (!ignore_comm && !(GameState & 0x80) &&
         (Factions[faction_id].diplo_status[owner] & 0x8000008) != 0x8000008)
         return -1;
-    if (base_id) *base_id = base_find_3(x, y, -1, sq->region, -1, -1);
+    if (base_id) *base_id = base_find_filtered(x, y, -1, sq->region, -1, -1);
     return owner;
 }
 
@@ -558,7 +558,7 @@ void GAMEAPI base_kill(int32_t base_id) {
             continue;
         }
         base.faction_id = (int8_t)0xFF;  // excluded from the search
-        int32_t home = base_find_2(x, y, faction_id);
+        int32_t home = base_find_faction(x, y, faction_id);
         base.faction_id = (int8_t)faction_id;
         if (home < 0) kill(veh_id);
         else Vehs[veh_id].home_base_id = (int16_t)home;
@@ -2499,7 +2499,7 @@ void say_unit_upgrade(int32_t unit_id) {
     std::strcat(StrBuffer, Units[unit_id].name);
     std::strcat(StrBuffer, " ");
     std::strcat(StrBuffer, "(");
-    say_stats_2(StrBuffer, unit_id);
+    say_stats_labeled(StrBuffer, unit_id);
     if (Units[unit_id].ability_flags) {
         std::strcat(StrBuffer, " ");
         for (int32_t i = 0; i < 29; i++)
@@ -3326,7 +3326,7 @@ void GAMEAPI base_production() {
         if (base->minerals_accumulated > limit && is_human())
             base->minerals_accumulated = limit < 0 ? 0 : (exempt < base->mineral_surplus ? exempt : base->mineral_surplus);
         base->minerals_accumulated_2 = base->minerals_accumulated;
-        if (dword_90EA40) return;
+        if (BaseProductionNoVeh) return;
         int32_t veh_id = veh_init(unit_id, faction_id, cur_base().x, cur_base().y);
         if (veh_id < 0) return;
         if (u.plan == 8) {
@@ -3617,7 +3617,7 @@ void GAMEAPI base_production() {
         if (sp == 31) interlude(0xC, 0, 1, 0);
         if (GamePreferences & 0x10000000) {
             if (!MultiplayerActive && faction_id == CurrentPlayerFaction) amovie_project(sp);
-            if (!MultiplayerActive && faction_id != CurrentPlayerFaction && sp == 32) amovie_project_2("theyTranscend");
+            if (!MultiplayerActive && faction_id != CurrentPlayerFaction && sp == 32) amovie_project_name("theyTranscend");
         }
         if (faction_id == CurrentPlayerFaction) help_project(sp);
         if (sp == 31) {
@@ -4172,9 +4172,9 @@ int32_t GAMEAPI base_upkeep(int32_t base_id) {
     ComputeBaseID = -1;
     if (CurrentBaseID == BaseUpkeepDrawID) BaseWin_on_redraw(&BaseWin);
     if (BaseUpkeepFlag && (!(GameState & 1) || (GameState & 8))) {
-        log_say_2("UPKEEP zoom-to-base", base_id, 0, 0);
+        log_say_values("UPKEEP zoom-to-base", base_id, 0, 0);
         BaseWin_zoom(&BaseWin, base_id, 1);
-        log_say_2("FINISHED zoom-to-base", base_id, 0, 0);
+        log_say_values("FINISHED zoom-to-base", base_id, 0, 0);
     }
     BaseUpkeepState = 0;
     BASE& b = cur_base();

@@ -1121,9 +1121,9 @@ void GAMEAPI battle_plans(int32_t f, int32_t fw) {
         pop("BATTLENO", fw);
         return;
     }
-    base_find_2(Bases[tw].x, Bases[tw].y, fw);
+    base_find_faction(Bases[tw].x, Bases[tw].y, fw);
     int32_t d1 = BaseFindDist;
-    base_find_2(t.x, t.y, fw);
+    base_find_faction(t.x, t.y, fw);
     if (BaseFindDist >= d1 * 2) {
         pop("BATTLENO", fw);
         return;

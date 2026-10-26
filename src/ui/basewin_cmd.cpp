@@ -191,7 +191,7 @@ void THISCALL BaseWin_farm_click(uint8_t* self, int32_t x, int32_t y, int32_t) {
         cur_base().worked_tiles |= bit;
     }
     recompute_redraw(self);
-    if (changed) log_say_2("BASE: changed farming locations", CurrentBaseID, 0, 0);
+    if (changed) log_say_values("BASE: changed farming locations", CurrentBaseID, 0, 0);
     bw_unlock_base(CurrentBaseID);
 }
 
@@ -263,7 +263,7 @@ void THISCALL BaseWin_pop_click(uint8_t* self, int32_t index, int32_t, int32_t, 
         }
         set_specialist_type(index, r);
     }
-    log_say_2("BASE: changed citizen professions", CurrentBaseID, 0, 0);
+    log_say_values("BASE: changed citizen professions", CurrentBaseID, 0, 0);
     if (Win_is_visible(self)) {
         set_base(bwf(kBwBase));
         base_compute(1);
@@ -370,12 +370,12 @@ void THISCALL BaseWin_facilities_click(uint8_t* self, int32_t fac, int32_t, int3
             if (i != CurrentBaseID) synch_base(i);
         }
         Factions[faction_id].energy_credits += refund;
-        log_say_2("BASE: global scrapped facility", CurrentBaseID, 0, 0);
+        log_say_values("BASE: global scrapped facility", CurrentBaseID, 0, 0);
     } else {
         cur_base().state_flags |= 0x200;
         set_fac(fac, CurrentBaseID, 0);
         Factions[faction_id].energy_credits += refund;
-        log_say_2("BASE: scrapped facility", CurrentBaseID, 0, 0);
+        log_say_values("BASE: scrapped facility", CurrentBaseID, 0, 0);
     }
     ComputeBaseID = -1;
     base_compute(0);
@@ -498,7 +498,7 @@ void THISCALL BaseWin_hurry(uint8_t* self) {
     cur_base().minerals_accumulated_2 = result;
     cur_base().minerals_accumulated = result;
     cur_base().production_id_last = cur_base().queue_items[0];
-    log_say_2("BASE: hurried production", CurrentBaseID, 0, 0);
+    log_say_values("BASE: hurried production", CurrentBaseID, 0, 0);
     bw_unlock_base(CurrentBaseID);
     bw_redraw();
     GraphicWin_redraw(&MainInterfaceWin);

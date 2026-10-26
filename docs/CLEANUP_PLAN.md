@@ -183,7 +183,7 @@ and the screenshot comparisons (`tests/*/compare.sh`, which need Wine).
   `x_dist`, `compass_index`, `radius_move`, …), text substitution (`parse_string`), random
   generators. All of them are fcompare-verified or on every harness path. Expected values are
   derived from the original's code and document its quirks. One test already pins a duplicate:
-  `veh_vector_dist` equals `vector_dist_2`.
+  `veh_vector_dist` equals `tile_distance`.
 * Next: rules lookups (`proto_cost`, `arm_val`, `weap_val`), combat odds (`battle_compute`
   pieces after the split), terrain math (`crop_yield`, `mine_yield` on a synthetic map), base
   growth formulas, social effects (`social_calc`), save round-trip (load a save, write it, compare
@@ -218,7 +218,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 2 | doctest + first unit tests (util, geometry, text, random) | S | done |
 | 3 | Name table + check + rename tool; first weak names (`base_unused_helper_1/2`) | S | done |
 | 4 | `.editorconfig`, target clang-format style (not applied) | XS | done |
-| 5 | Rename remaining weak names: `_2`/`_3` suffixes where a better name is clear, 36 `dword_`/`DAT_` globals | M | |
+| 5 | Rename remaining weak names: `_2`/`_3` suffixes where a better name is clear, 36 `dword_`/`DAT_` globals | M | done (see note 5) |
 | 6 | One-time reformat (if approved) | S (mechanical) | |
 | 7 | `GameState` view + `game()`; migrate module by module (map, factions, bases, vehs) | M ×4 | |
 | 8 | Magic numbers → named constants/enums, module by module | M | |
@@ -237,3 +237,24 @@ Each row is one commit (or a few), and each passes the gate.
 | 21 | UI windows: typed views, then classes | L | |
 
 Sizes: XS < 1 h, S ≈ hours, M ≈ a day, L ≈ several days, XL ≈ a week or more of agent time.
+
+Notes on the increments:
+
+5. All 22 `dword_`/`DAT_` globals and the two used `dword_` fields of `GamePrefs` (`TutorialChecks`,
+   `TutorialChecks2`) are named from their uses in the original (re/out/functions.jsonl); the
+   global's comment says what it holds. The other `GLOBAL` lines that mention `DAT_` only keep the
+   address as a comment. Three `GamePrefs` fields (`dword_9A64A0`, `dword_9A64BC`, `dword_9A64D0`)
+   have no reader or writer in the original apart from `setup_game` clearing them, so they keep
+   their address names. Renamed free functions (`_2`/`_3`): `vector_dist_2` → `tile_distance` (the
+   inlined copy in diplomacy.cpp became `tile_distance_inline`), `base_find_2/3` →
+   `base_find_faction`/`base_find_filtered`, `radius_move_2` → `radius_move_tiles`, `prefs_get_2`/
+   `prefs_put_2` → `prefs_get_int`/`prefs_put_int`, `log_say_2`/`log_say_hex_2` →
+   `log_say_values`/`log_say_hex`, `swap_2` → `swap_bytes`, `proto_sort_2` → `proto_sort_design`,
+   `say_stats_3`/`say_stats_2` → `say_stats_short`/`say_stats_labeled`, `clear_council_notify_2` →
+   `clear_council_notify_all`, `draw_tile_fixup_2` → `draw_tile_fixup_pair`, `amovie_project_2` →
+   `amovie_project_name`. Left for later (no clearly better name yet, or a UI class method):
+   `battle_fight_2` (named when it is split, increment 11), the popup family (`X_pop_2`, `popp_2`,
+   `POP3_2`, `NetMsg_pop_2/3`), `say_tech_2`/`tech_name_2`, `say_stats_3_2`, `say_morale_2`,
+   `say_orders_2`, `get_pacts_2`, `stack_sort_2`, and the methods of the UI classes (`Buffer_*`,
+   `Sprite_*`, `Texture_*`, `Font_*`, `Palette_*`, `Wave_*`, `Sound_*`, `Console_*`, `MapWin_*`,
+   `GraphicWin_*`), which get their names with the class (section 7.3).

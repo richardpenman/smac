@@ -22,12 +22,12 @@ ADDR(0x5A5D40) void GAMEAPI make_proto(int32_t unit_id, int32_t chassis_id, int3
 // Sorts the basic and faction prototypes for the design workshop (ProtoSortList).
 ADDR(0x5A6270) void GAMEAPI proto_sort(int32_t faction_id);
 // Same for the prototype list of the design window (obsolete designs last).
-ADDR(0x5A63D0) void GAMEAPI proto_sort_2(int32_t faction_id);
+ADDR(0x5A63D0) void GAMEAPI proto_sort_design(int32_t faction_id);
 // 0x5A6510: index (0-8) of the NearOffset direction with the signs of (dx, dy), or -1.
 ADDR(0x5A6510) int32_t GAMEAPI compass_index(int32_t dx, int32_t dy);
 // Index of offset (dx, dy) among the first count TableOffset entries, or -1.
 ADDR(0x5A65A0) int32_t GAMEAPI radius_move(int32_t dx, int32_t dy, int32_t count);
 // Same for the (wrapped) offset from (x1, y1) to (x2, y2).
-ADDR(0x5A65D0) int32_t GAMEAPI radius_move_2(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t count);
+ADDR(0x5A65D0) int32_t GAMEAPI radius_move_tiles(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t count);
 // Index (0-8) of the NearOffset direction from (x1, y1) towards (x2, y2), or -1.
 ADDR(0x5A6630) int32_t GAMEAPI compass_move(int32_t x1, int32_t y1, int32_t x2, int32_t y2);

@@ -1,5 +1,5 @@
 // Movies (ui module): amovie_project (0x403BA0: the secret project's movie by its line in
-// movlist.txt's #PROJECTS) and amovie_project_2 (0x403BE0: movies\NAME.wve, else the CD's, else
+// movlist.txt's #PROJECTS) and amovie_project_name (0x403BE0: movies\NAME.wve, else the CD's, else
 // movies\NAME.avi; the opening, faction, defeat and victory movies), played by FUN_004BEA50 (the
 // EA movie player of the video module, 640 x 480: Enter, Esc, space or a click end it). The WVE
 // files are decoded by wve.cpp; the frames (15 per second, timed by the clock from the start of the
@@ -26,10 +26,10 @@ void GAMEAPI amovie_project(int32_t project_id) {
     if (text_open("MOVLIST", "PROJECTS")) return;
     text_get();
     for (int32_t i = 0; i < project_id; i++) text_get();
-    amovie_project_2(text_item());
+    amovie_project_name(text_item());
 }
 
-void GAMEAPI amovie_project_2(const char* name) {
+void GAMEAPI amovie_project_name(const char* name) {
     sound_log("movie %s", name ? name : "");
     if (!name) return;
     std::string path = std::string("movies\\") + name + ".wve";

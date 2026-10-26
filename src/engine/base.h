@@ -52,11 +52,11 @@ ADDR(0x4E3A50) int32_t GAMEAPI base_at(int32_t x, int32_t y);
 // Nearest base to (x, y) (the last one on ties); its distance goes to BaseFindDist. -1 if none.
 ADDR(0x4E3B80) int32_t GAMEAPI base_find(int32_t x, int32_t y);
 // Nearest base of faction_id to (x, y).
-ADDR(0x4E3C60) int32_t GAMEAPI base_find_2(int32_t x, int32_t y, int32_t faction_id);
+ADDR(0x4E3C60) int32_t GAMEAPI base_find_faction(int32_t x, int32_t y, int32_t faction_id);
 // Nearest base to (x, y) with filters: region (-1 any), owner faction_id (-1: any owner equal to
 // faction_id_2, or with faction_id_2 == -2 any faction with a pact), faction_id_3 (-1 any: owner or
 // a faction that sees the base). BaseFindDist is 9999 when none is found.
-ADDR(0x4E3D50) int32_t GAMEAPI base_find_3(int32_t x, int32_t y, int32_t faction_id, int32_t region,
+ADDR(0x4E3D50) int32_t GAMEAPI base_find_filtered(int32_t x, int32_t y, int32_t faction_id, int32_t region,
                                            int32_t faction_id_2, int32_t faction_id_3);
 // Owner of the territory at (x, y) as seen by faction_id (-1 none or not visible without a
 // commlink unless ignore_comm). For foreign territory, *base_id receives the claiming base.

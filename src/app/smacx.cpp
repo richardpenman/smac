@@ -567,7 +567,7 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         out->command = "musicrender " + tok.substr(12);
         return true;
     }
-    if (tok.rfind("MOVIE:", 0) == 0) {  // MOVIE:NAME, amovie_project_2(NAME) (test aid)
+    if (tok.rfind("MOVIE:", 0) == 0) {  // MOVIE:NAME, amovie_project_name(NAME) (test aid)
         out->command = "movie " + tok.substr(6);
         return true;
     }

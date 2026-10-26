@@ -240,7 +240,7 @@ void GAMEAPI proto_sort(int32_t faction_id) {
     sort(128, ProtoSortList, values);
 }
 
-void GAMEAPI proto_sort_2(int32_t faction_id) {
+void GAMEAPI proto_sort_design(int32_t faction_id) {
     int32_t values[128];
     ProtoSortCount = 0;
     for (int32_t i = 0; i < 128; i++) {
@@ -299,7 +299,7 @@ int32_t GAMEAPI radius_move(int32_t dx, int32_t dy, int32_t count) {
     return -1;
 }
 
-int32_t GAMEAPI radius_move_2(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t count) {
+int32_t GAMEAPI radius_move_tiles(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t count) {
     int32_t dx = wrap_delta(x1, x2);
     for (int32_t i = 0; i < count; i++) {
         if (dx == TableOffsetX[i] && y2 - y1 == TableOffsetY[i]) return i;

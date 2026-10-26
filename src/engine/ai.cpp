@@ -239,7 +239,7 @@ int32_t GAMEAPI can_convoy(int32_t x, int32_t y) {
     for (int32_t i = 0; i < BaseCount; i++) {
         const BASE& b = Bases[i];
         if (tile_dist(x, y, b.x, b.y) < 3) {
-            int32_t r = radius_move_2(b.x, b.y, x, y, 21);
+            int32_t r = radius_move_tiles(b.x, b.y, x, y, 21);
             if (r >= 0 && ((1u << (r & 31)) & (uint32_t)b.worked_tiles)) return 0;
         }
     }
@@ -499,7 +499,7 @@ int32_t GAMEAPI enemy_veh(int32_t veh_id) {
         (v.state & 0x4000) || zoc_any(v.x, v.y, faction_id)) {
         if (enemy_move(veh_id)) return 1;
         if (veh_moves_done(veh_id)) {
-            if (MultiplayerActive) log_say_2("Enemy Vehicle DONE", veh_id, 0, 0);
+            if (MultiplayerActive) log_say_values("Enemy Vehicle DONE", veh_id, 0, 0);
             if (synch) {
                 synch_veh(veh_id);
                 NetDaemon_await_synch(&NetState);
@@ -940,14 +940,14 @@ int32_t GAMEAPI alien_move(int32_t veh_id) {
                 if ((dy + dx) >> 1 <= Rules.artillery_max_rng) {
                     MAP* sq = map_tile(tx, ty);
                     if (!(sq->items & (BIT_BASE_IN_TILE | BIT_VEH_IN_TILE)) || (sq->val2 & 0xF) > 7) {
-                        log_say_2("Enemy doing ARTY destroy 1...", veh_id, tx, ty);
+                        log_say_values("Enemy doing ARTY destroy 1...", veh_id, tx, ty);
                         action_destroy(veh_id, 0, tx, ty);
                         for (int32_t f = 1; f < 8; f++) synch_bit(tx, ty, f);
                         draw_tile(tx, ty, 2);
                         return 1;
                     }
                     if (arty > 8) {
-                        log_say_2("Enemy doing ARTY...", veh_id, arty, 0);
+                        log_say_values("Enemy doing ARTY...", veh_id, arty, 0);
                         battle_fight(veh_id, arty, 1, 1, nullptr);
                         return 1;
                     }
@@ -2208,8 +2208,8 @@ void enemy_strategy_regions(int32_t faction_id, int32_t abandon, int32_t target_
                 if (bat >= 0 && (f.diplo_status[(uint8_t)Bases[bat].faction_id] & 0x810) &&
                     tile_region(Bases[bat].x, Bases[bat].y) == best_region) {
                     BaseFindDist = vdist(b.x, b.y, Bases[bat].x, Bases[bat].y);
-                } else if (base_find_3(b.x, b.y, enemy, best_region, -1, -1) < 0) {
-                    base_find_2(b.x, b.y, enemy);
+                } else if (base_find_filtered(b.x, b.y, enemy, best_region, -1, -1) < 0) {
+                    base_find_faction(b.x, b.y, enemy);
                     BaseFindDist *= 2;
                 }
                 if (BaseFindDist < best_dist) {
@@ -2228,7 +2228,7 @@ void enemy_strategy_regions(int32_t faction_id, int32_t abandon, int32_t target_
                     int32_t u = v.unit_id;
                     if ((uint8_t)Units[u].plan > 2 || unit_triad(u) != TRIAD_LAND || has_abil(v.unit_id, ABL_DROP_POD)) continue;
                     if (tile_region(v.x, v.y) != best_region || (v.order != ORDER_NONE && v.order != ORDER_MOVE_TO)) continue;
-                    base_find_2(v.x, v.y, enemy);
+                    base_find_faction(v.x, v.y, enemy);
                     if (vdist(v.x, v.y, f.target_x, f.target_y) >= BaseFindDist) continue;
                     int32_t ws = weap_strat(Units[v.unit_id].weapon_id, faction_id);
                     int32_t as = arm_strat(Units[v.unit_id].armor_id, faction_id);
@@ -2629,7 +2629,7 @@ int32_t GAMEAPI air_power(int32_t veh_id, int32_t dist_own, int32_t zoc, int32_t
                     MAP* bsq = map_tile(b.x, b.y);
                     if ((bsq->climate & 0xE0) < 0x60) continue;
                     if (f.region_total_bases[bsq->region] != 0) {
-                        base_find_2(b.x, b.y, faction_id);
+                        base_find_faction(b.x, b.y, faction_id);
                         if (BaseFindDist <= 9) continue;
                     }
                     int32_t s = (b.pop_size + 4) / 5 * 8;
@@ -2673,7 +2673,7 @@ int32_t GAMEAPI air_power(int32_t veh_id, int32_t dist_own, int32_t zoc, int32_t
                         continue;
                     }
                     if (f.region_total_bases[tile_region(b.x, b.y)] != 0) {
-                        base_find_2(b.x, b.y, faction_id);
+                        base_find_faction(b.x, b.y, faction_id);
                         if (BaseFindDist <= 4) continue;
                     }
                     int32_t s0 = b.pop_size << 3;
@@ -2724,7 +2724,7 @@ int32_t GAMEAPI air_power(int32_t veh_id, int32_t dist_own, int32_t zoc, int32_t
                     bool close = false;
                     int32_t near;
                     if (t.order == ORDER_TERRAFORM_DOWN && map_is_ocean(t.x, t.y) &&
-                        (near = base_find_2(t.x, t.y, faction_id)) >= 0 &&
+                        (near = base_find_faction(t.x, t.y, faction_id)) >= 0 &&
                         air_dist2(t.x, t.y, Bases[near].x, Bases[near].y) <= 4) {
                         close = true;
                     } else if ((t.faction_id != faction_id || (t.flags & 0x440) == 0x440) && !(self_bit & t.visibility) &&
@@ -2892,7 +2892,7 @@ int32_t GAMEAPI air_power(int32_t veh_id, int32_t dist_own, int32_t zoc, int32_t
             bool close = false;
             int32_t near;
             if (t.order == ORDER_TERRAFORM_DOWN && map_is_ocean(t.x, t.y) &&
-                (near = base_find_2(t.x, t.y, faction_id)) >= 0 &&
+                (near = base_find_faction(t.x, t.y, faction_id)) >= 0 &&
                 air_dist2(t.x, t.y, Bases[near].x, Bases[near].y) <= 4) {
                 close = true;
             } else if ((t.faction_id != faction_id || (t.flags & 0x440) == 0x440) && !(self_bit & t.visibility)) {
@@ -2931,7 +2931,7 @@ int32_t GAMEAPI air_power(int32_t veh_id, int32_t dist_own, int32_t zoc, int32_t
                 if (!(v.state & 0x200) || v.order_auto_type != 12) {
                     score_it = true;
                 } else if (map_is_ocean(t.x, t.y)) {
-                    base_find_2(t.x, t.y, faction_id);
+                    base_find_faction(t.x, t.y, faction_id);
                     score_it = BaseFindDist < 3;
                 } else {
                     score_it = (uint32_t)whose_territory(faction_id, t.x, t.y, nullptr, 0) == faction_id;

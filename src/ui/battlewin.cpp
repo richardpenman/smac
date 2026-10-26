@@ -305,7 +305,7 @@ void THISCALL BattleWin_battle_report(uint8_t*, int32_t atk, int32_t def, int32_
             y = t.empty() ? y : Buffer_wrap_2(c, t.c_str(), &r);
         };
         char st[256] = "";
-        say_stats_3(st, Vehs[v].unit_id);
+        say_stats_short(st, Vehs[v].unit_id);
         wrap(st);
         bool armor = dside && (!(flags & 2) || Chassis[u.chassis_id].triad == 1);
         if (!probes) {

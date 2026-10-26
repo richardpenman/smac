@@ -29,10 +29,10 @@ void GAMEAPI load_sprites() {}
 void GAMEAPI config_popups() {
     CanvasWidth = ScreenWidth;
     CanvasHeight = ScreenHeight;
-    UnitAnimMode = prefs_get_2("FastUnitAnim", 0, 0);
-    prefs_put_2("FastUnitAnim", (uint32_t)UnitAnimMode, 0);
-    if (!UnitAnimMode && prefs_get_2("SmoothUnitAnim", 0, 0)) UnitAnimMode = -1;
-    prefs_put_2("SmoothUnitAnim", UnitAnimMode < 0, 0);
+    UnitAnimMode = prefs_get_int("FastUnitAnim", 0, 0);
+    prefs_put_int("FastUnitAnim", (uint32_t)UnitAnimMode, 0);
+    if (!UnitAnimMode && prefs_get_int("SmoothUnitAnim", 0, 0)) UnitAnimMode = -1;
+    prefs_put_int("SmoothUnitAnim", UnitAnimMode < 0, 0);
 }
 // The window block (0x22480 bytes, system_init) is zeroed, so the view fields saved by game_io
 // are deterministic (all zero).

@@ -17,7 +17,7 @@ void GAMEAPI draw_radius(int32_t, int32_t, int32_t, int32_t) {}
 void GAMEAPI draw_tile(int32_t, int32_t, int32_t) {}
 void GAMEAPI draw_tiles(int32_t, int32_t, int32_t) {}
 void GAMEAPI draw_tile_fixup(int32_t, int32_t, int32_t, int32_t) {}
-void GAMEAPI draw_tile_fixup_2(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t) {}
+void GAMEAPI draw_tile_fixup_pair(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t) {}
 void GAMEAPI draw_map(int32_t) {}
 void THISCALL pfncRedrawMap(uint8_t*, int32_t) {}
 void THISCALL pfncMoveMap(uint8_t*, int32_t, int32_t, int32_t) {}

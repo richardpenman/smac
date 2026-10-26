@@ -201,7 +201,7 @@ struct GammaWin : ScreenWin {
 void gamma_dialog() {
     GammaWin w;
     w.name = "gamma";
-    w.old = w.pos = std::max(1, std::min(400, (int32_t)prefs_get_2("Gamma Correction", 100, 0)));
+    w.old = w.pos = std::max(1, std::min(400, (int32_t)prefs_get_int("Gamma Correction", 100, 0)));
     Font_ctor(&w.font);
     Font_init(&w.font, "Arial", 0xE, 1);
     w.layout();
@@ -213,7 +213,7 @@ void gamma_dialog() {
     int32_t g = w.ok ? w.pos : w.old;
     std::fprintf(stderr, "gamma: %d%s\n", g, w.ok ? " (OK)" : " (cancelled)");
     if (w.ok) {
-        prefs_put_2("Gamma Correction", (uint32_t)g, 0);
+        prefs_put_int("Gamma Correction", (uint32_t)g, 0);
         load_palette();
     }
     ui_invalidate();
@@ -351,10 +351,10 @@ struct PrefWin : ScreenWin {
             int32_t slider_id = r == 0 ? 0 : r == 1 ? 1 : r == 2 ? 2 : 3;  // 0x50 + slider_id
             slider[slider_id] = UiRect{panel.left + 0x80, vy + r * 0x16 + 2, panel.right - 12, vy + r * 0x16 + bh - 2};
         }
-        volume[0] = prefs_get_2("Main Volume", 0x7F, 0);
-        volume[1] = prefs_get_2("Voice Volume", 0x55, 0);
-        volume[2] = prefs_get_2("SFX Volume", 0x5F, 0);
-        volume[3] = music_loaded() ? prefs_get_2("Music Volume", 0x3F, 0) : 0;
+        volume[0] = prefs_get_int("Main Volume", 0x7F, 0);
+        volume[1] = prefs_get_int("Voice Volume", 0x55, 0);
+        volume[2] = prefs_get_int("SFX Volume", 0x5F, 0);
+        volume[3] = music_loaded() ? prefs_get_int("Music Volume", 0x3F, 0) : 0;
         vol_on[0] = 1;
     }
     void redraw() override {
@@ -413,10 +413,10 @@ struct PrefWin : ScreenWin {
             AlphaIniPrefs.announce = (int32_t)words[2];
             prefs_use();
             prefs_save(0);
-            prefs_put_2("Main Volume", (uint32_t)volume[0], 0);
-            prefs_put_2("Voice Volume", (uint32_t)volume[1], 0);
-            prefs_put_2("Music Volume", (uint32_t)volume[3], 0);
-            prefs_put_2("SFX Volume", (uint32_t)volume[2], 0);
+            prefs_put_int("Main Volume", (uint32_t)volume[0], 0);
+            prefs_put_int("Voice Volume", (uint32_t)volume[1], 0);
+            prefs_put_int("Music Volume", (uint32_t)volume[3], 0);
+            prefs_put_int("SFX Volume", (uint32_t)volume[2], 0);
             std::fprintf(stderr, "prefs: preferences %08X more %08X warnings %08X saved\n", words[0], words[1],
                          words[2]);
         }
@@ -519,7 +519,7 @@ void THISCALL Console_retire_game(uint8_t*) {
     if (!net) show_replay();
     ControlTurnB = !net;
     ControlTurnA = 1;
-    log_say_2("Retire --------------------------------", 0, 0, 0);
+    log_say_values("Retire --------------------------------", 0, 0, 0);
 }
 
 // ---- Console_editor_rules (0x4DC230): the scenario's rules (RULES' check boxes) ----

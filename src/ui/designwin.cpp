@@ -4,7 +4,7 @@
 // first empty slot).
 //
 // The game state changes are the original's, in its order of calls (asm-faithful):
-//   * DesignWin_exec: enemy_capabilities, cost_factor, setup_veh, proto_sort_2, the second
+//   * DesignWin_exec: enemy_capabilities, cost_factor, setup_veh, proto_sort_design, the second
 //     ability slot dropped without two-ability tech, the DESIGNLABELS texts;
 //   * DesignWin_setup_veh: a prototype's components (flags 0x80 and, for a name equal to the
 //     automatic one, 2 cleared), or for an empty slot the best chassis / weapon / armour the
@@ -160,7 +160,7 @@ void DesignWinState::rebuild_slots() {
 }
 
 void DesignWinState::center_stack() {
-    proto_sort_2(faction);
+    proto_sort_design(faction);
     int32_t n = ProtoSortCount;
     for (int32_t i = stack_pos; i < stack_pos + n; i++)
         if (unit == ProtoSortList[i % n]) {
@@ -171,7 +171,7 @@ void DesignWinState::center_stack() {
 
 void DesignWinState::setup_veh(int32_t p, int32_t fresh) {
     if (p < 0 || !(U(p).unit_flags & 1) || (p < 64 && (Weapon[U(p).weapon_id].offense_value < 0 || p == 15))) {
-        proto_sort_2(faction);
+        proto_sort_design(faction);
         int32_t i = 0;
         for (; i < ProtoSortCount; i++)
             if (!(U(ProtoSortList[i]).unit_flags & 1)) break;
@@ -770,7 +770,7 @@ void DesignWinState::on_button(int32_t id) {
                 clear_bunglist(g);
             }
             setup_veh(0, 0);
-            proto_sort_2(f);
+            proto_sort_design(f);
             int32_t n = ProtoSortCount;
             for (int32_t i = stack_pos; i < stack_pos + n; i++)
                 if (ProtoSortList[i % n] == 0) {
@@ -824,7 +824,7 @@ void DesignWinState::on_button(int32_t id) {
             count++;
             char stats[256];
             stats[0] = 0;
-            say_stats_3(stats, u);
+            say_stats_short(stats, u);
             std::string t = std::string(x.name) + "|" + stats;
             if (!(x.unit_flags & 4) && (cur.unit_flags & 4)) t += " *";
             BasePop_item(pop, t.c_str(), u);
@@ -1062,7 +1062,7 @@ void DesignWinState::draw_vehicle(Buffer* c) {
     scratch.icon_offset = -1;
     char stats[256];
     stats[0] = 0;
-    say_stats_3(stats, 63);
+    say_stats_short(stats, 63);
     std::string ab;
     for (int32_t i = 0; i < 29; i++)
         if ((abil & (1u << i)) && Ability[i].abbreviation && *Ability[i].abbreviation) {
@@ -1201,7 +1201,7 @@ void DesignWinState::draw_stack(Buffer* c) {
     UiRect p = mi_rect(kMiPaneBottom);
     UiRect area{p.left + 0x1A, p.top + 3, p.right - 0x1A, p.bottom - 3};
     spot_init(&spots[1], 0x40);
-    proto_sort_2(faction);
+    proto_sort_design(faction);
     int32_t n = ProtoSortCount;
     int32_t w = ((area.right - area.left) + 2) / 10 - 2;
     int32_t x = area.left, shown = 0;
@@ -1234,7 +1234,7 @@ void DesignWinState::draw_stack(Buffer* c) {
             Buffer_write_l_4(c, t.c_str(), &in, (int32_t)t.size());
             char stats[256];
             stats[0] = 0;
-            say_stats_3(stats, Vehs[veh].unit_id);
+            say_stats_short(stats, Vehs[veh].unit_id);
             UiRect sr{in.left, in.bottom - 14, in.right, in.bottom};
             Buffer_write_cent_l_7(c, stats, &sr, (int32_t)std::strlen(stats));
         }

@@ -67,13 +67,13 @@ TEST_CASE("range: clamp, min wins when the bounds are inverted") {
     CHECK(range(9, 5, 1) == 5);
 }
 
-TEST_CASE("swap / swap_2: xor swap") {
+TEST_CASE("swap / swap_bytes: xor swap") {
     int32_t a = 3, b = -9;
     swap(&a, &b);
     CHECK(a == -9);
     CHECK(b == 3);
     uint8_t c = 1, d = 250;
-    swap_2(&c, &d);
+    swap_bytes(&c, &d);
     CHECK(c == 250);
     CHECK(d == 1);
     // As in the original, swapping an object with itself zeroes it.

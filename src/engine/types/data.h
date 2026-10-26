@@ -14,8 +14,8 @@ struct GamePrefs {
     int32_t GameRules;
     int32_t dword_9A64A0;
     int32_t GameInterludeState[2];
-    int32_t dword_9A64AC;
-    int32_t dword_9A64B0;
+    int32_t TutorialChecks;   // dword_9A64AC: tutorial hints given (tut_check bits)
+    int32_t TutorialChecks2;  // dword_9A64B0: more hints given (tut_check2 bits)
     int32_t TutWinMapState[2];
     int32_t dword_9A64BC;
     int32_t GameState;

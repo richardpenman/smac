@@ -18,7 +18,7 @@ int32_t GAMEAPI game_random(int32_t lo, int32_t hi) {
 }
 
 void GAMEAPI game_srand(uint32_t seed) {
-    log_say_2("Reseed to", (int32_t)seed, 0, 0);
+    log_say_values("Reseed to", (int32_t)seed, 0, 0);
     crt_srand(seed);
 }
 

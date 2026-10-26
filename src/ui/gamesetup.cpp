@@ -397,9 +397,9 @@ void GAMEAPI thumb_routine(int32_t f) {
     std::snprintf(pic, sizeof(pic), "faction:%d", f);
     BasePop_set_picture(g_thumb, pic);
     BasePop_set_loc(g_thumb, 5, 0x136);
-    dword_9469FC = 1;
+    ThumbRoutineActive = 1;
     BasePop_show(g_thumb);
-    dword_9469FC = 0;
+    ThumbRoutineActive = 0;
 }
 
 // ---- planetfall (0x589180) ----

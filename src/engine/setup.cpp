@@ -308,7 +308,7 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
             if (Factions[i].region_total_bases[region]) others |= 1 << i;
         }
         if (!aquatic && killer_id != kSetupArrival)
-            near_base = base_find_3(x, y, -1, region, -1, -1);
+            near_base = base_find_filtered(x, y, -1, region, -1, -1);
         else
             near_base = base_find(x, y);
         if (near_base < 0) BaseFindDist = 32;
@@ -843,10 +843,10 @@ void GAMEAPI setup_game(int32_t reload) {
     LastSavePath[0] = 0;
     prefs_put("Latest Save", "");
     prefs_put("Latest Scenario", "");
-    if (DiffLevel == 0 && reload == 0 && prefs_get_2("DontResetBeginnerPrefs", 0, 0) == 0) {
+    if (DiffLevel == 0 && reload == 0 && prefs_get_int("DontResetBeginnerPrefs", 0, 0) == 0) {
         prefs_load(1);
         AlphaIniPrefs.preferences |= 0x20;
-        prefs_put_2("DontResetBeginnerPrefs", 0, 0);
+        prefs_put_int("DontResetBeginnerPrefs", 0, 0);
     }
     if (MultiplayerActive) AlphaIniPrefs.preferences &= ~0x20;
     prefs_use();
@@ -861,8 +861,8 @@ void GAMEAPI setup_game(int32_t reload) {
     ReplayEventSize = 0;
     GameState &= STATE_RAND_FAC_LEADER_PERSONALITIES | STATE_RAND_FAC_LEADER_SOCIAL_AGENDA;
     cs.GameInterludeState[0] = 0;
-    cs.dword_9A64AC = 0;
-    cs.dword_9A64B0 = 0;
+    cs.TutorialChecks = 0;
+    cs.TutorialChecks2 = 0;
     cs.TutWinMapState[0] = 0;
     cs.TutWinMapState[1] = 0;
     cs.dword_9A64BC = 0;
@@ -872,7 +872,7 @@ void GAMEAPI setup_game(int32_t reload) {
     cs.dword_9A64D0 = 0;
     clear_all_offers();
     clear_hotseat_chat();
-    clear_council_notify_2();
+    clear_council_notify_all();
     clear_tamper();
     cs.GameTimeControl[1] = 0;
     GovernorFaction = -1;
@@ -1087,7 +1087,7 @@ int32_t GAMEAPI eliminate_player(int32_t faction_id, int32_t killer_id) {
     if (!respawned) mon_killed_faction(killer_id, f);
     bool track;
     if (!MultiplayerActive && (GamePreferences & 0x10000000) && killer_id == CurrentPlayerFaction) {
-        if (!respawned) amovie_project_2(m.filename);
+        if (!respawned) amovie_project_name(m.filename);
         track = respawned != 0;
     } else {
         track = respawned && !MultiplayerActive;
@@ -1190,7 +1190,7 @@ void GAMEAPI time_warp() {
     for (int32_t f = 1; f < 8; f++) {
         const uint8_t bit = (uint8_t)(1 << f);
         if (!(FactionStatus[1] & bit)) continue;
-        int32_t first = base_find_2(0, 0, f);
+        int32_t first = base_find_faction(0, 0, f);
         if (first < 0) continue;
         MFaction& m = MFactions[f];
         Faction& F = Factions[f];

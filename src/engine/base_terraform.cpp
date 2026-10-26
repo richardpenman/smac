@@ -108,7 +108,7 @@ void GAMEAPI base_terraform(int32_t flag) {
                 int32_t dx = std::abs(x - other.x);
                 if (!(MapToggleFlat & 1) && dx > MapHalfX) dx = MapAreaX - dx;
                 if (vector_dist(dx, std::abs(y - other.y)) > 2) continue;
-                int32_t idx = radius_move_2(other.x, other.y, x, y, 21);
+                int32_t idx = radius_move_tiles(other.x, other.y, x, y, 21);
                 if ((1u << (idx & 31)) & (uint32_t)other.worked_tiles) free = false;
             }
             if (!free) continue;

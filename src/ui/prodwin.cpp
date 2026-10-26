@@ -150,7 +150,7 @@ void build_list(ProdWin* w) {
             it.turns += label_get(0xC4 / 4);
         }
         char stats[256] = "";
-        say_stats_3(stats, u);
+        say_stats_short(stats, u);
         it.stats = stats;
         it.flags = unit_mandate(u) | (proto ? 0x80u : 0u) | 0x20u;
         if (u == current) w->sel = (int32_t)w->items.size();

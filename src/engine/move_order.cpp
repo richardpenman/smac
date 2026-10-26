@@ -407,13 +407,13 @@ L_595a92:
             if (f.SE_planet_base <= 0) goto L_59724d;
             if (f.units_active[Vehs[stack_id].unit_id]) goto L_59724d;
         }
-        int32_t near = base_find_2(tx, ty, faction_id);
+        int32_t near = base_find_faction(tx, ty, faction_id);
         if (!(VehAttackFlags & 2)) goto L_59724d;
         if (Vehs[stack_id].order_auto_type == (uint32_t)faction_id) goto L_597216;
         if (near >= 0 && Bases[near].eco_damage != 0) goto L_597216;
-        log_say_2("Precapture who, enemy", faction_id, stack_id, 0);
-        log_say_2("Precapture fac, proto", f.SE_planet_base, f.units_active[Vehs[stack_id].unit_id], 0);
-        log_say_2("Precapture type, soc2", Vehs[stack_id].unit_id, f.SE_planet, 0);
+        log_say_values("Precapture who, enemy", faction_id, stack_id, 0);
+        log_say_values("Precapture fac, proto", f.SE_planet_base, f.units_active[Vehs[stack_id].unit_id], 0);
+        log_say_values("Precapture type, soc2", Vehs[stack_id].unit_id, f.SE_planet, 0);
         if (Vehs[stack_id].flags & 0x2000) goto L_5971ce;
         if (game_rand() % 4 < f.SE_planet) {
             int32_t n = CurrentTurn / 5 + 100;
@@ -463,16 +463,16 @@ L_595a92:
                 NetMsg_pop(&NetMsg, "WORMCAPTURE", 5000, 0, nullptr);
             }
         }
-        log_say_2("Captured", 0, 0, 0);
+        log_say_values("Captured", 0, 0, 0);
         goto L_596052;
     }
 L_5971ce:  // no capture: the natives fight
     Vehs[stack_id].flags |= 0x2000;
     if (faction_id == CurrentPlayerFaction) NetMsg_pop(&NetMsg, "WORMNOCAPTURE", 5000, 0, nullptr);
-    log_say_2("No Capture", 0, 0, 0);
+    log_say_values("No Capture", 0, 0, 0);
     goto L_59724d;
 L_597216:
-    log_say_2("Agitated", 0, 0, 0);
+    log_say_values("Agitated", 0, 0, 0);
     if (faction_id == CurrentPlayerFaction) NetMsg_pop(&NetMsg, "WORMSAGITATED", 5000, 0, nullptr);
 L_59724d:  // attack
     attacked = 1;
@@ -783,7 +783,7 @@ L_59763b: {  // the move itself
             Vehs[veh_id].visibility &= map_tile(tx, ty)->visibility;
             for (int32_t f = 1; f < 8; f++) {
                 if (!(Vehs[veh_id].visibility & (1u << f))) continue;
-                base_find_2(tx, ty, f);
+                base_find_faction(tx, ty, f);
                 if (BaseFindDist >= 8 && whose_territory(f, tx, ty, nullptr, 0) != f)
                     Vehs[veh_id].visibility &= (uint8_t)~(1u << f);
             }

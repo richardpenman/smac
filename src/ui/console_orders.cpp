@@ -456,7 +456,7 @@ int32_t GAMEAPI popv(const char* file, const char* label, int32_t veh_id, int32_
 // ---- activate, disband, give ------------------------------------------------------------------------
 
 void THISCALL Console_activate(uint8_t* self, int32_t x, int32_t y, int32_t select) {
-    log_say_2("Console ACTIVATE", x, y, 0);
+    log_say_values("Console ACTIVATE", x, y, 0);
     int32_t v;
     if (MultiplayerActive) {
         if (NetLockHeld || NetLocked) return;
@@ -491,7 +491,7 @@ void THISCALL Console_activate(uint8_t* self, int32_t x, int32_t y, int32_t sele
     }
     if (stack_check(v, 1, -1, -1, -1) != 1) goto pick;
     if (veh_selectable(v) || veh(v).order || (veh(v).state & 0x4200)) {
-        log_say_2("VEH ORDERS", v, 0, 0);
+        log_say_values("VEH ORDERS", v, 0, 0);
         if ((int8_t)veh(v).order > 2 && !(GameMorePreferences & 0x40000)) {
             // The unit has orders: asked whether to cancel them (2: and do not ask again).
             parse_says(0, Units[veh(v).unit_id].name, -1, -1);
@@ -521,13 +521,13 @@ pick_v:
     if (v < 0) return;
 activate:
     if (veh(v).faction_id != (uint32_t)mw(self, kConFaction)) return;
-    log_say_2("Activate AWAKEN", v, veh(v).x, veh(v).y);
+    log_say_values("Activate AWAKEN", v, veh(v).x, veh(v).y);
     if (veh_jail(v)) {
         pop_msg("INJAIL");
         return;
     }
     if (net_lock_veh(&v, 0)) return;
-    log_say_2("Activate AWAKENING", v, veh(v).x, veh(v).y);
+    log_say_values("Activate AWAKENING", v, veh(v).x, veh(v).y);
     veh_wake(v);
     if (!veh_selectable(v)) {
         draw_tile(veh(v).x, veh(v).y, 1);
@@ -1009,7 +1009,7 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
     // run, -1 the base's rally point of a triad, -2 find a base (centre the view), -3 psi gate.
     StackPop pop;
     int32_t saved_options = mw(main_view(), kMwOptions);  // [ebp-0x58]
-    int32_t sort = prefs_get_2("Base Sort", 0, 0);         // [ebp-0x34]
+    int32_t sort = prefs_get_int("Base Sort", 0, 0);         // [ebp-0x34]
     int32_t artifact = 0;                                   // [ebp-0x40]: carries an artifact
     int32_t faction_id, x, y;                              // [ebp-0x28], [ebp-0x20], [ebp-0x1c]
     int32_t triad = -1;                                     // [ebp-0x30]
@@ -1335,7 +1335,7 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
         int32_t button = BasePop_button_pressed(pop.p);
         if (button >= 1 && button <= 3) {
             sort = button - 1;
-            prefs_put_2("Base Sort", (uint32_t)sort, 0);
+            prefs_put_int("Base Sort", (uint32_t)sort, 0);
             continue;
         }
         BASE& t = Bases[chosen < BaseCount && chosen >= 0 ? chosen : 0];
@@ -1356,7 +1356,7 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
         }
         if (mode == -3) {
             if (t.x != veh(id).x || t.y != veh(id).y) {
-                log_say_2("Psi Gate teleport", id, chosen, 0);
+                log_say_values("Psi Gate teleport", id, chosen, 0);
                 if (!NetDaemon_add_lock(&NetState, 0, t.x, t.y)) {
                     if (MultiplayerActive) {
                         message_veh(0x2410, id, chosen, 0);
@@ -1370,7 +1370,7 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
             restore_view();
             return;
         }
-        log_say_2("Setting special veh orders", id, mode, 0);
+        log_say_values("Setting special veh orders", id, mode, 0);
         VEH& v = veh(id);
         if (mode == 0x80) {
             v.state = (v.state & 0xFCFFFFFF) | 0x200;
@@ -1433,7 +1433,7 @@ static void console_clear_group(uint8_t* self) {
 // the dialog's first button sends the last of them to the cursor (go-to, the group follows it),
 // the second wakes them all.
 void THISCALL Console_assemble(uint8_t* self) {
-    uint32_t prefs = (uint32_t)prefs_get_2("Vehicle Groups", 7, 0);
+    uint32_t prefs = (uint32_t)prefs_get_int("Vehicle Groups", 7, 0);
     for (int32_t i = 0; i < 0xC; i++) {
         uint32_t bit = 1u << i;
         if (prefs & bit) DialogChoices |= (int32_t)bit;
@@ -1490,5 +1490,5 @@ void THISCALL Console_assemble(uint8_t* self) {
         }
     }
     draw_map(1);
-    prefs_put_2("Vehicle Groups", kinds, 0);
+    prefs_put_int("Vehicle Groups", kinds, 0);
 }

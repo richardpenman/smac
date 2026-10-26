@@ -65,21 +65,21 @@ void GAMEAPI say_checksum(const char* label, int32_t value) {
     std::strcat(line, num);
     std::strcat(line, " ");
     std::strcat(line, label);
-    log_say_hex_2(line, value, 0, 0);
+    log_say_hex(line, value, 0, 0);
 }
 
 void GAMEAPI do_checksums(int32_t stage) {
     if (!MultiDebugActive && stage != 4) return;
     FullChecksum sums;
     NetDaemon_game_checksum(&NetState, &sums);
-    log_say_2(" ", 0, 0, 0);
+    log_say_values(" ", 0, 0, 0);
     switch (stage) {
-    case 0: log_say_2("Checksums at end of turn", CurrentTurn, 0, 0); break;
-    case 1: log_say_2("Checksums at game start", CurrentTurn, 0, 0); break;
-    case 2: log_say_2("Checksums before world regen", CurrentTurn, 0, 0); break;
-    case 3: log_say_2("Checksums after world regen", CurrentTurn, 0, 0); break;
+    case 0: log_say_values("Checksums at end of turn", CurrentTurn, 0, 0); break;
+    case 1: log_say_values("Checksums at game start", CurrentTurn, 0, 0); break;
+    case 2: log_say_values("Checksums before world regen", CurrentTurn, 0, 0); break;
+    case 3: log_say_values("Checksums after world regen", CurrentTurn, 0, 0); break;
     case 4:
-        log_say_2("Checksums at beginning of turn", CurrentTurn, 0, 0);
+        log_say_values("Checksums at beginning of turn", CurrentTurn, 0, 0);
         MasterChecksum = static_cast<GameChecksum&>(sums);
         break;
     default: break;
@@ -90,7 +90,7 @@ void GAMEAPI do_checksums(int32_t stage) {
     say_checksum("MAP checksum = ", (int32_t)sums.map_all);
     say_checksum("VEHICLES checksum = ", (int32_t)sums.vehs);
     say_checksum("BASES checksum = ", (int32_t)sums.bases);
-    log_say_2(" ", 0, 0, 0);
+    log_say_values(" ", 0, 0, 0);
     for (int32_t i = 0; i < 16; i++) {
         StrBuffer[0] = 0;
         std::strcat(StrBuffer, "Map SECTION ");
@@ -178,7 +178,7 @@ void GAMEAPI wait_loop() {
     if (ControlUpkeepA || ControlTurnC || (NetTurnDoneMask & (1 << (CurrentPlayerFaction & 31)))) return;
     for (int32_t i = 1; i < 8; i++) {
         if (i == CurrentPlayerFaction || (FactionStatus[0] & (1 << i)) || !NetChannelRequests[i - 1]) continue;
-        log_say_2("Initiating diplomatic channel", CurrentPlayerFaction, i, 0);
+        log_say_values("Initiating diplomatic channel", CurrentPlayerFaction, i, 0);
         if (!NetDaemon_open_channel(&NetState, CurrentPlayerFaction, i)) communicate(CurrentPlayerFaction, i, 0);
     }
 }

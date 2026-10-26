@@ -29,7 +29,7 @@ static const uint8_t kStaticColors[20][3] = {
 void GAMEAPI load_palette() {
     Buffer canvas;
     Buffer_ctor(&canvas);
-    int32_t gamma = prefs_get_2("Gamma Correction", 100, 0);
+    int32_t gamma = prefs_get_int("Gamma Correction", 100, 0);
     for (int32_t i = 0; i < 10; i++) std::memcpy(GamePalette.rgb[i], kStaticColors[i], 3);
     for (int32_t i = 0; i < 10; i++) std::memcpy(GamePalette.rgb[246 + i], kStaticColors[10 + i], 3);
     Buffer_load_pcx(&canvas, "PALETTE.PCX", &GamePalette, 10, 0xEC);

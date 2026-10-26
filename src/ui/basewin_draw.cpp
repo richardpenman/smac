@@ -1947,7 +1947,7 @@ void THISCALL BaseWin_draw_garrison(uint8_t* self, int32_t flag) {
             veh_draw(c, v, x, y, -7, 0x48, 0);
             veh_draw(c, v, x, y, 0, 0x1800, 0);
             StrBuffer[0] = 0;
-            say_stats_3(StrBuffer, Vehs[v].unit_id);
+            say_stats_short(StrBuffer, Vehs[v].unit_id);
             if ((GameState & 0x40) && (GameState & 0x1000)) {
                 cat(" ");
                 cat("(");

@@ -1,6 +1,6 @@
 // Sound effects, voices and the Wave objects (ui 0x4455F0..0x447360 FX / wave_it / ambience,
 // 0x4C5000..0x4C7260 Wave and the sound groups of soundx.dll's wrapper): sound.cpp. Music
-// (load_music and the ambient music classes): music.cpp. Movies (amovie_project_2, the WVE
+// (load_music and the ambient music classes): music.cpp. Movies (amovie_project_name, the WVE
 // player): movie.cpp.
 //
 // The original's Wave objects (0x6C bytes: vtable, volume +4, pan +8, fade time +0x38, soundx

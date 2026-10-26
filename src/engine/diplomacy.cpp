@@ -236,7 +236,7 @@ void GAMEAPI treaty_on(int32_t faction_id, int32_t faction_id_with, uint32_t sta
     bool viewer = faction_id == CurrentPlayerFaction || faction_id_with == CurrentPlayerFaction;
     if (status & 7) {
         // A truce, treaty or pact ends the viewer's war music.
-        if (viewer && (mine & DIPLO_VENDETTA)) dword_74DA9C &= ~1;
+        if (viewer && (mine & DIPLO_VENDETTA)) AmbienceFlags &= ~1;
         mine &= 0xFFEE7FAF;
         theirs &= 0xFFEE7FAF;
     }
@@ -250,7 +250,7 @@ void GAMEAPI treaty_on(int32_t faction_id, int32_t faction_id_with, uint32_t sta
         mine &= 0xFAEEF378;
         theirs &= 0xFAEEF378;
         if (viewer) {
-            dword_74DA9C |= 1;
+            AmbienceFlags |= 1;
             ambience(0xCC);
         }
     }
@@ -408,7 +408,7 @@ void GAMEAPI net_agenda_on(int32_t faction_id, int32_t faction_id_with, uint32_t
         agenda_on(faction_id, faction_id_with, agenda);
         return;
     }
-    log_say_2("Sending AGENDA_ON", faction_id, faction_id_with, (int32_t)agenda);
+    log_say_values("Sending AGENDA_ON", faction_id, faction_id_with, (int32_t)agenda);
     message_data(0x2444, 0, faction_id, faction_id_with, (int32_t)agenda, 0);
     if (wait) NetDaemon_await_diplo(&NetState, 0x444);
 }
@@ -418,7 +418,7 @@ void GAMEAPI net_agenda_off(int32_t faction_id, int32_t faction_id_with, uint32_
         agenda_off(faction_id, faction_id_with, agenda);
         return;
     }
-    log_say_2("Sending AGENDA_OFF", faction_id, faction_id_with, (int32_t)agenda);
+    log_say_values("Sending AGENDA_OFF", faction_id, faction_id_with, (int32_t)agenda);
     message_data(0x2445, 0, faction_id, faction_id_with, (int32_t)agenda, 0);
     if (wait) NetDaemon_await_diplo(&NetState, 0x445);
 }
@@ -428,7 +428,7 @@ void GAMEAPI net_set_agenda(int32_t faction_id, int32_t faction_id_with, uint32_
         set_agenda(faction_id, faction_id_with, agenda, add);
         return;
     }
-    log_say_2("Sending SET_AGENDA", faction_id, faction_id_with, (int32_t)agenda);
+    log_say_values("Sending SET_AGENDA", faction_id, faction_id_with, (int32_t)agenda);
     message_data(0x2446, 0, faction_id, faction_id_with, (int32_t)agenda, add);
     if (wait) NetDaemon_await_diplo(&NetState, 0x446);
 }
@@ -441,14 +441,14 @@ void GAMEAPI net_energy(int32_t faction_id, int32_t amount, int32_t faction_id_w
         Console_update_data(&MainConsole, 1);
         return;
     }
-    log_say_2("Sending ENERGY", faction_id, faction_id_with, amount);
+    log_say_values("Sending ENERGY", faction_id, faction_id_with, amount);
     message_data(0x2447, 0, faction_id, amount, faction_id_with, amount_with);
     if (wait) NetDaemon_await_diplo(&NetState, 0x447);
 }
 
 void GAMEAPI net_loan(int32_t faction_id, int32_t faction_id_with, int32_t balance, int32_t payment) {
     if (MultiplayerActive) {
-        log_say_2("Sending LOAN", faction_id, faction_id_with, balance);
+        log_say_values("Sending LOAN", faction_id, faction_id_with, balance);
         message_data(0x244E, 0, faction_id, faction_id_with, balance, payment);
         return;
     }
@@ -461,7 +461,7 @@ void GAMEAPI net_maps(int32_t faction_id, int32_t faction_id_with, int32_t wait)
         trade_maps(faction_id, faction_id_with);
         return;
     }
-    log_say_2("Sending TRADE_MAPS", faction_id, faction_id_with, 0);
+    log_say_values("Sending TRADE_MAPS", faction_id, faction_id_with, 0);
     message_data(0x2448, 0, faction_id, faction_id_with, 0, 0);
     if (wait) NetDaemon_await_diplo(&NetState, 0x448);
 }
@@ -471,14 +471,14 @@ void GAMEAPI net_pact_ends(int32_t faction_id, int32_t faction_id_with, int32_t 
         pact_ends(faction_id, faction_id_with);
         return;
     }
-    log_say_2("Sending PACT_ENDS", 0, 0, 0);
+    log_say_values("Sending PACT_ENDS", 0, 0, 0);
     message_data(0x244D, 0, faction_id, faction_id_with, 0, 0);
     if (wait) NetDaemon_await_diplo(&NetState, 0x44D);
 }
 
 int32_t GAMEAPI net_withdrawal(int32_t faction_id, int32_t faction_id_with, int32_t wait) {
     if (MultiplayerActive) {
-        log_say_2("Sending WITHDRAWAL", faction_id, faction_id_with, 0);
+        log_say_values("Sending WITHDRAWAL", faction_id, faction_id_with, 0);
         message_data(0x244A, 0, faction_id, faction_id_with, 0, 0);
         if (wait) NetDaemon_await_diplo(&NetState, 0x44A);
         return 1;
@@ -491,7 +491,7 @@ void GAMEAPI net_cede_base(int32_t base_id, int32_t faction_id, int32_t wait) {
         give_a_base(base_id, faction_id);
         return;
     }
-    log_say_2("Sending CEDE_BASE", base_id, faction_id, 0);
+    log_say_values("Sending CEDE_BASE", base_id, faction_id, 0);
     message_data(0x2449, 0, base_id, faction_id, 0, 0);
     if (wait) NetDaemon_await_diplo(&NetState, 0x449);
 }
@@ -501,14 +501,14 @@ void GAMEAPI net_double_cross(int32_t faction_id, int32_t faction_id_with, int32
         double_cross(faction_id, faction_id_with, a3);
         return;
     }
-    log_say_2("Sending DOUBLE_CROSS", faction_id, faction_id_with, a3);
+    log_say_values("Sending DOUBLE_CROSS", faction_id, faction_id_with, a3);
     message_data(0x2440, 0, faction_id, faction_id_with, a3, 0);
     if (wait) NetDaemon_await_diplo(&NetState, 0x440);
 }
 
 int32_t GAMEAPI diplo_lock(int32_t timeout) {
     int32_t tries = 0;
-    log_say_2("Getting DIPLOMATIC LOCK", 0, 0, 0);
+    log_say_values("Getting DIPLOMATIC LOCK", 0, 0, 0);
     if (timeout && timeout < 100) timeout = 100;
     uint32_t start = engine_real_time();
     // NetDaemon_add_global returns 0 at once in single player (no lock to wait for).
@@ -526,7 +526,7 @@ int32_t GAMEAPI diplo_lock(int32_t timeout) {
 }
 
 void GAMEAPI diplo_unlock() {
-    log_say_2("Releasing DIPLOMATIC LOCK", 0, 0, 0);
+    log_say_values("Releasing DIPLOMATIC LOCK", 0, 0, 0);
     if (MultiplayerActive) NetDaemon_unlock(&NetState);  // nothing to release in single player
 }
 
@@ -614,7 +614,7 @@ void GAMEAPI mention_prototypes(int32_t faction_id, int32_t faction_id_with) {
     int32_t unit_id = DiploMentionUnitID;
     parse_says(0, Units[unit_id].name, -1, -1);
     StrBuffer[0] = 0;
-    say_stats_2(StrBuffer, unit_id);
+    say_stats_labeled(StrBuffer, unit_id);
     parse_says(1, StrBuffer, -1, -1);
     Units[unit_id].unit_flags |= 0x10;
     StrBuffer[0] = 0;
@@ -1501,7 +1501,7 @@ int32_t GAMEAPI do_withdrawal(int32_t faction_id, int32_t faction_id_with) {
                 moved++;
             }
         }
-        int32_t base_id = base_find_2(x, y, faction_id_with);
+        int32_t base_id = base_find_faction(x, y, faction_id_with);
         if (base_id < 0) continue;
         veh_drop(veh_lift(veh_id), Bases[base_id].x, Bases[base_id].y);
         veh.visibility = 0;
@@ -1525,7 +1525,7 @@ int32_t GAMEAPI dont_withdrawal(int32_t faction_id, int32_t faction_id_with) {
         if (veh.faction_id != (uint32_t)faction_id_with || Units[veh.unit_id].plan == PLAN_PROBE) continue;
         int32_t x = veh.x, y = veh.y;
         if (map_is_ocean(x, y)) continue;
-        if (base_find_2(x, y, faction_id) < 0) continue;
+        if (base_find_faction(x, y, faction_id) < 0) continue;
         if (whose_territory(faction_id, x, y, nullptr, 0) != faction_id_with || veh.order != ORDER_MOVE_TO) continue;
         int32_t target = base_at(veh.waypoint_x[0], veh.waypoint_y[0]);
         if (target < 0) continue;
@@ -1623,7 +1623,7 @@ int32_t GAMEAPI demand_withdrawal(int32_t faction_id, int32_t faction_id_with) {
 
 namespace {
 // The original's inlined distance of two tiles (vector_dist with the horizontal wrap).
-int32_t tile_distance(int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
+int32_t tile_distance_inline(int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
     int32_t dx = std::abs(x1 - x2);
     if (!(MapToggleFlat & 1) && dx > MapHalfX) dx = MapAreaX - dx;
     int32_t dy = std::abs(y1 - y2);
@@ -1648,16 +1648,16 @@ int32_t GAMEAPI suggest_plan(int32_t faction_id, int32_t faction_id_with) {
         int32_t region = map_tile(b.x, b.y)->region;
         int32_t dist = 0;
         if (f.target_x >= 0) {
-            dist = tile_distance(f.target_x, f.target_y, b.x, b.y) * 2;
+            dist = tile_distance_inline(f.target_x, f.target_y, b.x, b.y) * 2;
             if (region != map_tile(f.target_x, f.target_y)->region) dist += 0x200;
         }
-        if (base_find_3(b.x, b.y, faction_id, region, -1, -1) < 0) {
-            base_find_2(b.x, b.y, faction_id);
+        if (base_find_filtered(b.x, b.y, faction_id, region, -1, -1) < 0) {
+            base_find_faction(b.x, b.y, faction_id);
             BaseFindDist += 0x400;
         }
         int32_t own = ((f.target_x >= 0) + 1) * BaseFindDist;
-        if (base_find_3(b.x, b.y, faction_id_with, region, -1, -1) < 0) {
-            base_find_2(b.x, b.y, faction_id_with);
+        if (base_find_filtered(b.x, b.y, faction_id_with, region, -1, -1) < 0) {
+            base_find_faction(b.x, b.y, faction_id_with);
             BaseFindDist += 0x100;
         }
         int32_t score = dist + own + BaseFindDist;
@@ -1677,7 +1677,7 @@ int32_t GAMEAPI attack_from(int32_t base_id, int32_t faction_id) {
     for (int32_t i = 0; i < BaseCount; i++) {
         const BASE& b = Bases[i];
         if ((uint8_t)b.faction_id != (uint32_t)faction_id) continue;
-        int32_t dist = tile_distance(b.x, b.y, target.x, target.y);
+        int32_t dist = tile_distance_inline(b.x, b.y, target.x, target.y);
         if (b.x == Factions[faction_id].target_x && b.y == Factions[faction_id].target_y) dist = 0;
         if (map_tile(b.x, b.y)->region != region) dist += 1000;
         if (dist <= best_dist) {
@@ -3025,7 +3025,7 @@ void GAMEAPI call_off_vendetta(int32_t faction_id, int32_t faction_id_with) {
     }
     X_pops_11("CALLEDOFF", 0x100000, portrait, 0);
     if (MultiplayerActive) {
-        log_say_2("Sending TREATY_ON", r, target, DIPLO_TREATY);
+        log_say_values("Sending TREATY_ON", r, target, DIPLO_TREATY);
         message_data(0x2441, 0, r, target, DIPLO_TREATY, 0);
         NetDaemon_await_diplo(&NetState, 0x441);
     } else {

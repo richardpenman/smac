@@ -460,11 +460,11 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
         if (!save_io(&CouncilSessionPending, 4, file)) return 1;
         if (!save_io(CouncilProposal, 0x20, file)) return 1;
         if (!save_io(CouncilVoteState, 0x20, file)) return 1;
-        if (!save_io(&dword_93A9AC, 4, file)) return 1;
-        if (!save_io(&dword_93A9B0, 4, file)) return 1;
-        if (!save_io(&dword_93A9B4, 4, file)) return 1;
-        if (!save_io(&dword_93A9B8, 0x20, file)) return 1;
-        if (!save_io(&dword_93A9D8, 0x20, file)) return 1;
+        if (!save_io(&PbemGameID, 4, file)) return 1;
+        if (!save_io(&PbemGameDate, 4, file)) return 1;
+        if (!save_io(&PbemSaveCount, 4, file)) return 1;
+        if (!save_io(&PbemTamperFaction, 0x20, file)) return 1;
+        if (!save_io(&PbemTamperReloads, 0x20, file)) return 1;
     }
     if (!write) {
         int32_t width, height;
@@ -505,7 +505,7 @@ int32_t GAMEAPI map_data(CrtFile* file, int32_t write, int32_t is_save) {
 
 int32_t GAMEAPI save_daemon(const char* filename) {
     char path[1024];  // 256 in the original (longer names overflow it)
-    if (PbemActive) dword_93A9B4++;
+    if (PbemActive) PbemSaveCount++;
     uint32_t stamp = engine_logic_time();
     if ((GameRules & 0x400) && !MultiplayerActive) game_srand(stamp);
     SaveFileVersion = kSaveFileVersion;
@@ -879,8 +879,8 @@ int32_t GAMEAPI save_game(int32_t scenario) {
     crt_strcat(name, ".");
     crt_strcat(name, ext);
     FileList_add_ext(d.list(), name);
-    int32_t windows_box = prefs_get_2("WindowsFileBox", 0, 0);
-    prefs_put_2("WindowsFileBox", (uint32_t)windows_box, 0);
+    int32_t windows_box = prefs_get_int("WindowsFileBox", 0, 0);
+    prefs_put_int("WindowsFileBox", (uint32_t)windows_box, 0);
     char* chosen;
     if (Win_is_visible(ui_console_vbase()) && !GameNotStarted && !windows_box) {
         chosen = FileBox_save(d.box);
@@ -966,8 +966,8 @@ int32_t GAMEAPI load_game(int32_t scenario, int32_t relinearize) {
         crt_strcat(pattern, ext);
         FileList_set_path(d.list(), path);
         FileList_add_ext(d.list(), pattern);
-        int32_t windows_box = prefs_get_2("WindowsFileBox", 0, 0);
-        prefs_put_2("WindowsFileBox", (uint32_t)windows_box, 0);
+        int32_t windows_box = prefs_get_int("WindowsFileBox", 0, 0);
+        prefs_put_int("WindowsFileBox", (uint32_t)windows_box, 0);
         char* chosen = windows_box ? FileDialog_open(d.dialog) : FileBox_load(d.box);
         do_all_draws();
         if (!chosen) {

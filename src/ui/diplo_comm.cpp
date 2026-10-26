@@ -71,7 +71,7 @@ void label_num(const char* label, int32_t n) {
 }
 // The inlined diplomatic lock (diplo_lock without the timeout).
 void lock() {
-    log_say_2("Getting DIPLOMATIC LOCK", 0, 0, 0);
+    log_say_values("Getting DIPLOMATIC LOCK", 0, 0, 0);
     engine_real_time();
     while (!ControlTurnA && MultiplayerActive && NetDaemon_add_global(&NetState)) {
         check_spock();

@@ -209,7 +209,7 @@ void GAMEAPI alt_set(int32_t x, int32_t y, int32_t altitude) {
                     int32_t next = veh.next_veh_id_stack;
                     int32_t triad = Chassis[Units[veh.unit_id].chassis_id].triad;
                     if (triad != TRIAD_AIR && !(veh.flags & 0x20) && (triad == TRIAD_SEA) != (bool)to_ocean) {
-                        MapBaseIdClosestSubmergedVeh[veh.faction_id] = base_find_2(x, y, veh.faction_id);
+                        MapBaseIdClosestSubmergedVeh[veh.faction_id] = base_find_faction(x, y, veh.faction_id);
                         veh_kill(veh_id);
                         if (next > veh_id) next--;
                     }
@@ -417,7 +417,7 @@ void GAMEAPI say_loc(char* buffer, int32_t x, int32_t y, int32_t near_base, int3
     int32_t base_id = base_at(x, y);
     if (near_base && base_id < 0) {
         with_near = 0;
-        base_id = base_find_3(x, y, -1, -1, -1, CurrentPlayerFaction);
+        base_id = base_find_filtered(x, y, -1, -1, -1, CurrentPlayerFaction);
         if (base_id >= 0) {
             std::strcat(buffer, label_get(0xF8 / 4));
             std::strcat(buffer, " ");

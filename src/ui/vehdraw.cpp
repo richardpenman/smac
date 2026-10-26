@@ -1303,7 +1303,7 @@ int32_t GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, i
 
 void THISCALL MapWin_draw_vehicles(uint8_t* win, int32_t x, int32_t y, int32_t px, int32_t py, int32_t faction_id) {
     int32_t mode = 2;
-    if (!dword_93A940 && !ControlTurnMove && !(GameRules & 0x80)) return;
+    if (!ControlTurnStarted && !ControlTurnMove && !(GameRules & 0x80)) return;
     uint32_t opts = (uint32_t)mw(win, kMwOptions);
     if ((opts & 0x1000000) || !(opts & 0x802000C0) || (opts & 0x1000)) return;
     MAP* sq = &MapTiles[MapHalfX * y + (x >> 1)];

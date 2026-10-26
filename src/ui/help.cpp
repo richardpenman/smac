@@ -1,6 +1,6 @@
 // The help module (0x44B380..0x44CBC0): help_tech_info, tech_heck and the help_* entry points of
 // the datalinks (help.h). Asm-faithful in the order and form of the lines; the globals the
-// original also sets for the chassis and weapon items (dword_7591A4 / dword_7591A8, the last
+// original also sets for the chassis and weapon items (HelpChassisShown / HelpWeaponShown, the last
 // name shown) are not written.
 #include "ui/help.h"
 

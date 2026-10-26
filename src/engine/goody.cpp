@@ -420,7 +420,7 @@ dispatch:
             kind = 7;
             goto dispatch;
         }
-        int32_t b = base_find_2(x, y, faction_id);
+        int32_t b = base_find_faction(x, y, faction_id);
         if (!MultiplayerActive && b >= 0) {
             int32_t item = Bases[b].queue_items[0];
             if (item > -70) {
@@ -532,7 +532,7 @@ dispatch:
         if (is_sea && stack_check(veh_id, 8, -1, -1, -1) <= 0) break;
         int32_t unit_id = 11;
         if (TechOwners[38] && game_rand() % 3 == 0 && !fac.units_active[12]) {
-            base_find_2(x, y, faction_id);
+            base_find_faction(x, y, faction_id);
             if (BaseFindDist <= speed_proto(12) * 3) unit_id = 12;
         }
         uint8_t foils = fac.units_active[13];
@@ -718,7 +718,7 @@ dispatch:
         // 12..17: native life
         bool spore = false;
         if ((GameRules & 0x200000) || ((GameRules & 0x1000000) && DiffLevel <= 1)) break;
-        base_find_2(x, y, faction_id);
+        base_find_faction(x, y, faction_id);
         int32_t own_dist = BaseFindDist;
         base_find(x, y);
         if (BaseFindDist <= 1) break;

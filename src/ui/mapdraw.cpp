@@ -227,7 +227,7 @@ void GAMEAPI base_draw(Buffer* dest, int32_t base_id, int32_t px, int32_t py, in
 void THISCALL MapWin_draw_bases(uint8_t* win, int32_t x, int32_t y, int32_t px, int32_t py, int32_t faction_id) {
     uint32_t opts = (uint32_t)mw(win, kMwOptions);
     if (!(opts & 0x200080)) return;
-    if (!dword_93A940 && !ControlTurnMove && !(GameRules & 0x80)) return;
+    if (!ControlTurnStarted && !ControlTurnMove && !(GameRules & 0x80)) return;
     int32_t b = base_at(x, y);
     if (b < 0) return;
     if (!(GameState & 0x80)) {
@@ -242,7 +242,7 @@ void THISCALL MapWin_draw_bases(uint8_t* win, int32_t x, int32_t y, int32_t px, 
 }
 
 void THISCALL MapWin_draw_base_names(uint8_t* win) {
-    if (!dword_93A940 && !ControlTurnMove && !(GameRules & 0x80)) return;
+    if (!ControlTurnStarted && !ControlTurnMove && !(GameRules & 0x80)) return;
     MapWinNative* n = ui_mapwin_native(win);
     Buffer* canvas = n->canvas;
     UiRect saved = canvas->clip;

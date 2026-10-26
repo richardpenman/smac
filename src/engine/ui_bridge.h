@@ -311,7 +311,7 @@ void ui_production_popup_blurb(bool is_project);
 void ui_production_popup_exec();
 // Secret project movies and help (shown to the viewer).
 ADDR_NATIVE(0x403BA0) void GAMEAPI amovie_project(int32_t project_id);
-ADDR_NATIVE(0x403BE0) void GAMEAPI amovie_project_2(const char* name);
+ADDR_NATIVE(0x403BE0) void GAMEAPI amovie_project_name(const char* name);
 ADDR_NATIVE(0x44C9E0) void GAMEAPI help_project(int32_t project_id);
 // Voice clip of a new facility (a Wave object; StrBuffer holds voices\fac<n>.mp3).
 GLOBAL(uint8_t, FacilityVoice, 0x945ED0);
@@ -327,7 +327,7 @@ ADDR_NATIVE(0x441250) void GAMEAPI clear_all_offers();
 // original deletes the StringStruct entries; the effect is ui_stringlist_clear on each list).
 ADDR_NATIVE(0x440F80) void GAMEAPI clear_hotseat_chat();
 // Council notification state cleared: CouncilVoteState and CouncilProposal (0x4243F0).
-ADDR_NATIVE(0x4243F0) void GAMEAPI clear_council_notify_2();
+ADDR_NATIVE(0x4243F0) void GAMEAPI clear_council_notify_all();
 // Records "faction_id eliminated killed_id" in faction_id's monuments (first free entry of the
 // six killed-faction events) and shows the monuments window to a non-alien viewer.
 ADDR_NATIVE(0x477A60) void GAMEAPI mon_killed_faction(int32_t faction_id, int32_t killed_id);
@@ -470,7 +470,7 @@ GLOBAL(int32_t, InfoWinBattleShown, 0x8C6B3C);  // InfoWin field: a battle is sh
 GLOBAL(int32_t, BaseWinMultiplayerRefresh, 0x6E8150);
 ADDR_NATIVE(0x415DD0) void THISCALL BaseWin_focus(uint8_t* win);
 // Redraws two tiles (attacker and defender) with their surroundings.
-ADDR_NATIVE(0x46B040) void GAMEAPI draw_tile_fixup_2(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t a5,
+ADDR_NATIVE(0x46B040) void GAMEAPI draw_tile_fixup_pair(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t a5,
                                                      int32_t a6);
 // Popup of SCRIPT.txt shown to faction_id with the map centred on (x, y). Headless: 0.
 ADDR_NATIVE(0x4055A0) int32_t GAMEAPI POP3(const char* label, int32_t a2, int32_t faction_id, int32_t x, int32_t y);

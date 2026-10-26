@@ -253,7 +253,7 @@ int32_t GAMEAPI veh_at(int32_t x, int32_t y) {
             if (Vehs[veh_id].x == x && Vehs[veh_id].y == y) return stack_top(veh_id);
         }
         if (y >= 0 && y < MapAreaY && x >= 0 && x < MapAreaX) {
-            if (!VehBitError) log_say_2("Vehicle Bit Error  (x, y)", x, y, 0);
+            if (!VehBitError) log_say_values("Vehicle Bit Error  (x, y)", x, y, 0);
             if ((GameState & 0x40) || (GameState & 0x1000) || MultiplayerActive) {
                 if (VehBitError) return -1;
                 VehBitError = 1;
@@ -373,7 +373,7 @@ int32_t GAMEAPI veh_init(int32_t unit_id, int32_t faction_id, int32_t x, int32_t
     int32_t veh_id = VehCount;
     if (veh_id >= 0x800) return -1;
     VehCount = veh_id + 1;
-    log_say_2("Adding Vehicle (v,who,v2)", veh_id, faction_id, unit_id);
+    log_say_values("Adding Vehicle (v,who,v2)", veh_id, faction_id, unit_id);
     Faction& f = Factions[faction_id];
     if ((uint8_t)Units[unit_id].plan < 8) f.total_combat_units++;
     f.units_active[unit_id]++;
@@ -404,7 +404,7 @@ int32_t GAMEAPI veh_init(int32_t unit_id, int32_t faction_id, int32_t x, int32_t
         }
     }
     if (enemy_id >= 0) {
-        base_find_3(x, y, enemy_id, region, -1, -1);
+        base_find_filtered(x, y, enemy_id, region, -1, -1);
         if (veh_vector_dist(x, y, f.target_x, f.target_y) > BaseFindDist) return veh_id;
     }
     int32_t limit = f.region_total_bases[region] * 2 / 3;
@@ -445,7 +445,7 @@ int32_t GAMEAPI veh_init(int32_t unit_id, int32_t faction_id, int32_t x, int32_t
 void GAMEAPI veh_kill(int32_t veh_id) {
     if (veh_id < 0) return;
     if (MultiplayerActive) DeletionList_add_deletion(&DeleteList, veh_id);
-    log_say_2("Killing vehicle (v,who,v2)", veh_id, Vehs[veh_id].faction_id, Vehs[veh_id].unit_id);
+    log_say_values("Killing vehicle (v,who,v2)", veh_id, Vehs[veh_id].faction_id, Vehs[veh_id].unit_id);
     int32_t x = Vehs[veh_id].x;
     int32_t home_base_id = Vehs[veh_id].home_base_id;
     int32_t y = Vehs[veh_id].y;

@@ -203,7 +203,7 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
                 }
             }
         }
-        log_say_2("BASE: changed production", CurrentBaseID, slot, cb.queue_items[slot]);
+        log_say_values("BASE: changed production", CurrentBaseID, slot, cb.queue_items[slot]);
         if (slot == 0) {
             cb.queue_items[0] = item;
             if (cb.queue_items[0] < -0x45) wave_it(0x24);

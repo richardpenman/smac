@@ -428,8 +428,8 @@ void GAMEAPI compute_score(int32_t faction_id, int32_t* score, int32_t* table, i
 
 
 void GAMEAPI replay_base(int32_t event, int32_t x, int32_t y, int32_t faction_id) {
-    log_say_2("Replay Base", x, y, faction_id);
-    log_say_2("Replay Base Info", CurrentTurn, event, ReplayEventSize);
+    log_say_values("Replay Base", x, y, faction_id);
+    log_say_values("Replay Base Info", CurrentTurn, event, ReplayEventSize);
     ReplayEvent e;
     e.event = (int8_t)event;
     e.faction_id = (int8_t)faction_id;

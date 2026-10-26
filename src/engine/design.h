@@ -23,9 +23,9 @@ ADDR(0x57D560) void GAMEAPI say_offense(char* buffer, int32_t unit_id);
 // Defense value with ability markers.
 ADDR(0x57D6D0) void GAMEAPI say_defense(char* buffer, int32_t unit_id);
 // "offense-defense-moves[*reactor]".
-ADDR(0x57D7D0) void GAMEAPI say_stats_3(char* buffer, int32_t unit_id);
+ADDR(0x57D7D0) void GAMEAPI say_stats_short(char* buffer, int32_t unit_id);
 // Same with labels for psi values and sea/air triads.
-ADDR(0x57D8E0) void GAMEAPI say_stats_2(char* buffer, int32_t unit_id);
+ADDR(0x57D8E0) void GAMEAPI say_stats_labeled(char* buffer, int32_t unit_id);
 // Long form with the plan name; separator (default "/") between offense, defense and moves.
 ADDR(0x57DAA0) void GAMEAPI say_stats(char* buffer, int32_t unit_id, const char* separator);
 

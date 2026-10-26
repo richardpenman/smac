@@ -127,7 +127,7 @@ SDL_AUDIODRIVER=dummy run music --new size=0 --human 1 --seed 1,2 --keys "ENTER,
 check music "the music sequencer plays (30 s, level above silence)" "musicrender .*music.wav: 30 s, rms 0\.0[1-9]"
 nocrash music
 
-# 7. A secret project's movie (amovie_project_2): the WVE container, its TQI frames and its sound.
+# 7. A secret project's movie (amovie_project_name): the WVE container, its TQI frames and its sound.
 SMACX_MOVIE_FRAMES=100 run movie --new size=0 --human 1 --seed 1,2 --keys "ENTER,MOVIE:humanGenome"
 check movie "movie call" "sound: T1 movie humanGenome"
 check movie "the movie's frames and sound" "movie movies.humanGenome.wve: 320x240, 422 frames, sound 28066 ms"

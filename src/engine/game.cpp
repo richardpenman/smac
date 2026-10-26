@@ -35,7 +35,7 @@ int32_t GAMEAPI system_init() {
     crt_mkdir("scenarios");
     GameNotStarted = 1;
     log_set_state(0);
-    set_language(prefs_get_2("Language", 0, 0));
+    set_language(prefs_get_int("Language", 0, 0));
     textcolor_init();
     Strings_init(&StringTable, 0xC320);
     if (labels_init()) return 1;
@@ -164,7 +164,7 @@ void engine_static_init(const char* ini_path) {
     // pfncWinMain (0x45F950) before control_game
     GameCmdLine[0] = 0;
     ExpansionEnabled = 1;
-    dword_9469FC = 0;
+    ThumbRoutineActive = 0;
     BasePopAlloc = headless_basepop_alloc;
     GameDialogFlags |= 4;
 }

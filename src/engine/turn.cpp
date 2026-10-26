@@ -111,7 +111,7 @@ void GAMEAPI reset_territory() {
             // base next to the tile.
             int32_t owner = -1;
             bool ocean = (sq->climate & 0xE0) < 0x60;
-            int32_t base_id = base_find_3(x, y, -1, region, -1, -1);
+            int32_t base_id = base_find_filtered(x, y, -1, region, -1, -1);
             if (base_id >= 0) {
                 int32_t limit = Rules.territory_max_dist_base;
                 if (ocean) limit >>= 1;
@@ -166,7 +166,7 @@ void GAMEAPI reset_territory() {
                 uint8_t bit = (uint8_t)(1 << f);
                 if (!(sq->visibility & bit) && ((FactionStatus[0] & bit) || DiffLevel <= 3)) continue;
                 if (at_site(f, 3, x, y)) continue;
-                if (base_find_3(x, y, f, region, -1, -1) < 0) continue;
+                if (base_find_filtered(x, y, f, region, -1, -1) < 0) continue;
                 if (BaseFindDist >= Rules.territory_max_dist_base && BaseFindDist <= Rules.territory_max_dist_base * 2)
                     add_site(f, 3, 1, x, y);
             }
@@ -871,7 +871,7 @@ void GAMEAPI alien_fauna() {
             if (!(sq->visible_items[f - 1] & growth)) continue;
             sq2->visible_items[f - 1] = (sq2->visible_items[f - 1] | growth) & ~BIT_FUNGUS;
             if (f != CurrentPlayerFaction) continue;
-            int32_t base_id = base_find_3(x, y, -1, -1, -1, CurrentPlayerFaction);
+            int32_t base_id = base_find_filtered(x, y, -1, -1, -1, CurrentPlayerFaction);
             if (base_id < 0 || Bases[base_id].faction_id != CurrentPlayerFaction ||
                 (BaseFindDist > 3 && whose_territory(CurrentPlayerFaction, x, y, nullptr, 0) != CurrentPlayerFaction)) {
                 draw_tiles(x, y, 2);
@@ -947,7 +947,7 @@ void GAMEAPI alien_fauna() {
         int32_t region = sq->region;
         if ((region & 0x3F) == 0x3F || (region & 0x3F) == 0) continue;
         if ((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8) continue;
-        int32_t base_id = base_find_3(x, y, -1, region, -1, -1);
+        int32_t base_id = base_find_filtered(x, y, -1, region, -1, -1);
         if ((sq->items & 2) && (sq->val2 & 0xF) < 8) {
             int32_t owner = sq->val2 & 0xF;
             if (owner > 0 && (base_id < 0 || BaseFindDist > 2)) {
@@ -1040,7 +1040,7 @@ void GAMEAPI turn_upkeep() {
         int32_t hp = Units[veh.unit_id].plan == 12 ? 1 : range(Units[veh.unit_id].reactor_id, 1, 100) * 10;
         if (hp - veh.damage_taken <= 0) kill(veh_id);
     }
-    dword_90DB84 = 0;
+    TerraformDoneSoundPlayed = 0;
     rankings(1);
     CurrentTurn++;
     CurrentMissionYear = game_year(CurrentTurn);
@@ -1659,9 +1659,9 @@ int32_t GAMEAPI end_of_game(int32_t check) {
     case 7:
         if (GamePreferences & 0x10000000) {
             if (MFactions[CurrentPlayerFaction].rule_flags & RFLAG_ALIEN)
-                amovie_project_2("losealien");
+                amovie_project_name("losealien");
             else
-                amovie_project_2(MFactions[CurrentPlayerFaction].is_leader_female ? "losewoman" : "loseman");
+                amovie_project_name(MFactions[CurrentPlayerFaction].is_leader_female ? "losewoman" : "loseman");
         }
         break;
     case 8:
@@ -1738,7 +1738,7 @@ int32_t GAMEAPI end_of_game(int32_t check) {
             StrBuffer[0] = 0;
             crt_strcat(StrBuffer, MFactions[CurrentPlayerFaction].search_key);
             CharUpperA(StrBuffer);
-            amovie_project_2(!crt_strcmp(StrBuffer, "CARETAKE") ? "close_ct" : "close_us");
+            amovie_project_name(!crt_strcmp(StrBuffer, "CARETAKE") ? "close_ct" : "close_us");
         }
         break;
     case 17:
@@ -1811,7 +1811,7 @@ int32_t GAMEAPI end_of_game(int32_t check) {
         NetDaemon_hang_up(&NetState);
         for (int32_t i : {0, 1, 2, 3, 12, 11, 15, 14, 19, 30, 28, 29, 39, 38, 8, 9, 10, 37, 36, 32, 31, 33, 4, 5, 42, 41, 6, 7})
             NetSessionState[i] = 0;
-        dword_93E960 = 0xFF;
+        ChatRecipientMask = 0xFF;
         NetSessionState[18] = 0;
         for (int32_t i = 0; i < 8; i++) NetSessionState[20 + i] = 0;
         Lock_clear(&NetLock);
@@ -2585,7 +2585,7 @@ void GAMEAPI control_turn() {
         if (!PbemActive) crash_landing(CurrentPlayerFaction);
     }
     if (!PbemActive) draw_map(1);
-    dword_93A940 = 1;
+    ControlTurnStarted = 1;
     if (ControlTurnMove && !is_human(CurrentPlayerFaction)) Console_human_turn(&MainConsole);
     do {
         if (!PbemActive) MessageWin_clear(&MessageWin);
@@ -2665,9 +2665,9 @@ void GAMEAPI control_game() {
         filefind_init("movies\\virtualWorld.wve", registered);
         prefs_load(0);
         GamePreferences = AlphaIniPrefs.preferences;
-        int32_t no_movie = prefs_get_2("DisableOpeningMovie", 0, 0);
-        prefs_put_2("DisableOpeningMovie", (uint32_t)no_movie, 0);
-        if (!no_movie && (GamePreferences & 0x10000000)) amovie_project_2("openingx");
+        int32_t no_movie = prefs_get_int("DisableOpeningMovie", 0, 0);
+        prefs_put_int("DisableOpeningMovie", (uint32_t)no_movie, 0);
+        if (!no_movie && (GamePreferences & 0x10000000)) amovie_project_name("openingx");
     }
     if (!ui_shift_pressed()) FX_init(&Sounds);
     for (;;) {

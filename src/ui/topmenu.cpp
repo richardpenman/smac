@@ -668,7 +668,7 @@ int32_t GAMEAPI size_of_planet(int32_t mode) {
     }
     // Custom size (CUSTOMMAP): the width and height, 16..256, beyond 128 after VERYLARGEMAP.
     Popup_start(pop, ScriptFileName, "CUSTOMMAP", -1, nullptr, 0x44);
-    int32_t cx = prefs_get_2("Custom Map X", 0x28, 0), cy = prefs_get_2("Custom Map Y", 0x50, 0);
+    int32_t cx = prefs_get_int("Custom Map X", 0x28, 0), cy = prefs_get_int("Custom Map Y", 0x50, 0);
     char num[16];
     std::snprintf(num, sizeof(num), "%d", cx);
     BasePop_edit(pop, label_get(0x1108 / 4), num, 8);
@@ -684,8 +684,8 @@ int32_t GAMEAPI size_of_planet(int32_t mode) {
         popup_delete(pop);
         return 1;
     }
-    prefs_put_2("Custom Map X", (uint32_t)x, 0);
-    prefs_put_2("Custom Map Y", (uint32_t)y, 0);
+    prefs_put_int("Custom Map X", (uint32_t)x, 0);
+    prefs_put_int("Custom Map Y", (uint32_t)y, 0);
     return finish(x, y);
 }
 

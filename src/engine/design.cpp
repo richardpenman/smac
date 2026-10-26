@@ -124,7 +124,7 @@ void GAMEAPI say_defense(char* buffer, int32_t unit_id) {
     if (Units[unit_id].armor_id == 11 || Units[unit_id].armor_id == 13) std::strcat(buffer, "r");
 }
 
-void GAMEAPI say_stats_3(char* buffer, int32_t unit_id) {
+void GAMEAPI say_stats_short(char* buffer, int32_t unit_id) {
     char num[80];
     const UNIT& unit = Units[unit_id];
     if (weap_off(unit.weapon_id) < 0)
@@ -148,7 +148,7 @@ void GAMEAPI say_stats_3(char* buffer, int32_t unit_id) {
     }
 }
 
-void GAMEAPI say_stats_2(char* buffer, int32_t unit_id) {
+void GAMEAPI say_stats_labeled(char* buffer, int32_t unit_id) {
     char num[80];
     const UNIT& unit = Units[unit_id];
     if (weap_off(unit.weapon_id) < 0)
@@ -709,7 +709,7 @@ void prune_say_design(int32_t unit_id) {
     std::strcat(StrBuffer, Units[unit_id].name);
     std::strcat(StrBuffer, " ");
     std::strcat(StrBuffer, "(");
-    say_stats_2(StrBuffer, unit_id);
+    say_stats_labeled(StrBuffer, unit_id);
     if (Units[unit_id].ability_flags) {
         std::strcat(StrBuffer, " ");
         for (int32_t i = 0; i < 29; i++)
@@ -1098,7 +1098,7 @@ int32_t GAMEAPI propose_proto(int32_t faction_id, int32_t chassis_id, int32_t we
             q++;
         } while (q <= base.queue_size);
     }
-    if (dword_68F0F0 < 0) dword_68F0F0 = best;
+    if (NewDesignUnitID < 0) NewDesignUnitID = best;
     return best;
 }
 
@@ -1127,7 +1127,7 @@ void GAMEAPI consider_designs(int32_t faction_id) {
     Faction& fac = Factions[f];
     const MFaction& mf = MFactions[f];
     const bool human = is_human(f);
-    dword_68F0F0 = -1;
+    NewDesignUnitID = -1;
     // hostility (war_score): vendettas and atrocity victims
     int32_t war_score = 0;
     for (int32_t i = 1; i < 8; i++) {

@@ -25,7 +25,7 @@ void GAMEAPI clear_hotseat_chat() {
     }
 }
 
-void GAMEAPI clear_council_notify_2() {
+void GAMEAPI clear_council_notify_all() {
     for (int32_t i = 0; i < 8; i++) CouncilVoteState[i] = 0;
     for (int32_t i = 0; i < 8; i++) CouncilProposal[i] = 0;
 }

@@ -19,7 +19,7 @@ void GAMEAPI log_say(const char* label, const char* text, int32_t v1, int32_t v2
     }
 }
 
-void GAMEAPI log_say_2(const char* label, int32_t v1, int32_t v2, int32_t v3) {
+void GAMEAPI log_say_values(const char* label, int32_t v1, int32_t v2, int32_t v3) {
     if (!log_active()) return;
     if (FILE* f = std::fopen(LogFileName, "a")) {
         std::fprintf(f, "%s %d %d %d\n", label, v1, v2, v3);
@@ -27,7 +27,7 @@ void GAMEAPI log_say_2(const char* label, int32_t v1, int32_t v2, int32_t v3) {
     }
 }
 
-void GAMEAPI log_say_hex_2(const char* label, int32_t v1, int32_t v2, int32_t v3) {
+void GAMEAPI log_say_hex(const char* label, int32_t v1, int32_t v2, int32_t v3) {
     if (!log_active()) return;
     if (FILE* f = std::fopen(LogFileName, "a")) {
         std::fprintf(f, "%s %04x %04x %04x\n", label, (uint32_t)v1, (uint32_t)v2, (uint32_t)v3);

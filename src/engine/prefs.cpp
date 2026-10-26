@@ -71,7 +71,7 @@ uint32_t GAMEAPI default_warn() { return 0x3C3A9; }
 
 uint32_t GAMEAPI default_rules() { return 0x1A0E; }
 
-int32_t GAMEAPI prefs_get_2(const char* key, int32_t def, int32_t use_default) {
+int32_t GAMEAPI prefs_get_int(const char* key, int32_t def, int32_t use_default) {
     str_number(def);
     if (!use_default)
         ini_get(key, StrBuffer);
@@ -129,15 +129,15 @@ void GAMEAPI prefs_load(int32_t use_defaults) {
     DefaultPrefs.top_menu = load_number("Top Menu", 0);
     DefaultPrefs.faction_id = load_number("Faction", 1);
 
-    // BUG(original): prefs_get_2 leaves "0" in StrBuffer, so the default reads "0" + digits.
+    // BUG(original): prefs_get_int leaves "0" in StrBuffer, so the default reads "0" + digits.
     StrBuffer[0] = 0;
-    uint32_t prefs = laptop_prefs(prefs_get_2("Laptop", 0, 0));
+    uint32_t prefs = laptop_prefs(prefs_get_int("Laptop", 0, 0));
     if (DefaultPrefs.difficulty < 2) prefs |= 0x20;  // tutorial messages for beginners
     str_binary(prefs, "1", "0");
     load_bits("Preferences", use_defaults);
     AlphaIniPrefs.preferences = text_item_binary();
 
-    int32_t laptop = prefs_get_2("Laptop", 0, 0);
+    int32_t laptop = prefs_get_int("Laptop", 0, 0);
     StrBuffer[0] = 0;
     str_binary(laptop_prefs2(laptop), "1", "0");
     load_bits("More Preferences", use_defaults);
@@ -167,13 +167,13 @@ void GAMEAPI prefs_load(int32_t use_defaults) {
     load_bits("Custom World", use_defaults);
     for (int32_t i = 0; i < 7; i++) AlphaIniPrefs.custom_world[i] = text_item_number();
 
-    prefs_get_2("Time Controls", 1, use_defaults);
+    prefs_get_int("Time Controls", 1, use_defaults);
     AlphaIniPrefs.time_controls = text_item_number();
 }
 
 void GAMEAPI prefs_put(const char* key, const char* value) { ini_put(key, value); }
 
-void GAMEAPI prefs_put_2(const char* key, uint32_t value, int32_t binary) {
+void GAMEAPI prefs_put_int(const char* key, uint32_t value, int32_t binary) {
     char num[80];
     StrBuffer[0] = 0;
     if (!binary) {
@@ -203,10 +203,10 @@ void GAMEAPI prefs_save(int32_t save_factions) {
     StrBuffer[0] = 0;
     str_binary((uint32_t)AlphaIniPrefs.more_preferences, "1", "0");
     ini_put("More Preferences", StrBuffer);
-    prefs_put_2("Semaphore", (uint32_t)AlphaIniPrefs.semaphore, 1);
-    prefs_put_2("Announce", (uint32_t)AlphaIniPrefs.announce, 1);
-    prefs_put_2("Rules", (uint32_t)AlphaIniPrefs.rules, 1);
-    prefs_put_2("Customize", (uint32_t)AlphaIniPrefs.customize, 0);
+    prefs_put_int("Semaphore", (uint32_t)AlphaIniPrefs.semaphore, 1);
+    prefs_put_int("Announce", (uint32_t)AlphaIniPrefs.announce, 1);
+    prefs_put_int("Rules", (uint32_t)AlphaIniPrefs.rules, 1);
+    prefs_put_int("Customize", (uint32_t)AlphaIniPrefs.customize, 0);
     StrBuffer[0] = 0;
     for (int32_t i = 0; i < 7; i++) {
         crt_itoa(AlphaIniPrefs.custom_world[i], num, 10);
@@ -214,7 +214,7 @@ void GAMEAPI prefs_save(int32_t save_factions) {
         crt_strcat(StrBuffer, ", ");
     }
     ini_put("Custom World", StrBuffer);
-    prefs_put_2("Time Controls", (uint32_t)AlphaIniPrefs.time_controls, 0);
+    prefs_put_int("Time Controls", (uint32_t)AlphaIniPrefs.time_controls, 0);
     if (save_factions) {
         for (int32_t i = 1; i < 8; i++) {
             if (!ExpansionEnabled) continue;

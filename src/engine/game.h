@@ -3,7 +3,7 @@
 #include "engine/globals.h"
 
 GLOBAL(int32_t, GameNotStarted, 0x68F21C);  // pfGameNotStarted (= GameHalted)
-GLOBAL(int32_t, dword_9469FC, 0x9469FC);   // cleared by WinMain
+GLOBAL(int32_t, ThumbRoutineActive, 0x9469FC);   // faction picker thumbnail up (thumb_routine): wider popup text; cleared by WinMain
 
 // New game, Alien Crossfire: unless the viewer plays an alien or the Cult of Planet, removes the
 // computer-controlled aliens and Cult (bases, units, alive bit).

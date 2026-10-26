@@ -164,7 +164,7 @@ builds stay unchanged.
   Wine/Xvfb (1024x768) with oracle.dll and grabs every changed frame (`grab.py`) while the script
   runs (`load SAVE`, optional `viewer N`, `turns 1`). The first map frame after load is the
   desktop_init redraw: same save, same view centre (the map cursor), no bases/units yet
-  (`dword_93A940` is still 0); later frames show the turn.
+  (`ControlTurnStarted` is still 0); later frames show the turn.
 * **Native screenshots**: `smacx --save SAVE [--viewer N] [--center X,Y] --hidden --shot out.bmp`
   with `SDL_VIDEODRIVER=dummy` renders offscreen; `--turns N` first plays N turns.
 * **Compare**: `work/ui/compare.py` (stacked image), `work/ui/score.py` (fraction of pixels within
@@ -584,7 +584,7 @@ original does (smacx's main_menu only adds the seeding and the human player for 
   slots (formal name | (description), RANDOM) with their arrow menus (every faction's noun and
   RANDOM: read_faction2), the line to the selected slot, INFO / QUOTE, CHANGE NAME, OK, CANCEL;
   under it thumb_routine's text box (the faction's BLURB or DATALINKS1/2 with the leader's portrait,
-  700 pixels wide while dword_9469FC is set). The picker stays up under the name popup, as the
+  700 pixels wide while ThumbRoutineActive is set). The picker stays up under the name popup, as the
   original's.
 * **FileBox** (src/ui/filebox.cpp, replacing the simple box of console_filebox.cpp): FileBox_init's
   layout at the menu and in a game, the list of FileList (directories, "..", the files of the
@@ -679,7 +679,7 @@ are replaced by smacx (src/ui/sound.cpp, music.cpp, movie.cpp).
 * **Movies** (wve.cpp, movie.cpp): the GOG data's movies are EA WVE files (SCHl / SCCl / pIQT /
   SCDl / SCEl chunks): TQI video (MPEG-1 intra macroblocks, AAN-scaled dequantisation, EA's IDCT,
   15 frames per second; tables of ISO 11172-2 taken from libavcodec once) and EA ADPCM stereo sound
-  at 22050 Hz, decoded natively. amovie_project (movlist.txt's #PROJECTS) and amovie_project_2
+  at 22050 Hz, decoded natively. amovie_project (movlist.txt's #PROJECTS) and amovie_project_name
   (movies\NAME.wve; the CD and .avi fallbacks find nothing in the GOG data) play them full window
   with their sound while the other sounds are off; Enter, Esc, space or a click end them. The
   engine calls them for the opening (openingx), the factions' planetfall movies, secret projects,

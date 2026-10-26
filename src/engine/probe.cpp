@@ -85,7 +85,7 @@ int32_t GAMEAPI vulnerable(int32_t faction_id, int32_t x, int32_t y) {
     return 12;
 }
 
-int32_t GAMEAPI vector_dist_2(int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
+int32_t GAMEAPI tile_distance(int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
     int32_t dx = std::abs(x1 - x2);
     if (!(MapToggleFlat & 1) && dx > MapHalfX) dx = MapAreaX - dx;
     int32_t dy = std::abs(y1 - y2);
@@ -187,7 +187,7 @@ void GAMEAPI net_treaty_on(int32_t faction_id, int32_t faction_id_with, uint32_t
         treaty_on(faction_id, faction_id_with, status);
         return;
     }
-    log_say_2("Sending TREATY_ON", faction_id, faction_id_with, (int32_t)status);
+    log_say_values("Sending TREATY_ON", faction_id, faction_id_with, (int32_t)status);
     message_data(0x2441, 0, faction_id, faction_id_with, (int32_t)status, 0);
     if (wait) NetDaemon_await_diplo(&NetState, 0x441);
 }
@@ -197,7 +197,7 @@ void GAMEAPI net_treaty_off(int32_t faction_id, int32_t faction_id_with, uint32_
         treaty_off(faction_id, faction_id_with, status);
         return;
     }
-    log_say_2("Sending TREATY_OFF", faction_id, faction_id_with, (int32_t)status);
+    log_say_values("Sending TREATY_OFF", faction_id, faction_id_with, (int32_t)status);
     message_data(0x2442, 0, faction_id, faction_id_with, (int32_t)status, 0);
     if (wait) NetDaemon_await_diplo(&NetState, 0x442);
 }
@@ -207,7 +207,7 @@ void GAMEAPI net_set_treaty(int32_t faction_id, int32_t faction_id_with, uint32_
         set_treaty(faction_id, faction_id_with, status, add);
         return;
     }
-    log_say_2("Sending SET_TREATY", faction_id, faction_id_with, (int32_t)status);
+    log_say_values("Sending SET_TREATY", faction_id, faction_id_with, (int32_t)status);
     message_data(0x2443, 0, faction_id, faction_id_with, (int32_t)status, add);
     if (wait) NetDaemon_await_diplo(&NetState, 0x443);
 }
@@ -217,7 +217,7 @@ void GAMEAPI net_tech(int32_t faction_id, int32_t tech_id, int32_t from, int32_t
         tech_achieved(faction_id, tech_id, from, 0);
         return;
     }
-    log_say_2("Sending TECH", faction_id, tech_id, from);
+    log_say_values("Sending TECH", faction_id, tech_id, from);
     message_data(0x244B, 0, faction_id, tech_id, from, 0);
     if (wait) NetDaemon_await_diplo(&NetState, 1099);
 }
@@ -1178,7 +1178,7 @@ success:
         Factions[f].mind_control_total++;
         Factions[t].diplo_mind_control[f]++;
         owner_set(u.x, u.y, f);
-        u.home_base_id = (int16_t)base_find_2(u.x, u.y, f);
+        u.home_base_id = (int16_t)base_find_faction(u.x, u.y, f);
         u.moves_spent = 0;
         u.order = 0;
         u.state &= 0xFCFFBDFF;
@@ -1201,7 +1201,7 @@ survive: {
     int32_t p = range(defense + Factions[t].SE_probe, -2, 0);
     if (risk < rnd(morale_veh(veh_id, 1, 0) - p)) {
         // the probe team returns home
-        dest = base_find_2(Vehs[veh_id].x, Vehs[veh_id].y, f);
+        dest = base_find_faction(Vehs[veh_id].x, Vehs[veh_id].y, f);
         if (veh_triad(veh_id) == 1) {
             if (dest < 0) goto lost;
             if (!is_port(dest, 0)) {
@@ -1234,7 +1234,7 @@ survive: {
         }
     } else {
         if (!ProbeTargetHasHSA && ProbeHasAlgoEnhancement && probe_clock_odd()) {
-            dest = base_find_2(Vehs[veh_id].x, Vehs[veh_id].y, f);
+            dest = base_find_faction(Vehs[veh_id].x, Vehs[veh_id].y, f);
             if (veh_triad(veh_id) == 1 && dest >= 0 && !is_port(dest, 0)) dest = sea_return_base(veh_id, f);
             if (dest >= 0) goto home;
             goto lost;
@@ -1266,7 +1266,7 @@ survive: {
         // the units in and next to the base change sides
         for (int32_t v = VehCount - 1; v >= 0; v--) {
             if (v >= VehCount || Vehs[v].faction_id != t) continue;
-            int32_t d = vector_dist_2(Vehs[v].x, Vehs[v].y, Bases[base_id].x, Bases[base_id].y);
+            int32_t d = tile_distance(Vehs[v].x, Vehs[v].y, Bases[base_id].x, Bases[base_id].y);
             if (d >= 2 || (d != 0 && base_who(Vehs[v].x, Vehs[v].y) >= 0)) continue;
             VEH& u = Vehs[v];
             int32_t unit = u.unit_id;

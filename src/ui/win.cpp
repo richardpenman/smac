@@ -271,7 +271,7 @@ bool run_command(const std::string& cmd) {
         return true;
     }
     if (cmd.rfind("movie", 0) == 0) {  // test aid: a movie by name (movie.cpp)
-        amovie_project_2(arg.c_str());
+        amovie_project_name(arg.c_str());
         return true;
     }
     if (cmd.rfind("popup", 0) == 0) {  // test aid: a popup by label (win_popup.cpp)
