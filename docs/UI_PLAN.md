@@ -730,8 +730,8 @@ tests/placeholders/compare.sh (orig_rmenu.steps; orig_basewin.steps by eye).
 | World map pane | WorldWin_on_redraw, MapWin_gen_bases_only, WorldWin_draw_box, WorldWin_tile_to_pixel | done (nearest-pixel stretch for maps larger than the pane) | — |
 | Date box, TURN COMPLETE, globe buttons | MainInterface_set_date, MainInterface_redraw_complete, MainInterface_init's geometry | done (turn.flc not decoded) | — |
 | Map cursor and blinking | MapWin_draw_radius's cursor texture, Texture_draw_trans_3, blink_timer | done (no edge scrolling) | — |
-| Info pane | InfoWin_setup_text, InfoWin_draw_text, InfoWin timer / set_state, the M / I / X buttons, InfoWin_right_menu | approximated (year and allocation) | L |
-| Clicks on the interface panes | StatusWin_on_left_click / on_right_click, StatusWin_arrow_left / right, WorldWin_click / right_menu, the stack scroll arrows | not reconstructed | M |
+| Info pane | InfoWin_setup_text, InfoWin_draw_text, InfoWin timer / set_state, the M / I / X buttons, InfoWin_right_menu, MessageWin (the M mode's list), MainInterface_set_message | done (infowin.cpp; the message list's ListBox look approximated; control_turn's faction boxes in the pane during the computer players' turns not drawn) | — |
+| Clicks on the interface panes | StatusWin_on_left_click / on_right_click, StatusWin_arrow_left / right, WorldWin_click / right_menu, the stack scroll arrows | done (maininfc.cpp; the world map window of a shift click / the menu's item 4 not reconstructed: the view is centred) | — |
 | Labs report and the Datalinks tech tree | ReportWin_draw_labs, ReportIf_draw_labs, the Datalinks tree view | approximated / missing | L |
 | Energy report's two columns | ReportWin_draw_energy, ReportIf_draw_energy | approximated | M |
 | Base locator map, report pictures, satellite FLC, hover help | ReportWin_draw_ops / sat, ReportIf_* | approximated | L |

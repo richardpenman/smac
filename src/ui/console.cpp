@@ -4,6 +4,7 @@
 // Calls to window code that is not reconstructed yet (status/info panes, menus, cursor drawing,
 // sounds, most orders) go to placeholders (console_placeholders.cpp) or the bridge's headless
 // versions; their game-state effects, where they have any, are noted at the call.
+#include "ui/statuswin.h"
 #include "ui/console.h"
 #include "ui/mapwin.h"
 #include "ui/help.h"
@@ -1844,8 +1845,8 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     }
     if (dir >= 0) {
         if (ctrl && (vk & 0x10000)) {
-            if (dir == 5) console_not_reconstructed("StatusWin_arrow_left");
-            else if (dir == 1) console_not_reconstructed("StatusWin_arrow_right");
+            if (dir == 5) StatusWin_arrow_left(&InfoWin);
+            else if (dir == 1) StatusWin_arrow_right(&InfoWin);
             return 1;
         }
         if (MapWinInVehMode) {

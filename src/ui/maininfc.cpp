@@ -10,9 +10,12 @@
 // BattleWin_clear / pulse_timer / stop_timer and SubInterface_set_iface_mode do nothing as there
 // (the battle display, BattleWin_battle_report, is not reconstructed), tut_check2 is the same.
 //
-// Not reconstructed: the panes' clickable spots (StatusWin_on_left_click / on_right_click), the
-// stack row's scroll arrows (buttons 0x3F0..0x3F2, shown when the tile has more units than fit),
-// the world map's StretchBlt when the map is larger than the pane (nearest pixel here; the
+// The panes' clicks (StatusWin_on_left_click / on_left_double_click / on_right_click, the hover of
+// MainInterface_on_iface_mouse_move), the stack row's scroll arrows (buttons 0x3F0 / 0x3F2 of
+// MainInterface_on_iface_button_clicked), StatusWin_arrow_left / right, the world map's clicks
+// (WorldWin_click, WorldWin_right_menu) and spot 5 (TURN COMPLETE: Console_end_my_turn) are at the
+// end of the file. Not reconstructed: the world map window of WorldWin_click's shift click and
+// its menu's item 4 (the view is centred instead), the world map's StretchBlt when the map is larger than the pane (nearest pixel here; the
 // original's GDI stretch mode is BLACKONWHITE).
 #include <algorithm>
 #include <cstdio>
@@ -35,6 +38,11 @@
 #include "engine/ui_bridge.h"
 #include "engine/veh.h"
 #include "engine/zoc.h"
+#include "platform/ui_platform.h"
+#include "ui/pulldown.h"
+#include "ui/help.h"
+#include "ui/infowin.h"
+#include "ui/mapwin.h"
 #include "ui/basewin.h"
 #include "ui/basewin_internal.h"
 #include "ui/console.h"
@@ -70,6 +78,9 @@ Buffer* canvas() { return basewin_mi_canvas(); }
 int32_t tc(uint32_t addr) { return text_color(addr); }
 UiRect rect(uint32_t off) { return mi_rect(off); }
 int32_t zoom_or(int32_t base, int32_t mul) { return ZoomNum < 1 ? base : ZoomNum * mul / ZoomDenom; }
+
+Spots g_spots;  // StatusWin's spots (+0x15E0): the panes and the stack row's units
+void stack_arrows_show(bool on);
 
 // StatusWin's fonts (+0x1530 normal, +0x1558 italic, +0x1580 bold; StatusWin_redraw).
 Font g_font[3];
@@ -474,7 +485,7 @@ void THISCALL StatusWin_draw_active(uint8_t* self, int32_t veh_id, int32_t base_
                 write(c, std::string("[") + lbl(0x71C) + ": " + num(t + 1) + "]", x0, yy);
             }
         }
-        if (spots) {}  // Spot_add(veh, 10, pane): the pane's spot (clicks: not reconstructed)
+        if (spots) spot_add(&g_spots, veh_id, 10, r.left, r.top, r.right - r.left, r.bottom - r.top);
         DestLinesVeh = -1;
         if ((vf == CurrentPlayerFaction || (GameState & 0x80)) && v.order == 0x18 && !(GameMorePreferences & 0x2000000)) {
             // draw_my_dest + Win_show(DesktopWin): the go-to order's path on the overlay.
@@ -556,6 +567,7 @@ void THISCALL StatusWin_draw_active(uint8_t* self, int32_t veh_id, int32_t base_
                 s += " (" + num(bs.minerals_accumulated) + "/" + num(cost_factor(bf, 1, -1) * cost) + ")";
             wrap_cent4(c, s, x0, y, w);
         }
+        if (spots) spot_add(&g_spots, b, 1, r.left, r.top, r.right - r.left, r.bottom - r.top);
     }
     ui_invalidate();
 }
@@ -572,6 +584,8 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
     Buffer* c = canvas();
     if (!c->data) return;
     status_fonts();
+    if (!g_spots.capacity) spot_init(&g_spots, 0x40);
+    for (int32_t t : {0, 1, 2, 3, 10, 11}) spot_kill_type(&g_spots, t);
     int32_t lh = line_h(&g_font[0]);
     Buffer_set_font(c, &g_font[0], &g_font[2], &g_font[1], nullptr);
     int32_t shown = MapWinVehA, x, y;
@@ -672,6 +686,10 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
     }
     UiRect all{0, 0, c->width, c->height};
     Buffer_set_clip(c, &all);
+    {
+        const UiRect& t = rect(0xCCC);
+        spot_add(&g_spots, 0, 3, t.left, t.top, t.right - t.left, t.bottom - t.top);
+    }
     sw(0x15C8) = -1;
     sw(0x15C4) = -1;
     sw(0x15CC) = shown;
@@ -705,7 +723,15 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
         for (; v >= 0; v = Vehs[v].next_veh_id_stack) count++;
     }
     int32_t fit = (r.right - r.left) / (cw + 0x10);
-    // (more than fit: the scroll arrows' layout; not reconstructed, the row is clipped)
+    // More than fit: the row between the scroll arrows (buttons 0x3F0 / 0x3F2 shown; 0x3F1 never).
+    if (fit < count) {
+        r.left = mi_rect(0xAAC).right + 1;
+        r.right = mi_rect(0xACC).left - 1;
+        cell = (r.right - r.left) / fit - 5;
+        stack_arrows_show(true);
+    } else {
+        stack_arrows_show(false);
+    }
     int32_t cx = r.left, cy = r.top;
     UiRect cr{cx - 2, cy - 2, cx + cell + 2, cy + rh + 2};
     Buffer_set_clip(c, &cr);
@@ -714,6 +740,7 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
         n = 1;
         base_draw(c, b, cx + 0xB, cy - 1, -8, 0x40);
         base_draw(c, b, cx, cy - 1, 0, 0x1800);
+        spot_add(&g_spots, b, 0xB, cx, cy, cell + 5, rh);
         if (b == sel_base) {
             UiRect hb{cx - 2, cy - 2, cx + cell + 2, cy + rh + 2};
             Buffer_box_2(c, &hb, 0xAE, 0xAE);
@@ -754,6 +781,7 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
                 UiRect hb{cx - 2, cy - 2, cx + cell + 2, cy + rh + 2};
                 Buffer_box_2(c, &hb, 0xAE, 0xAE);
             }
+            spot_add(&g_spots, v, 0, cx, cy, cell + 5, rh);
             cx += cell + 5;
         }
     }
@@ -963,4 +991,413 @@ void maininfc_geometry() {
     set(0xA3C, b1, center.bottom - 0x1D, b2, center.bottom - 9);
     set(0xA4C, b1, center.top + 0x1D + 5, b2, center.bottom - 0x1D - 5);
     set(0xD1C, center.left + 7, center.top + 7, b1 - 10, center.bottom - 7);
+}
+
+// ==== the panes' mouse input ====================================================================
+
+namespace {
+
+// The stack row's scroll arrows (MainInterface_init: buttons 0x3F0 / 0x3F2 with the arrows of
+// interface.pcx (0x18D + 13 k, 0x99 / 0xC4; 12 x 42, three states), 4 pixels inside the stack pane,
+// vertically centred; 0x3F1 at the bottom pane's left is never shown).
+struct Arrow {
+    Sprite spr[3];
+    bool shown = false, pressed = false;
+    uint32_t rect_off = 0;
+    int32_t id = 0;
+} g_arrow[2];
+bool g_arrows_loaded = false;
+
+void load_arrows() {
+    if (g_arrows_loaded) return;
+    g_arrows_loaded = true;
+    Buffer ifc;
+    Buffer_ctor(&ifc);
+    if (Buffer_load_pcx(&ifc, "interface.pcx", nullptr, 10, 0xEC)) return;
+    for (int32_t j = 0; j < 2; j++)
+        for (int32_t k = 0; k < 3; k++)
+            pfncSpriteFromCanvasRectTrans(&g_arrow[j].spr[k], &ifc, 9, 0x18D + 0xD * k, 0x99 + 0x2B * j, 0xC, 0x2A, 0);
+    const UiRect& s = rect(0xCEC);
+    int32_t w = g_arrow[0].spr[0].width, h = g_arrow[0].spr[0].height;
+    int32_t top = s.top + (s.bottom - h - s.top) / 2;
+    mi_rect(0xAAC) = {s.left + 4, top, s.left + 4 + w, top + h};
+    mi_rect(0xACC) = {s.right - w - 4, top, s.right - 4, top + h};
+    g_arrow[0].rect_off = 0xAAC;
+    g_arrow[0].id = 0x3F0;
+    g_arrow[1].rect_off = 0xACC;
+    g_arrow[1].id = 0x3F2;
+}
+
+bool in_rect(int32_t x, int32_t y, const UiRect& r) { return x >= r.left && x < r.right && y >= r.top && y < r.bottom; }
+
+// pfncDrawTileInfo (0x4B8890): the fonts, StatusWin_draw_status, the panes to the screen.
+void draw_tile_info() {
+    StatusWin_redraw(&InfoWin);
+    ui_invalidate();
+}
+
+// MainInterface_on_iface_button_clicked's 0x3F0 / 0x3F1 (the top unit to the bottom of the stack)
+// and 0x3F2 (the bottom unit to the top).
+void arrow_clicked(int32_t id) {
+    int32_t v = veh_at(sw(0x15B4), sw(0x15B8));
+    if (v < 0) return;
+    if (id == 0x3F2) {
+        while (Vehs[v].next_veh_id_stack >= 0) v = Vehs[v].next_veh_id_stack;
+        veh_promote(v);
+    } else {
+        veh_demote(v);
+    }
+    VehStackSortOff = 1;
+    draw_tile_info();
+    VehStackSortOff = 0;
+}
+
+// The StatusWin's selection after a menu choice or an arrow key: draw_status of the panes.
+void reselect() { draw_tile_info(); }
+
+int32_t g_dbl = 0;  // +0x15D8: a double click
+
+}  // namespace
+
+namespace {
+void stack_arrows_show(bool on) {
+    load_arrows();
+    g_arrow[0].shown = g_arrow[1].shown = on;
+}
+}  // namespace
+
+// StatusWin_on_left_click (0x4B8E40): a unit of the stack or the unit pane activates it; a base
+// (the stack row's or the pane's) opens its window when it may be seen; the tile pane toggles the
+// terrain words / resource numbers.
+void THISCALL StatusWin_on_left_click(uint8_t* self, int32_t x, int32_t y) {
+    if (g_dbl) return;
+    InfoWin_reset(&InfoWindow);
+    StatusWin_reset(self);
+    BaseWinMultiplayerRefresh = 0;
+    int32_t index = 0, type = 0;
+    if (spot_check(&g_spots, x, y, &index, &type) < 0) return;
+    switch (type) {
+    case 0:
+    case 10:
+        if (veh_selectable(index)) {
+            MapWinVehA = index;
+            if (!net_lock_veh(&index, 0)) {
+                veh_wake(index);
+                ui_synch_veh(index);
+                net_await_synch();
+                net_unlock_veh();
+            }
+            Console_set_move(&MainConsole, 1);
+        }
+        break;
+    case 1:
+    case 0xB: {
+        int32_t f = Bases[index].faction_id;
+        if ((GameState & 0x80) || f == CurrentPlayerFaction || spying(f) ||
+            (Factions[CurrentPlayerFaction].diplo_status[f] & 1))
+            BaseWin_zoom(&BaseWin, index, 0);
+        break;
+    }
+    case 3:
+        sw(0x15A8) = ~sw(0x15A8);
+        draw_tile_info();
+        break;
+    default: break;
+    }
+}
+
+// StatusWin_on_left_double_click (0x4B8990): the click with +0x15D8 set (nothing).
+void THISCALL StatusWin_on_left_double_click(uint8_t* self, int32_t x, int32_t y) {
+    g_dbl = 1;
+    StatusWin_on_left_click(self, x, y);
+    g_dbl = 0;
+}
+
+// StatusWin_on_right_click (0x4B9010): the tile pane's menu (terrain words, resource numbers, the
+// datalinks on terrain); a unit's menu (activate it, show it; the editor's unit edit); a base's
+// menu (show it, its window, production, hurry, the governor's modes); Help.
+void THISCALL StatusWin_on_right_click(uint8_t* self, int32_t x, int32_t y, int32_t) {
+    const UiRect& pos = mi_rect(kMiPos);
+    int32_t index = 0, type = -1;
+    bool hit = spot_check(&g_spots, x, y, &index, &type) >= 0;
+    if (hit && type == 3) {
+        // PopMenu: the three items by their position.
+        PullDown pm;
+        PullDown_init(&pm);
+        PullDown_add_item(&pm, 0, label_get(0xFEC / 4));
+        PullDown_add_item(&pm, 1, label_get(0xFF0 / 4));
+        PullDown_add_item(&pm, 2, label_get(0xFF4 / 4));
+        int32_t mx = 0, my = 0;
+        ui_mouse_pos(&mx, &my);
+        PullDown_show(&pm, mx, my);
+        int32_t sel = PullDown_get_selected(&pm);
+        int32_t r = sel >= 0 && sel < 0x40 ? pulldown_item_id(&pm, sel) : -1;
+        if (r == 0) sw(0x15A8) = 0;
+        else if (r == 1) sw(0x15A8) = -1;
+        else if (r == 2) Datalink_exec(&DatalinkWin, 9, 0);
+        if (r == 0 || r == 1) draw_tile_info();
+        return;
+    }
+    PullDown pd;
+    PullDown_init(&pd);
+    int32_t veh = -1, base = -1;
+    if (hit && type != 2) {
+        if (type == 0 || type == 10) {
+            veh = type == 10 ? MapWinVehA : index;
+            PullDown_add_item(&pd, 6, label_get(0x958 / 4));
+            PullDown_add_item(&pd, 7, label_get(0x112C / 4));
+            if (GameState & 0x40) PullDown_add_item(&pd, 0x5A, label_get(0xDFC / 4));
+            PullDown_add_separator(&pd, 99);
+        } else {
+            base = index;
+            int32_t owner = Bases[base].faction_id;
+            if ((GameState & 0x80) || owner == CurrentPlayerFaction || spying(owner) ||
+                (Factions[CurrentPlayerFaction].diplo_status[owner] & 1))
+                PullDown_add_item(&pd, 5, label_get(0x894 / 4));
+            if (owner == CurrentPlayerFaction || (GameState & 0x80)) {
+                static char str[6][256];
+                auto ind = [&](int32_t k, uint32_t off) {
+                    std::snprintf(str[k], sizeof(str[k]), " %s", label_get((int32_t)(off / 4)));
+                    return str[k];
+                };
+                PullDown_add_item(&pd, 0x33, ind(0, 0x898));
+                int32_t item = Bases[base].queue_items[0];
+                const char* prod = item < 0 ? Strings_get(&StringTable, Facility[-item].name) : Units[item].name;
+                std::snprintf(str[1], sizeof(str[1]), " %s %s", label_get(0x89C / 4), prod);
+                PullDown_add_item(&pd, 0x34, str[1]);
+                PullDown_add_item(&pd, 0x35, ind(2, 0x8A0));
+                PullDown_add_item(&pd, 0x36, ind(3, 0x8A4));
+                PullDown_add_item(&pd, 0x37, ind(4, 0x8A8));
+                PullDown_add_item(&pd, 0x38, ind(5, 0x8AC));
+                PullDown_add_separator(&pd, 99);
+            }
+        }
+    }
+    PullDown_add_item(&pd, 0x14, label_get(0x8FC / 4));
+    PullDown_show(&pd, x + pos.left, y + pos.top);
+    int32_t sel = PullDown_get_selected(&pd);
+    int32_t id = sel >= 0 && sel < 0x40 ? pulldown_item_id(&pd, sel) : -1;
+    bool locked = MultiplayerActive && (ControlTurnC || NetLocked || NetInputPending ||
+                                        ((1u << CurrentPlayerFaction) & (uint32_t)NetTurnDoneMask));
+    switch (id) {
+    case 5: BaseWin_zoom(&BaseWin, base, 0); break;
+    case 6:
+        if (veh_selectable(veh)) {
+            MapWinVehA = veh;
+            if (!net_lock_veh(&veh, 0)) {
+                veh_wake(veh);
+                ui_synch_veh(veh);
+                net_await_synch();
+                net_unlock_veh();
+            }
+            Console_set_move(&MainConsole, 1);
+        }
+        break;
+    case 7:
+        sw(0x15BC) = veh;
+        reselect();
+        break;
+    case 0x14: help_any(); break;
+    case 0x33:
+        if (!locked) {
+            BaseWin_soft_zoom(&BaseWin, base);
+            BaseWin_production(&BaseWin, 0, 0);
+        }
+        break;
+    case 0x34:
+        if (!locked) {
+            BaseWin_soft_zoom(&BaseWin, base);
+            BaseWin_hurry(&BaseWin);
+        }
+        break;
+    case 0x35:
+    case 0x36:
+    case 0x37:
+    case 0x38:
+        if (!locked) {
+            BaseWin_soft_zoom(&BaseWin, base);
+            BaseWin_gov_on(&BaseWin, 0x1000000u << (id - 0x35));
+        }
+        break;
+    case 0x5A: Console_editor_edit_veh(&MainConsole, veh); break;
+    default: break;
+    }
+    if (id != 5 && id != 6 && (sw(0x15C4) >= 0 || sw(0x15C8) >= 0)) {
+        sw(0x15C8) = -1;
+        sw(0x15C4) = -1;
+        ui_invalidate();
+    }
+}
+
+// StatusWin_arrow_left (0x4B89C0, ctrl+shift+left): the unit above in the stack, else the tile's
+// base.
+void THISCALL StatusWin_arrow_left(uint8_t*) {
+    int32_t v = sw(0x15BC);
+    if (v == -1) return;
+    if (Vehs[v].prev_veh_id_stack >= 0) {
+        sw(0x15BC) = Vehs[v].prev_veh_id_stack;
+        reselect();
+        return;
+    }
+    int32_t b = base_at(sw(0x15B4), sw(0x15B8));
+    if (b >= 0) {
+        sw(0x15C0) = b;
+        sw(0x15BC) = -1;
+        reselect();
+    }
+}
+
+// StatusWin_arrow_right (0x4B8BD0, ctrl+shift+right): the unit below, or from the base the top unit.
+void THISCALL StatusWin_arrow_right(uint8_t*) {
+    if (sw(0x15C0) < 0) {
+        int32_t v = sw(0x15BC);
+        if (v >= 0 && Vehs[v].next_veh_id_stack >= 0) {
+            sw(0x15BC) = Vehs[v].next_veh_id_stack;
+            reselect();
+        }
+        return;
+    }
+    int32_t v = veh_at(sw(0x15B4), sw(0x15B8));
+    if (sw(0x15DC) && v >= 0) {
+        sw(0x15C0) = -1;
+        sw(0x15BC) = v;
+        reselect();
+    }
+}
+
+// WorldWin_pixel_to_tile (0x4C43F0): the tile under a point of the world map pane; 1 when none.
+int32_t worldwin_pixel_to_tile(int32_t px, int32_t py, int32_t* tx, int32_t* ty) {
+    UiRect pane = rect(0xCFC);
+    int32_t w, h;
+    if (!g_world_ox && !g_world_oy) {
+        w = pane.right - pane.left;
+        h = pane.bottom - pane.top;
+    } else {
+        if (px < g_world_ox || py < g_world_oy) return 1;
+        w = g_world_map.width;
+        h = g_world_map.height;
+        if (px >= w + g_world_ox || py >= g_world_oy + h) return 1;
+        px -= g_world_ox;
+        py -= g_world_oy;
+    }
+    if (w <= 0 || h <= 0) return 1;
+    *tx = MapAreaX * px / w;
+    int32_t y = MapAreaY * py / h;
+    y = (*tx & 1) ? (y | 1) : (y & ~1);
+    *ty = y;
+    return (y >= 0 && y < MapAreaY && *tx >= 0 && *tx < MapAreaX) ? 0 : 1;
+}
+
+// WorldWin_right_menu (0x4C3AB0).
+static void worldwin_right_menu(int32_t px, int32_t py, int32_t sx, int32_t sy) {
+    int32_t tx = 0, ty = 0;
+    bool ok = worldwin_pixel_to_tile(px, py, &tx, &ty) == 0;
+    PullDown pd;
+    PullDown_init(&pd);
+    PullDown_add_item(&pd, 4, label_get(0xC00 / 4));
+    PullDown_add_separator(&pd, 99);
+    if (ok) {
+        PullDown_add_item(&pd, 1, label_get(0x910 / 4));
+        PullDown_add_item(&pd, 2, label_get(0x914 / 4));
+    }
+    PullDown_add_separator(&pd, 99);
+    PullDown_add_item(&pd, 0x14, label_get(0x8FC / 4));
+    PullDown_show(&pd, sx, sy);
+    if (GameState & 0x800) return;
+    int32_t sel = PullDown_get_selected(&pd);
+    int32_t id = sel >= 0 && sel < 0x40 ? pulldown_item_id(&pd, sel) : -1;
+    switch (id) {
+    case 1: pfncMoveMap(&MainConsole, tx, ty, 1); break;
+    case 2: ui_invalidate(); break;  // WorldWin's redraw
+    case 4: pfncMoveMap(&MainConsole, mw(MapWins[0], kMwCenterX), mw(MapWins[0], kMwCenterY), 1); break;
+    case 0x14: help_any(); break;
+    default: break;
+    }
+}
+
+// WorldWin_click (0x4C3D40): the view centred on the tile clicked (shift: the world map window,
+// not reconstructed: the view stays); the right button's menu.
+static void worldwin_click(int32_t px, int32_t py, int32_t sx, int32_t sy, bool right) {
+    BaseWinMultiplayerRefresh = 0;
+    const UiRect& pane = rect(0xCFC);
+    if (right) {
+        worldwin_right_menu(px - pane.left, py - pane.top, sx, sy);
+        return;
+    }
+    int32_t tx = 0, ty = 0;
+    if (worldwin_pixel_to_tile(px - pane.left, py - pane.top, &tx, &ty)) return;
+    if (!(ui_key_state(VKEY_SHIFT) & 0x8000)) pfncMoveMap(&MainConsole, tx, ty, 1);
+    else pfncMoveMap(&MainConsole, mw(MapWins[0], kMwCenterX), mw(MapWins[0], kMwCenterY), 1);
+}
+
+void statuswin_compose(Buffer* mi) {
+    load_arrows();
+    for (Arrow& a : g_arrow) {
+        if (!a.shown || !a.spr[0].width) continue;
+        const UiRect& r = mi_rect(a.rect_off);
+        BlitDestScale = BlitSourceScale = 1;
+        pfncSpriteStretchCopyToCanvas(&a.spr[a.pressed ? 2 : 0], mi, 9, r.left, r.top);
+    }
+}
+
+// MainInterface_on_iface_left_click / right_click / left_down / mouse_move / button_clicked for the
+// status panes, the stack arrows, the world map and spot 5 (main interface coordinates).
+bool statuswin_mouse(int32_t type, int32_t x, int32_t y, int32_t sx, int32_t sy) {
+    load_arrows();
+    for (Arrow& a : g_arrow) {
+        if (!a.shown || !in_rect(x, y, mi_rect(a.rect_off))) continue;
+        if (type == UiInput::LDOWN) a.pressed = true;
+        if (type == UiInput::LUP && a.pressed) {
+            a.pressed = false;
+            arrow_clicked(a.id);
+        }
+        ui_invalidate();
+        return true;
+    }
+    for (Arrow& a : g_arrow) a.pressed = false;
+    if (in_rect(x, y, mi_rect(0xA7C))) {  // spot 5
+        if (type == UiInput::LDOWN) Console_end_my_turn(&MainConsole);
+        return true;
+    }
+    bool panes = in_rect(x, y, rect(0xCDC)) || in_rect(x, y, rect(0xCEC)) || in_rect(x, y, rect(0xCCC));
+    if (type == UiInput::MOVE) {
+        // MainInterface_on_iface_mouse_move: the stack row's unit / base under the mouse in the
+        // unit pane.
+        int32_t index = 0, t = -1;
+        if (panes && spot_check(&g_spots, x, y, &index, &t) >= 0 && (t == 0 || t == 0xB)) {
+            if (t == 0xB && index != sw(0x15C8)) {
+                sw(0x15C8) = index;
+                sw(0x15C4) = -1;
+                ui_invalidate();
+            } else if (t == 0 && index != sw(0x15C4)) {
+                sw(0x15C8) = -1;
+                sw(0x15C4) = index;
+                ui_invalidate();
+            }
+        } else if (sw(0x15C4) >= 0 || sw(0x15C8) >= 0) {  // StatusWin_reset_active
+            sw(0x15C8) = -1;
+            sw(0x15C4) = -1;
+            ui_invalidate();
+        }
+        return panes;
+    }
+    if (in_rect(x, y, rect(0xCFC))) {
+        if (type == UiInput::LUP) worldwin_click(x, y, sx, sy, false);
+        else if (type == UiInput::RUP) worldwin_click(x, y, sx, sy, true);
+        return true;
+    }
+    if (!panes) return false;
+    if (type == UiInput::LUP) StatusWin_on_left_click(&InfoWin, x, y);
+    else if (type == UiInput::RUP) StatusWin_on_right_click(&InfoWin, x, y, in_rect(x, y, rect(0xCEC)));
+    return true;
+}
+
+// The unit pane of the stack row's unit / base under the mouse after the panes' redraw.
+void statuswin_hover() {
+    int32_t v = sw(0x15C4), b = sw(0x15C8);
+    if (v < 0 && b < 0) return;
+    if ((v >= 0 && v >= VehCount) || (b >= 0 && b >= BaseCount)) return;
+    StatusWin_draw_active(&InfoWin, v, v >= 0 ? -1 : b, 0);
+    sw(0x15C4) = v;
+    sw(0x15C8) = b;
 }

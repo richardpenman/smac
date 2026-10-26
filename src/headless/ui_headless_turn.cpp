@@ -34,7 +34,6 @@ void GAMEAPI interlude(int32_t id, int32_t, int32_t, int32_t) {
     }
 }
 int32_t GAMEAPI energy_limit(int32_t) { return 10; }
-void THISCALL MessageWin_clear(uint8_t*) {}
 void GAMEAPI clear_council_notify(int32_t faction_id) {
     CouncilProposal[faction_id] = 0;
     CouncilVoteState[faction_id] = 0;

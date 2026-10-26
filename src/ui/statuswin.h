@@ -15,3 +15,21 @@
 ADDR_NATIVE(0x4B43E0) void GAMEAPI say_orders(char* buffer, int32_t veh_id);
 // say_orders into StrBuffer.
 ADDR_NATIVE(0x4B4970) void GAMEAPI say_orders_2(int32_t veh_id);
+
+// The panes' mouse input (maininfc.cpp).
+ADDR_NATIVE(0x4B8E40) void THISCALL StatusWin_on_left_click(uint8_t* self, int32_t x, int32_t y);
+ADDR_NATIVE(0x4B8990) void THISCALL StatusWin_on_left_double_click(uint8_t* self, int32_t x, int32_t y);
+ADDR_NATIVE(0x4B9010) void THISCALL StatusWin_on_right_click(uint8_t* self, int32_t x, int32_t y, int32_t a3);
+ADDR_NATIVE(0x4B89C0) void THISCALL StatusWin_arrow_left(uint8_t* self);
+ADDR_NATIVE(0x4B8BD0) void THISCALL StatusWin_arrow_right(uint8_t* self);
+
+// ---- not original functions ----
+// The stack row's scroll arrows (buttons 0x3F0 / 0x3F2) into the main interface's canvas.
+void statuswin_compose(Buffer* mi);
+// Mouse input on the status panes, the stack arrows, the world map pane and spot 5 (main interface
+// coordinates x, y; screen sx, sy); true when taken.
+bool statuswin_mouse(int32_t type, int32_t x, int32_t y, int32_t sx, int32_t sy);
+// The unit pane of the unit / base under the mouse (the hover kept over the console's redraws).
+void statuswin_hover();
+// WorldWin_pixel_to_tile (0x4C43F0) in the pane's coordinates; 1 when off the map.
+int32_t worldwin_pixel_to_tile(int32_t px, int32_t py, int32_t* tx, int32_t* ty);

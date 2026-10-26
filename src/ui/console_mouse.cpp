@@ -26,6 +26,7 @@
 #include "engine/veh.h"
 #include "engine/world.h"
 #include "platform/ui_platform.h"
+#include "ui/infowin.h"
 #include "ui/console.h"
 #include "ui/mapwin.h"
 #include "ui/font_text.h"
@@ -231,6 +232,12 @@ void console_ui_tick() {
     if (now - last_blink >= 150) {
         last_blink = now;
         blink_timer();
+    }
+    // InfoWin_init's timer (10, every 50 ms): the info pane's typing.
+    static uint32_t last_info = 0;
+    if (now - last_info >= 50) {
+        last_info = now;
+        infowin_tick();
     }
 }
 

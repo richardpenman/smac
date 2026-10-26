@@ -22,6 +22,7 @@
 #include "platform/ui_platform.h"
 #include "ui/console.h"
 #include "ui/popup.h"
+#include "ui/infowin.h"
 #include "ui/win.h"
 
 namespace {
@@ -245,7 +246,7 @@ int32_t GAMEAPI POP2(const char* label, const char* pcx, int32_t) {
     std::string text = BasePop_text(h.pop);
     crt_strcpy(StrBuffer, text.c_str());
     if (PbemActive) return 0;  // the PBEM message list is not reconstructed
-    ui_set_message(text);
+    MainInterface_set_message(&MainInterfaceWin, text.c_str());
     if (!(GameWarnings & 0x20000)) return 0;
     if (pcx) BasePop_set_picture(h.pop, pcx);
     return BasePop_exec_3(h.pop, 0, 0);
@@ -257,7 +258,7 @@ int32_t GAMEAPI POP3(const char* label, int32_t, int32_t, int32_t, int32_t) {
     popup_start(h.pop, ScriptFileName, label, -1, nullptr, 0);
     std::string text = BasePop_text(h.pop);
     crt_strcpy(StrBuffer, text.c_str());
-    if (!PbemActive) ui_set_message(text);
+    if (!PbemActive) MainInterface_set_message(&MainInterfaceWin, text.c_str());
     return 0;
 }
 

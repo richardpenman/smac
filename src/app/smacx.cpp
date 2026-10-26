@@ -35,7 +35,8 @@
 // engineering / monuments screen: its texts and state), FACTIONSTATE (the viewer's social choice,
 // energy allocation, credits and upheaval paid), TECHSTATE (the viewer's research goal and
 // points, blind research priorities), PROTOSTATE (the viewer's prototypes), MENUSTATE (the open
-// menu column of the opening screens: caption, items, selection), and the commands SHOT[:FILE]
+// menu column of the opening screens: caption, items, selection), INFOSTATE (the info pane's
+// displays and texts), INFOTICK:N (N steps of the info pane's 50 ms timer), and the commands SHOT[:FILE]
 // (screenshot), SAVE:FILE (save the game
 // and its generators in FILE.rng, relative to --outdir), UNITS (list the human's units on
 // stderr), QUIT. --exit-after-keys (default with --hidden) quits when they run out.
@@ -491,6 +492,14 @@ bool parse_key(std::string tok, ScriptedKey* out) {
     }
     if (tok == "DIPLOSTATE") {  // the viewer's treaties, energy and techs (diplowin.h, test aid)
         out->command = "diplostate";
+        return true;
+    }
+    if (tok == "INFOSTATE") {  // the info pane's displays and texts (infowin.h, test aid)
+        out->command = "infostate";
+        return true;
+    }
+    if (tok.rfind("INFOTICK:", 0) == 0) {  // INFOTICK:N, N steps of the info pane's timer (test aid)
+        out->command = "infotick " + tok.substr(9);
         return true;
     }
     if (tok == "MENUSTATE") {  // the open menu column of the opening screens (topmenu.h, test aid)

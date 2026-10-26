@@ -1,4 +1,5 @@
 // Graphics classes of the original UI (see gfx.h).
+#include "ui/font_text.h"
 #include "ui/gfx.h"
 
 #include <algorithm>
@@ -548,7 +549,7 @@ int32_t THISCALL Buffer_write_l_3(Buffer* self, const char* text, int32_t x, int
     int32_t n = (int32_t)std::strlen(text);
     if (n < len) len = n;
     if (len == 0) return x;
-    return Buffer_write_raw_l(self, text, x, y, len);
+    return Buffer_write_multi_font_raw_l(self, text, x, y, len);  // {} [] markup interpreted
 }
 
 int32_t THISCALL Buffer_write_cent_l_7(Buffer* self, const char* text, const UiRect* rect, int32_t len) {

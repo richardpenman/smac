@@ -1,6 +1,7 @@
 #!/bin/bash
 # Scripted checks of the functions reconstructed by the placeholder sweep (UI_PLAN.md "Remaining
-# work"): the map's right-click menu (pulldown.cpp, mapwin_menu.cpp), landmarks, ...
+# work"): the map's right-click menu (pulldown.cpp, mapwin_menu.cpp), landmarks, the info pane and
+# the status panes' clicks (infowin.cpp, maininfc.cpp), ...
 #
 #   tests/placeholders/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/ph-native/smacx)
 #
@@ -95,5 +96,29 @@ nocrash survey
 #    date box) and the map cursor in view mode (v), over a few moves of the cursor.
 run panes $NEW --keys "ENTER,SHOT:unit.bmp,v,KP6,KP6,SHOT:cursor.bmp,S-BACK,BACK,UNITS"
 nocrash panes
+
+# 7. The info pane (infowin.cpp: InfoWin_setup_text, the typing timer, clicks, the right-click menu
+#    of the displays, the M / I buttons) and the status panes' clicks (maininfc.cpp:
+#    StatusWin_on_left_click / on_right_click, the hover of a stack unit, StatusWin_arrow_*).
+#    INFOTICK:N runs N steps of the 50 ms timer. The first display (turn 1: the year, the
+#    allocation) is typed into the first column; a click on the pane finishes the typing (the
+#    second click the empty column's), the next click shows the next display in the other column; the menu's first item sets the display 0
+#    again; the tile pane's click toggles the resource numbers; the stack row's unit under the mouse
+#    is shown (hover); M shows the message list (mode 1000), I the info again (0x3E9).
+run infopane $NEW --keys "ENTER,INFOTICK:60,INFOSTATE,CLICK:400x620,INFOSTATE,CLICK:400x620,CLICK:400x620,INFOSTATE,\
+RCLICK:400x620,DOWN,ENTER,INFOSTATE,CLICK:190x600,MOVE:240x730,INFOSTATE,SHOT:info.bmp,RCLICK:170x730,ESC,\
+MOVE:600x300,CLICK:745x596,INFOSTATE,CLICK:745x700,INFOSTATE"
+check infopane "first display typing" "infostate mode 1001 pane 0 state0 0 progress 9/75"
+check infopane "the year line" "info 0.0: Mission Year: \{2101\}"
+check infopane "the allocation line" "info 0.2: Econ: \{50%  \(\+1/turn\)\}"
+check infopane "click: typing finished" "pane 0 state0 0 progress 76/75"
+check infopane "second click: the other column" "pane 1 state0 0 progress 76/75 state1 0 progress 76/75"
+check infopane "the displays' menu" "pulldown item 20: Help"
+check infopane "menu: display 0 typed again (both columns from the start)" "pane 1 state0 0 progress 0/75 state1 0 progress 0/75"
+check infopane "tile pane: numbers, hover of the stack unit" "status numbers -1 veh -1 base -1 hover 4/-1"
+check infopane "stack row's base menu" "pulldown item 52:  Hurry"
+check infopane "M: the message list" "infostate mode 1000 .* hover -1/-1"
+check infopane "I: the info pane" "infostate mode 1001 .* hover -1/-1"
+nocrash infopane
 
 exit $FAIL

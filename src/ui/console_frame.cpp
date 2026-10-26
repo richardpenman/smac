@@ -10,10 +10,8 @@
 // colour 0x65. The pane rectangles below are the init's (fields +0xD80.., 1024 layout).
 //
 // The status panes, the world map, the date box and "TURN COMPLETE" are drawn by the original's
-// code (maininfc.cpp) into the main interface's canvas. Approximated: the info pane's text
-// (InfoWin_setup_text: the year and the allocation, at measured positions). Not drawn: turn.flc,
-// the info pane's buttons (M / I), the globe buttons, the button highlight states and the slide
-// animation of the arms.
+// code (maininfc.cpp) into the main interface's canvas, the info pane and its M / I buttons by
+// infowin.cpp. Not drawn: turn.flc, the button highlight states of the menu / commlink buttons.
 #include "ui/console_frame.h"
 #include "ui/reports.h"
 
@@ -33,6 +31,7 @@
 #include "ui/colortables.h"
 #include "ui/console.h"
 #include "ui/diplowin.h"
+#include "ui/infowin.h"
 #include "platform/ui_platform.h"
 #include "ui/popup.h"
 #include "ui/sprites.h"
@@ -130,24 +129,6 @@ void draw_button(Buffer* s, const UiRect& r, const char* label) {
     write_center(s, up, r, 14, 1, color(228, 104, 24));
 }
 
-// The info pane (InfoWin_setup_text, first state): the year, the faction's allocation.
-void draw_info_pane(Buffer* s) {
-    int32_t green = color(116, 156, 56), light = color(184, 192, 96);
-    char line[160];
-    char year[64];
-    year[0] = 0;
-    say_year(year);
-    std::snprintf(line, sizeof(line), "%s: %s", label_get(0), year);
-    write(s, line, 0x112, 0x4C, 12, 0, light);
-    const Faction& f = Factions[CurrentPlayerFaction];
-    std::snprintf(line, sizeof(line), "%s: %d%%", label_get(169), (10 - f.SE_alloc_psych - f.SE_alloc_labs) * 10);
-    write(s, line, 0x112, 0x68, 12, 0, green);
-    std::snprintf(line, sizeof(line), "%s: %d%%", label_get(168), f.SE_alloc_psych * 10);
-    write(s, line, 0x112, 0x76, 12, 0, green);
-    std::snprintf(line, sizeof(line), "%s: %d%%", label_get(170), f.SE_alloc_labs * 10);
-    write(s, line, 0x112, 0x84, 12, 0, green);
-}
-
 }  // namespace
 
 int32_t console_view_height(int32_t h) { return h - 168; }
@@ -166,6 +147,9 @@ bool console_frame_hit(int32_t x, int32_t y) {
 void console_frame_mouse(int32_t type, int32_t x, int32_t y) {
     int32_t fx = x - g_ox, fy = y - g_oy;
     auto in = [&](const UiRect& r) { return fx >= r.left && fx < r.right && fy >= r.top && fy < r.bottom; };
+    const UiRect& pos = mi_rect(kMiPos);
+    if (infowin_mouse(type, x - pos.left, y - pos.top)) return;
+    if (statuswin_mouse(type, x - pos.left, y - pos.top, x, y)) return;
     if (type != UiInput::LUP) return;
     // MainInterface_on_iface_button_clicked: 0x3EB the menu, 0x3EC commlink (Alt / the menu
     // bar's HQ menu is the keyboard way to them).
@@ -195,11 +179,14 @@ void console_frame_draw(Buffer* s) {
         Buffer_box_sprite(mi, &r, box_def(3));  // MainInterface_on_redraw's box (button 0x3E9: info)
     }
     if (!diplowin_draw_console(mi, 0, 0)) {
+        int32_t hv = *reinterpret_cast<int32_t*>(&InfoWin + 0x15C4), hb = *reinterpret_cast<int32_t*>(&InfoWin + 0x15C8);
         StatusWin_redraw(&InfoWin);
-        draw_info_pane(mi);
-    } else {
-        draw_info_pane(mi);
+        *reinterpret_cast<int32_t*>(&InfoWin + 0x15C4) = hv;
+        *reinterpret_cast<int32_t*>(&InfoWin + 0x15C8) = hb;
+        statuswin_hover();
     }
+    statuswin_compose(mi);  // the stack row's scroll arrows
+    infowin_compose(mi);  // the info pane (InfoWin) or the message list, the M / I buttons
     worldwin_draw();
     maininfc_set_date();
     // The globe buttons (0x3EE pressed by ButtonGroup_set(0x3EE, 1), 0x3EF): their sprite centred.

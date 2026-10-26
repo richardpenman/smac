@@ -149,7 +149,6 @@ bool diplowin_draw_console(Buffer* s, int32_t ox, int32_t oy) {
 
 void THISCALL DiploPop_draw_info(uint8_t*) { ui_invalidate(); }
 void THISCALL GraphicWin_soft_update_3(uint8_t*, uint8_t*) { ui_invalidate(); }
-void THISCALL InfoWin_set_state(uint8_t*, int32_t, int32_t) { ui_invalidate(); }
 
 // DiploPop_start (0x43F2B0): diplomacy_check for the viewer, then (for a new faction) the
 // animations: dip_<alien a | female f | male m>_<DiploFriction * 3 / 20, 0..2>.flc and

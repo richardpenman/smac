@@ -22,6 +22,7 @@
 #include "platform/ui_platform.h"
 #include "engine/game.h"
 #include "ui/win.h"
+#include "ui/infowin.h"
 
 namespace {
 
@@ -1266,7 +1267,9 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
             msg += p->strings[i].text;
         }
         if (kind == 1 || kind == 2 || kind == 0x3EA) {
-            ui_set_message(msg);
+            // MainInterface_set_message (1) / MessageWin_add_base (2, 0x3EA: the info pane's list).
+            if (kind == 1) MainInterface_set_message(&MainInterfaceWin, msg.c_str());
+            else MessageWin_add_base(&MessageWin, (uint32_t)CurrentBaseID, msg.c_str());
             std::fprintf(stderr, "popup %s as message (mode %d): %s\n", p->label.c_str(), p->mode, msg.c_str());
             if (kind != 0x3EA) return -1;
         }

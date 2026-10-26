@@ -1,4 +1,5 @@
 // Window layer of smacx (see win.h): screen, message pump, keyboard, placeholder console panel.
+#include "ui/infowin.h"
 #include "ui/diplowin.h"
 #include "ui/win.h"
 #include "ui/pulldown.h"
@@ -212,6 +213,14 @@ bool run_command(const std::string& cmd) {
     }
     if (cmd == "diplostate") {  // test aid: the viewer's treaties, energy and technologies (diplowin.h)
         diplowin_log_state();
+        return true;
+    }
+    if (cmd == "infostate") {  // test aid: the info pane's displays and texts (infowin.h)
+        infowin_log_state();
+        return true;
+    }
+    if (cmd.rfind("infotick", 0) == 0) {  // test aid: N steps of the info pane's timer (infowin.h)
+        for (int32_t i = std::atoi(arg.c_str()); i > 0; i--) infowin_tick();
         return true;
     }
     if (cmd == "factionstate") {  // test aid: the viewer's social choice and allocation (screenwin.h)

@@ -15,8 +15,6 @@ void GAMEAPI draw_cursor() {
     else ui_invalidate();
 }
 void THISCALL MapWin_draw_cursor(uint8_t*) { ui_invalidate_map(); }
-void THISCALL InfoWin_change(uint8_t*, int32_t) { ui_invalidate(); }
-void THISCALL InfoWin_reset(uint8_t*) {}
 void THISCALL WorldWin_set_world_map(uint8_t*) {}
 void THISCALL pfncMainMenuUpdateVisible(uint8_t*, int32_t) {}
 void THISCALL TutWin_tour(uint8_t*) { console_not_reconstructed("TutWin_tour"); }
