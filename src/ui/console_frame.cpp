@@ -189,7 +189,8 @@ void console_frame_draw(Buffer* s) {
         statuswin_hover();
     }
     if (!battlewin_shown()) statuswin_compose(mi);  // the stack row's scroll arrows
-    if (!battlewin_shown()) infowin_compose(mi);  // the info pane (InfoWin) or the message list, the M / I buttons
+    // (In the diplomacy mode DiploPop's panes replace the info pane: InfoWin is hidden.)
+    if (!battlewin_shown() && diplowin_faction() < 0) infowin_compose(mi);  // the info pane or the message list
     worldwin_draw();
     maininfc_set_date();
     // The globe buttons (0x3EE pressed by ButtonGroup_set(0x3EE, 1), 0x3EF): their sprite centred.

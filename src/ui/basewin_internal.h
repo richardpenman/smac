@@ -130,3 +130,7 @@ void prodwin_compose(Buffer* screen);
 extern ScrollBar g_fac_bar, g_sup_bar;
 extern bool g_fac_bar_shown, g_sup_bar_shown;
 extern int32_t g_fac_bar_page;
+// The units present pane's stack arrows (maininfc.cpp): shown when the units do not fit.
+extern bool g_garrison_arrows;
+void stack_arrows_draw(Buffer* mi);
+int32_t stack_arrow_at(int32_t x, int32_t y);

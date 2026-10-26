@@ -14,7 +14,9 @@
 // original's BasePop_set_def_external_window places them.
 // FLC files are decoded here (COLOR_256, BRUN, COPY, BLACK, SS2/DELTA_FLC, LC) and their colours
 // mapped to the game palette (the original's player loads their palette into the reserved range).
-// Not reconstructed: DiploPop_draw_info / DiploPop_draw_hq (the info and HQ panes stay empty),
+// DiploPop_draw_info: the centre pane's two faction boxes (draw_info below). Not reconstructed:
+// DiploPop_draw_hq (its pane is shown only with a toggle whose button is not reconstructed:
+// DiploPop + 0x4208 stays 0, the pane's background),
 // the PlanWin map previews of the base and battle plan menus (FUN_0048b3f0.., battle_routine),
 // the multiplayer paths (channels, diplo lock messages, PBEM diplo).
 #include "ui/diplowin.h"
@@ -50,6 +52,8 @@
 #include "ui/basewin.h"
 #include "ui/colortables.h"
 #include "ui/popup.h"
+#include "ui/sprites.h"
+#include "ui/font_text.h"
 #include "ui/win.h"
 
 namespace {
@@ -103,6 +107,96 @@ void diplowin_log_state() {
 void diplowin_set_animate(bool on) { g_animate = on; }
 int32_t diplowin_faction() { return g_faction; }
 
+namespace {
+// DiploPop_draw_info (0x43FA90): the centre pane (MainInfc + 0xDC0, inset 7, 0x17 above its bottom
+// for the buttons) split in two boxes, the faction on the commlink then the viewer's: the faction
+// logo (BaseSprites[f][29]), its formal name in capitals in its colour, then in colour 0xA0 the
+// diplomatic status (the other faction's), the intelligence ("spying" or not), the energy reserves
+// (the viewer's or a faction spied on: credits less the hurry costs paid this turn) and the power
+// (Might by ranking).
+void draw_info(Buffer* s, int32_t ox, int32_t oy) {
+    UiRect c = mi_rect(kMiPaneCenter2);
+    int32_t l = c.left + 7 + ox, t = c.top + 7 + oy, r = c.right - 7 + ox, b = c.bottom - 7 - 0x17 + oy;
+    int32_t half = ((r - l) + 3) / 2 - 3 + l;
+    bool w800 = ScreenWidth == 800;
+    Font* fa = find_font(w800 ? 12 : 14, 1);  // +0xA6C
+    Font* fb = find_font(w800 ? 10 : 12, 0);  // +0xA44
+    auto lh = [](Font* f) { return f->field_0 < 0 ? f->height : f->ascent_above + f->field_0; };
+    for (int32_t i = 0; i < 2; i++) {
+        UiRect box{l, t, half, b};
+        Buffer_box_sprite(s, &box, box_def(0));
+        int32_t bl = l + 3, bt = t + 3, br = half - 3, bb = b - 3;
+        int32_t f = i == 0 ? g_faction : CurrentPlayerFaction;
+        Sprite* logo = &BaseSprites[f & 7][29];
+        if (logo->width) {
+            BlitDestScale = BlitSourceScale = 1;
+            if (w800) {
+                BlitDestScale = 0x41;
+                Sprite_draw_mono_2(logo, s, logo->key, ((br - logo->full_width) - bl) / 2 + bl,
+                                   ((bb - logo->full_height) - bt) / 2 + bt, 0);
+                BlitDestScale = 1;
+            } else {
+                pfncSpriteStretchCopyToCanvas(logo, s, logo->key, bl, lh(fa) + 3 + bt);
+            }
+        }
+        Buffer_set_text_color(s, *reinterpret_cast<int32_t*>(mem::host(0x68FA30 + (uint32_t)f * 4)), -1, 1, 1);
+        Buffer_set_font(s, fa, nullptr, nullptr, nullptr);
+        StrBuffer[0] = 0;
+        crt_strcat(StrBuffer, MFactions[f].formal_name_faction);
+        win32::CharUpperA(StrBuffer);
+        UiRect nr{bl, bt + 2, br, lh(fa) + bt};
+        int32_t y = Buffer_wrap_cent_6(s, StrBuffer, &nr);
+        if (!w800) bl += 2 + logo->full_width;
+        Buffer_set_text_color(s, 0xA0, -1, 1, 1);
+        br -= 3;
+        int32_t x = bl + 3;
+        y += 3;
+        Buffer_set_font(s, fb, nullptr, nullptr, nullptr);
+        auto wrap = [&](const char* text) {
+            UiRect rr{x, y, br, y};
+            y = Buffer_wrap_2(s, text, &rr);
+        };
+        if (i == 0) {
+            StrBuffer[0] = 0;
+            crt_strcat(StrBuffer, label_get(0xE98 / 4));
+            crt_strcat(StrBuffer, ": ");
+            uint32_t st = Factions[CurrentPlayerFaction].diplo_status[f];
+            uint32_t lab = (st & 1) ? 0xA14 : (st & 2) ? 0xA10 : (st & 4) ? 0xA0C : (st & 0x10) ? 0xA1C : 100;
+            crt_strcat(StrBuffer, label_get(lab / 4));
+            win32::CharUpperA(StrBuffer);
+            wrap(StrBuffer);
+        }
+        StrBuffer[0] = 0;
+        crt_strcat(StrBuffer, label_get(0xE9C / 4));
+        crt_strcat(StrBuffer, ": ");
+        crt_strcat(StrBuffer, label_get((spying(f) ? 0x614 : 0xEA0) / 4));
+        wrap(StrBuffer);
+        if (f == CurrentPlayerFaction || spying(f)) {
+            StrBuffer[0] = 0;
+            crt_strcat(StrBuffer, label_get(0x90 / 4));
+            crt_strcat(StrBuffer, ": ");
+            std::string n = std::to_string(Factions[f].energy_credits - Factions[f].hurry_cost_total);
+            crt_strcat(StrBuffer, n.c_str());
+            Buffer_write_l_3(s, StrBuffer, x, y, (int32_t)std::strlen(StrBuffer));
+            y += lh(fb);
+        }
+        StrBuffer[0] = 0;
+        crt_strcat(StrBuffer, label_get(0x37C / 4));
+        crt_strcat(StrBuffer, ": ");
+        int32_t px = Buffer_write_l_3(s, StrBuffer, x, y, (int32_t)std::strlen(StrBuffer));
+        StrBuffer[0] = 0;
+        int32_t m = 7 - Factions[f].ranking;
+        m = m < 0 ? 0 : (m > 6 ? 6 : m);
+        say_fac_special(StrBuffer, Strings_get(&StringTable, Might[m].adj_start), f);
+        win32::CharUpperA(StrBuffer);
+        Buffer_write_l_3(s, StrBuffer, px, y, (int32_t)std::strlen(StrBuffer));
+        int32_t d = (half - l) + 3;
+        l += d;
+        half += d;
+    }
+}
+}  // namespace
+
 bool diplowin_draw_console(Buffer* s, int32_t ox, int32_t oy) {
     if (g_faction < 0) return false;
     int32_t fw = g_faction;
@@ -142,6 +236,7 @@ bool diplowin_draw_console(Buffer* s, int32_t ox, int32_t oy) {
     int32_t mood = get_mood(Factions[fw].diplo_friction[CurrentPlayerFaction]);
     say_fac_special(StrBuffer, Strings_get(&StringTable, Mood[mood]), fw);
     Buffer_write_l_3(s, StrBuffer, x, y, (int32_t)std::strlen(StrBuffer));
+    draw_info(s, ox, oy);
     return true;
 }
 

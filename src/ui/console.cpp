@@ -1381,9 +1381,31 @@ void THISCALL Console_cursor_key(uint8_t* self, int32_t, int32_t key, int32_t) {
 
 void THISCALL pfncProcZoomKey(uint8_t*, int32_t command, int32_t index) {
     if (index < 0) {
-        // The map window under the mouse (and the tile under it becomes its centre): mouse
-        // positions are not reconstructed yet, so no window is under the mouse (all are zoomed).
-        console_not_reconstructed("pfncProcZoomKey (mouse position)");
+        // The mouse over the world map pane: the main view zooms, centred on the tile there; else
+        // the first map window of a reduced zoom under the mouse, centred on the tile under it;
+        // else every window zooms (around its centre). The tile must be known to the viewer.
+        int32_t mx = 0, my = 0, tx = -1, ty = -1;
+        ui_mouse_pos(&mx, &my);
+        auto seen = [&](int32_t x, int32_t y) {
+            return y >= 0 && y < MapAreaY && x >= 0 && x < MapAreaX &&
+                   ((Factions[CurrentPlayerFaction].player_flags & 0x200) ||
+                    (map_tile(x, y)->visibility & (1 << CurrentPlayerFaction)) || (GameState & 0x80));
+        };
+        if (worldwin_screen_tile(mx, my, &tx, &ty) == 0 && seen(tx, ty)) {
+            mw(main_view(), kMwCenterX) = tx;
+            mw(main_view(), kMwCenterX + 4) = ty;
+            index = 0;
+        } else {
+            for_each_mapwin([&](int32_t i, uint8_t* w) {
+                if (index >= 0 || mw(w, kMwZoom) >= 0) return;
+                int32_t cw = mw(w, kGwWidth), ch = -mw(w, kGwWidth + 4);
+                if (mx < 0 || my < 0 || mx >= cw || my >= ch) return;
+                if (pfncPtToTile(w, mx, my, &tx, &ty) != 0 || !seen(tx, ty)) return;
+                mw(w, kMwCenterX) = tx;
+                mw(w, kMwCenterX + 4) = ty;
+                index = i;
+            });
+        }
     }
     for_each_mapwin([&](int32_t i, uint8_t* w) {
         if (index >= 0 && i != index) return;

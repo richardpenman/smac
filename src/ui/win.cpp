@@ -403,6 +403,76 @@ static void set_layers() {
     platform::set_layer_palettes(g_layers.data(), g_canvas.stride, pals, 4);
 }
 
+// ---- help bubbles (Win_set_bubble_text 0x5F83D0 / Win_clear_bubble_text, drawn by pfncPaintMain) ----
+
+namespace {
+std::string g_bubble;
+UiRect g_bubble_r{};
+}  // namespace
+
+// The bubble's text (lines split at '^', find_font(12) plain): each line's width plus two space
+// widths, the box above the point (below when it would leave the screen's top), centred on it
+// and kept on the screen.
+void ui_bubble_set(const char* text, int32_t x, int32_t y) {
+    if (!text) return;
+    Font* f = find_font(0xC, 0);
+    g_bubble = text;
+    int32_t w = 0, lines = 0;
+    size_t start = 0;
+    for (;;) {
+        size_t hat = g_bubble.find('^', start);
+        std::string l = g_bubble.substr(start, hat == std::string::npos ? std::string::npos : hat - start);
+        w = std::max(w, Font_width(f, l.c_str()) + Font_width(f, " ") * 2);
+        lines++;
+        if (hat == std::string::npos) break;
+        start = hat + 1;
+    }
+    int32_t lh = f->field_0 < 0 ? f->height : f->ascent_above + f->field_0;
+    int32_t h = lh * lines;
+    int32_t top = y - h;
+    if (top < 0) top = y;
+    int32_t left = ((x - w) + x) / 2;
+    if (left < 0) left = 0;
+    else if (ScreenWidth < left + w) left = ScreenWidth - w;
+    g_bubble_r = {left, top, left + w, top + h};
+    std::fprintf(stderr, "bubble: %s\n", text);
+    ui_invalidate();
+}
+
+void ui_bubble_clear() {
+    if (g_bubble.empty()) return;
+    g_bubble.clear();
+    ui_invalidate();
+}
+
+static void draw_bubble(Buffer* s) {
+    if (g_bubble.empty()) return;
+    Font* f = find_font(0xC, 0);
+    UiRect all{0, 0, s->width, s->height};
+    Buffer_set_clip(s, &all);
+    UiRect r = g_bubble_r;
+    Buffer_box_2(s, &r, 255, 255);  // DAT_00696D30
+    r = {r.left + 1, r.top + 1, r.right - 1, r.bottom - 1};
+    Buffer_fill_3(s, &r, 0);  // DAT_009B7A64
+    Buffer_set_font(s, f, nullptr, nullptr, nullptr);
+    Buffer_set_text_color(s, 255, -1, 1, 1);  // DAT_00696D2C
+    int32_t lh = f->field_0 < 0 ? f->height : f->ascent_above + f->field_0;
+    if (g_bubble.find('^') == std::string::npos) {
+        Buffer_write_cent_l_7(s, g_bubble.c_str(), &r, (int32_t)g_bubble.size());
+        return;
+    }
+    int32_t y = r.top + 1;
+    size_t start = 0;
+    for (;;) {
+        size_t hat = g_bubble.find('^', start);
+        std::string l = g_bubble.substr(start, hat == std::string::npos ? std::string::npos : hat - start);
+        Buffer_write_cent_l_5(s, l.c_str(), r.left, y, r.right - r.left, (int32_t)l.size());
+        y += lh;
+        if (hat == std::string::npos) break;
+        start = hat + 1;
+    }
+}
+
 void ui_present() {
     if (!g_ready) return;
     g_layers.assign((size_t)g_canvas.stride * g_canvas.height, 0);
@@ -435,6 +505,7 @@ void ui_present() {
     pulldown_draw_windows(&g_canvas);
     tutwin_draw_lines(&g_canvas);  // TutWin's pointer lines (Win_window_line_raw on the screen)
     popup_draw_windows(&g_canvas);
+    draw_bubble(&g_canvas);
     console_draw_cursor(&g_canvas);
     set_layers();
     platform::video_present(g_canvas.data, g_canvas.stride, g_canvas.width, g_canvas.height,

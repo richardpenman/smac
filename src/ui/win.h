@@ -28,6 +28,10 @@ Buffer* ui_screen_canvas();
 // The map view must be redrawn (draw_map, draw_tile, ...) / the screen must be presented again.
 void ui_invalidate_map();
 void ui_invalidate();
+// The help bubble (Win_set_bubble_text): `text` (lines split at '^') above the screen point
+// (x, y); cleared by the next mouse move over the window (Win_clear_bubble_text).
+void ui_bubble_set(const char* text, int32_t x, int32_t y);
+void ui_bubble_clear();
 // A full redraw of the main view is pending (the next ui_present does it).
 bool ui_map_dirty();
 // Redraws what is invalid and presents the screen.

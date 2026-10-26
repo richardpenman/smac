@@ -257,4 +257,13 @@ check custom "the name kept" "custom faction 1: Lady Bob, Gaia's Stepdaughters /
 nocheck custom "no placeholder" "not reconstructed: Console_custom_my_faction"
 nocrash custom
 
+# 16. The base window's help bubbles (BaseWin_click / BaseWin_iface_click with the right button:
+#     Win_set_bubble_text over the click): the nutrients box, the resource map, the facilities
+#     list.
+run bubbles $NEW --keys "ENTER,BASE:0,RCLICK:240x150,RCLICK:500x200,RCLICK:760x200,ESC"
+check bubbles "the nutrients' bubble" "^bubble: NUTRIENTS: "
+check bubbles "the resource map's" "^bubble: RESOURCES: "
+check bubbles "the facilities'" "^bubble: FACILITIES: "
+nocrash bubbles
+
 exit $FAIL

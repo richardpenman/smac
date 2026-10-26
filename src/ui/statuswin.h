@@ -49,3 +49,5 @@ bool statuswin_mouse(int32_t type, int32_t x, int32_t y, int32_t sx, int32_t sy)
 void statuswin_hover();
 // WorldWin_pixel_to_tile (0x4C43F0) in the pane's coordinates; 1 when off the map.
 int32_t worldwin_pixel_to_tile(int32_t px, int32_t py, int32_t* tx, int32_t* ty);
+// The world map pane's tile under a screen point (0: found).
+int32_t worldwin_screen_tile(int32_t sx, int32_t sy, int32_t* tx, int32_t* ty);

@@ -22,6 +22,7 @@
 #include "engine/text.h"
 #include "engine/veh.h"
 #include "ui/basewin_internal.h"
+#include "ui/tutwin.h"
 #include "ui/console.h"
 #include "ui/popup.h"
 #include "ui/win.h"
@@ -716,7 +717,41 @@ void THISCALL BaseWin_click(uint8_t* self, int32_t x, int32_t y, int32_t right, 
     TutWin_reset(&TutWin);
     bwf(kBwDragState) = -1;
     if (!Win_is_visible(self) || (MultiplayerActive && NetInputPending)) return;
-    // Right clicks on the panes show their help bubbles (not reconstructed).
+    // Right clicks on the panes: their help bubbles (Win_set_bubble_text at the click).
+    if (right) {
+        uint32_t label = 0;
+        bool alt_mode = ScreenWidth == 0x400 || bwf(0x1A1E4);  // (the energy pane's two layouts)
+        bool alt_mode2 = ScreenWidth == 0x400 || !bwf(0x1A1E4);
+        if (in_box(x, y, bw_rect(0x40B8C))) {
+            int32_t pane = bwf(kBwPane);
+            label = pane == 0 ? 0xC98 : pane == 2 ? 0xC20 : pane == 1 ? 0xC24 : 0;
+            if (!label) return;
+        } else if (in_box(x, y, bw_rect(0x40BEC))) {
+            label = (MFactions[(uint8_t)Bases[bwf(kBwBase)].faction_id].rule_flags & 0x80) ? 0x1190 : 0xC74;
+        } else if (in_box(x, y, bw_rect(0x40BBC))) {
+            label = 0xC78;
+        } else if (in_box(x, y, bw_rect(0x40C1C))) {
+            label = 0xC7C;
+        } else if (in_box(x, y, bw_rect(0x40CBC)) && alt_mode2) {
+            label = 0xC80;
+        } else if (in_box(x, y, bw_rect(0x40CDC)) && alt_mode2) {
+            label = 0xC84;
+        } else if (in_box(x, y, bw_rect(0x40CCC)) && alt_mode2) {
+            label = 0xC88;
+        } else if (in_box(x, y, bw_rect(0x40CEC)) && alt_mode) {
+            label = 0xC8C;
+        } else if (in_box(x, y, bw_rect(0x40CFC)) && alt_mode) {
+            label = 0xC90;
+        } else if (in_box(x, y, bw_rect(0x40D0C)) && alt_mode) {
+            label = 0xC94;
+        }
+        if (label) {
+            int32_t sx = x, sy = y;
+            basewin_client_to_screen(&sx, &sy);
+            ui_bubble_set(label_get(label / 4), sx, sy);
+            return;
+        }
+    }
     int32_t index, type;
     if (spot_check(&g_bw.spots_win, x, y, &index, &type) < 0) return;
     bw_set_base();
@@ -735,6 +770,19 @@ void THISCALL BaseWin_iface_click(uint8_t* self, int32_t x, int32_t y, int32_t r
     if (!Win_is_visible(self) || (MultiplayerActive && NetInputPending)) return;
     int32_t index = -1, type = -1;
     if (spot_check(&g_bw.spots_iface, x, y, &index, &type) < 0) {
+        // A right click outside the spots: the panes' help bubbles (the citizens row, the
+        // nutrients' box, the units present; the production pane's text is not shown, the
+        // original passes an uninitialised local there).
+        if (right) {
+            uint32_t label = 0;
+            if (in_box(x, y, bw_rect(kBwRectPopMI))) label = 0xCA4;
+            else if (in_box(x, y, bw_rect(0x40B7C))) label = 0xC9C;
+            else if (in_box(x, y, bw_rect(kBwRectGarrisonMI))) label = 0xCA0;
+            if (label) {
+                ui_bubble_set(label_get(label / 4), x + mi_rect(kMiPos).left, y + mi_rect(kMiPos).top);
+                return;
+            }
+        }
         // The citizens row outside a citizen: a worker.
         if (!in_box(x, y, bw_rect(kBwRectPopMI))) return;
         type = 1;

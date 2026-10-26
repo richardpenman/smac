@@ -22,6 +22,7 @@
 #include "engine/diplo_act.h"
 #include "engine/design.h"
 #include "ui/basewin_internal.h"
+#include "ui/voxel.h"
 #include "ui/scroll.h"
 #include "ui/win.h"
 #include "ui/console.h"
@@ -471,6 +472,7 @@ void THISCALL BaseWin_draw_commerce(uint8_t* self, int32_t flag) {
 // ==== BaseWin_draw_facilities (0x40FCC0): the facilities list ======================================
 
 ScrollBar g_fac_bar, g_sup_bar;
+bool g_garrison_arrows = false;
 bool g_fac_bar_shown = false, g_sup_bar_shown = false;
 int32_t g_fac_bar_page = 1;
 
@@ -1020,9 +1022,34 @@ void THISCALL BaseWin_draw_production(uint8_t* self, int32_t flag) {
             Vehs[fake].morale = (uint8_t)(breed_mod(CurrentBaseID, (uint8_t)cur_base().faction_id) + 1);
         ZoomDenom = 100;
         ZoomNum = wide;
-        veh_draw(c, fake, cx - wide / 2, cy - hh / 2, 1, 0xCC, 0);
-        // (a 3D model is then rendered by the window's own renderer: vehdraw_construct_vehicle and
-        // FUN_00617230, the voxel renderer; not reconstructed here)
+        if (veh_draw(c, fake, cx - wide / 2, cy - hh / 2, 1, 0xCC, 0)) {
+            // The 3D model (BaseWin + 0x1D170, its camera of BaseWin_init: angles (0, 0, 0.785),
+            // light and shadow straight down): vehdraw_construct_vehicle, the scale wide * 0.0007,
+            // turned (BaseWin + 0x1E670) + 30 degrees, rendered at the pane's centre.
+            static VoxelScene scene;
+            static bool ready = false;
+            if (!ready) {
+                Scene_ctor(&scene);
+                Scene_init(&scene);
+                ready = true;
+            }
+            float angles[3] = {0.0f, 0.0f, 0.785f}, mat[9];
+            mat3_from_euler(angles, mat);
+            mat[6] = -mat[6];
+            mat[7] = -mat[7];
+            mat[8] = -mat[8];
+            const float pos[3] = {(float)((double)mat[6] * -10000.0f), (float)((double)mat[7] * -10000.0f),
+                                  (float)((double)mat[8] * -10000.0f)};
+            Scene_set_camera(&scene, pos, mat);
+            const float down[3] = {0.0f, 0.0f, 1.0f};
+            std::memcpy(scene.v_shadow, down, 12);
+            std::memcpy(scene.v_light, down, 12);
+            scene.count = 0;
+            vehdraw_construct_vehicle(fake, &scene);
+            Scene_set_scale(&scene, (float)((double)wide * 0.0007));
+            Scene_set_rotation(&scene, (float)((double)(bwf(0x1E670) + 0x1E) * 0.017444445), 0.0f, 0.0f);
+            Scene_render(&scene, c, cx, cy, 0);
+        }
         r.top += 0x41;
         ZoomNum = -1;
         ZoomDenom = -1;
@@ -1902,11 +1929,14 @@ void THISCALL BaseWin_draw_garrison(uint8_t* self, int32_t flag) {
         for (; v >= 0; v = Vehs[v].next_veh_id_stack) count++;
         per = (r.right - r.left) / (cw + 5);
         if (per < count) {
-            // Scroll arrows at both ends of the pane (MainInfc buttons): not reconstructed; the
-            // cells share the width as the original's.
+            // The main interface's stack arrows (buttons 0x3F0 / 0x3F2) at both ends of the pane;
+            // the cells share the width between them.
             r.left = mif(0xAC4) + 1;
             r.right = mif(0xACC) - 1;
             cw = (r.right - r.left) / per - 5;
+            g_garrison_arrows = true;
+        } else {
+            g_garrison_arrows = false;
         }
         v = top;
         while (Vehs[v].prev_veh_id_stack >= 0) v = Vehs[v].prev_veh_id_stack;
@@ -1935,6 +1965,11 @@ void THISCALL BaseWin_draw_garrison(uint8_t* self, int32_t flag) {
     }
     UiRect all{0, 0, c->width, c->height};
     Buffer_set_clip(c, &all);
+    if (g_garrison_arrows) {
+        UiRect mall{0, 0, c->width, c->height};
+        Buffer_set_clip(c, &mall);
+        stack_arrows_draw(c);
+    }
     Buffer_set_clip(c, &old);
     (void)flag;
     ui_invalidate();

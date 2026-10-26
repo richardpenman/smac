@@ -28,6 +28,8 @@
 #include "engine/strings.h"
 #include "engine/text.h"
 #include "ui/basewin_internal.h"
+#include "engine/veh.h"
+#include "engine/map.h"
 #include "ui/console.h"
 #include "ui/font_text.h"
 #include "ui/mapwin.h"
@@ -1078,6 +1080,7 @@ bool basewin_mouse(int32_t type, int32_t x, int32_t y, bool double_click, bool r
         ly = y - g_bw.y;
     }
     if (parent < 0) return true;  // the map around the window: no action
+    if (type == UiInput::MOVE) ui_bubble_clear();  // BaseWin_on_mouse_move: Win_clear_bubble_text
     BaseButton* b = button_at(parent, lx, ly);
     if (b) {
         // BaseButton_on_left_down / on_left_up: pressed look, the click on release inside.
@@ -1118,6 +1121,30 @@ bool basewin_mouse(int32_t type, int32_t x, int32_t y, bool double_click, bool r
                 bwf(kBwDragState) = 0;
             }
         }
+        return true;
+    }
+    if (parent == 1 && g_garrison_arrows && type == UiInput::LUP) {
+        // The stack arrows (MainInterface 0x3F0: the top unit to the bottom, 0x3F2: the bottom
+        // unit to the top) on the base's units.
+        if (int32_t id = stack_arrow_at(lx, ly)) {
+            int32_t v = veh_at(cur_base().x, cur_base().y);
+            if (v >= 0) {
+                if (id == 0x3F2) {
+                    while (Vehs[v].next_veh_id_stack >= 0) v = Vehs[v].next_veh_id_stack;
+                    veh_promote(v);
+                } else {
+                    veh_demote(v);
+                }
+                BaseWin_draw_garrison(self, 1);
+            }
+            return true;
+        }
+    }
+    if (type == UiInput::RUP) {
+        // BaseWin_on_right_click / on_iface_right_click: the click with the right flag (the panes'
+        // help bubbles, the tiles', citizens' and facilities' right-click actions).
+        if (parent == 0) BaseWin_click(self, lx, ly, 1, 0);
+        else BaseWin_iface_click(self, lx, ly, 1, 0);
         return true;
     }
     if (type == UiInput::LUP) {

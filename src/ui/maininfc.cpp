@@ -1330,6 +1330,24 @@ static void worldwin_click(int32_t px, int32_t py, int32_t sx, int32_t sy, bool 
     else pfncMoveMap(&MainConsole, mw(MapWins[0], kMwCenterX), mw(MapWins[0], kMwCenterY), 1);
 }
 
+// The stack arrows in the base window's copy of the main interface (BaseWin_draw_garrison shows
+// MainInfc's buttons 0x3F0 / 0x3F2 when the units present do not fit), and the one at (x, y).
+void stack_arrows_draw(Buffer* mi) {
+    load_arrows();
+    for (Arrow& a : g_arrow) {
+        if (!a.spr[0].width) continue;
+        const UiRect& r = mi_rect(a.rect_off);
+        BlitDestScale = BlitSourceScale = 1;
+        pfncSpriteStretchCopyToCanvas(&a.spr[0], mi, 9, r.left, r.top);
+    }
+}
+int32_t stack_arrow_at(int32_t x, int32_t y) {
+    load_arrows();
+    for (Arrow& a : g_arrow)
+        if (in_rect(x, y, mi_rect(a.rect_off))) return a.id;
+    return 0;
+}
+
 void statuswin_compose(Buffer* mi) {
     load_arrows();
     for (Arrow& a : g_arrow) {
@@ -1403,3 +1421,13 @@ void statuswin_hover() {
 }
 
 void statuswin_say_morale(char* out, int32_t veh_id, int32_t faction_id) { say_morale(out, veh_id, faction_id); }
+
+// The tile of the world map pane under the screen point (sx, sy): 0 and the tile, 1 outside it
+// (pfncProcZoomKey's Win_get_mouse_pos on WorldWin and WorldWin_pixel_to_tile).
+int32_t worldwin_screen_tile(int32_t sx, int32_t sy, int32_t* tx, int32_t* ty) {
+    const UiRect& pos = mi_rect(kMiPos);
+    const UiRect& pane = mi_rect(0xCFC);
+    int32_t px = sx - pos.left - pane.left, py = sy - pos.top - pane.top;
+    if (px < 0 || py < 0 || px >= pane.right - pane.left || py >= pane.bottom - pane.top) return 1;
+    return worldwin_pixel_to_tile(px, py, tx, ty);
+}
