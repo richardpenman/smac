@@ -102,6 +102,18 @@ the whole single-player game: main menu and game setup, the map with 3D units, u
 base window, research, the design workshop, social engineering and the reports, diplomacy and the
 Planetary Council, Datalinks, load/save, preferences, sound, music and movies. What is still
 approximated or missing is listed in `docs/UI_PLAN.md` section 13; multiplayer is not supported.
+Audio and video are supported: sound effects, voices (MP3), music and the game's movies (.wve).
+
+Screenshots of `smacx` (native, no original code):
+
+| | |
+|---|---|
+| ![Developed land, late game](docs/screenshots/map.png) | ![Base window](docs/screenshots/base.png) |
+| Map: bases and developed land, turn 300 | Base window: resources, citizens, production |
+| ![Diplomacy](docs/screenshots/diplo.png) | ![Design workshop](docs/screenshots/design.png) |
+| Diplomacy: an AI leader calls | Design workshop with the 3D unit preview |
+| ![Planetary Council](docs/screenshots/council.png) | |
+| Planetary Council election | |
 
 ## Playing on macOS
 
