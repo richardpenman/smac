@@ -121,6 +121,9 @@ int32_t BasePop_selected_id(BasePop* self);
 int32_t Popup_start(BasePop* pop, const char* file, const char* label, int32_t active, const char* edit,
                     uint32_t flags);
 std::string BasePop_text(BasePop* self);
+// BasePop_set_def_external_window (0x6050F0): the window the popups started with flag 0x100000
+// are drawn into (DiploPop's: at its screen origin x, y, of its size w x h; BasePop_close copies it).
+void BasePop_set_def_external_window(bool on, int32_t x, int32_t y, int32_t w, int32_t h);
 // StringList_sort (0x6087A0) of the popup's list: the items in text order (strcmp, stable).
 void BasePop_sort_items(BasePop* self);
 // The #caption of the section(s) read (null for none).

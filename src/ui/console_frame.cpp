@@ -150,6 +150,19 @@ void console_frame_mouse(int32_t type, int32_t x, int32_t y) {
     auto in = [&](const UiRect& r) { return fx >= r.left && fx < r.right && fy >= r.top && fy < r.bottom; };
     const UiRect& pos = mi_rect(kMiPos);
     if (infowin_mouse(type, x - pos.left, y - pos.top)) return;
+    // MainInterface_on_iface_group_clicked: the globe buttons (1000 + 6 the world map, else the
+    // detail map).
+    if (type == UiInput::LUP && InfcList[InfcUsed] == 0) {
+        for (int32_t i = 0; i < 2; i++) {
+            const UiRect& r = mi_rect(i ? 0xA9C : 0xA8C);
+            int32_t mx = x - pos.left, my = y - pos.top;
+            if (mx >= r.left && mx < r.right && my >= r.top && my < r.bottom) {
+                if (i) WorldWin_set_detail_map(&WorldWin);
+                else WorldWin_set_world_map(&WorldWin);
+                return;
+            }
+        }
+    }
     if (statuswin_mouse(type, x - pos.left, y - pos.top, x, y)) return;
     if (type != UiInput::LUP) return;
     // MainInterface_on_iface_button_clicked: 0x3EB the menu, 0x3EC commlink (Alt / the menu
@@ -193,12 +206,14 @@ void console_frame_draw(Buffer* s) {
     // (In the diplomacy mode DiploPop's panes replace the info pane: InfoWin is hidden.)
     if (!battlewin_shown() && diplowin_faction() < 0) infowin_compose(mi);  // the info pane or the message list
     if (planwin_shown()) planwin_compose(mi);  // the go-to list's PlanWin in the world map pane
-    else if (!diplowin_hq_shown()) worldwin_draw();  // WorldWin hidden under DiploPop's HQ pane
+    else if (!diplowin_hq_shown()) worldpane_draw(mi);  // WorldWin / MapWins[1] (hidden under DiploPop's HQ pane)
     maininfc_set_date();
-    // The globe buttons (0x3EE pressed by ButtonGroup_set(0x3EE, 1), 0x3EF): their sprite centred.
+    // The globe buttons (0x3EE world map, 0x3EF detail map: the one shown pressed; neither under
+    // DiploPop's HQ pane, ButtonGroup_set(-1)): their sprite centred.
+    int32_t pressed = diplowin_hq_shown() ? -1 : (worldwin_detail_shown() ? 1 : 0);
     for (int32_t i = 0; i < 2; i++) {
         const UiRect& r = mi_rect(i ? 0xA9C : 0xA8C);
-        Sprite* sp = &g_art.globe[i][i ? 0 : 2];
+        Sprite* sp = &g_art.globe[i][i == pressed ? 2 : 0];
         if (!sp->width) continue;
         BlitDestScale = BlitSourceScale = 1;
         pfncSpriteStretchCopyToCanvas(sp, mi, kKey, r.left + ((r.right - r.left) - sp->full_width) / 2,
@@ -218,8 +233,12 @@ void console_frame_draw(Buffer* s) {
         for (int32_t x = 0; x < mi->width && pos.left + x < s->width; x++)
             if (src[x] != kKey) dst[x] = src[x];
     }
-    draw_button(s, kMenuBtn, label_get(624));
-    draw_button(s, kCommBtn, label_get(527));
+    // MainInterface_on_status(0) hides the interface's buttons while another mode (the diplomacy
+    // dialog's) is on.
+    if (InfcList[InfcUsed] == 0 && diplowin_faction() < 0) {
+        draw_button(s, kMenuBtn, label_get(624));
+        draw_button(s, kCommBtn, label_get(527));
+    }
 }
 
 void THISCALL StatusWin_set_title(uint8_t*, const char*) { ui_invalidate(); }

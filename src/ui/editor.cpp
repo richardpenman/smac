@@ -675,7 +675,7 @@ void GAMEAPI Console_editor_veh() {
     }
 }
 
-// The omniscient view on / off (F10, the Scenario menu's 0x601): the editor's panel button
+// The omniscient view on / off (the y key, the Scenario menu's 0x601): the editor's panel button
 // (EditorPanelWin) shown with it, the map, the world map, the info and status panes and the
 // caption redrawn.
 void editor_toggle_omniscient() {
@@ -692,14 +692,17 @@ void editor_toggle_omniscient() {
 
 // ---- the keys (Console_on_key_click's editor part) -----------------------------------------------
 
-bool editor_key(uint8_t* self, int32_t key) {
+bool editor_key(uint8_t* self, int32_t key, int32_t ch) {
     if (!(GameState & 0x40)) return false;
     int32_t vk = key & 0x7FFFF;
-    switch (vk) {
-    case 0x79:  // F10: the omniscient view
+    // The characters' switch (FUN_006466EF's lower case): 'y' the omniscient view. (F10 stays
+    // the hall of fame.)
+    if (ch == 'y' || ch == 'Y') {
         set_dirty();
         editor_toggle_omniscient();
         return true;
+    }
+    switch (vk) {
     case 0x10070: Console_editor_veh(); return true;
     case 0x10071: tech_advance(CurrentPlayerFaction); return true;
     case 0x10072: Console_editor_view(); return true;

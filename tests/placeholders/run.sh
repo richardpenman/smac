@@ -370,13 +370,13 @@ nocrash editor
 #     the difficulty, the personality and strategy (AIEDITOR / AIEDITOR2's check boxes), the
 #     scenario's parameters, rules and victory conditions, a natural landmark placed and removed,
 #     the factions reset, the diplomacy editor's window (the pact box clicked, another faction
-#     selected: the boxes applied; INTEGRITY; OK), the view (ALL: EDITORCONTROLALL), F10, the base
+#     selected: the boxes applied; INTEGRITY; OK), the view (ALL: EDITORCONTROLALL), the y key (the omniscient view), the base
 #     window's editor menu (the population, a secret project made unbuilt).
 run editor2 $NEW --keys "ENTER,C-k,DOWN,ENTER,ENTER,EDITSTATE,2,EDITSTATE,C-S-F1,CLICK:332x472,BACK,5,ENTER,\
 CMD:0x607,DOWN,ENTER,CMD:0x612,ENTER,SPACE,ENTER,CMD:0x613,ENTER,DOWN,SPACE,ENTER,CMD:0x616,ENTER,CMD:0x615,SPACE,ENTER,\
 CMD:0x617,ENTER,CMD:0xA17,ENTER,CMD:0xA18,ENTER,CMD:0x610,DOWN,ENTER,\
 S-F9,ENTER,CLICK:560x324,SCREENSTATE,CLICK:200x243,CLICK:420x569,ENTER,CLICK:794x569,\
-CMD:0x606,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,ENTER,F10,EDITSTATE,F10,EDITSTATE,BASE:0,e,DOWN,ENTER,BASESTATE,\
+CMD:0x606,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,ENTER,y,EDITSTATE,y,EDITSTATE,BASE:0,e,DOWN,ENTER,BASESTATE,\
 e,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,ENTER,ENTER"
 check editor2 "the pane shown with its buttons" "^editpane shown 1 mode 1002 paint 0 \\(button 1011\\) brush 0 \\(button 1036\\)"
 check editor2 "the paint buttons' bubbles" "^editpane button 3FA at 313,110 43x18: Soil Enricher"
@@ -397,7 +397,7 @@ check editor2 "diplomacy: applied on selecting another faction" "^diploedit 1-2:
 check editor2 "diplomacy: integrity" "^diploedit 1: integrity 0"
 check editor2 "diplomacy: closed" "^diploedit closed"
 check editor2 "view: all factions" "^editor: view all \\(humans 02\\)"
-check editor2 "F10: the pane's button hidden" "^editpane shown 0 mode 1002"
+check editor2 "y: the pane's button hidden" "^editpane shown 0 mode 1002"
 check editor2 "base editor: population" "^basestate base 0 .* f1 pop 2 "
 check editor2 "base editor: a project made unbuilt" "^base editor: project 2 at -1"
 nocheck editor2 "no placeholder" "not reconstructed"

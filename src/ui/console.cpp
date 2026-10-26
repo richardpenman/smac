@@ -1560,7 +1560,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     InfoWin_reset(&InfoWindow);
     StatusWin_reset(&InfoWin);
     // The scenario editor's keys (editor.cpp); the others as usual.
-    if ((GameState & 0x40) && editor_key(self, vk)) return 1;
+    if ((GameState & 0x40) && editor_key(self, vk, ch)) return 1;
     if (vk >= 0x60 && vk <= 0x69) ch = 0;  // keypad digits
     if (vk == 0xD && (GameState & 0x80) && (mw(main_view(), kMwOptions) & 0x4000)) {
         // Path display (omniscient debug view): the go-to unit at the cursor moves.

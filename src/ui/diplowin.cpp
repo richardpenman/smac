@@ -10,8 +10,10 @@
 // part (DiploPop_init's rectangle +0x20E4), the leader's animation (<faction>.flc, faction.flc
 // when missing), the leader's name in capitals, "Attitude:" (Repute[integrity_blemishes]) and
 // "Mood:" (Mood[get_mood(friction)]) as DiploPop_draw_portrait writes them. The dialog's texts
-// and menus are the script popups (X_pops_11, BasePop menus) above the interface, as the
-// original's BasePop_set_def_external_window places them.
+// and menus are the script popups (X_pops_11, BasePop menus, flag 0x100000) drawn into
+// DiploPop's own window (700 x 0x1C2 above the console, slid up when the dialog starts:
+// BasePop_set_def_external_window). The globe buttons: the world map or the detail map
+// (detailmap.cpp).
 // FLC files are decoded here (COLOR_256, BRUN, COPY, BLACK, SS2/DELTA_FLC, LC) and their colours
 // mapped to the game palette (the original's player loads their palette into the reserved range).
 // DiploPop_draw_info: the centre pane's two faction boxes (draw_info below); DiploPop's buttons
@@ -59,6 +61,9 @@
 #include "ui/sprites.h"
 #include "ui/font_text.h"
 #include "ui/win.h"
+#include "ui/slide.h"
+#include "ui/statuswin.h"
+#include "ui/console.h"
 
 namespace {
 
@@ -69,6 +74,54 @@ int32_t g_faction = -1;       // +0xA94: the faction on the commlink
 std::string g_bioscan, g_portrait;
 uint32_t g_start_ms = 0;
 bool g_animate = false;
+
+// DiploPop's own window (DiploPop_init: GraphicWin 700 x 0x1C2, 600 less the console at 800;
+// Win_move to the screen's centre + 0x10 above the console; box 9 inset 0x17 / 0x37): shown and
+// slid up by DiploPop_on_status(1) (slide_show flag 2), the dialog's popups drawn into it
+// (BasePop_set_def_external_window).
+struct DiploWindow {
+    bool shown = false;
+    Buffer canvas;
+    int32_t x = 0, y = 0;
+    DiploWindow() { Buffer_ctor(&canvas); }
+} g_win;
+
+int32_t console_h() { return ScreenWidth >= 1024 ? 213 : 213 * ScreenHeight / 768; }
+
+void window_geometry(int32_t* w, int32_t* h, int32_t* x, int32_t* y) {
+    *w = 700;
+    *h = ScreenWidth == 800 ? 600 - console_h() : 0x1C2;
+    *x = ((ScreenWidth - *w) + 0x20) / 2;
+    *y = ScreenHeight - console_h() - *h;
+}
+
+// DiploPop_on_status(1): the window drawn and slid up, the console's lid (flag 2).
+void window_show() {
+    if (g_win.shown) return;
+    int32_t w, h;
+    window_geometry(&w, &h, &g_win.x, &g_win.y);
+    Buffer_init(&g_win.canvas, w, h, 8, 0);
+    UiRect all{0, 0, w, h};
+    Buffer_set_clip(&g_win.canvas, &all);
+    Buffer_fill_3(&g_win.canvas, &all, 9);
+    UiRect frame{0x17, 0, w - 0x37, h};
+    Buffer_box_sprite(&g_win.canvas, &frame, box_def(9));
+    BasePop_set_def_external_window(true, g_win.x, g_win.y, w, h);
+    slide_show_window(&g_win.canvas, g_win.x, g_win.y);
+    mi_slide(true);
+    g_win.shown = true;
+    std::fprintf(stderr, "diplopop window shown at %d,%d %dx%d\n", g_win.x, g_win.y, w, h);
+}
+
+// DiploPop_on_status(0): slid down out of view.
+void window_hide() {
+    if (!g_win.shown) return;
+    g_win.shown = false;
+    ui_invalidate();
+    slide_hide_window(&g_win.canvas, g_win.x, g_win.y);
+    mi_slide(false);
+    std::fprintf(stderr, "diplopop window hidden\n");
+}
 
 void say_leader(int32_t n, int32_t f) {
     const MFaction& m = MFactions[f];
@@ -110,6 +163,22 @@ void diplowin_log_state() {
 
 void diplowin_set_animate(bool on) { g_animate = on; }
 int32_t diplowin_faction() { return g_faction; }
+
+void diplowin_draw_window(Buffer* screen) {
+    if (!g_win.shown) return;
+    const Buffer& c = g_win.canvas;
+    for (int32_t j = 0; j < c.height; j++) {
+        int32_t y = g_win.y + j;
+        if (y < 0 || y >= screen->height) continue;
+        const uint8_t* src = c.data + (size_t)j * c.stride;
+        uint8_t* dst = screen->data + (size_t)y * screen->stride;
+        for (int32_t i = 0; i < c.width; i++) {
+            int32_t x = g_win.x + i;
+            if (x >= 0 && x < screen->width && src[i] != 9) dst[x] = src[i];
+        }
+    }
+    ui_layer_mark(g_win.x, g_win.y, &c, 0, 9);
+}
 
 namespace {
 // DiploPop_draw_info (0x43FA90): the centre pane (MainInfc + 0xDC0, inset 7, 0x17 above its bottom
@@ -363,6 +432,9 @@ bool diplowin_hq_shown() { return g_faction >= 0 && g_hq; }
 // detail map) shows the map pane again and clears HQINFO.
 void diplowin_globe_clicked(int32_t id) {
     diplowin_set_hq(0);
+    // 6: WorldWin shown, MapWins[1] hidden; 7: the reverse (the detail map).
+    if (id == 0x3EF) WorldWin_set_detail_map(&WorldWin);
+    else WorldWin_set_world_map(&WorldWin);
     std::fprintf(stderr, "diplopop globe %d: hq 0\n", id);
     ui_invalidate();
 }
@@ -414,7 +486,10 @@ void THISCALL DiploPop_start(uint8_t*, int32_t faction_id_with) {
     diplomacy_check(CurrentPlayerFaction, faction_id_with, 0);
     // SubInterface_set_iface_mode -> DiploPop_on_status(1) when the mode starts: the main
     // interface's WorldWin hidden, no globe button pressed, HQINFO set (the HQ pane shown).
-    if (g_faction < 0) diplowin_set_hq(1);
+    if (g_faction < 0) {
+        diplowin_set_hq(1);
+        window_show();
+    }
     if (g_faction != faction_id_with) {
         g_faction = faction_id_with;
         const char* kind = (ExpansionEnabled && (MFactions[faction_id_with].rule_flags & 0x80))
@@ -432,6 +507,7 @@ void THISCALL DiploPop_start(uint8_t*, int32_t faction_id_with) {
 
 // DiploPop_stop (0x43F5C0): the interface mode released.
 void THISCALL DiploPop_stop(uint8_t*) {
+    window_hide();
     g_faction = -1;
     ui_invalidate();
 }

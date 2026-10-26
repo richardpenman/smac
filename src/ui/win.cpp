@@ -525,6 +525,7 @@ void ui_present() {
     }
     screens_compose(&g_canvas);  // full-screen windows (reports, social engineering; screenwin.h)
     basewin_compose(&g_canvas);  // the base window over the console frame
+    diplowin_draw_window(&g_canvas);  // DiploPop's window (the diplomacy dialog's popups in it)
     console_menu_draw(&g_canvas);
     pulldown_draw_windows(&g_canvas);
     tutwin_draw_lines(&g_canvas);  // TutWin's pointer lines (Win_window_line_raw on the screen)

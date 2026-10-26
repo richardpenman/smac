@@ -173,6 +173,11 @@ ADDR_NATIVE(0x458900) void THISCALL InfoWin_change(uint8_t* win, int32_t a1);
 ADDR_NATIVE(0x459280) void THISCALL InfoWin_reset(uint8_t* win);
 ADDR_NATIVE(0x4B9F90) void THISCALL StatusWin_set_loc(uint8_t* win, int32_t x, int32_t y);
 ADDR_NATIVE(0x4C3990) void THISCALL WorldWin_set_world_map(uint8_t* win);
+ADDR_NATIVE(0x4C3950) void THISCALL WorldWin_set_detail_map(uint8_t* win);
+// detailmap.cpp: the world map pane's detail map (MapWins[1]) is shown in place of the world map.
+bool worldwin_detail_shown();
+// The world map pane into the main interface's canvas: the detail map or WorldWin's map.
+void worldpane_draw(Buffer* mi);
 ADDR_NATIVE(0x460DD0) void THISCALL pfncMainMenuUpdateVisible(uint8_t* menu, int32_t veh_id);
 ADDR_NATIVE(0x4BC6E0) void THISCALL TutWin_tour(uint8_t* win);
 ADDR_NATIVE(0x4BDDE0) int32_t THISCALL TutWin_reset(uint8_t* win);
@@ -236,12 +241,12 @@ ADDR_NATIVE(0x4DB870) void GAMEAPI Console_editor_diplomacy();
 ADDR_NATIVE(0x515F70) void THISCALL Console_show_movies(uint8_t* console);
 // Console_on_key_click's ctrl+shift+F2 (inline in the original): every technology given / taken.
 void editor_all_techs();
-// The omniscient view toggled (F10 / the Scenario menu's 0x601): the editor's panel button shown
+// The omniscient view toggled (the y key / the Scenario menu's 0x601): the editor's panel button shown
 // or hidden (EditorPanelWin's slots 1 / 2) and the panes redrawn.
 void editor_toggle_omniscient();
-// Console_on_key_click's editor keys (F10, shift / ctrl / ctrl+shift F-keys, the digits); true
+// Console_on_key_click's editor keys (y, shift / ctrl / ctrl+shift F-keys, the digits); true
 // when the key was the editor's.
-bool editor_key(uint8_t* console, int32_t key);
+bool editor_key(uint8_t* console, int32_t key, int32_t ch);
 // PrefWin_display (0x48FA00): the preferences dialog on a page (0 preferences, 1 advanced,
 // 2 warnings, 3 automation, 4 audio/visual, 5 map display; prefwin.cpp).
 void prefwin_display(int32_t page);

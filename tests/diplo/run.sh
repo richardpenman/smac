@@ -136,4 +136,20 @@ has diplopop147 "the faction's datalink" "^datalink cat 15 index 2 "
 has diplopop147 "HQINFO" "^diplopop button 2"
 has diplopop147 "a globe button clears it" "^diplopop globe 1006: hq 0"
 
+# 6. DiploPop's own window: shown and slid up when the dialog starts (700 x 0x1C2 above the
+#    console), the dialog's popups (flag 0x100000) drawn into it at its origin and size
+#    (BasePop_set_def_external_window), hidden when the dialog ends; its globe buttons: 0x3EF the
+#    detail map (MapWins[1]), 0x3EE the world map. In the main interface the globe buttons switch
+#    the pane too (WorldWin_set_detail_map / _set_world_map).
+run diplowin147 --save work/saves_late/turn_147.sav --human 3 --keys \
+"ENTER,SHOT:intro.bmp,CLICK:985x740,SHOT:detail.bmp,CLICK:930x740,ENTER,ENTER,ENTER,ENTER,ENTER,ENTER,ENTER,CLICK:985x740,SHOT:main_detail.bmp,CLICK:930x740"
+nocrash diplowin147
+has diplowin147 "the window shown" "^diplopop window shown at 178,105 700x450"
+has diplowin147 "the greeting in it" "^popup INTRO0 shown: 700x450 at 178,105"
+has diplowin147 "the detail map" "^diplopop globe 1007: hq 0"
+has diplowin147 "the world map again" "^diplopop globe 1006: hq 0"
+has diplowin147 "the window hidden at the end" "^diplopop window hidden"
+has diplowin147 "the main interface's detail map" "^worldwin detail map"
+if [ "$(grep -ac '^worldwin detail map' "$OUT/diplowin147.log")" = 2 ]; then echo "PASS diplowin147: the main interface's globe"; else echo "FAIL diplowin147: the main interface's globe"; FAIL=1; fi
+
 exit $FAIL

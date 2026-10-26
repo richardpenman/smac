@@ -1,6 +1,7 @@
 // Script-driven popups of the original UI (see popup.h).
 #include "ui/popup.h"
 #include "ui/slide.h"
+#include "ui/basewin_internal.h"
 #include "ui/diplowin.h"
 #include "ui/scroll.h"
 #include "ui/labs.h"
@@ -455,6 +456,10 @@ public:
     int32_t pressed_button = 0x7FFF;   // button under the mouse while held
     bool edit_fresh = true;            // the edit text is still the selected default
     std::string label;                 // the (last) section read, for the log
+    // The external window (+0xA14..+0xA24, BasePop_set_external_window): DiploPop's window, the
+    // popup drawn into it at its origin (screen ext_x, ext_y) with its size.
+    bool ext = false;
+    int32_t ext_x = 0, ext_y = 0, ext_w = 0, ext_h = 0;
 
     BasePop() { Buffer_ctor(&canvas); }
 
@@ -469,6 +474,16 @@ public:
 namespace {
 
 std::vector<BasePop*> g_windows;  // shown popups, bottom to top
+
+// BasePop_set_def_external_window's defaults (0x9B8D04.., copied by BasePop_close).
+struct { bool on = false; int32_t x = 0, y = 0, w = 0, h = 0; } g_def_ext;
+
+// A popup's text colour pair i (0 caption, 1..3 the strings, 4..6 the items by state): text.pcx's
+// popup pairs (0x8C6C6C..) or, in DiploPop's window, DiploPop's (0x8C6E2C..).
+int32_t pcol(const BasePop* p, int32_t i, int32_t j) {
+    if (p->ext) return *reinterpret_cast<int32_t*>(mem::host(0x8C6E2C + 8 * (uint32_t)i + 4 * (uint32_t)j));
+    return g_popup_text_colors[i][j];
+}
 
 bool interface_visible() {
     // pfncWinIsVisible(pMain): the main interface (console) is up once the game screen exists.
@@ -499,6 +514,20 @@ void basepop_init(BasePop* p, uint32_t flags) {
     p->cols = 1;
     p->max_rows = 12;  // BasePop_close -> ListBox_close -> Dialog_close (DAT_006970A4)
     p->req_x = p->req_y = 0x1000;
+    // BasePop_close: the default external window; BasePop_init keeps it only with flag 0x100000.
+    p->ext = g_def_ext.on && (flags & 0x100000);
+    if (p->ext) {
+        p->ext_x = g_def_ext.x;
+        p->ext_y = g_def_ext.y;
+        p->ext_w = g_def_ext.w;
+        p->ext_h = g_def_ext.h;
+        // The item group fixed at the window's width (+0x21FC, +0x21F0 | 2; Popup_calculate_dimensions
+        // widens it for the picture at 1024). (Its height, +0x2200 with +0x21F0 | 1, is left to the
+        // items: the window's 450 rows of the original fall under its buttons, unseen.)
+        p->dlg_width = p->ext_w;
+        p->dlg_flags |= 2;
+        p->req_x = p->req_y = 0;
+    }
     p->text_x = -1;
     p->text_indent = 0;
     if (flags & 1) p->item_type = 1;
@@ -508,8 +537,10 @@ void basepop_init(BasePop* p, uint32_t flags) {
 }
 
 int32_t scaled(BasePop* p, int32_t v) {
-    return (!(p->flags & 0x400) && ScreenWidth > 0x3FF) ? v * 3 / 2 : v;
+    return (!p->ext && !(p->flags & 0x400) && ScreenWidth > 0x3FF) ? v * 3 / 2 : v;
 }
+
+
 
 int32_t atoi_s(const char* s) { return std::atoi(s); }
 
@@ -572,6 +603,7 @@ int32_t BasePop_start(BasePop* self, const char* file, const char* label, int32_
                       uint32_t flags, uint8_t*) {
     bool text_mode = true;
     if (!(flags & 0x80)) basepop_init(self, flags);
+    if (!(flags & 0x100000)) self->ext = false;
     self->select_cb = nullptr;
     if (flags & 1) self->item_type = 1;
     else if (flags & 2) self->item_type = 2;
@@ -602,9 +634,9 @@ int32_t BasePop_start(BasePop* self, const char* file, const char* label, int32_
                 return s;
             };
             if (kw(a, "xs")) {
-                self->dlg_width = scaled(self, atoi_s(arg(2)));
+                if (!self->ext) self->dlg_width = scaled(self, atoi_s(arg(2)));
             } else if (kw(a, "ys")) {
-                self->dlg_height = scaled(self, atoi_s(arg(2)));
+                if (!self->ext) self->dlg_height = scaled(self, atoi_s(arg(2)));
             } else if (kw(a, "x ")) {
                 int32_t v = atoi_s(arg(1));
                 if (v != 0x2000) self->req_x = v;
@@ -901,9 +933,10 @@ int32_t calculate(BasePop* p) {
     int32_t state = PopupDialogState;
     p->mode += state * 10000;
     // Popup: the text colours of text.pcx (pairs 1..4 from 0x8C6C74; DiploPop's from 0x8C6E34).
+    if (p->ext) textcolor_load();
     for (int32_t i = 0; i < 4; i++) {
-        p->str_color[i][0] = g_popup_text_colors[1 + i][0];
-        p->str_color[i][1] = g_popup_text_colors[1 + i][1];
+        p->str_color[i][0] = pcol(p, 1 + i, 0);
+        p->str_color[i][1] = pcol(p, 1 + i, 1);
     }
     if (ControlWaitLoop || state == 6) p->flags |= 0x200000;
     // Popup look.
@@ -974,6 +1007,14 @@ int32_t calculate(BasePop* p) {
     if (p->button_h) p->height += p->vspace;
     p->height += p->bottom + p->top;
     p->width += p->right + p->left;
+    // In DiploPop's window: its size (the buttons at its bottom, Popup_on_adjust_button_placement).
+    if (p->ext) {
+        p->width = p->ext_w;
+        p->height = p->ext_h;
+        if (p->n_buttons)
+            p->button_w = (p->width - p->left - p->right - p->hpad * 2 - (p->n_buttons - 1) * p->vspace) / p->n_buttons;
+        return 0;
+    }
     // Popup: at least 300 pixels high in the main interface's frame.
     if (main_visible && (state == 0 || state == 5) && p->height < 300) {
         p->bottom += 300 - p->height;
@@ -988,12 +1029,18 @@ void draw_items(BasePop* p);
 void draw_buttons(BasePop* p);
 
 // Popup_on_draw_background (0x405C80): frame, caption bar, text and item frames.
+void draw_background_ext(BasePop* p);
+
 void draw_background(BasePop* p) {
     Buffer* b = &p->canvas;
     int32_t state = p->mode / 10000;
     UiRect all = {0, 0, b->width, b->height};
     Buffer_set_clip(b, &all);
     Buffer_fill_3(b, &all, kKey);
+    if (p->ext) {
+        draw_background_ext(p);
+        return;
+    }
     bool main_visible = interface_visible();
     UiRect frame = all;
     if (main_visible && (state == 0 || state == 5)) {
@@ -1067,6 +1114,33 @@ void draw_background(BasePop* p) {
     Buffer_box_sprite(b, &r, box_def(3));
 }
 
+// Popup_on_draw_background's DiploPop branch: the frame inside DiploPop's rectangle (0x17 in from
+// the left, 0x37 from the right, 5 below), the caption bar, the text's box to the frame's right
+// less 7 and a box around it.
+void draw_background_ext(BasePop* p) {
+    Buffer* b = &p->canvas;
+    UiRect d = {0, 0, p->ext_w, p->ext_h};
+    UiRect frame = {d.left + 0x17, d.top, d.right - 0x37, d.bottom + 5};
+    Buffer_fill_3(b, &frame, kKey);
+    Buffer_box_sprite(b, &frame, box_def(9));
+    if (p->caption) {
+        for (char* c = p->caption; *c; c++) *c = (char)std::toupper((unsigned char)*c);
+        UiRect r = {d.left + 0x1B, d.top + 4, d.right - 0x3B, d.top + 0x1C};
+        Buffer_box_sprite(b, &r, box_def(3));
+        r = {r.left + 3, r.top + 3, r.right - 3, r.bottom - 3};
+        Buffer_box_sprite(b, &r, box_def(6));
+        r = {r.left + 3, r.top + 3, r.right - 3, r.bottom - 3};
+        Buffer_set_font(b, &g_caption_font, nullptr, nullptr, nullptr);
+        Buffer_set_text_color(b, pcol(p, 0, 0), pcol(p, 0, 1), 1, 1);
+        Buffer_write_cent_l_7(b, p->caption, &r, (int32_t)std::strlen(p->caption));
+    }
+    int32_t top = p->top + p->hpad;
+    UiRect text = {p->left + p->pic_w + p->text_indent + p->hpad - 3, top - 3, frame.right - 7, p->text_h + top};
+    if (p->text_h) Buffer_box_sprite(b, &text, box_def(0));
+    UiRect r = {text.left - 3, text.top - 3, text.right + 3, text.bottom + 3};
+    Buffer_box_sprite(b, &r, box_def(3));
+}
+
 // BasePop_on_redraw (0x604AB0): background, picture, text; then the items and buttons.
 void redraw(BasePop* p) {
     Buffer* b = &p->canvas;
@@ -1101,7 +1175,7 @@ void item_back(BasePop* p, int32_t state, UiRect r) {
         r.left += 0x15;
     }
     Buffer_box_sprite(b, &r, box_def(27 + state));
-    Buffer_set_text_color(b, g_popup_text_colors[6 - state][0], g_popup_text_colors[6 - state][1], 1, 1);
+    Buffer_set_text_color(b, pcol(p, 6 - state, 0), pcol(p, 6 - state, 1), 1, 1);
 }
 
 UiRect item_rect(BasePop* p, int32_t pos) {
@@ -1224,6 +1298,7 @@ void place_buttons(BasePop* p) {
     p->btns.clear();
     if ((p->flags & 0x80100) || !p->n_buttons) return;
     int32_t x = -p->right, y = p->height - p->bottom - p->hpad - p->button_h + 3;
+    if (p->ext) y = p->height - 0x1E - p->button_h;  // Popup_on_adjust_button_placement: y -0x1E
     auto at = [&](int32_t bx) {  // negative x: from the right edge of the window
         return bx < 0 ? p->width + bx - p->button_w : bx;
     };
@@ -1354,7 +1429,10 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
     // The window (GraphicWin_init) and its position (Popup_show / BasePop_exec_3).
     Buffer_init(&p->canvas, std::max(1, p->width), std::max(1, p->height), 8, 0);
     int32_t state = p->mode / 10000;
-    if (interface_visible() && (state == 0 || state == 5)) {
+    if (p->ext) {  // in DiploPop's window, at its origin (Popup_show: no slide)
+        p->win_x = p->ext_x;
+        p->win_y = p->ext_y;
+    } else if (interface_visible() && (state == 0 || state == 5)) {
         p->win_x = (ScreenWidth - p->width + 0x20) / 2;
         p->win_y = ScreenHeight - p->height - interface_height();
     } else {
@@ -1552,6 +1630,14 @@ void BasePop_hide(BasePop* p) {
     g_windows.erase(std::remove(g_windows.begin(), g_windows.end(), p), g_windows.end());
     p->shown = false;
     ui_invalidate();
+}
+
+void BasePop_set_def_external_window(bool on, int32_t x, int32_t y, int32_t w, int32_t h) {
+    g_def_ext.on = on;
+    g_def_ext.x = x;
+    g_def_ext.y = y;
+    g_def_ext.w = w;
+    g_def_ext.h = h;
 }
 
 void popup_draw_windows(Buffer* screen) {

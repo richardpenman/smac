@@ -23,6 +23,8 @@ void diplowin_set_hq(int32_t on);
 bool diplowin_hq_shown();
 // The faction on the commlink (-1: none).
 int32_t diplowin_faction();
+// DiploPop's own window (the dialog's popups are drawn into it) onto the screen, under the popups.
+void diplowin_draw_window(Buffer* screen);
 // The diplomacy menu's initial selection (COUNCILVOTEGOV: the human's own entry; popup_menus.cpp).
 void ui_diplo_menu_set_active(int32_t value);
 // The menu's selection callback (Popup +0x3280: battle_routine).

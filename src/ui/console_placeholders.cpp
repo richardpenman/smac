@@ -24,7 +24,6 @@ void GAMEAPI draw_cursor() {
     else ui_invalidate();
 }
 void THISCALL MapWin_draw_cursor(uint8_t*) { ui_invalidate_map(); }
-void THISCALL WorldWin_set_world_map(uint8_t*) {}
 // Console_time_controls (0x515900): outside multiplayer it only builds and closes its popup (the
 // TIMECONTROLS dialog, HOSTTIME and the synchronisation are multiplayer's, out of scope).
 void THISCALL Console_time_controls(uint8_t*) {}
