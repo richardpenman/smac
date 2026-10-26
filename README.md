@@ -4,11 +4,6 @@ A native, cross-platform reconstruction of *Sid Meier's Alpha Centauri: Alien Cr
 rebuilt from the original game and verified to play identically to it. It runs on Windows, macOS
 and Linux. You need your own copy of the game.
 
-| | |
-|---|---|
-| ![Developed land, late game](docs/screenshots/map.png) | ![Base window](docs/screenshots/base.png) |
-| ![Diplomacy](docs/screenshots/diplo.png) | ![Design workshop](docs/screenshots/design.png) |
-
 ## Play
 
 Download the package for your system from this repository's Releases page:
@@ -46,4 +41,9 @@ The whole single-player game works: game setup, the map, units, bases, research,
 workshop, diplomacy, the Planetary Council, reports, saving and loading, sound, music and movies.
 Multiplayer is not supported. Known gaps are listed in the [UI plan](docs/UI_PLAN.md) (section 13).
 
-Development details (how the reconstruction is verified, releases, layout): [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+| | |
+|---|---|
+| ![Developed land, late game](docs/screenshots/map.png) | ![Base window](docs/screenshots/base.png) |
+| ![Diplomacy](docs/screenshots/diplo.png) | ![Design workshop](docs/screenshots/design.png) |
+
+Development details (how the reconstruction is verified, releases, layout): [DEVELOPMENT.md](docs/DEVELOPMENT.md).
