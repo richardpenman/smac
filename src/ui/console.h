@@ -192,6 +192,36 @@ ADDR_NATIVE(0x4E2000) void THISCALL Console_corner_the_market(uint8_t* console);
 ADDR_NATIVE(0x514B30) void THISCALL Console_retire_game(uint8_t* console);
 // The scenario editor's game rules (RULES' check boxes; prefwin.cpp).
 ADDR_NATIVE(0x4DC230) void THISCALL Console_editor_rules(uint8_t* console);
+// ---- the scenario editor (editor.cpp) ----
+ADDR_NATIVE(0x4D9970) void THISCALL Console_editor_on(uint8_t* console);
+ADDR_NATIVE(0x4E0A50) void GAMEAPI Console_editor_paints(int32_t paint);
+ADDR_NATIVE(0x4E0EA0) void GAMEAPI Console_editor_set_brush();
+ADDR_NATIVE(0x4E0AD0) void GAMEAPI Console_editor_minor();
+ADDR_NATIVE(0x4E0B00) void GAMEAPI Console_editor_terrain();
+ADDR_NATIVE(0x4E0F30) void GAMEAPI Console_editor_flat();
+ADDR_NATIVE(0x4E0F80) void GAMEAPI Console_editor_polar();
+ADDR_NATIVE(0x4E0FA0) void GAMEAPI Console_editor_climate();
+ADDR_NATIVE(0x4E14A0) void GAMEAPI Console_editor_rockiness();
+ADDR_NATIVE(0x4E13E0) void THISCALL Console_editor_fungus(uint8_t* console);
+ADDR_NATIVE(0x4E1290) void GAMEAPI Console_editor_clear();
+ADDR_NATIVE(0x4E1300) void GAMEAPI Console_editor_clear_vehicles();
+ADDR_NATIVE(0x4E1380) void GAMEAPI Console_editor_clear_terrain();
+ADDR_NATIVE(0x4E1190) void GAMEAPI Console_editor_randomize();
+ADDR_NATIVE(0x4E1200) void GAMEAPI Console_editor_clear_random();
+ADDR_NATIVE(0x4E10C0) void GAMEAPI Console_editor_fast();
+ADDR_NATIVE(0x4E0FD0) void GAMEAPI Console_editor_generate();
+ADDR_NATIVE(0x4E1F70) void GAMEAPI Console_editor_lock2();
+ADDR_NATIVE(0x4E1F20) void GAMEAPI Console_editor_undo();
+ADDR_NATIVE(0x4E1F30) void GAMEAPI Console_editor_redo();
+ADDR_NATIVE(0x4E09E0) void GAMEAPI Console_editor_save();
+ADDR_NATIVE(0x4E0A00) void GAMEAPI Console_editor_load();
+ADDR_NATIVE(0x4E0120) void GAMEAPI Console_editor_energy();
+ADDR_NATIVE(0x4E0210) void GAMEAPI Console_editor_date();
+ADDR_NATIVE(0x4E09B0) void GAMEAPI Console_editor_kill_vehicles();
+ADDR_NATIVE(0x4DED00) void GAMEAPI Console_editor_veh();
+// Console_on_key_click's editor keys (F10, shift / ctrl / ctrl+shift F-keys, the digits); true
+// when the key was the editor's.
+bool editor_key(uint8_t* console, int32_t key);
 // PrefWin_display (0x48FA00): the preferences dialog on a page (0 preferences, 1 advanced,
 // 2 warnings, 3 automation, 4 audio/visual, 5 map display; prefwin.cpp).
 void prefwin_display(int32_t page);

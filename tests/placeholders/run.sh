@@ -344,4 +344,24 @@ check menucol "the column, MAP its third button" "^menu column at 0,343 \\(139x1
 check menucol "HQ the second" "^menu column at 0,343 \\(139x168\\): HQ at 0,367"
 nocrash menucol
 
+# 21. The scenario editor (editor.cpp): ctrl+K (SCENEDITOR yes) switches it on; '1' paints the
+#     elevation, the Edit Map menu's Place At Cursor (0xA20) raises the cursor's tile
+#     (MapWin_editor; world_raise_alt lifts the foil's sea tile beside it: the foil is lost, as the
+#     engine does); '7' the brush (radius 1), '5' unity pods placed then removed (0xA21);
+#     ctrl+shift+F1 edits the scout's flags (EDITVEH: its second box, flag 0x80); shift+F1 creates a unit (EDITORUNIT: the first, a colony pod) at the cursor; ctrl+F6 kills the
+#     cursor's stack; ctrl+K switches the editor off.
+D12=$(printf 'DOWN,%.0s' $(seq 1 12))
+run editor $NEW --keys "ENTER,C-k,DOWN,ENTER,ENTER,1,A-e,${D12}ENTER,7,DOWN,DOWN,ENTER,5,A-e,${D12}ENTER,A-e,DOWN,${D12}ENTER,\
+C-S-F1,DOWN,SPACE,ENTER,S-F1,ENTER,UNITS,C-F6,UNITS,C-k,ENTER"
+check editor "on" "^scenario editor on \\(GameState 000000E0\\)"
+check editor "elevation raised at the cursor" "^editor paint 0 at 35,7: change 1"
+check editor "the brush" "^editor paint 0 brush 2"
+check editor "a unity pod placed" "^editor paint 4 at 35,7: change 1"
+check editor "and removed" "^editor paint 4 at 35,7 \\(remove\\): change 1"
+check editor "the unit's flags edited" "^editor: unit 4 flags 0080 "
+check editor "a unit created" "^editor: unit 19 \\(Colony Pod\\) of faction 1 at 35,7"
+if [ "$(grep -c '^unit 19 f1 Colony Pod' "$OUT/editor.log")" = 1 ]; then echo "PASS editor: the stack killed"; else echo "FAIL editor: the stack killed"; FAIL=1; fi
+check editor "off" "^scenario editor off"
+nocrash editor
+
 exit $FAIL

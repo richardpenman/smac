@@ -423,7 +423,7 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
     case 0x322: Console_sentry(self, veh(self), 10); break;
     case 0x323: Console_skip(self, veh(self)); break;
     case 0x324: Console_set_patrol(self, veh(self)); break;
-    case 0x600: console_not_reconstructed("Console_editor_on"); break;
+    case 0x600: Console_editor_on(self); break;
     // Help
     case 0x701: help_topic(2, 0); break;
     case 0x702: help_topic(0, 0); break;
@@ -509,6 +509,35 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
         if (id == 0x614) {
             Console_editor_rules(self);
             return;
+        }
+        switch (id) {  // editor.cpp
+        case 0x602: Console_editor_veh(); return;
+        case 0x608: Console_editor_energy(); return;
+        case 0x609: Console_editor_date(); return;
+        case 0x60C: Console_editor_kill_vehicles(); return;
+        case 0x618: Console_editor_undo(); return;
+        case 0x619: Console_editor_redo(); return;
+        case 0xA00: Console_editor_save(); return;
+        case 0xA01: Console_editor_load(); return;
+        case 0xA10: case 0xA11: case 0xA12: case 0xA13: case 0xA14: Console_editor_paints(id - 0xA10); return;
+        case 0xA15: Console_editor_terrain(); return;
+        case 0xA16: Console_editor_paints(5); return;
+        case 0xA19: Console_editor_minor(); return;
+        case 0xA24: Console_editor_set_brush(); return;
+        case 0xA30: Console_editor_climate(); return;
+        case 0xA31: Console_editor_generate(); return;
+        case 0xA32: Console_editor_fast(); return;
+        case 0xA36: Console_editor_fungus(self); return;
+        case 0xA37: Console_editor_rockiness(); return;
+        case 0xA40: Console_editor_randomize(); return;
+        case 0xA41: Console_editor_clear_random(); return;
+        case 0xA48: Console_editor_flat(); return;
+        case 0xA50: Console_editor_clear(); return;
+        case 0xA51: Console_editor_polar(); return;
+        case 0xA52: Console_editor_clear_vehicles(); return;
+        case 0xA53: Console_editor_clear_terrain(); return;
+        case 0xA54: Console_editor_lock2(); return;
+        default: break;
         }
         console_not_reconstructed("Console_menu_proc: scenario editor command");
     }

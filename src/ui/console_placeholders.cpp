@@ -76,7 +76,3 @@ void THISCALL Console_custom_my_faction(uint8_t*) {
     std::fprintf(stderr, "custom faction %d: %s %s, %s / %s / %s (%s)\n", f, m.title_leader, m.name_leader,
                  m.formal_name_faction, m.noun_faction, m.adj_name_faction, m.is_leader_female ? "female" : "male");
 }
-void THISCALL Console_editor_edit_veh(uint8_t*, int32_t) { console_not_reconstructed("Console_editor_edit_veh"); }
-void THISCALL Console_editor_kill_veh(uint8_t*, int32_t) { console_not_reconstructed("Console_editor_kill_veh"); }
-// Scenario editor brush (ui module, not reconstructed).
-void THISCALL MapWin_editor(uint8_t*, int32_t, int32_t, int32_t) { console_not_reconstructed("MapWin_editor"); }

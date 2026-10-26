@@ -1558,6 +1558,8 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     }
     InfoWin_reset(&InfoWindow);
     StatusWin_reset(&InfoWin);
+    // The scenario editor's keys (editor.cpp); the others as usual.
+    if ((GameState & 0x40) && editor_key(self, vk)) return 1;
     if (vk >= 0x60 && vk <= 0x69) ch = 0;  // keypad digits
     if (vk == 0xD && (GameState & 0x80) && (mw(main_view(), kMwOptions) & 0x4000)) {
         // Path display (omniscient debug view): the go-to unit at the cursor moves.
@@ -1732,12 +1734,6 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
             update_panes(self);
         }
     }
-    if (GameState & 0x40) {
-        // Scenario editor keys (only the custom rules, shift+F10, are reconstructed).
-        if (vk == 0x10079) Console_editor_rules(self);
-        else console_not_reconstructed("Console_on_key_click: scenario editor keys");
-        return 1;
-    }
     if (!Console_edit_lock(self)) {
         if (key == '*') Console_zoom_to_upkeep_base(self);
         if (vk >= 0x31 && vk <= 0x36) {
@@ -1840,7 +1836,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         draw_map(1);
         prefs_save(0);
         break;
-    case 0x2004B: console_not_reconstructed("Console_editor_on"); break;  // ctrl+K: scenario editor
+    case 0x2004B: Console_editor_on(self); break;  // ctrl+K: scenario editor
     case 0x3004C: Console_load_proc(self, 0, 0); break;                    // ctrl+shift+L
     case 0x20073:                                                          // ctrl+F4: version
         parse_says(0, "RELEASE 2.0", -1, -1);
