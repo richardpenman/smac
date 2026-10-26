@@ -5,14 +5,16 @@
 // Look: the desktop is the opening picture (xopeninga.pcx at 1024x768, xopeningb.pcx at 800x600)
 // shown through its own palette (under GDI the window's DIB colour table: palette layer 1, win.h).
 // The menu column stacks the items of openitem.flc (354 x 75, frame 5 is the item at rest; frames
-// 0-5 slide it in and 6-11 out, not animated here) at the bottom right: the animation's indices
+// 0-5 slide it in and 6-11 out) at the bottom right: the animation's indices
 // are those of the desktop's colour table, 9 is transparent and 0 shows the redtint table's colour
 // of the desktop pixel under it (Win +0xA0 = RedTintTable). Texts: Arial 18 bold, centred, upper
 // case, the part from "(" dropped, colour 0xCD (0xCA highlighted; the caption 0x42). Items of the
 // custom map show their planet picture (S<ocean>L<life>C<clouds>.pcx at the right edge, the moons
 // MOON1..3.PCX at the top left) on the desktop when highlighted; the pictures stay until the
 // desktop is redrawn (change_opening at the next main menu).
-// Not reconstructed: the slide animations, the menu sounds (fx\menu out.wav, opening menu.wav).
+// The column slides in and out (frames 0-5 and 6-11 of openitem.flc, at least 10 ms each; not in
+// unattended runs); its sound (fx\menu out.wav) and the opening menu's music (fx\opening menu.wav)
+// play through sound.cpp.
 #include "ui/topmenu.h"
 #include "ui/sound.h"
 
@@ -94,6 +96,7 @@ struct SetupWin : ScreenWin {
     Font font;                       // Arial 18 bold
     SetupPics* pics = nullptr;
     Spots spots;
+    int32_t anim = 5;                // the frame of openitem.flc drawn (5: at rest)
 
     // Top of item i's frame (the caption is frame 0 when present).
     int32_t frame_top(int32_t i) const {
@@ -101,8 +104,9 @@ struct SetupWin : ScreenWin {
         return k * flc->height + (caption.empty() ? 0 : kCaptionGap);
     }
     void frame(int32_t top) {
-        // Frame 5 of openitem.flc: 9 transparent, 0 the redtint of the desktop under it.
-        const std::vector<uint8_t>& px = flc->frames[std::min<size_t>(5, flc->frames.size() - 1)];
+        // Frame 5 of openitem.flc (0-4 sliding in, 6-11 out): 9 transparent, 0 the redtint of the
+        // desktop under it.
+        const std::vector<uint8_t>& px = flc->frames[std::min<size_t>((size_t)anim, flc->frames.size() - 1)];
         for (int32_t y = 0; y < flc->height; y++) {
             int32_t cy = top + y;
             if (cy < 0 || cy >= canvas.height) continue;
@@ -253,7 +257,26 @@ int32_t run_menu(std::vector<std::string> items, std::string caption, int32_t ac
     static uint8_t menu_out[0x6C];
     Wave_load(menu_out, "fx\\menu out.wav");
     if (GamePreferences & 0x400) Wave_play_2(menu_out);
+    // The slide (SetupWin_do_menu_rightside): frames 0..5 of every item's frame, at least 10 ms
+    // each, then the texts; on leaving, frames 6..11 (not for unattended runs).
+    auto slide = [&](int32_t from, int32_t to) {
+        if (g_ui_exit_when_script_done) return;
+        sw_show(&w);
+        for (int32_t f = from; f <= to; f++) {
+            uint32_t t0 = platform::ticks_ms();
+            w.anim = f;
+            UiRect all{0, 0, w.canvas.width, w.canvas.height};
+            Buffer_fill_3(&w.canvas, &all, 9);
+            for (int32_t k = 0; k < n; k++) w.frame(k * flc->height + (k && !w.caption.empty() ? kCaptionGap : 0));
+            ui_invalidate();
+            ui_present();
+            while (platform::ticks_ms() - t0 < 10) platform::delay_ms(1);
+        }
+        w.anim = 5;
+    };
+    slide(0, 5);
     sw_run(&w);
+    if (w.done && (int32_t)flc->frames.size() >= 12) slide(6, 11);
     g_menu = nullptr;
     // No more input (a scripted run that ended): cancelled.
     if (!w.done) w.sel = -1;

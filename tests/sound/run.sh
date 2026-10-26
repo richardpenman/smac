@@ -19,8 +19,9 @@
 # 5. voice: an MP3 voice decoded and played (24.3 s), and the mixer's output not silent (SDL's disk
 #    audio driver).
 # 6. music: the default music set rendered for 30 s (MUSICRENDER).
-# Runs use --nosound (the same calls as with a device: every call is logged before the device is
-# used) except 5 and 6. Exit status 0 when every check passes.
+# 7. movie: a secret project movie (WVE): 100 frames decoded, the 100th a picture.
+# Runs 1-4 use --nosound (the same calls as with a device: every call is logged before the device
+# is used). Exit status 0 when every check passes.
 set -u
 # No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
@@ -121,9 +122,25 @@ fi
 nocrash voice
 
 # 6. The music (aset1, the default set: the sequencer's groups of the .amb file's MIDI tracks on its
-#    sampled instruments) rendered for 30 seconds.
-run music --new size=0 --human 1 --seed 1,2 --keys "ENTER,MUSICRENDER:music.wav:30"
+#    sampled instruments) rendered for 30 seconds (the music needs a device: the dummy driver).
+SDL_AUDIODRIVER=dummy run music --new size=0 --human 1 --seed 1,2 --keys "ENTER,MUSICRENDER:music.wav:30"
 check music "the music sequencer plays (30 s, level above silence)" "musicrender .*music.wav: 30 s, rms 0\.0[1-9]"
 nocrash music
+
+# 7. A secret project's movie (amovie_project_2): the WVE container, its TQI frames and its sound.
+SMACX_MOVIE_FRAMES=100 run movie --new size=0 --human 1 --seed 1,2 --keys "ENTER,MOVIE:humanGenome"
+check movie "movie call" "sound: T1 movie humanGenome"
+check movie "the movie's frames and sound" "movie movies.humanGenome.wve: 320x240, 422 frames, sound 28066 ms"
+check movie "100 frames decoded" "movie movies.humanGenome.wve: 100 of 100 frames decoded"
+if "$PY" -c '
+import sys
+from PIL import Image, ImageStat
+s = ImageStat.Stat(Image.open(sys.argv[1]).convert("L"))
+sys.exit(0 if s.mean[0] > 60 and s.stddev[0] > 30 else 1)' "$OUT/movie/movie.bmp"; then
+    echo "PASS movie: frame 100 is a picture"
+else
+    echo "FAIL movie: frame 100 is not a picture"; FAIL=1
+fi
+nocrash movie
 
 exit $FAIL

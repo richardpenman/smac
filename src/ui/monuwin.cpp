@@ -11,9 +11,9 @@
 // (monbigN.pcx, the faction's "3" picture for unification and eliminations) and records it as
 // the faction's latest monument (Monuments[f].latest_event_id, game state, as the original). A key
 // or the button closes the text, then the window.
-// Approximated: the background (the original plays the frames of monument.flc up to the number of
-// monuments: FLC decoding is not reconstructed), the decorations and the eliminated leaders'
-// portraits (written as text).
+// The overview's background is monument.flc's frame of the number of monuments (as MonuWin_init
+// leaves it). Approximated: the decorations and the eliminated leaders' portraits (written as
+// text).
 //
 // hall_of_fame(add): reads hallfame.jhh (7 factions x 5 entries of 0x8C bytes, 0x9A3840),
 // shows the viewer's faction's top five, and writes the table back. smacx reads and writes the
@@ -33,6 +33,7 @@
 #include "engine/tech.h"
 #include "engine/text.h"
 #include "engine/ui_bridge.h"
+#include "ui/flic.h"
 #include "ui/basewin.h"
 #include "ui/console.h"
 #include "ui/font_text.h"
@@ -325,10 +326,17 @@ void MonuWinState::redraw() {
     UiRect all{0, 0, c->width, c->height};
     Buffer_set_clip(c, &all);
     spot_init(&spots[0], 0x100);
-    // Background: the overview's (the frames of monument.flc) is a tiled panel here; the text's
-    // is monzoom1.pcx (up to four monuments) or monzoom2.pcx.
-    Buffer* tile = box_def(9)->center;
-    Buffer_tile(c, tile, 0, 0, 0, 0, c->width, c->height);
+    // Background: the overview's is monument.flc advanced by one frame per monument (MonuWin_init:
+    // the first frame, then MonumentCount more, 13 for 14); the text's is monzoom1.pcx (up to
+    // four monuments) or monzoom2.pcx.
+    const Flc* flc = flc_get("monument.flc");
+    if (flc) {
+        Buffer_fill_3(c, &all, 0);
+        flc_draw(c, flc, (c->width - flc->width) / 2, (c->height - flc->height) / 2,
+                 MonumentCount != 14 ? MonumentCount : 13);
+    } else {
+        Buffer_tile(c, box_def(9)->center, 0, 0, 0, 0, c->width, c->height);
+    }
     if (zoom) {
         Buffer bg;
         Buffer_ctor(&bg);

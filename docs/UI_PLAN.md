@@ -84,8 +84,8 @@ src/app/smacx.cpp the native game executable
 
 * **Platform layer** replaces DirectDraw/GDI/user32/WinMM: present an 8-bit frame with its palette
   (SDL texture, scaled), input as Windows messages (VK codes, client coordinates), clock, fonts
-  (TTF rasterised without antialiasing, GDI metrics), audio later (SDL audio for WAV/MP3 voices),
-  movies later (FLC/WVE decoders on top of the frame API).
+  (TTF rasterised without antialiasing, GDI metrics), audio (a mixer of sample voices and streams
+  on SDL audio) and true-colour frames for movies (section 12).
 * **Original classes above it**: Buffer, Palette, Font, Sprite, Texture, then Win/GraphicWin and
   widgets, then the game windows. Same algorithms as the asm (scaling tables, texture stepping,
   text layout) so screenshots match; per-function fidelity as in docs/RECONSTRUCTION.md, with
@@ -146,7 +146,7 @@ src/app/smacx.cpp the native game executable
 | 7 (done, section 9) | design workshop (DesignWin), tech pick (research window, Console_set_tech / set_ai), NewTechWin, datalinks (help); social engineering was done with the reports (section 8) | tests/design/run.sh, tests/datalinks/run.sh; tests/design/compare.sh vs the original |
 | 8 (done, section 10; reports and monuments in section 8) | diplomacy (communicate and the human's menus, DiploPop), council window (CouncilWin); hotseat/PBEM `diplo` (DiploWin) not reconstructed | tests/diplo/run.sh |
 | 9 (done, section 11) | main menu, game setup (top_menu, setup dialogs), file dialogs (FileBox), preferences (PrefWin), Resign | tests/menu/run.sh (a new game from the menu equals --new); tests/menu/compare.sh vs the original |
-| 10 | sound (FX, voices, music), movies (FLC/WVE: openings, interludes, secret projects) | |
+| 10 (done, section 12) | sound (FX, voices, music), movies (WVE: opening, faction, secret project, defeat and victory movies), the menu column's slide, monument.flc | tests/sound/run.sh; tests/sound/compare.sh vs the original (oracle `logsound`) |
 
 Each phase replaces the corresponding headless stubs in smacx; `smacx_headless` and the hybrid
 builds stay unchanged.
@@ -204,7 +204,7 @@ computer players move with the engine.
   right_click / right_down / mouse_move, MapWin_click (select, centre, open bases, the modes'
   targets, rally-point drag), the go-to drag (go_timer, go_reset) and its keys (g, space, j).
   say_orders (statuswin.cpp). Not reconstructed: MapWin_right_menu, MapWin_editor, the path
-  preview (MapWin_dest_line, Console_goto_routine's PlanWin), sounds.
+  preview (MapWin_dest_line, Console_goto_routine's PlanWin). Sounds: section 12.
 * **Main interface** (console_frame.cpp; approximated, see its header): console2_A.pcx frame,
   pane backgrounds, menu / commlink buttons, "TURN COMPLETE", the unit, tile, stack, info and
   date panes and a simple world map, drawn with the original's art, fonts and colours at the
@@ -284,7 +284,7 @@ win_popup.cpp, popup_menus.cpp); every engine popup call opens the original's di
   (Font_find_line_break_l / Buffer_find_line_break_l) and the flying writer that flows the text
   lines into paragraphs (Buffer_write_strings and its measuring twin), as the gfx module does.
   Glyphs come from platform::font_render (the one place where GDI is approximated).
-* **Not reconstructed**: sounds (`#wave` etc.), the main interface's frame arms and the slide
+* **Not reconstructed**: the main interface's frame arms and the slide
   animation (slide_show), DiploPop's own popup look (the diplomacy dialog's popups are the plain popups, with the leader
   portrait: section 10),
   the help texts and tech icons of the tech popup, scroll bars of list boxes, hyperlink spots,
@@ -420,7 +420,7 @@ F10 hall of fame, F11 menu detail, F12 the commlink panel (MainInterface_on_ifac
   four sections (base facilities, technologies, unit advances, miscellaneous) with their links,
   the BLURBSX quote, OK; a link opens the datalinks, then the window again. help_tech_info and
   tech_heck (helpx.txt TECHHECK) are in src/ui/help.cpp, with the help_* entry points. Not
-  reconstructed: the voice clip, the two picture buttons' function, scroll bars.
+  reconstructed: the two picture buttons' function, scroll bars. The voice clip: section 12.
 * **Design workshop** (src/ui/designwin.cpp): DesignWin_exec and its methods with the original's
   game state changes (setup_veh, design_it, check_abil, suggest_abil, the select_* rules, the
   buttons APPLY / DONE / RENAME / OBSOLETE / UPGRADE / RETIRE / CANCEL / presets, the keys, the
@@ -574,11 +574,10 @@ original does (smacx's main_menu only adds the seeding and the human player for 
   pages. Resign (shift+Q, Console_retire_game: REALLYRETIRE, report_score, quayle, hall_of_fame,
   show_replay, back to the main menu) and the editor's custom rules (shift+F10,
   Console_editor_rules) are reconstructed; Start New Game (ctrl+shift+Q) returns to the main menu.
-* **Not reconstructed (placeholders)**: the menu column's slide animations and sounds, the opening
-  movie and menu music, multiplayer_init (DirectPlay / hotseat / PBEM setup, time controls,
-  HOTSEATADD), the PBEM tamper seeds, the gamma correction dialog, the audio page's volume buttons
-  and sliders (switches as check boxes here), the Windows common file dialog (WindowsFileBox), the
-  scenario editor itself.
+* **Not reconstructed (placeholders)**: multiplayer_init (DirectPlay / hotseat / PBEM setup, time
+  controls, HOTSEATADD), the PBEM tamper seeds, the gamma correction dialog, the Windows common file
+  dialog (WindowsFileBox), the scenario editor itself. The menu column's slide, its sound, the menu
+  music, the opening movie and the audio page's volume buttons and sliders: section 12.
 * **Testing**: tests/menu/run.sh: the main menu and its sub-menus (MENUSTATE, SCREENSTATE); a new
   game set up through every dialog compared with the --new game (`size=0 ocean=1 erosion=1 orbit=0
   clouds=1 natives=1 diff=3`, the Crossfire factions, human 3): turn_000 equal by
@@ -593,3 +592,94 @@ original does (smacx's main_menu only adds the seeding and the human player for 
   game's arialn.ttf, so the box is lower); the preferences 0.869 (and its check boxes reflect
   different preferences); the save FileBox in a game 0.847 (the original's base window behind it).
   The credits (animated) and the multiplayer setup (a placeholder) are not scored.
+
+## 12. Sound, music and movies (phase 10)
+
+The original plays its sounds through soundx.dll (DirectSound, and the ACM MP3 codec for the
+voices) and its movies through EA's player library (video module). smacx replaces both: the platform
+layer has an audio mixer (src/platform/sdl/audio_sdl.cpp: sample voices with gain, pan, pitch, loop
+and fade-out, and generator streams, on one SDL audio device; `--nosound` opens none,
+SDL_AUDIODRIVER chooses it, the tests use `dummy`) and true-colour frames
+(`video_present_rgb`). Nothing in the sound layer touches game state: its objects live in native
+side structures keyed by the original's addresses (the image's FX object 0x749CF8..0x74C5F0 and the
+other Wave objects are never written; the fcompare ignore list names them), it reads the real clock,
+never the logic clock or a game generator, and a call's choices that depend on a sound playing
+(wave_it, ambience_veh) only decide what is heard. The headless areas `sound` (FX, voices, Wave_*,
+ambience, release_sound, desktop_init), `movie` (amovie_project*), `boom` and `scoot` (veh_scoot)
+are replaced by smacx (src/ui/sound.cpp, music.cpp, movie.cpp).
+
+* **Sound effects** (src/ui/sound.cpp, from the disassembly): FX_init's table (the file, flags and
+  sound group of each slot; slot = offset / 0x6C: 0 psi attack, 1 energy1, 2/3 projectiles, 4 laser
+  (pitch 1100), 56..96 mind worms, planet buster, CPU turn complete / new data, psi blow, boom, the
+  units' engines by chassis and the weapons; the slots FX_init never loads, e.g. 6, 0x0F, 0x16, are
+  silent in the original too), the 45 CPU voices (0x74C5F0, loaded at each play), ok.wav,
+  amenu2.wav, scoot.wav, passover.wav, menu up / down.wav with their volumes and pitches. FX_play /
+  FX_play_loc (preference GamePreferences 0x400; slots 0..2 duck the music, the psi attack's pitch
+  rises by 100 cents while it plays; FX_play_loc ignores the location, as the original), FX_stop,
+  FX_fade, FX_engine_pitch, wave_it (one voice at a time: not while FacilityVoice or the last
+  voice plays), the popups' `#wave N` / `#vol V` (popup_wave_callback: 0x19 becomes 0x25 for a
+  secret project, 0x2B plays one time in three, 0x10 adds FX 0x38), ambience (ids < 200: the one
+  current ambient effect, faded when replaced; 200..0xD5: the music's events; preference 0x800),
+  ambience_veh (the selected unit's sound by plan, chassis, triad, weapon and native unit, alien
+  factions' variants), boom's sounds (the missile's launch, the explosion once per map window
+  showing the tile, then the shooter's weapon or the psi attack; the animation is not drawn),
+  veh_scoot's scoot.wav, the base window's fx\menu2.wav / ambience 0xCD and 0xCE / menu down.wav,
+  the design workshop's menu up.wav and ambience 0xD3 / 0xD4, ok_callback / passover_callback /
+  input_callback (every key and click goes to the music), release_sound.
+* **Groups and preferences**: sound group 0 (voices) and 1 (effects) with their volumes and
+  switches, the master volume. The audio page of PrefWin (prefwin.cpp) has the original's Main /
+  Voice / SFX / Music On|Off buttons (ids 0x55..0x58, labels 1080..1087,
+  PrefWin_change_volume_button_state: the master off clears 0x400 / 0x800 / More 0x4000 at once,
+  Music on loads the music) and the four 0..127 sliders (PrefWin_on_scrolling: master, group 0,
+  group 1, music; applied at once), Main / Voice / SFX / Music Volume written by PrefWin_destroy;
+  desktop_init applies the saved volumes (PrefWin_init's sliders).
+* **Voices** (mp3.cpp, mp3_tables.h): a minimal MPEG audio layer III decoder (MPEG-1/2/2.5, mono,
+  stereo and mid/side; no intensity stereo, which the game's files do not use). Its Huffman,
+  scale factor band and window tables were taken once from the system's libmp3lame / libmpg123
+  (standard data; the build has no dependency); its output equals Wine's mpg123 (ACM) within
+  +-2 LSB on the voice files. NewTechWin plays voices\techN.mp3 at the voices group's volume
+  (More 0x4000, faded after the window with More 0x20000), config_game the faction's
+  voices\NAME.mp3 while its leader is named, base_production (engine) voices\facN.mp3. The
+  original's datalinks play no voice (VOICEOVERDATA is a text popup).
+* **Music** (music.cpp): load_music's choice of the set and class by the faction's search key
+  (gaians, peace: gset1; hive, morgan: mset1; univ: uset2; spartans: sset1; believers: bset1 (the
+  Believers' key is "believers"); others: aset1), and the six music classes' methods (vtable
+  +0x12C..+0x164, 0x447340..0x448280) with their statics: which groups play on which event and
+  input, with which pitch, the default set's three phases (counted in user inputs). The groups
+  are played by soundx.dll's ambient engine, which is not reconstructed: music.cpp approximates it
+  with the .amb files' data (prgm programs, kmap key zones of fx\*.wav samples with their smpl
+  unity notes and sustain loops, glbl groups: type 4 loops a random track of its range, type 1
+  plays one and then its next group; the MIDI tracks' notes, programs, volume and pan) mixed as a
+  stream. The opening menu's music is fx\opening menu.wav (looped, faded on leaving).
+* **Movies** (wve.cpp, movie.cpp): the GOG data's movies are EA WVE files (SCHl / SCCl / pIQT /
+  SCDl / SCEl chunks): TQI video (MPEG-1 intra macroblocks, AAN-scaled dequantisation, EA's IDCT,
+  15 frames per second; tables of ISO 11172-2 taken from libavcodec once) and EA ADPCM stereo sound
+  at 22050 Hz, decoded natively. amovie_project (movlist.txt's #PROJECTS) and amovie_project_2
+  (movies\NAME.wve; the CD and .avi fallbacks find nothing in the GOG data) play them full window
+  with their sound while the other sounds are off; Enter, Esc, space or a click end them. The
+  engine calls them for the opening (openingx), the factions' planetfall movies, secret projects,
+  theyTranscend, defeat (losealien / loseman / losewoman) and victory (close_ct / close_us).
+  Unattended runs decode only SMACX_MOVIE_FRAMES frames (default none).
+* **Animations**: the menu column slides in and out (frames 0-5 / 6-11 of openitem.flc, 10 ms
+  each, not in unattended runs); the monuments' background is monument.flc's frame of the
+  number of monuments (MonuWin_init).
+* **Not reconstructed (placeholders)**: soundx.dll's ambient engine (approximated as above), its
+  DirectSound volume curve (linear here) and 3D positioning; AlphaMenu_show / hide's amenu2.wav (the
+  menu bar does not slide), the design workshop's button sounds (FX 0x2B etc., silent slots), the
+  combat animation itself, Popup_show's slide sound, the interlude windows (text, no movie in the
+  original), Console_show_movies (its SHOWMOVIES section is missing from the GOG scripts), the
+  8BitMovieSound option.
+* **Testing**: `SMACX_SOUNDLOG=1` logs every call ("sound: T<turn> FX_play 15") before the
+  preferences or the device are looked at, so logs are the same with or without a device. The
+  oracle's `logsound` command (harness/oracle/oracle.cpp) hooks the same functions in terranx.exe
+  (thunks keeping ECX for the thiscall ones) and logs "SOUND T<turn> name args". tests/sound/run.sh:
+  the 20-turn tiny20 observer game makes the original's 257 calls in order (orig_tiny20.log; the
+  original repeats an explosion for a second map window showing the tile, which `soundcmp.py
+  --one-window` counts once; snapshots must be written as the oracle does, as save_game reads the
+  logic clock); scripted human actions make the triggers the original's code makes (startup, unit
+  selection, base window, main menu); the audio page; an MP3 voice decoded and the mixer's output
+  not silent (SDL disk driver); 30 s of music rendered (MUSICRENDER); a movie's frames decoded
+  (MOVIE, SMACX_MOVIE_FRAMES; frame 100 a picture). tests/sound/compare.sh runs the oracle again
+  and compares (--update refreshes the reference). Human-input sounds cannot be logged in the
+  original under the oracle (it plays observer games only); their triggers come from the
+  disassembly.
