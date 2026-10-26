@@ -1143,9 +1143,9 @@ int32_t tile_intake_change(int32_t i, int32_t sign) {
 }  // namespace
 
 // 0x4E7E50 (no callers): adds the yields of radius tile i to the current base's intake.
-int32_t GAMEAPI base_unused_helper_1(int32_t i) { return tile_intake_change(i, 1); }
+int32_t GAMEAPI base_tile_intake_add(int32_t i) { return tile_intake_change(i, 1); }
 // 0x4E7F80 (no callers): removes the yields of radius tile i from the current base's intake.
-int32_t GAMEAPI base_unused_helper_2(int32_t i) { return tile_intake_change(i, -1); }
+int32_t GAMEAPI base_tile_intake_remove(int32_t i) { return tile_intake_change(i, -1); }
 
 // ---- base tiles and yields ----------------------------------------------------------------------
 

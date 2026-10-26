@@ -1,0 +1,23 @@
+# Target style of the reconstruction (docs/CLEANUP_PLAN.md, "Formatting"). Kept out of the root
+# (no .clang-format there) so format-on-save does not reformat whole files before the planned
+# one-time reformat. Format only the lines you change:
+#   git clang-format --style=file:src/tools/clang-format.yml
+BasedOnStyle: Google
+IndentWidth: 4
+ContinuationIndentWidth: 4
+ColumnLimit: 120
+AccessModifierOffset: -4
+IndentCaseLabels: false
+DerivePointerAlignment: false
+PointerAlignment: Left
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortLoopsOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Empty
+SpacesBeforeTrailingComments: 2
+IncludeBlocks: Preserve
+SortIncludes: CaseSensitive
+AlignConsecutiveMacros: Consecutive
+AlignTrailingComments: false
+ReflowComments: false

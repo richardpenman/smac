@@ -14,7 +14,7 @@ permissions:
 env:
   # The SDL2 UI (smacx) is not built here; only the engine, smacx_headless and the smoke test.
   CONFIGURE_FLAGS: -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=ON -DCMAKE_DISABLE_FIND_PACKAGE_SDL2_ttf=ON
-  TARGETS: smacx_headless smacx_smoke
+  TARGETS: smacx_headless smacx_smoke smacx_unit
 
 jobs:
   unix:
@@ -74,6 +74,6 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -A x64 -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=ON -DCMAKE_DISABLE_FIND_PACKAGE_SDL2_ttf=ON
       - name: Build
-        run: cmake --build build --config RelWithDebInfo --parallel 4 --target smacx_headless smacx_smoke
+        run: cmake --build build --config RelWithDebInfo --parallel 4 --target smacx_headless smacx_smoke smacx_unit
       - name: Smoke test
         run: ctest --test-dir build -C RelWithDebInfo --output-on-failure

@@ -104,13 +104,14 @@ cmake --build build/hybrid -j2                                         # oracle.
 The native build needs CMake 3.20+, Python 3 (it generates the original-function bindings) and a
 C++17 compiler with `<filesystem>`. Game data is only needed at run time: `smacx_headless` reads
 `game/` and `src/data/data_image.bin` (see "Getting started"). `smacx_smoke` (`ctest`) is a
-portability self-test that needs no game data.
+portability self-test that needs no game data; `smacx_unit` (`ctest`, doctest) holds the engine's
+unit tests. Cleanup work (docs/CLEANUP_PLAN.md) is gated by `src/tools/gate.sh`.
 
 **macOS** (Xcode command line tools, CMake from Homebrew or cmake.org; Apple Silicon or Intel):
 
 ```sh
 cmake -S . -B build/native -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build build/native -j8 --target smacx_headless smacx_smoke && ctest --test-dir build/native
+cmake --build build/native -j8 --target smacx_headless smacx_smoke smacx_unit && ctest --test-dir build/native
 ```
 
 **Windows**: MSYS2 with the CLANG64 (or UCRT64) environment is the supported toolchain:
@@ -118,7 +119,7 @@ cmake --build build/native -j8 --target smacx_headless smacx_smoke && ctest --te
 ```sh
 pacman -S mingw-w64-clang-x86_64-{clang,cmake,ninja,python}
 cmake -S . -B build/native -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_EXE_LINKER_FLAGS=-static
-cmake --build build/native --target smacx_headless smacx_smoke && ctest --test-dir build/native
+cmake --build build/native --target smacx_headless smacx_smoke smacx_unit && ctest --test-dir build/native
 ```
 
 Cross-compiling from Linux with the local llvm-mingw: `-DCMAKE_TOOLCHAIN_FILE=cmake/x86_64-mingw.cmake`

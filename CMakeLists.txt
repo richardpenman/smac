@@ -103,6 +103,12 @@ else()
   add_executable(smacx_smoke tests/smoke.cpp)
   target_link_libraries(smacx_smoke PRIVATE smacx_engine)
   add_test(NAME smoke COMMAND smacx_smoke WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+  # Unit tests (doctest, no game data needed): ctest, or run smacx_unit (doctest options, e.g. -s).
+  file(GLOB UNIT_SOURCES CONFIGURE_DEPENDS tests/unit/*.cpp)
+  add_executable(smacx_unit ${UNIT_SOURCES})
+  target_include_directories(smacx_unit PRIVATE third_party tests/unit)
+  target_link_libraries(smacx_unit PRIVATE smacx_engine)
+  add_test(NAME unit COMMAND smacx_unit WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
   # Native game with the SDL2 UI (src/ui, src/platform/sdl). Uses tools/sdl2 when present.
   find_package(SDL2 CONFIG QUIET HINTS ${CMAKE_SOURCE_DIR}/tools/sdl2/lib/cmake/SDL2)
   find_package(SDL2_ttf CONFIG QUIET HINTS ${CMAKE_SOURCE_DIR}/tools/sdl2/lib/cmake/SDL2_ttf)

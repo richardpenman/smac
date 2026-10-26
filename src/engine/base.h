@@ -114,8 +114,10 @@ ADDR(0x4E7310) int32_t GAMEAPI mine_yield(int32_t faction_id, int32_t base_id, i
 ADDR(0x4E7750) int32_t GAMEAPI energy_yield(int32_t faction_id, int32_t base_id, int32_t x, int32_t y, int32_t flag);
 // Yield of resource type (0 nutrients, 1 minerals, 2 energy) of a tile.
 ADDR(0x4E7DC0) int32_t GAMEAPI resource_yield(int32_t type, int32_t faction_id, int32_t base_id, int32_t x, int32_t y);
-ADDR(0x4E7E50) int32_t GAMEAPI base_unused_helper_1(int32_t a1);
-ADDR(0x4E7F80) int32_t GAMEAPI base_unused_helper_2(int32_t a1);
+// Adds / removes the yields of radius tile i (worked by the current base) to / from the base's
+// intake; returns the total yield (no callers in the original).
+ADDR(0x4E7E50) int32_t GAMEAPI base_tile_intake_add(int32_t i);
+ADDR(0x4E7F80) int32_t GAMEAPI base_tile_intake_remove(int32_t i);
 // Resource intake of the current base: worked tiles, specialists.
 ADDR(0x4E80B0) void GAMEAPI base_yield();
 // Unit support of the current base.
