@@ -22,6 +22,7 @@
 #include "engine/diplo_act.h"
 #include "engine/design.h"
 #include "ui/basewin_internal.h"
+#include "ui/scroll.h"
 #include "ui/win.h"
 #include "ui/console.h"
 #include "platform/ui_platform.h"
@@ -469,6 +470,10 @@ void THISCALL BaseWin_draw_commerce(uint8_t* self, int32_t flag) {
 
 // ==== BaseWin_draw_facilities (0x40FCC0): the facilities list ======================================
 
+ScrollBar g_fac_bar, g_sup_bar;
+bool g_fac_bar_shown = false, g_sup_bar_shown = false;
+int32_t g_fac_bar_page = 1;
+
 void THISCALL BaseWin_draw_facilities(uint8_t* self, int32_t flag) {
     Buffer* c = bwc();
     Font font;
@@ -506,7 +511,17 @@ void THISCALL BaseWin_draw_facilities(uint8_t* self, int32_t flag) {
     int32_t count = 0;
     for (int32_t i = 0; i < 0x86; i++)
         if (listed(i)) count++;
-    // (count >= rows: the original adds a scroll bar at the right edge; not reconstructed)
+    // count >= rows: a scroll bar (scroll_small) at the right edge, range 0 .. count - 1, at the
+    // first shown facility (BaseWin_draw_facilities: Scroll_init_2).
+    g_fac_bar_shown = count >= rows;
+    if (g_fac_bar_shown) {
+        g_fac_bar.r = {t.right - 0xC, t.top, t.right, t.bottom};
+        g_fac_bar.small = true;
+        g_fac_bar.min = 0;
+        g_fac_bar.max = count - 1;
+        g_fac_bar.pos = std::max(0, std::min(bwf(kBwB10), count - 1));
+        g_fac_bar_page = rows - 1;
+    }
     int32_t y = t.top, index = -1;
     for (int32_t k = 0; k < 0x86; k++) {
         int32_t fac = k == 0 ? 0x1A : (k == 0x1A ? 0 : k);
@@ -538,6 +553,7 @@ void THISCALL BaseWin_draw_facilities(uint8_t* self, int32_t flag) {
         spot_add(&g_bw.spots_win, fac, 2, t.left, y, t.right - t.left, lh);
         y += lh;
     }
+    if (g_fac_bar_shown) scroll_draw(c, g_fac_bar);
     Buffer_set_clip(c, &old);
     (void)flag;
     ui_invalidate();
@@ -1815,11 +1831,19 @@ void THISCALL BaseWin_draw_supported(uint8_t* self, int32_t flag) {
     int32_t x0;
     if (count > rows * cols) {
         x0 = (r.right - (count < cols ? count : cols) * cw - r.left - 0xC) / 2;
-        // (a scroll bar at the right edge: not reconstructed)
+        // A scroll bar (scroll_small) at the right edge, range 0 .. rows - 1 (BaseWin_draw_supported:
+        // Scroll_init_2 on the main interface).
         bwf(0x40B20) = 1;
+        g_sup_bar_shown = true;
+        g_sup_bar.r = {r.right - 0xF, r.top, r.right, r.bottom};
+        g_sup_bar.small = true;
+        g_sup_bar.min = 0;
+        g_sup_bar.max = (count + cols - 1) / cols - 1;
+        g_sup_bar.pos = std::max(0, std::min(bwf(kBwB14), g_sup_bar.max));
     } else {
         x0 = (r.right - (count < cols ? count : cols) * cw - r.left) / 2;
         bwf(0x40B20) = 0;
+        g_sup_bar_shown = false;
     }
     x0 += r.left;
     int32_t y = r.top + (r.bottom - rows * ch - r.top) / 2;
@@ -1848,6 +1872,7 @@ void THISCALL BaseWin_draw_supported(uint8_t* self, int32_t flag) {
     }
     BlitDestScale = 1;
     BlitSourceScale = 1;
+    if (bwf(0x40B20) && g_sup_bar_shown) scroll_draw(c, g_sup_bar);
     Buffer_set_clip(c, &old);
     (void)flag;
     ui_invalidate();

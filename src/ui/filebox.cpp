@@ -37,6 +37,7 @@
 #include "ui/basewin_internal.h"
 #include "ui/popup.h"
 #include "ui/screenwin.h"
+#include "ui/scroll.h"
 #include "ui/win.h"
 
 namespace fs = std::filesystem;
@@ -198,6 +199,11 @@ struct FileBoxWin : ScreenWin {
             sw_font(&canvas, list_font, s ? mem_i32(0x8C6C8C) : mem_i32(0x8C6B5C));
             sw_text(this, &canvas, entries[i].name, list_r.left + 0x1D, y + 1);
         }
+        // The list's scroll bar (scroll_normal) when the entries exceed the rows.
+        if ((int32_t)entries.size() > n) {
+            UiRect lr = list_r;
+            scroll_draw(&canvas, scroll_for_list(&lr, false, top, (int32_t)entries.size(), n));
+        }
         Buffer_set_clip(&canvas, &all);
         // The edit field.
         Buffer_box_2(&canvas, &edit_r, mem_i32(0x8C6B7C), mem_i32(0x8C6B7C));
@@ -320,9 +326,16 @@ struct FileBoxWin : ScreenWin {
     }
     void on_click(int32_t parent, int32_t index, int32_t, int32_t x, int32_t y, bool right, bool dbl) override {
         if (parent != 0 || right || index != 0) return;
+        if ((int32_t)entries.size() > rows()) {
+            UiRect lr = list_r;
+            ScrollBar sb = scroll_for_list(&lr, false, top, (int32_t)entries.size(), rows());
+            if (x >= sb.r.left) {
+                top = std::max(0, std::min(top + scroll_click(sb, x, y, rows()), sb.max));
+                return;
+            }
+        }
         int32_t i = top + (y - list_r.top - 3) / row_h;
         if (i < 0 || i >= (int32_t)entries.size()) return;
-        (void)x;
         select(i);
         if (dbl) ok();
     }

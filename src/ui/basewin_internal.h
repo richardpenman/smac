@@ -123,3 +123,10 @@ void prodwin_rebuild();
 void prodwin_hide();
 bool prodwin_shown();
 void prodwin_compose(Buffer* screen);
+
+// The scroll bars of the facilities pane (window) and of the units supported pane (main
+// interface): basewin_draw.cpp, clicked in basewin.cpp.
+#include "ui/scroll.h"
+extern ScrollBar g_fac_bar, g_sup_bar;
+extern bool g_fac_bar_shown, g_sup_bar_shown;
+extern int32_t g_fac_bar_page;

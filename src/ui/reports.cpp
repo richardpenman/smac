@@ -38,6 +38,7 @@
 #include "engine/diplo_act.h"
 #include "engine/diplomacy.h"
 #include "engine/globals.h"
+#include "engine/parse.h"
 #include "engine/probe.h"
 #include "engine/rules.h"
 #include "engine/score.h"
@@ -61,6 +62,7 @@
 #include "ui/popup.h"
 #include "ui/reports.h"
 #include "ui/screenwin.h"
+#include "ui/scroll.h"
 #include "ui/sprites.h"
 #include "ui/techwin.h"
 #include "ui/vehdraw.h"
@@ -79,6 +81,8 @@ bool g_ops_ids_ready = false;
 int32_t g_ops_view = 0;        // ReportWin + 0x1F230 (0x8B3..0x8B5): production, citizens, garrison
 int32_t g_sec_filter = 4;      // DAT_008A417C: land, naval, air, non-combat, all
 int32_t g_intel_target = 0;    // DAT_008A4164
+int32_t g_energy_subject = -1; // ReportWin + 0x59AC (DAT_0087BE24): the energy budget's base / facility
+int32_t g_energy_base = 0;     // ReportWin + 0x59B0: 1 a base, 0 a facility
 
 struct ReportScreen : ScreenWin {
     int32_t faction = 0;         // ReportIf + 0x1E228 (DAT_008A4160)
@@ -101,6 +105,24 @@ struct ReportScreen : ScreenWin {
     };
     std::vector<Row> labs_list;  // the left pane's list (ListBox items)
     int32_t labs_top = 0;
+    int32_t energy_top = 0, energy_itop[2] = {0, 0};
+    int32_t list_keep[8] = {-2, -2, -2, -2, -2, -2, -2, -2};  // the selection last kept in view
+    ScrollBar list_bars[8];
+    int32_t* list_top(int32_t type) {
+        switch (type) {
+        case 4: return &labs_top;
+        case 5: return &energy_top;
+        case 6: return &energy_itop[0];
+        case 7: return &energy_itop[1];
+        default: return nullptr;
+        }
+    }
+    int32_t line_h12() const {
+        Font* f = find_font(12, 0);  // ReportWin + 0xE268 / ReportIf + 0x1C
+        return f->field_0 < 0 ? f->height : f->ascent_above + f->field_0;
+    }
+    void list_draw(Buffer* m, int32_t parent, const UiRect& lr, const std::vector<Row>& rows, int32_t sel_id,
+                   int32_t sel_pos, int32_t& top, int32_t type, const char* tag, int32_t (*color3)(int32_t id));
     std::vector<std::string> state;  // what log_state prints
 
     void redraw() override;
@@ -496,33 +518,10 @@ void ReportScreen::iface_labs() {
             key[best] = 0;
         }
     }
-    int32_t row = lh + 2, rows = std::max(1, (lr.bottom - lr.top) / row);
-    int32_t sel = -1;
-    for (size_t i = 0; i < labs_list.size(); i++)
-        if (labs_tab && labs_list[i].id == labs_tree_tech()) sel = (int32_t)i;
-    if (sel >= 0 && (sel < labs_top || sel >= labs_top + rows)) labs_top = std::max(0, sel - rows / 2);
-    labs_top = std::max(0, std::min(labs_top, std::max(0, (int32_t)labs_list.size() - rows)));
-    Buffer_set_clip(m, &lr);
-    for (int32_t k = 0; k < rows && labs_top + k < (int32_t)labs_list.size(); k++) {
-        int32_t i = labs_top + k, ry = lr.top + k * row;
-        const std::string& t = labs_list[i].text;
-        size_t bar = t.find('|');
-        std::string l = t.substr(0, bar), rt = bar == std::string::npos ? "" : t.substr(bar + 1);
-        if (i == sel) {
-            UiRect hl{lr.left, ry, lr.right, ry + row};
-            Buffer_box_sprite(m, &hl, box_def(2));
-        }
-        Buffer_set_font(m, f12, f12, f12, nullptr);
-        Buffer_set_text_color(m, i == sel ? 0xF2 : 0x99, -1, 1, 1);
-        Buffer_set_text_color2(m, 0x99, -1, 1, 1);
-        Buffer_set_text_color3(m, labs_tab ? mandate_color(tech_category(labs_list[i].id)) : 0x99, -1, 1, 1);
-        sw_text(this, m, l, lr.left + 2, ry + 1);
-        UiRect rr{lr.left, ry + 1, lr.right - 2, ry + 1 + lh};
-        sw_text_right(this, m, rt, rr);
-        spot_add(&spots[1], labs_list[i].id, 4, lr.left, ry, lr.right - lr.left, row);
-        state.push_back("labs list " + num(labs_list[i].id) + " " + t);
-    }
-    Buffer_set_clip(m, &all);
+    std::vector<Row> rows;
+    for (const Row& r0 : labs_list) rows.push_back(r0);
+    list_draw(m, 1, lr, rows, labs_tab ? labs_tree_tech() : -1, -1, labs_top, 4, "labs list",
+              labs_tab ? +[](int32_t id) { return mandate_color(tech_category(id)); } : nullptr);
     // The centre pane: the title and the summary.
     UiRect c = mi_rect(kMiPaneCenter);
     bool wide = ScreenWidth != 800;  // ReportIf + 0x1E230
@@ -618,70 +617,305 @@ void ReportScreen::iface_labs() {
 
 // ---- energy ----
 
+// ReportWin_draw_energy: the summary (left column) and the budget of a base or of a facility in
+// every base (right column, a list: a facility shows its bases, a base its facilities).
 void ReportScreen::draw_energy() {
     Buffer* c = &canvas;
-    title("[" + up(adj(faction)) + " " + up(sw_label(0xA98)) + "]");
-    UiRect in = inner(), tr = title_rect();
-    int32_t y = tr.bottom + 6, lh = line_h() + 2;
-    rows_shown = (in.bottom - y - 6) / lh;
-    std::vector<int32_t> list;
-    for (int32_t i = 0; i < BaseCount; i++)
-        if (Bases[i].faction_id == faction) list.push_back(i);
-    rows_total = (int32_t)list.size();
-    int32_t c1 = in.left + 0xC8, c2 = in.left + 0x140, c3 = in.left + 0x1B8, c4 = in.right - 12;
-    sw_font(c, f_bold, 0x99);
-    sw_text(this, c, up(sw_label(0x2F8)), in.left + 12, y);
-    sw_text_right(this, c, up(sw_label(0x5B8)), {c1 - 60, y, c1, y + lh});
-    sw_text_right(this, c, up(sw_label(0x4F8)), {c2 - 60, y, c2, y + lh});
-    sw_text_right(this, c, up(sw_label(0xF0)), {c3 - 60, y, c3, y + lh});
-    sw_text_right(this, c, up(sw_label(0xF08)), {c4 - 150, y, c4, y + lh});
-    y += lh + 2;
-    for (int32_t r = 0; r < rows_total; r++) {
-        int32_t id = list[r];
-        set_base(id);
-        base_compute(0);
-        const BASE& b = Bases[id];
-        int32_t maint = 0;
-        for (int32_t fac = 1; fac < 0x46; fac++)
-            if (b.facilities_built[fac >> 3] & (1 << (fac & 7))) maint += Facility[fac].maint;
-        std::string l = "energy " + std::string(b.name) + " " + num(b.economy_total) + " " + num(b.psych_total) + " " +
-                        num(b.labs_total) + " " + num(maint);
-        state.push_back(l);
-        if (r < scroll || r >= scroll + rows_shown - 1) continue;
-        sw_font(c, f_text, 0xE1);
-        sw_text(this, c, b.name, in.left + 12, y);
-        sw_text_right(this, c, num(b.economy_total), {c1 - 60, y, c1, y + lh});
-        sw_text_right(this, c, num(b.psych_total), {c2 - 60, y, c2, y + lh});
-        sw_text_right(this, c, num(b.labs_total), {c3 - 60, y, c3, y + lh});
-        sw_text_right(this, c, num(maint), {c4 - 150, y, c4, y + lh});
-        y += lh;
+    Font* f12 = find_font(12, 0);
+    Font* f14 = find_font(14, 0);
+    int32_t lh = line_h12();
+    UiRect in = inner();
+    int32_t mid = (in.left + in.right) / 2;
+    int32_t t_bottom = lh + 9 + in.top;          // local_48
+    int32_t h_bottom = lh + 9 + t_bottom;        // local_58
+    UiRect title_r{in.left + 3, in.top + 3, in.right - 3, t_bottom};
+    UiRect lhead{in.left + 3, t_bottom + 2, mid - 1, h_bottom};
+    UiRect rhead{mid + 2, t_bottom + 2, in.right - 3, h_bottom};
+    UiRect lbody{in.left + 3, h_bottom + 2, mid - 1, in.bottom - 3};
+    UiRect rbody{mid + 2, h_bottom + 2, in.right - 3, in.bottom - 3};
+    Buffer_box_sprite(c, &in, box_def(3));
+    Buffer_box_sprite(c, &title_r, box_def(2));
+    Buffer_box_sprite(c, &lhead, box_def(2));
+    Buffer_box_sprite(c, &rhead, box_def(2));
+    Buffer_box_sprite(c, &lbody, box_def(0));
+    Buffer_box_sprite(c, &rbody, box_def(0));
+    Buffer_set_font(c, f12, f12, f14, nullptr);
+    Buffer_set_text_color(c, 0x99, -1, 1, 1);
+    Buffer_set_text_color2(c, 0xF2, -1, 1, 1);
+    Buffer_set_text_color3(c, 0xE1, -1, 1, 1);
+    const MFaction& mf = MFactions[faction];
+    const Faction& f = Factions[faction];
+    energy_compute(faction, 0);
+    auto cent = [&](const std::string& t, UiRect r) {
+        r.top--;
+        r.bottom--;
+        Buffer_write_cent_l_7(c, t.c_str(), &r, (int32_t)t.size());
+        texts.push_back(t);
+    };
+    GenderDefault = mf.noun_gender;
+    PluralDefault = mf.is_noun_plural;
+    cent("[" + up(mf.formal_name_faction) + " " + label_get(0xA98 / 4) + "]", title_r);
+    cent("[" + std::string(label_get(0xB9C / 4)) + "]", lhead);
+    int32_t x = lbody.left + 6, y = lbody.top + 6, w = (lbody.right - lbody.left) - 12;
+    auto left = [&](const std::string& t) {
+        Buffer_write_l_3(c, t.c_str(), x, y, (int32_t)t.size());
+        texts.push_back(t);
+    };
+    auto right = [&](const std::string& t) {  // Buffer_write_right_l_4
+        int32_t tw = Buffer_text_width_2(c, t.c_str(), (int32_t)t.size());
+        Buffer_write_multi_font_raw_l(c, t.c_str(), x + (w - tw), y, (int32_t)t.size());
+        texts.push_back(t);
+    };
+    left("{" + std::string(label_get(0xE4 / 4)) + ": ");
+    right("{" + num(f.energy_credits) + "}");
+    y += lh * 2;
+    left("{" + std::string(label_get(0x5F4 / 4)) + ": ");
+    right("{" + num(FactionCurrentGrossIncome) + "}");
+    y += lh;
+    left("{" + std::string(label_get(0x5F8 / 4)) + ": ");
+    right("{-" + num(FactionCurrentTotalMaint) + "}");
+    y += lh;
+    left("{" + std::string(label_get(0x5FC / 4)) + ": ");
+    right("{" + std::string(FactionCurrentTotalLoan > 0 ? "+" : "") + num(FactionCurrentTotalLoan) + "}");
+    state.push_back("energy summary " + num(f.energy_credits) + " income " + num(FactionCurrentGrossIncome) +
+                    " maint " + num(FactionCurrentTotalMaint) + " loan " + num(FactionCurrentTotalLoan) + " net " +
+                    num(FactionCurrentNetIncome));
+    if (f.sanction_turns) {
+        y += lh * 2;
+        left(up("{" + std::string(label_get((mf.rule_flags & 0x80 ? 0x1194 : 0x708) / 4)) + ": }"));
+        right("{" + num(f.sanction_turns) + " " + label_get(0x71C / 4) + "}");
     }
+    bool gap = false;
+    auto flying = [&]() {
+        Buffer_wrap_flying(c, StrBuffer, x, y, w);
+        Buffer_wrap_flying_flush(c);
+        texts.push_back(StrBuffer);
+    };
+    if (mf.rule_flags & 0x4000) {  // FACTENERGY: the faction's interest rule
+        gap = true;
+        y += lh;
+        int32_t v = mf.rule_interest;
+        parse_num(0, v);
+        std::string l = std::string("FACTENERGY") + (v < 0 ? "PEN" : (v == 0 ? "BON2" : "BON"));
+        parse_it(ScriptFileName, l.c_str());
+        flying();
+        y += lh * 2;
+    }
+    // The loans with the other factions (LOANPAYMENT / LOANINCOME), "*" for a vendetta or
+    // sanctions.
+    for (int32_t i = 1; i < 8; i++) {
+        uint32_t st = FactionStatus[1];
+        if (i == faction || !(st & (1u << i)) || !(st & (1u << faction))) continue;
+        const Faction& o = Factions[i];
+        if (!f.loan_balance[i] && !o.loan_balance[faction]) continue;
+        if (!gap) {
+            gap = true;
+            y += 10;
+        }
+        y += lh * 2;
+        StrBuffer[0] = 0;
+        std::string pre;
+        if (f.diplo_status[i] & 0x10) pre = "*" + std::string(label_get(0x604 / 4)) + " ";
+        else if ((f.loan_balance[i] && o.sanction_turns) || (o.loan_balance[faction] && f.sanction_turns))
+            pre = "*" + std::string(label_get(0x708 / 4)) + " ";
+        const MFaction& m = MFactions[i];
+        parse_says(3, pre.c_str(), -1, -1);
+        GenderDefault = m.is_leader_female;
+        PluralDefault = 0;
+        parse_says(0, m.title_leader, -1, -1);
+        GenderDefault = m.is_leader_female;
+        PluralDefault = 0;
+        parse_says(1, m.name_leader, -1, -1);
+        GenderDefault = m.noun_gender;
+        PluralDefault = m.is_noun_plural;
+        parse_says(2, m.noun_faction, -1, -1);
+        parse_num(1, f.loan_balance[i] ? f.loan_balance[i] : o.loan_balance[faction]);
+        parse_num(0, f.loan_balance[i] ? f.loan_payment[i] : o.loan_payment[faction]);
+        parse_it(ScriptFileName, f.loan_balance[i] ? "LOANPAYMENT" : "LOANINCOME");
+        flying();
+    }
+    y += lh * 2;
+    left("{" + std::string(label_get(0xEFC / 4)) + ": ");
+    right("{" + std::string(FactionCurrentNetIncome > 0 ? "+" : "") + num(FactionCurrentNetIncome) + label_get(0x5EC / 4) +
+          "}");
+    // The right column's subject: the first base when none.
+    if (g_energy_subject == -1) {
+        g_energy_base = 0;
+        for (int32_t i = 0; i < BaseCount; i++)
+            if (Bases[i].faction_id == faction) {
+                g_energy_base = 1;
+                g_energy_subject = i;
+                break;
+            }
+    }
+    if (g_energy_subject == -1) return;
+    std::vector<Row> rows;
+    bool half = SecretProjects[25] >= 0 && Bases[SecretProjects[25]].faction_id == faction;
+    int32_t total = 0;
+    auto cost = [&](int32_t m) {
+        total += m;
+        if (!half) return num(m);
+        return num(m / 2) + ((m & 1) ? ".5" : "");
+    };
+    if (!g_energy_base) {
+        int32_t fac = g_energy_subject;
+        StrBuffer[0] = 0;
+        std::strcat(StrBuffer, Facility[fac].name);  // say_facility(.., 0)
+        cent(up("[" + up(StrBuffer) + " " + label_get(0x160 / 4) + "]"), rhead);
+        for (int32_t b = 0; b < BaseCount; b++) {
+            if (Bases[b].faction_id != faction || fac >= 0x41) continue;
+            if (!(Bases[b].facilities_built[fac >> 3] & (1 << (fac & 7)))) continue;
+            StrBuffer[0] = 0;
+            say_base(StrBuffer, b);
+            std::string t = std::string(StrBuffer) + "|{" + cost(fac_maint(fac, faction)) + "}";
+            rows.push_back({t, b + 0x400});
+        }
+    } else {
+        int32_t b = g_energy_subject;
+        StrBuffer[0] = 0;
+        say_base(StrBuffer, b);
+        cent("[" + up(StrBuffer) + " " + label_get(0xA98 / 4) + "]", rhead);
+        for (int32_t fac = 0; fac < 0x41; fac++) {
+            if (Bases[b].faction_id != faction) break;
+            if (!(Bases[b].facilities_built[fac >> 3] & (1 << (fac & 7)))) continue;
+            StrBuffer[0] = 0;
+            std::strcat(StrBuffer, Facility[fac].name);  // say_facility(.., 0)
+            std::string t = std::string(StrBuffer) + "|{" + cost(fac_maint(fac, faction)) + "}";
+            rows.push_back({t, fac});
+        }
+    }
+    rows.push_back({" | ", 99999998});
+    std::string tt = "{" + std::string(label_get(0xA9C / 4)) + ": |";
+    tt += half ? num(total / 2) + ((total & 1) ? ".5" : "") : num(total);
+    rows.push_back({tt + "}", 99999999});
+    UiRect lr{rbody.left + 3, rbody.top + 3, rbody.right - 3, rbody.bottom - 3};
+    list_draw(c, 0, lr, rows, 99999999, -1, energy_top, 5, "energy budget", nullptr);
 }
 
+// ReportIf_draw_energy: BASE EXPENDITURES (left pane: each base's energy, maintenance and net),
+// the title and the reserves (centre), MAINTENANCE COSTS (right pane: each facility's count and
+// cost).
 void ReportScreen::iface_energy() {
     Buffer* m = &mi;
-    Faction& f = Factions[faction];
+    const Faction& f = Factions[faction];
     energy_compute(faction, 0);
-    UiRect p = mi_rect(kMiPaneQueue);
-    UiRect r{p.left + 6, p.top + 6, p.right - 6, p.bottom - 6};
-    Buffer_box_sprite(m, &r, box_def(3));
-    int32_t y = r.top + 6, lh = f_small->height + 2;
-    int32_t loans = 0;
-    for (int32_t i = 0; i < 8; i++) loans += f.loan_payment[i];
-    auto line = [&](uint32_t label, const std::string& v) {
-        sw_font(m, f_small, 0x99);
-        sw_text(this, m, up(sw_label(label)) + ": " + v, r.left + 6, y);
-        y += lh;
+    Font* f10 = find_font(10, 0);
+    Font* f12 = find_font(12, 0);
+    int32_t lh = line_h12();
+    bool half = SecretProjects[25] >= 0 && Bases[SecretProjects[25]].faction_id == faction;
+    auto pane = [&](const UiRect& p, const std::string& head, std::vector<Row>& rows, int32_t sel_id, int32_t sel_pos,
+                    int32_t& top, int32_t type, const char* tag) {
+        int32_t x = p.left + 6, y = p.top + 6, w = (p.right - p.left) - 12, h = (p.bottom - p.top) - 12;
+        Buffer_set_font(m, find_font(14, 0), find_font(14, 2), find_font(14, 1), nullptr);
+        UiRect r{x, y, x + w, y + lh + 6};
+        Buffer_box_sprite(m, &r, box_def(0));
+        Buffer_set_text_color3(m, 0xE1, -1, 1, 1);
+        Buffer_write_cent_l_5(m, head.c_str(), x, y + 4, w, (int32_t)head.size());
+        texts.push_back(head);
+        r = {x, r.bottom + 2, x + w, y + h};
+        Buffer_box_sprite(m, &r, box_def(0));
+        UiRect lr{r.left + 3, r.top + 3, r.right - 3, r.bottom - 3};
+        list_draw(m, 1, lr, rows, sel_id, sel_pos, top, type, tag, nullptr);
     };
-    line(0xE4, num(f.energy_credits));
-    line(0xF08, num(f.facility_maint_total));
-    line(0x5FC, num(loans));
-    line(0xEFC, num(FactionCurrentNetIncome) + sw_label(0x5EC));
-    std::string alloc = num((10 - f.SE_alloc_psych - f.SE_alloc_labs) * 10) + "/" + num(f.SE_alloc_psych * 10) + "/" +
-                        num(f.SE_alloc_labs * 10);
-    line(0xAC8, alloc);
+    std::vector<Row> bases;
+    for (int32_t i = 0; i < BaseCount; i++) {
+        const BASE& b = Bases[i];
+        if (b.faction_id != faction) continue;
+        StrBuffer[0] = 0;
+        say_base(StrBuffer, i);
+        int32_t mt = EnergyBaseMaint[i];
+        std::string t = std::string(StrBuffer) + "|+" + num(b.economy_total) + "/-" + num(mt) + " = " +
+                        (mt <= b.economy_total ? "+" : "") + num(b.economy_total - mt) + label_get(0x5EC / 4);
+        bases.push_back({t, i + 0x400});
+    }
+    // The selection: with a base shown the list's first row (the original compares the base id
+    // with 0x3FF), else none.
+    int32_t bsel = -1, bpos = -1;
+    if (g_energy_base) {
+        if (g_energy_subject > 0x3FF) bsel = g_energy_subject;
+        else bpos = 0;
+    }
+    pane(mi_rect(kMiPaneQueue), "[" + std::string(label_get(0x2F8 / 4)) + " " + label_get(0xB98 / 4) + "]", bases, bsel,
+         bpos, energy_itop[0], 6, "energy bases");
+    // The centre pane.
+    UiRect c = mi_rect(kMiPaneCenter);
+    bool wide = ScreenWidth != 800;
+    int32_t cx = c.left + (wide ? 0x4C : 0), cw = (c.right - (wide ? 0x4C : 0)) - c.left, cy = c.top;
+    Buffer_set_font(m, find_font(14, 0), find_font(14, 2), find_font(14, 1), nullptr);
+    Buffer_set_text_color(m, 0xE1, -1, 1, 1);
+    std::string t = up(MFactions[faction].adj_name_faction) + " " + label_get(0xAC8 / 4);
+    if (wide) t += std::string(", ") + " " + label_get(0xB68 / 4) + " " + num(game_year(CurrentTurn));
+    Buffer_write_cent_l_5(m, t.c_str(), cx, cy + 10, cw, (int32_t)t.size());
+    texts.push_back(t);
+    Buffer_set_font(m, f10, f10, f10, nullptr);
+    Buffer_set_text_color(m, 0x99, -1, 1, 1);
+    cy += lh * 2;
+    std::string r = std::string(label_get(0xE4 / 4)) + ": " + num(f.energy_credits);
+    Buffer_write_cent_l_5(m, r.c_str(), cx, cy, cw, (int32_t)r.size());
+    texts.push_back(r);
+    (void)f12;
+    std::vector<Row> facs;
+    for (int32_t i = 0; i < 70; i++) {
+        int32_t n = EnergyFacilityCount[i];
+        if (!n) continue;
+        int32_t mt = fac_maint(i, faction) * n;
+        std::string s = num(n) + " " + Facility[i].name + "|-" + (half ? num(mt / 2) + ((mt & 1) ? ".5" : "") : num(mt)) +
+                        label_get(0x5EC / 4);
+        facs.push_back({s, i});
+    }
+    pane(mi_rect(kMiPaneRight), "[" + std::string(label_get(0xF08 / 4)) + "]", facs, g_energy_base ? -1 : g_energy_subject,
+         -1, energy_itop[1], 7, "energy facilities");
     state.push_back("energy reserves " + num(f.energy_credits) + " maintenance " + num(f.facility_maint_total) +
-                    " net " + num(FactionCurrentNetIncome) + " alloc " + alloc);
+                    " net " + num(FactionCurrentNetIncome) + " subject " + num(g_energy_subject) + " base " +
+                    num(g_energy_base));
+}
+
+// ListBox (Dialog_init_3 in a rectangle, ListBox_item "left|right", font 12, colour 0x99, the
+// selected item in 0xF2; rows of the line height + 3): rows from `top`, the selection (by id or
+// position) kept in view; each row a spot (type) of parent's spots.
+void ReportScreen::list_draw(Buffer* m, int32_t parent, const UiRect& lr, const std::vector<Row>& rows, int32_t sel_id,
+                             int32_t sel_pos, int32_t& top, int32_t type, const char* tag,
+                             int32_t (*color3)(int32_t id)) {
+    Font* f12 = find_font(12, 0);
+    int32_t lh = line_h12(), row = lh + 3, n = std::max(1, (lr.bottom - lr.top) / row);
+    int32_t sel = sel_pos;
+    for (size_t i = 0; i < rows.size(); i++)
+        if (sel_id >= 0 && rows[i].id == sel_id) sel = (int32_t)i;
+    if (sel >= 0 && (sel < top || sel >= top + n) && sel != list_keep[type & 7]) top = sel < top ? sel : sel - n + 1;
+    list_keep[type & 7] = sel;
+    top = std::max(0, std::min(top, std::max(0, (int32_t)rows.size() - n)));
+    UiRect all{0, 0, m->width, m->height};
+    UiRect lr2 = lr;
+    if ((int32_t)rows.size() > n) {
+        // The list's scroll bar (scroll_small in the main interface, scroll_normal in the window):
+        // its buttons and the track above / below the thumb are spots of type + 100.
+        ScrollBar sb = scroll_for_list(&lr2, parent == 1, top, (int32_t)rows.size(), n);
+        scroll_draw(m, sb);
+        int32_t w = sb.r.right - sb.r.left;
+        spot_add(&spots[parent], -1, type + 100, sb.r.left, sb.r.top, w, w);
+        spot_add(&spots[parent], 1, type + 100, sb.r.left, sb.r.bottom - w, w, w);
+        spot_add(&spots[parent], -n, type + 100, sb.r.left, sb.r.top + w, w, (sb.r.bottom - sb.r.top) - 2 * w);
+        list_bars[type & 7] = sb;
+    }
+    const UiRect& lr_ = lr2;
+    Buffer_set_clip(m, &lr_);
+    for (int32_t k = 0; k < n && top + k < (int32_t)rows.size(); k++) {
+        int32_t i = top + k, ry = lr_.top + k * row;
+        const std::string& t = rows[i].text;
+        size_t bar = t.find('|');
+        std::string l = t.substr(0, bar), rt = bar == std::string::npos ? "" : t.substr(bar + 1);
+        int32_t col = i == sel ? 0xF2 : 0x99;
+        Buffer_set_font(m, f12, f12, f12, nullptr);
+        Buffer_set_text_color(m, col, -1, 1, 1);
+        Buffer_set_text_color2(m, col, -1, 1, 1);
+        Buffer_set_text_color3(m, color3 ? color3(rows[i].id) : col, -1, 1, 1);
+        sw_text(this, m, l, lr_.left + 2, ry + 1);
+        int32_t tw = Buffer_text_width_2(m, rt.c_str(), (int32_t)rt.size());
+        if (!rt.empty()) Buffer_write_multi_font_raw_l(m, rt.c_str(), lr_.right - 2 - tw, ry + 1, (int32_t)rt.size());
+        spot_add(&spots[parent], rows[i].id, type, lr_.left, ry, lr_.right - lr_.left, row);
+        state.push_back(std::string(tag) + " " + num(rows[i].id) + (i == sel ? " * " : " ") + t);
+    }
+    Buffer_set_clip(m, &all);
 }
 
 // ---- secret projects ----
@@ -999,7 +1233,7 @@ void ReportScreen::redraw() {
         std::string h = up(adj(faction)) + " " + up(sw_label(names[k])) + ",  " + sw_label(0xB68) + " " +
                         num(game_year(CurrentTurn));
         sw_font(&mi, f_bold, 0xE1);
-        if (k != kLabs) sw_text_cent(this, &mi, h, {cp.left, cp.top + 4, cp.right, cp.top + 4 + f_bold->height});
+        if (k != kLabs && k != kEnergy) sw_text_cent(this, &mi, h, {cp.left, cp.top + 4, cp.right, cp.top + 4 + f_bold->height});
         if (k == kOps) {
             sw_font(&mi, f_small, 0xF2);
             sw_text_cent(this, &mi, up(sw_label(0xE4)) + ": " + num(Factions[faction].energy_credits),
@@ -1046,6 +1280,7 @@ void ReportScreen::log_state() {
 void switch_report(int32_t k) {
     kind() = k;
     g_rs.scroll = 0;
+    g_energy_subject = -1;  // (ReportWin_on_redraw)
 }
 
 void ReportScreen::on_button(int32_t id) {
@@ -1113,9 +1348,27 @@ void ReportScreen::on_key(int32_t key) {
     scroll = std::max(0, std::min(scroll, last));
 }
 
-void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t, int32_t, bool, bool dbl) {
+void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool, bool dbl) {
+    if (type >= 100) {  // a list's scroll bar: a line (the buttons) or a page (the track)
+        int32_t* t = list_top(type - 100);
+        if (t) {
+            int32_t d = index;
+            if (d < -1 || d > 1) {
+                const ScrollBar& sb = list_bars[(type - 100) & 7];
+                d = scroll_click(sb, x, y, -d);
+            }
+            *t = std::max(0, *t + d);
+        }
+        return;
+    }
     if (parent == 1) {
         // ReportIf_on_iface_selected (labs): a technology moves the tree, a base opens.
+        if (kind() == kEnergy && (type == 6 || type == 7) && index >= 0) {
+            // ReportIf_on_iface_selected (energy): a base or a facility in the right column.
+            g_energy_subject = index > 0x3FF ? index - 0x400 : index;
+            g_energy_base = index > 0x3FF;
+            return;
+        }
         if (kind() == kLabs && type == 4 && index >= 0) {
             if (index < 0x400) labs_tree_tech() = index;
             else BaseWin_zoom(&BaseWin, index - 0x400, 0);
@@ -1133,6 +1386,17 @@ void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t
             // A click outside the rows: the selection and the order are reset.
             std::memset(selected, 0, sizeof(selected));
             ops_reset_order();
+        }
+        return;
+    }
+    if (kind() == kEnergy && type == 5) {
+        // ReportWin_on_selected: a facility of the base, or a base with the facility.
+        if (index < 0x400) {
+            g_energy_subject = index;
+            g_energy_base = 0;
+        } else if (index <= 0x5F5E0FD) {
+            g_energy_subject = index - 0x400;
+            g_energy_base = 1;
         }
         return;
     }
@@ -1274,6 +1538,8 @@ void open_reports(int32_t k) {
     s->labs_iface.push_back(sw_button(s, sw_label(0x5D8).c_str(), 0x93, gx + gw / 2 + 1, q.top + 9, gw / 2, 0x14, 1, s->f_bold));
     s->labs_tab = 1;
     s->labs_top = 0;
+    g_energy_subject = -1;
+    s->energy_top = s->energy_itop[0] = s->energy_itop[1] = 0;
     {
         int32_t r = Factions[s->faction].tech_research_id;
         bool blind = !(GameState & 0x80) && (GameRules & 0x200);

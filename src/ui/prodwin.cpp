@@ -17,9 +17,10 @@
 // (FUN_00493EA0)), the buttons (FUN_004945D0: the mode returned to BaseWin_production) and the
 // dimmed base window under it (BaseWin_production's window: the base window's canvas with the
 // tile at +0xBDD0 over it).
-// Not reconstructed: the scroll bar's picture (Scroll_init at the right edge when the list has
-// more rows than shown; the scroll position itself follows the selection and PgUp / PgDn). The
-// unit spin timer (FUN_004946D0) is never started by the original.
+// The scroll bar (FUN_00494700: Scroll_init at (width - 0x14, 0x15), 0x18 x 0x13A, scroll_normal,
+// when the list has more cells than shown; its position top / cols, range 0 .. count / cols -
+// rows + 2, page rows - 1; scroll.cpp): its buttons move a row, the track a page. The unit spin
+// timer (FUN_004946D0) is never started by the original.
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -37,6 +38,7 @@
 #include "engine/veh.h"
 #include "platform/ui_platform.h"
 #include "ui/basewin_internal.h"
+#include "ui/scroll.h"
 #include "ui/font_text.h"
 #include "ui/mapwin.h"
 #include "ui/pulldown.h"
@@ -301,6 +303,8 @@ void draw_cell(ProdWin* w, int32_t i) {
     ui_invalidate();
 }
 
+ScrollBar scroll_bar(ProdWin* w);
+
 void ProdWin::redraw() {
     Buffer* c = &canvas;
     UiRect all{0, 0, c->width, c->height};
@@ -333,6 +337,7 @@ void ProdWin::redraw() {
         Buffer_box_sprite(c, &br, box_def(3));
     }
     for (int32_t i = top; i < visible + top; i++) draw_cell(this, i);
+    if (visible < (int32_t)items.size()) scroll_draw(c, scroll_bar(this));
     ui_invalidate();
 }
 
@@ -353,6 +358,15 @@ void on_button(ProdWin* w, int32_t id, bool* done) {
     }
     *done = true;  // Win_release_modal
     if (w->slot != 0 && (id == -1 || id == -2)) w->shown = false;  // hide
+}
+
+// The scroll bar of FUN_00494700.
+ScrollBar scroll_bar(ProdWin* w) {
+    ScrollBar s;
+    s.r = {w->canvas.width - 0x14, 0x15, w->canvas.width - 0x14 + 0x18, 0x15 + 0x13A};
+    s.max = std::max(0, (int32_t)w->items.size() / w->cols - w->rows + 2);
+    s.pos = std::min(w->top / w->cols, s.max);
+    return s;
 }
 
 // FUN_00494280: the keys (the scroll bar's position is top / cols, its page rows - 1, its range
@@ -569,6 +583,16 @@ int32_t prodwin_pick(int32_t faction, int32_t slot, int32_t* mode) {
                 ui_invalidate();
                 if (p == b) on_button(w, p->id, &done);
                 continue;
+            }
+            if (!b && w->visible < (int32_t)w->items.size()) {
+                ScrollBar sb = scroll_bar(w);
+                if (int32_t d = scroll_click(sb, lx, ly, w->rows - 1)) {  // Scroll: a row / a page
+                    int32_t pos = std::max(0, std::min(sb.pos + d, sb.max));
+                    w->top = pos * w->cols;
+                    w->redraw();
+                    continue;
+                }
+                if (lx >= sb.r.left && lx < sb.r.right && ly >= sb.r.top && ly < sb.r.bottom) continue;
             }
             if (!b && lx >= 0 && ly >= 0 && lx < w->canvas.width && ly < w->canvas.height) select_at(w, lx, ly);
             continue;

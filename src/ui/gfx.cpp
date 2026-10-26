@@ -559,10 +559,10 @@ int32_t THISCALL Buffer_write_cent_l_7(Buffer* self, const char* text, const UiR
     int32_t n = (int32_t)std::strlen(text);
     if (n < len) len = n;
     if (len < 0 || len == 0) return 0;
-    int32_t w = Font_width_2(font, text, n);  // Buffer_text_width_2 of the whole string
+    int32_t w = Buffer_text_width_2(self, text, n);  // of the whole string, markup aware
     int32_t x = ((rect->right - w) - rect->left) / 2 + rect->left;
     int32_t y = ((rect->bottom - font->ascent_above) - rect->top) / 2 + rect->top;
-    return Buffer_write_raw_l(self, text, x, y, len);
+    return Buffer_write_multi_font_raw_l(self, text, x, y, len);
 }
 
 int32_t THISCALL Buffer_write_cent_l_8(Buffer* self, const char* text, int32_t x, int32_t y, int32_t len) {

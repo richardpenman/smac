@@ -1,5 +1,6 @@
 // Script-driven popups of the original UI (see popup.h).
 #include "ui/popup.h"
+#include "ui/scroll.h"
 #include "ui/labs.h"
 #include "ui/sound.h"
 #include "ui/sprites.h"
@@ -1128,6 +1129,16 @@ void draw_items(BasePop* p) {
     }
     int32_t first = p->item_type == 2 ? p->top_item : 0;
     int32_t last = p->item_type == 2 ? std::min(n, first + p->rows) : n;
+    // The list box's scroll bar (Popup_on_listbox_scroll_create: scroll_normal, at (width - 0x2B,
+    // 0x15), 0x18 wide, down to the last row; its height formula's margins approximated by the
+    // last row's bottom).
+    if (p->item_type == 2 && n > p->rows && p->rows > 0) {
+        ScrollBar sb;
+        sb.r = {b->width - 0x2B, 0x15, b->width - 0x2B + 0x18, item_rect(p, p->rows - 1).bottom};
+        sb.max = n - p->rows;
+        sb.pos = std::min(p->top_item, sb.max);
+        if (sb.r.bottom > sb.r.top + 3 * 0x18) scroll_draw(b, sb);
+    }
     for (int32_t i = first; i < last; i++) {
         UiRect r = item_rect(p, i - first);
         // RadioButton_draw_item / CheckBox_draw_item: state 2 for the selected (check boxes: checked)
@@ -1389,6 +1400,20 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
             int32_t btn = 0x7FFF;
             for (const BasePop::Button& bt : p->btns)
                 if (x >= bt.r.left && x < bt.r.right && y >= bt.r.top && y < bt.r.bottom) btn = bt.id;
+            int32_t nitems = (int32_t)p->items.size();
+            if (in.type == UiInput::LDOWN && btn == 0x7FFF && hit < 0 && p->item_type == 2 && nitems > p->rows &&
+                p->rows > 0) {
+                // The list box's scroll bar: a line (its buttons) or a page (its track).
+                ScrollBar sb;
+                sb.r = {p->canvas.width - 0x2B, 0x15, p->canvas.width - 0x2B + 0x18, item_rect(p, p->rows - 1).bottom};
+                sb.max = nitems - p->rows;
+                sb.pos = std::min(p->top_item, sb.max);
+                if (int32_t d = scroll_click(sb, x, y, p->rows)) {
+                    p->top_item = std::max(0, std::min(p->top_item + d, sb.max));
+                    dirty = true;
+                    continue;
+                }
+            }
             if (in.type == UiInput::LDOWN) {
                 if (btn != 0x7FFF) {
                     p->pressed_button = btn;

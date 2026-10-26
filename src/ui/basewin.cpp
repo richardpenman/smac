@@ -1127,6 +1127,19 @@ bool basewin_mouse(int32_t type, int32_t x, int32_t y, bool double_click, bool r
             // A drag (worker dragged to another tile): the release's click with the drag kept.
             bwf(kBwDragState) = 1;
         }
+        // The panes' scroll bars (Scroll: a button moves a line, the track a page; BaseWin_on_scrolled
+        // / on_iface_scrolled redraw the pane).
+        const ScrollBar* bar = parent == 0 ? (g_fac_bar_shown ? &g_fac_bar : nullptr)
+                                           : (g_sup_bar_shown && bwf(0x40B20) ? &g_sup_bar : nullptr);
+        if (!right && bar && lx >= bar->r.left && lx < bar->r.right && ly >= bar->r.top && ly < bar->r.bottom) {
+            int32_t d = scroll_click(*bar, lx, ly, parent == 0 ? g_fac_bar_page : 1);
+            int32_t& pos = bwf(parent == 0 ? kBwB10 : kBwB14);
+            pos = std::max(bar->min, std::min(pos + d, bar->max));
+            if (parent == 0) BaseWin_draw_facilities(self, 0);
+            else BaseWin_draw_supported(self, 0);
+            bwf(kBwDragState) = -1;
+            return true;
+        }
         if (parent == 0) BaseWin_click(self, lx, ly, right ? 1 : 0, 0);
         else BaseWin_iface_click(self, lx, ly, right ? 1 : 0, 0);
         bwf(kBwDragState) = -1;

@@ -56,6 +56,7 @@
 #include "ui/labs.h"
 #include "ui/popup.h"
 #include "ui/screenwin.h"
+#include "ui/scroll.h"
 #include "ui/techwin.h"
 #include "ui/vehdraw.h"
 
@@ -440,6 +441,11 @@ void DatalinkState::redraw() {
     sw_font(c, find_font(0xE, 1), 0xE0);
     sw_text_cent(this, c, label_get(712 + cat), {r_cat.left + 3, r_cat.top + 3, r_cat.right - 3, r_cat.bottom - 3});
     UiRect lr{r_list.left + 3, r_list.top + 3, r_list.right - 3, r_list.bottom - 3};
+    // The list's scroll bar (ListBox's Scroll, scroll_normal) at its right.
+    if ((int32_t)items.size() > visible()) {
+        ScrollBar sb = scroll_for_list(&lr, false, top, (int32_t)items.size(), visible());
+        scroll_draw(c, sb);
+    }
     Buffer_set_clip(c, &lr);
     for (int32_t k = 0; k < visible() && top + k < (int32_t)items.size(); k++) {
         const Item& it = items[top + k];
@@ -607,7 +613,14 @@ void DatalinkState::on_click(int32_t parent, int32_t, int32_t, int32_t x, int32_
         link(std::atoi(t->c_str()));
         return;
     }
-    if (x >= r_list.left + 3 && x < r_list.right - 3 && y >= r_list.top + 3 && y < r_list.bottom - 3) {
+    UiRect lr{r_list.left + 3, r_list.top + 3, r_list.right - 3, r_list.bottom - 3};
+    ScrollBar sb = scroll_for_list(&lr, false, top, (int32_t)items.size(), visible());
+    if ((int32_t)items.size() <= visible()) lr.right = r_list.right - 3;
+    else if (int32_t d = scroll_click(sb, x, y, visible())) {
+        top = std::max(0, std::min(top + d, sb.max));
+        return;
+    }
+    if (x >= r_list.left + 3 && x < lr.right && y >= r_list.top + 3 && y < r_list.bottom - 3) {
         int32_t k = top + (y - r_list.top - 3) / 16;
         if (k < (int32_t)items.size() && k != sel) {
             sel = k;

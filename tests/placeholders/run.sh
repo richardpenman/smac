@@ -190,4 +190,21 @@ check labsdl "a successor's button opens its entry" "^datalink cat 14 index 49 "
 check labsdl "its tree" "^screentext labs tree 49 preq 0 44 leads"
 nocrash labsdl
 
+# 12. The energy report's two columns (ReportWin_draw_energy, ReportIf_draw_energy; turn_147,
+#     faction 3): the summary, the first base's budget, a click on one of its facilities shows that
+#     facility in every base; the main interface's BASE EXPENDITURES and MAINTENANCE COSTS lists.
+#     The scroll bars (scroll.cpp): the labs report's technology list scrolled by its down button.
+run energy --save work/saves_late/turn_147.sav --human 3 --keys "DOWN,ENTER,F3,SCREENSTATE,CLICK:560x80,SCREENSTATE,F2,SCREENSTATE,CLICK:232x748,SCREENSTATE,ESC"
+check energy "the summary" "^report energy summary 195 income 18 maint 8 loan 0 net 10"
+check energy "the base's budget" "^screentext \\[UNIVERSITY BASE BUDGET\\]"
+check energy "its facilities" "^report energy budget 3 Recycling Tanks\\|\\{0\\}"
+check energy "its total, selected" "^report energy budget 99999999 \\* \\{TOTAL COST: \\|0\\}"
+check energy "a facility in every base" "^screentext \\[RECYCLING TANKS COST\\]"
+check energy "the bases with it" "^report energy budget 1029 U.N. Headquarters"
+check energy "base expenditures" "^report energy bases 1026 \\* University Base\\|\\+3/-0 = \\+3/year"
+check energy "maintenance costs" "^report energy facilities 6 4 Recreation Commons\\|-4/year"
+check energy "the list scrolled a line (its ninth row shown)" "^report labs list 36 "
+nocheck energy "not a page" "^report labs list 13 "
+nocrash energy
+
 exit $FAIL
