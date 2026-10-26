@@ -25,8 +25,9 @@
 // Drawing (approximated, not compared with the original's pixels): the window (833 x 354 above
 // the console) and the main interface panes at the original's rectangles, with its box sprites,
 // fonts and colours; the models' effects under their buttons are written as text ("++POLICE")
-// where the original draws icons of socwin.pcx; the leader's portrait, the hover bubbles, the
-// tutorial window and the slide animation are not drawn.
+// where the original draws icons of socwin.pcx; the leader's portrait and the hover bubbles are
+// not drawn. The tutorial: the SOCWIN hint and the tour's display (SocialWin_exec with a
+// negative faction, tutwin.cpp); the slide (screenwin.cpp).
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -47,6 +48,9 @@
 #include "ui/popup.h"
 #include "ui/screenwin.h"
 #include "ui/sprites.h"
+#include "ui/tutwin.h"
+#include "ui/console.h"
+#include "ui/mapwin.h"
 
 namespace {
 
@@ -548,12 +552,15 @@ void load_art(SocialWinState* s) {
 
 }  // namespace
 
-// SocialWin_exec (0x4B2740): builds the window for faction_id and runs it (negative faction_id:
-// the tutorial tour's display without the modal loop, not reconstructed).
+// SocialWin_exec (0x4B2740): builds the window for faction_id and runs it; negative faction_id:
+// the tutorial tour's display (built and shown, without the modal loop). The first time, the
+// SOCWIN hint (tut_check2 8, TutorialArrowShown 5) points at the first category.
 void THISCALL SocialWin_exec(uint8_t* self, int32_t faction_id) {
     SocialWinState* s = &g_sw;
     s->name = "social";
-    if (faction_id < 0) return;
+    s->slide = true;  // FUN_004B2120: slide_show / slide_hide
+    bool tour = faction_id < 0;
+    if (tour) faction_id = -faction_id;
     *reinterpret_cast<int32_t*>(self + 0xCF4) = faction_id;
     s->faction = faction_id;
     s->limit_hit = 0;
@@ -607,7 +614,57 @@ void THISCALL SocialWin_exec(uint8_t* self, int32_t faction_id) {
         }
         spot_add(&s->spots[1], i, 1, r.left + 3, r.bottom - 0x11, 0x18, 0xE);
     }
+    if (tour) {
+        s->open = true;
+        sw_show(s);
+        return;
+    }
+    if (tut_check2(8)) {
+        sw_show(s);
+        TutorialArrowShown = 5;
+        int32_t x = 0, y = 0;
+        socialwin_point(0, &x, &y);
+        TutWin_tut_win(&TutWin, MapWins[0], "SOCWIN", x, y, nullptr, 1, -1, -1);
+    }
     sw_run(s);
+}
+
+bool socialwin_open() { return g_sw.open; }
+
+// FUN_004B26B0 / FUN_004B26D0 after the tour's display: the window hidden, its buttons closed.
+void socialwin_tour_close() {
+    g_sw.open = false;
+    sw_hide(&g_sw);
+    sw_clear_buttons(&g_sw);
+}
+
+// The centres on the screen of SocialWin's rectangles the tour points at (TutWin_soc_rect /
+// TutWin_iface_rect): 0..3 the categories (+0x1F110..), 10..19 the effect rows (+0x1F070..),
+// 20 the effects box (+0x1F060), 21 the faction's power box (+0x1F2A0), 22 CANCEL, 23 RESET,
+// 24 OK, 30 the right pane (+0x1F250), 31 economy, 32 psych, 33 labs (+0x1F260 / 0x1F280 /
+// 0x1F270), 34 the centre pane (+0x1F2E0).
+void socialwin_point(int32_t which, int32_t* x, int32_t* y) {
+    UiRect r{};
+    bool iface = which >= 30;
+    if (which < 4) r = cat_rect(which);
+    else if (which >= 10 && which < 20) r = {0x274, 0x1D + (which - 10) * 0x16, 0x303, 0x1D + (which - 10) * 0x16 + 0x14};
+    else if (which == 20) r = {0x271, 4, 0x306, 0xFA};
+    else if (which == 21) r = {0x271, 0xFD, 0x306, 0x12D};
+    else if (which == 22) r = {0x1E4, 0x13A, 0x286, 0x14E};
+    else if (which == 23) r = {0x13F, 0x13A, 0x1E1, 0x14E};
+    else if (which == 24) r = {0x9A, 0x13A, 0x13C, 0x14E};
+    else if (which == 30) r = inset(mi_rect(kMiPaneRight), 4);
+    else if (which >= 31 && which <= 33) r = alloc_rect(which - 31);
+    else if (which == 34) r = inset(mi_rect(kMiPaneCenter), 4);
+    *x = (r.right - r.left) / 2 + r.left;
+    *y = (r.bottom - r.top) / 2 + r.top;
+    if (iface) {
+        *x += mi_rect(kMiPos).left;
+        *y += mi_rect(kMiPos).top;
+    } else {
+        *x += g_sw.x;
+        *y += g_sw.y;
+    }
 }
 
 // SocialWin_close (FUN_004b26d0): the buttons and groups closed, the hover state cleared.

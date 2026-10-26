@@ -345,6 +345,7 @@ struct PrefWin : ScreenWin {
 void prefwin_display(int32_t page) {
     PrefWin w;
     w.name = "prefwin";
+    w.slide = true;  // PrefWin_display / PrefWin_destroy: slide_show / slide_hide
     w.load();
     w.layout();
     w.words[0] = (uint32_t)GamePreferences;

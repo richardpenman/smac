@@ -40,8 +40,9 @@
 // renderer, scale 0.14), its name, stats and costs (COST, PROTOTYPE COST); the main interface
 // with the info pane (DESIGN WORKSHOP, the design's state), the component list (W:, A:, C:, R:,
 // SP1:, SP2:), the presets and the prototype list (10 at a time: model, name, stats). The
-// pickers are grids of names and values (no models); bubble help, the tutorial and the copter
-// animation step are not reconstructed.
+// pickers are grids of names and values (no models); bubble help and the copter animation step
+// are not reconstructed. The tutorial: the DESWIN hint and the tour's display (unit_id -2,
+// tutwin.cpp's TutWin_tour7).
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -68,6 +69,7 @@
 #include "ui/font_text.h"
 #include "ui/popup.h"
 #include "ui/screenwin.h"
+#include "ui/tutwin.h"
 #include "ui/vehdraw.h"
 #include "ui/voxel.h"
 
@@ -1272,6 +1274,7 @@ void DesignWinState::log_state() {
 int32_t THISCALL DesignWin_exec(uint8_t*, int32_t f, int32_t unit_id) {
     DesignWinState w;
     w.ScreenWin::name = "design";
+    w.slide = true;  // DesignWin_on_status: slide_show / slide_hide
     bool tour = unit_id == -2;
     if (unit_id < 0) {
         int32_t found = unit_id;
@@ -1306,7 +1309,8 @@ int32_t THISCALL DesignWin_exec(uint8_t*, int32_t f, int32_t unit_id) {
         }
         text_close();
     }
-    if (tour) return 0;
+    // The tutorial tour's display (unit_id -2, TutWin_tour7): the window is built and shown
+    // without its modal loop while the tour's windows point at it.
     // The window: deswin.pcx above the main interface.
     Buffer art;
     Buffer_ctor(&art);
@@ -1363,16 +1367,74 @@ int32_t THISCALL DesignWin_exec(uint8_t*, int32_t f, int32_t unit_id) {
     sw_button(&w, "<", 0x17, pb.left + 3, pb.top + 3, 0x14, pb.bottom - pb.top - 6, 1, bf);
     sw_button(&w, ">", 0x18, pb.right - 0x17, pb.top + 3, 0x14, pb.bottom - pb.top - 6, 1, bf);
     g_dw = &w;
+    if (tour) {
+        w.open = true;
+        sw_show(&w);
+        tutwin_tour7_steps();
+        w.open = false;
+        sw_hide(&w);
+        g_dw = nullptr;
+        sw_clear_buttons(&w);
+        if (w.scene_ready) Scene_clear(&w.scene, 0);
+        return 0;
+    }
     // DesignWin_show (ambience 0xD3) and DesignWin_on_status (fx\menu up.wav as it slides in);
     // DesignWin_hide: ambience 0xD4.
     ambience(0xD3);
     sound_menu_up();
+    if (tut_check2(0x2000)) {
+        // The DESWIN hint (TutorialArrowShown 7) at the vehicle's box (+0xA9C).
+        sw_show(&w);
+        TutorialArrowShown = 7;
+        int32_t x = (kVehicle.right - kVehicle.left) / 2 + kVehicle.left + w.x;
+        int32_t y = (kVehicle.bottom - kVehicle.top) / 2 + kVehicle.top + w.y;
+        TutWin_tut_win(&TutWin, MapWins[0], "DESWIN", x, y, nullptr, 1, -1, -1);
+    }
     sw_run(&w);
     ambience(0xD4);
     g_dw = nullptr;
     sw_clear_buttons(&w);
     if (w.scene_ready) Scene_clear(&w.scene, 0);
     return w.result;
+}
+
+bool designwin_open() { return g_dw != nullptr; }
+
+// The screen centres of DesignWin's rectangles the tour points at (TutWin_des_rect /
+// TutWin_iface_rect): 0..4 the component boxes (+0xAAC..), 10 the cost line (+0xB2C), 11 the
+// statistics line (+0xB3C), 20 the stack bar (+0xB0C), 21 the arrows (+0xCBC), 22 the presets
+// (+0xA6C), 30 + id the window's buttons (DONE 4, APPLY 1, RENAME 5, OBSOLETE 6, UPGRADE 7,
+// RETIRE 0, CANCEL 8).
+void designwin_point(int32_t which, int32_t* x, int32_t* y) {
+    UiRect r{};
+    bool iface = which >= 20 && which < 30;
+    const UiRect& q = mi_rect(kMiPaneQueue);
+    if (which >= 0 && which < 6) r = kBoxes[which];
+    else if (which == 10) r = {kVehicle.left, kVehicle.bottom - 36, kVehicle.right, kVehicle.bottom - 20};
+    else if (which == 11) r = {kVehicle.left, kVehicle.bottom - 54, kVehicle.right, kVehicle.bottom - 38};
+    else if (which == 20) {
+        r = mi_rect(0xCEC);
+        r.left = q.left + 4;
+    } else if (which == 21) {
+        const UiRect& a = mi_rect(0xAAC);
+        int32_t d = (q.left - a.left) + 8;
+        r = {a.left + d, a.top, a.right + d, a.bottom};
+    } else if (which == 22) {
+        const UiRect& p = mi_rect(kMiPaneRight);
+        r = {p.left + 7, p.top + 7, p.right - 7, p.top + 7 + 0x15};
+    } else if (which >= 30 && g_dw) {
+        for (BaseButton* b : g_dw->buttons)
+            if (b->parent == 0 && b->id == which - 30) r = b->r;
+    }
+    *x = (r.right - r.left) / 2 + r.left;
+    *y = (r.bottom - r.top) / 2 + r.top;
+    if (iface) {
+        *x += mi_rect(kMiPos).left;
+        *y += mi_rect(kMiPos).top;
+    } else if (g_dw) {
+        *x += g_dw->x;
+        *y += g_dw->y;
+    }
 }
 
 // PROTOSTATE (test aid): the viewer's prototypes ("proto U name 'N' chassis C weapon W armor A

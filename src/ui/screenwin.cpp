@@ -1,5 +1,6 @@
 // Native frame of the full-screen modal windows (screenwin.h).
 #include "ui/screenwin.h"
+#include "ui/slide.h"
 
 #include <algorithm>
 #include <cctype>
@@ -163,8 +164,16 @@ void sw_hide(ScreenWin* s) {
 
 void sw_run(ScreenWin* s) {
     s->open = true;
-    if (std::find(g_stack.begin(), g_stack.end(), s) == g_stack.end()) g_stack.push_back(s);
+    bool shown = std::find(g_stack.begin(), g_stack.end(), s) != g_stack.end();
+    if (!shown) g_stack.push_back(s);
     redraw(s);
+    if (s->slide && !shown) {
+        // slide_show: the window rises into view (drawn without it first).
+        g_stack.erase(std::remove(g_stack.begin(), g_stack.end(), s), g_stack.end());
+        ui_present();
+        g_stack.push_back(s);
+        slide_show_window(&s->canvas, s->x, s->y, nullptr, false);
+    }
     const UiRect& mp = mi_rect(kMiPos);
     while (s->open && !ControlTurnA) {
         if (Win_is_visible(&BaseWin)) {
@@ -240,6 +249,7 @@ void sw_run(ScreenWin* s) {
     s->open = false;
     g_stack.erase(std::remove(g_stack.begin(), g_stack.end(), s), g_stack.end());
     ui_invalidate();
+    if (s->slide) slide_hide_window(&s->canvas, s->x, s->y);  // slide_hide: it sinks out of view
 }
 
 ScreenWin* screen_top() { return g_stack.empty() ? nullptr : g_stack.back(); }

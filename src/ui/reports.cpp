@@ -1476,6 +1476,7 @@ void open_reports(int32_t k) {
         return;
     }
     s->name = "report";
+    s->slide = true;  // ReportIf_on_status: slide_show / slide_hide
     basewin_mi_init();
     int32_t w = 0x28A + 0x4E, h = 0x161 + 200;
     sw_init(s, (ScreenWidth - 0x28A) / 2 - 0x17, ScreenHeight - h - 0xD4, w, h, true);

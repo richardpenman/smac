@@ -20,11 +20,14 @@
 // DIRECTIONS text (TOUR1, TOUR2), the nearest ocean and fungus (TOUROCEAN, TOURFUNGUS), the
 // interface (TOURMENU, TOURCOMMLINK, TOURUNITSINFO, TOURTERRAININFO, TOURSTACKINFO,
 // TOURMESSAGEINFO, TOURBUTTONMESSAGE, TOURBUTTONINFO, TOURWORLDINFO, TOURDATEINFO) and TOUROVER;
-// kind 3 (the first terraformer): TERRAFORMER and TOURMAP.
-// Not reconstructed: kind 3's terraforming lessons after TOURMAP (TOURRAIN .. TOURFORMDONE: the
-// scoring of the tiles around the cursor), the tours of the base window (kind 1, tour1), the
-// social engineering (5), the drone riots (6, tour6) and the design workshop (7, tour7): they end
-// at once.
+// kind 3 (the first terraformer, the Help menu's terraforming tour): TERRAFORMER, TOURMAP and the
+// terraforming lessons (the tiles around the cursor scored as the original: TOURRAIN and its
+// wettest / moderate / driest tiles, TOURALT, TOURTWOROCK, TOURONEROCK, TOURFLAT, TOURFOREST,
+// TOURREVIEW, TOURADVANCED at the best base site, TOURFORMDONE); the tours of the base window
+// (kind 1, TutWin_tour1), the social engineering (5, tour5), the drone riots (6, tour6) and the
+// design workshop (7, tour7), the window opened or shown for them when it is not open; the
+// SOCWIN and DESWIN hints of those windows.
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -42,6 +45,7 @@
 #include "engine/strings.h"
 #include "engine/ui_bridge.h"
 #include "engine/veh.h"
+#include "engine/world.h"
 #include "platform/ui_platform.h"
 #include "ui/basewin.h"
 #include "ui/basewin_internal.h"
@@ -325,6 +329,152 @@ void mi_point(uint32_t off, int32_t* x, int32_t* y) {
 
 }  // namespace
 
+// TutWin_tour5 (0x4BB380): the social engineering window's tour (the window shown for it when it
+// is not open, hidden after).
+void tour5(uint8_t* self) {
+    bool was_open = socialwin_open();
+    if (!was_open) SocialWin_exec(&SocialWin, -CurrentPlayerFaction);
+    auto step = [&](const char* label, int32_t which) {
+        int32_t x = 0, y = 0;
+        socialwin_point(which, &x, &y);
+        return TutWin_tut_win(self, MapWins[0], label, x, y, nullptr, 2, -1, -1) != 0;
+    };
+    [&]() {
+        if (!step("SOCTOURMAIN", 1) || !step("SOCTOURFACTION", 21) || !step("SOCTOUROVERVIEW", 30) ||
+            !step("SOCTOUREFFECTS", 20))
+            return;
+        for (int32_t i = 0; i < 3; i++)
+            if (!step(("SOCTOUR" + std::to_string(i)).c_str(), 10 + i * 4)) return;
+        if (!step("SOCTOURECON", 31) || !step("SOCTOURPSYCH", 32) || !step("SOCTOURLABS", 33) ||
+            !step("SOCTOURINFO", 34) || !step("SOCTOURCANCEL", 22) || !step("SOCTOURRESET", 23))
+            return;
+        step("SOCTOUROK", 24);  // TutWin_do_soc
+    }();
+    if (!was_open) socialwin_tour_close();
+}
+
+// TutWin_tour7 (0x4BAF20): the design workshop's tour (the window shown for it when it is not
+// open: DesignWin_exec(faction, -2), which runs these steps).
+void tutwin_tour7_steps() {
+    uint8_t* self = &TutWin;
+    auto step = [&](const char* label, int32_t which) {
+        int32_t x = 0, y = 0;
+        designwin_point(which, &x, &y);
+        return TutWin_tut_win(self, MapWins[0], label, x, y, nullptr, 2, -1, -1) != 0;
+    };
+    static const struct {
+        const char* label;
+        int32_t which;
+    } kSteps[] = {{"DESTOURCHAS", 0},    {"DESTOURWEAP", 1},     {"DESTOURARM", 2},     {"DESTOURREACTOR", 3},
+                  {"DESTOURABILITY", 4}, {"DESTOURCOST", 10},    {"DESTOURSTATS", 11},  {"DESTOURBAR", 20},
+                  {"DESTOURARROWS", 21}, {"DESTOURPRESETS", 22}, {"DESTOURDONE", 34},   {"DESTOURAPPLY", 31},
+                  {"DESTOURRENAME", 35}, {"DESTOUROBS", 36},     {"DESTOURUPGRADE", 37}, {"DESTOURRETIRE", 30},
+                  {"DESTOURCANCEL", 38}};
+    for (const auto& st : kSteps)
+        if (!step(st.label, st.which)) return;
+}
+
+// The base window's tours (TutWin_tour1 0x4BB7A0, TutWin_tour6 0x4BAA70): the window opened on
+// the viewer's first base when it is not open; each step's point is a rectangle of BaseWin's
+// (centre: on the base window, or on the main interface's), the population row's point at its
+// left + 5 (as the original, not converted).
+namespace {
+enum PtKind { kBase, kIface, kPop };
+
+int32_t base_step(uint8_t* self, const char* label, uint32_t rect, PtKind k) {
+    const UiRect& r = bw_rect(rect);
+    int32_t x = (r.right - r.left) / 2 + r.left, y = (r.bottom - r.top) / 2 + r.top;
+    if (k == kBase) {
+        basewin_client_to_screen(&x, &y);
+    } else {
+        x += mi_rect(kMiPos).left;
+        y += mi_rect(kMiPos).top;
+        if (k == kPop) x = r.left + 5;
+    }
+    return TutWin_tut_win(self, MapWins[0], label, x, y, nullptr, 2, -1, -1);
+}
+
+bool base_tour_open() {
+    if (!Win_is_visible(&BaseWin)) {
+        for (int32_t i = 0; i < BaseCount; i++)
+            if (Bases[i].faction_id == CurrentPlayerFaction) {
+                BaseWin_zoom(&BaseWin, i, 0);
+                break;
+            }
+        if (!Win_is_visible(&BaseWin)) return false;
+    }
+    BaseWin_focus(&BaseWin);
+    parse_says(0, Bases[CurrentBaseID].name, -1, -1);
+    return true;
+}
+}  // namespace
+
+void tour1(uint8_t* self) {
+    if (!base_tour_open()) return;
+    pfncDrawCityMap(&BaseWin, 4);
+    static const struct {
+        const char* label;
+        uint32_t rect;
+        PtKind kind;
+    } kA[] = {{"TOUR1GOVERNOR", 0x40DAC, kBase},     {"TOUR1EXPLORE", 0x40D6C, kBase},
+              {"TOUR1DISCOVER", 0x40D7C, kBase},     {"TOUR1BUILD", 0x40D8C, kBase},
+              {"TOUR1CONQUER", 0x40D9C, kBase},      {"TOUR1GOVERNOR2", 0x40DAC, kBase},
+              {"TOUR1ADVANCED", 0x40E4C, kBase},     {"TOUR1CAPTION", 0x40CAC, kIface},
+              {"TOUR1ECO", 0x40D1C, kBase},          {"TOUR1POP", 0x40C5C, kIface},
+              {"TOUR1POP2", 0x40C5C, kIface},          {"TOUR1STAPLE", 0x40E2C, kIface},
+              {"TOUR1PRODUCTION", 0x40C6C, kIface},  {"TOUR1QUEUE", 0x40C8C, kIface},
+              {"TOUR1CHANGE", 0x40DEC, kIface},      {"TOUR1HURRY", 0x40DFC, kIface},
+              {"TOUR1GARRISON", 0x40C2C, kIface},    {"TOUR1SUPPORTED", 0x40B6C, kIface},
+              {"TOUR1FACILITIES", 0x40BAC, kBase},   {"TOUR1COMMERCE", 0x40BDC, kBase},
+              {"TOUR1NUTRIENTS", 0x40BFC, kBase},    {"TOUR1AREA", 0x40B8C, kBase}};
+    for (const auto& st : kA)
+        if (!base_step(self, st.label, st.rect, st.kind)) return;
+    BaseWin_draw_expenses(&BaseWin, 2);
+    parse_num(0, Rules.nutrient_intake_req_citizen);
+    if (!base_step(self, "TOUR1NUT", 0x40CCC, kBase) || !base_step(self, "TOUR1MIN", 0x40CDC, kBase) ||
+        !base_step(self, "TOUR1ENERGY", 0x40CBC, kBase))
+        return;
+    BaseWin_draw_energy_alloc(&BaseWin, 2);
+    // (The slider button of 800 x 600 screens, BaseWin + 0x197CC, is visible only there.)
+    bool slider = ScreenWidth == 800;
+    if (!(slider ? base_step(self, "TOUR1ALLOC2", 0x40E3C, kBase) : base_step(self, "TOUR1ALLOC", 0x40D0C, kBase)))
+        return;
+    if (!base_step(self, "TOUR1ECON", 0x40D0C, kBase) || !base_step(self, "TOUR1PSYCH", 0x40CEC, kBase) ||
+        !base_step(self, "TOUR1LABS", 0x40CFC, kBase))
+        return;
+    BaseWin_draw_expenses(&BaseWin, 1);
+    pfncDrawCityMap(&BaseWin, 3);
+    if (!base_step(self, "TOUR1SUPPORTBUTTON", 0x40DBC, kBase)) return;
+    pfncDrawCityMap(&BaseWin, 2);
+    if (!base_step(self, "TOUR1PSYCHBUTTON", 0x40DDC, kBase)) return;
+    pfncDrawCityMap(&BaseWin, 4);
+    if (!base_step(self, "TOUR1RESOURCEBUTTON", 0x40DCC, kBase) || !base_step(self, "TOUR1PREV", 0x40D4C, kIface) ||
+        !base_step(self, "TOUR1NEXT", 0x40D5C, kIface) || !base_step(self, "TOUR1RENAME", 0x40D3C, kBase) ||
+        !base_step(self, "TOUR1OK", 0x40D2C, kBase))
+        return;
+    pfncDrawCityMap(&BaseWin, 1);
+}
+
+void tour6(uint8_t* self) {
+    if (!base_tour_open()) return;
+    if (!base_step(self, "DRONETOUR1", 0x40C5C, kPop) || !base_step(self, "DRONETOUR2", 0x40C2C, kIface) ||
+        !base_step(self, "DRONETOUR3", 0x40E2C, kIface) || !base_step(self, "DRONETOUR4", 0x40DEC, kIface) ||
+        !base_step(self, "DRONETOUR5", 0x40C5C, kPop))
+        return;
+    BaseWin_draw_energy_alloc(&BaseWin, 2);
+    bool slider = ScreenWidth == 800;
+    if (!(slider ? base_step(self, "DRONETOUR6", 0x40E3C, kBase) : base_step(self, "DRONETOUR6", 0x40D0C, kBase)))
+        return;
+    BaseWin_draw_expenses(&BaseWin, 1);
+    pfncDrawCityMap(&BaseWin, 2);
+    if (base_step(self, "TOUR1PSYCHBUTTON", 0x40DDC, kBase)) pfncDrawCityMap(&BaseWin, 1);
+}
+
+void tour7() {
+    if (designwin_open()) tutwin_tour7_steps();
+    else DesignWin_exec(&DesignWin, CurrentPlayerFaction, -2);
+}
+
 void THISCALL TutWin_tour(uint8_t* self) {
     if (tf(kResult)) return;
     int32_t kind = TutorialArrowShown;
@@ -338,10 +488,21 @@ void THISCALL TutWin_tour(uint8_t* self) {
         clear_state();
         ui_invalidate();
     };
-    if (kind == 1 || kind == 5 || kind == 6 || kind == 7) {
-        console_not_reconstructed_quiet("TutWin_tour (base window / social engineering / design workshop tours)");
-        end();
-        return;
+    if (kind == 5) {
+        tour5(self);
+        return end();
+    }
+    if (kind == 7) {
+        tour7();
+        return end();
+    }
+    if (kind == 1) {
+        tour1(self);
+        return end();
+    }
+    if (kind == 6) {
+        tour6(self);
+        return end();
     }
     pfncMoveMap(win, cx, cy, 1);
     // The best of the 8 neighbours in view, starting at a random direction.
@@ -395,8 +556,21 @@ void THISCALL TutWin_tour(uint8_t* self) {
     }
     mw(win, kMwOptions) &= ~0x20000;
     ui_invalidate_map();
-    // The tiles around the cursor (rings 1..20): the best ocean tile, a fungus tile.
+    // The tiles around the cursor (rings 1..20, twice): the best ocean tile, a fungus tile, and the
+    // land tiles' scores of the terraforming lessons (the original's locals named by what they
+    // hold; the "rock" (temperature) table keeps the index where the score belongs and the
+    // slopes use the ring's index instead of the neighbour's, as the original).
     int32_t ocean_x = -1, ocean_y = -1, ocean_score = -1, fungus_x = -1, fungus_y = -1;
+    int32_t flat_s = -1, flat_x = -1, flat_y = -1;         // [ebp-0x88], -0x80, -0x48
+    int32_t roll_s = -1, roll_x = -1, roll_y = -1;         // [ebp-0x98], -0x40, -0x78
+    int32_t rocky_s = -1, rocky_x = -1, rocky_y = -1;      // [ebp-0x5c], -0x68, -0x70
+    int32_t alt3_s = -1, alt3_x = -1, alt3_y = -1;         // [ebp-0x9c], -0xa4, -0x60
+    int32_t high = 3, high_x = -1, high_y = -1;            // [ebp-0x64], -0x54, -0x58
+    int32_t rain_s[3] = {-1, -1, -1}, rain_x[3] = {-1, -1, -1}, rain_y[3] = {-1, -1, -1}, rain_id[3] = {-1, -1, -1};
+    int32_t temp_s[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
+    int32_t rain_max = -1, rain_max_x = -1, rain_max_y = -1, rain_min = 3, rain_min_x = -1;
+    int32_t temp_max = -1, temp_min = 3;
+    int32_t food1 = -1, food2 = -1, site_s = -1, site_x = -1, site_y = -1;
     for (int32_t pass = 0; pass < 2; pass++) {
         for (int32_t i = 1; i < 0x15; i++) {
             int32_t tx = TableOffsetX[i] + cx, ty = TableOffsetY[i] + cy;
@@ -419,17 +593,145 @@ void THISCALL TutWin_tour(uint8_t* self) {
                     ocean_y = ty;
                     ocean_score = score;
                 }
-            } else if ((sq->items & 0x20) && alt >= 0x40) {
+                continue;
+            }
+            if ((sq->items & 0x20) && alt >= 0x40) {
                 if (fungus_y < 0 || fungus_y >= MapAreaY || fungus_x < 0 || fungus_x >= MapAreaX || (sq->val3 & 0xC0) < 0x80) {
                     fungus_y = ty;
                     fungus_x = tx;
                 }
+                continue;
+            }
+            int32_t bonus = (goody_at(tx, ty) || bonus_at(tx, ty) || (sq->items & 0x2000)) ? 1 : 0;
+            int32_t food = crop_yield(CurrentPlayerFaction, -1, tx, ty, 0);
+            uint32_t items = sq->items;
+            int32_t river = (int32_t)(items & 0x80);
+            int32_t fung = ((items & 0x20) && alt >= 0x40) ? 1 : 0;
+            int32_t up = 0, down = 0;
+            for (int32_t k = 0; k < 8; k++) {
+                int32_t nx = NearOffsetX[k] + tx, ny = NearOffsetY[k] + ty;
+                if (!(MapToggleFlat & 1)) {
+                    if (nx < 0) nx += MapAreaX;
+                    else if (nx >= MapAreaX) nx -= MapAreaX;
+                }
+                if (ny < 0 || ny >= MapAreaY || nx < 0 || nx >= MapAreaX) continue;
+                int32_t nalt = map_tile(nx, ny)->climate & 0xE0;
+                if (nalt < 0x60) continue;
+                if (nalt > alt) {
+                    if (k == 0 || k >= 6) up = 1;
+                    if (i >= 2 && i <= 4) down = 1;
+                }
+                if (nalt < alt) {
+                    if (k == 0 || k >= 6) down = 1;
+                    if (i >= 2 && i <= 4) up = 1;
+                }
+            }
+            int32_t slope = (up && !down) ? 1 : 0;
+            int32_t fb = fung + bonus, base_s = (8 - down) * 2;
+            int32_t score = slope - fb * 3 - river + base_s;
+            int32_t rock = sq->val3 & 0xC0;
+            if (!bonus) {
+                if (rock == 0) {
+                    if (score > flat_s) {
+                        flat_s = score;
+                        flat_y = ty;
+                        flat_x = tx;
+                    }
+                } else if (rock == 0x40) {
+                    int32_t s2 = food + score * 8;
+                    if (s2 > roll_s && (pass == 0 || roll_x < 0)) {
+                        roll_s = s2;
+                        roll_y = ty;
+                        roll_x = tx;
+                    }
+                } else if (rock == 0x80 && score > rocky_s) {
+                    rocky_s = score;
+                    rocky_y = ty;
+                    rocky_x = tx;
+                }
+            }
+            int32_t a3 = sq->climate >> 5;
+            if (a3 == 3) {
+                int32_t s3 = food + (((((4 - down) * 2 - fung) - bonus) * 2 - up) - river) * 8;
+                if (rock > 0x40) s3 = 0;
+                if (s3 > alt3_s) {
+                    alt3_s = s3;
+                    alt3_y = ty;
+                    alt3_x = tx;
+                }
+            }
+            if (a3 > high) {
+                high = a3;
+                high_x = tx;
+                high_y = ty;
+            }
+            int32_t t = sq->climate & 7, r = (sq->climate >> 3) & 3;
+            int32_t s4 = -fb * 3 - (sq->val3 >> 6) - river + slope + base_s;
+            if (r > 2) r = 2;
+            if (t > 7) t = 7;
+            if (s4 > temp_s[t]) temp_s[t] = t;  // (the original stores the index)
+            if (s4 > rain_s[r]) {
+                rain_x[r] = tx;
+                rain_y[r] = ty;
+                rain_id[r] = r;
+                rain_s[r] = s4;
+            }
+            if (r > rain_max || (r == rain_max && s4 >= rain_s[r])) {
+                rain_max = r;
+                rain_max_x = tx;
+                rain_max_y = ty;
+            }
+            if (r < rain_min || (r == rain_min && s4 >= rain_s[r])) {
+                rain_min = r;
+                rain_min_x = tx;
+            }
+            if (t > temp_max || (t == temp_max && s4 >= temp_s[t])) temp_max = t;
+            if (t < temp_min || (t == temp_min && s4 >= temp_s[t])) temp_min = t;
+            if (!bonus && !(items & 0xA000)) {
+                if (food == 1) food1 = std::max(food1, s4);
+                else if (food == 2) food2 = std::max(food2, s4);
+                int32_t ws = world_site(tx, ty, 0);
+                if (ws > site_s) {
+                    site_s = ws;
+                    site_x = tx;
+                    site_y = ty;
+                }
             }
         }
     }
+    (void)food1;
+    (void)food2;
+    (void)temp_max;
+    (void)temp_min;
     if (kind != 0) {
-        if (tut_map(self, "TOURMAP", cx, cy, -1, nullptr, 2, -1, -1))
-            console_not_reconstructed_quiet("TutWin_tour (the terraforming lessons after TOURMAP)");
+        // The terraforming lessons (kind 3): rainfall (the wettest tile, then wet / moderate / dry),
+        // altitude (the best tile at altitude 3 and the highest), rocky, rolling and flat tiles,
+        // then forests, the review and the advanced lesson at the best base site.
+        if (!tut_map(self, "TOURMAP", cx, cy, -1, nullptr, 2, -1, -1)) return end();
+        if (rain_max_x >= 0 && rain_min_x >= 0) {
+            if (!tut_map(self, "TOURRAIN", rain_max_x, rain_max_y, -1, nullptr, 2, -1, -1)) return end();
+            for (int32_t r = 2; r >= 0; r--) {
+                if (rain_id[r] < 0) continue;
+                std::string l = std::string("TOURRAIN") + (r == 0 ? (rain_max ? "DRY" : "DRY2") : r == 1 ? "MOD" : "WET");
+                if (!tut_map(self, l.c_str(), rain_x[r], rain_y[r], -1, nullptr, 2, -1, -1)) return end();
+            }
+        }
+        if (alt3_x >= 0 && high_x >= 0 && !tut_map(self, "TOURALT", alt3_x, alt3_y, -1, nullptr, 2, high_x, high_y))
+            return end();
+        if (rocky_x >= 0 && !tut_map(self, "TOURTWOROCK", rocky_x, rocky_y, -1, nullptr, 2, -1, -1)) return end();
+        if (roll_x >= 0 && !tut_map(self, "TOURONEROCK", roll_x, roll_y, -1, nullptr, 2, -1, -1)) return end();
+        if (flat_x >= 0 && !tut_map(self, "TOURFLAT", flat_x, flat_y, -1, nullptr, 2, -1, -1)) return end();
+        if (site_x <= 0) {
+            site_x = cx;
+            site_y = cy;
+        }
+        if (!tut_map(self, "TOURFOREST", site_x, site_y, -1, nullptr, 2, -1, -1)) return end();
+        if (!tut_map(self, "TOURREVIEW", site_x, site_y, -1, nullptr, 2, -1, -1)) return end();
+        if (!tut_map(self, "TOURADVANCED", site_x, site_y, -1, nullptr, 2, -1, -1)) return end();
+        tf(kParent) = 0;
+        clear_state();
+        TutTourContinues = 0;
+        tut_map(self, "TOURFORMDONE", site_x, site_y, -1, nullptr, 2, -1, -1);
         return end();
     }
     if (ocean_x >= 0 && !tut_map(self, "TOUROCEAN", ocean_x, ocean_y, -1, nullptr, 2, -1, -1)) return end();

@@ -8,7 +8,9 @@
 
 // slide_show(window, 0): `win` (the window's canvas, at sx, sy on the screen) rises into view; the
 // arms are then drawn into it (and into `back`, its background copy, when given).
-void slide_show_window(Buffer* win, int32_t sx, int32_t sy, std::vector<uint8_t>* back = nullptr);
+// draw_arms false: the window draws its own arms (the screens of screenwin.h redraw their canvas).
+void slide_show_window(Buffer* win, int32_t sx, int32_t sy, std::vector<uint8_t>* back = nullptr,
+                       bool draw_arms = true);
 // slide_hide(window, 0): the window's picture `win` sinks out of view; call it once the window is
 // hidden (the screen behind is presented first).
 void slide_hide_window(const Buffer* win, int32_t sx, int32_t sy);

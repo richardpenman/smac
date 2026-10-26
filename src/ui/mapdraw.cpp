@@ -91,6 +91,28 @@ Font* label_font(int32_t zoom, int32_t num, int32_t den, int32_t style) { return
 
 }  // namespace
 
+namespace {
+// load_icons' riot icons (colours 6 and 7 made transparent).
+Sprite* riot_icon(bool alien) {
+    static Sprite icons[2];
+    static bool loaded = false;
+    if (!loaded) {
+        loaded = true;
+        const char* files[2] = {"ICONS.PCX", "TER1WRECK.PCX"};
+        static const int32_t at[2][4] = {{0x2E, 0x12F, 0x21, 0x1E}, {0x300, 0x94, 0x1C, 0x2A}};
+        for (int32_t k = 0; k < 2; k++) {
+            Buffer art;
+            Buffer_ctor(&art);
+            if (Buffer_load_pcx(&art, files[k], nullptr, 10, 0xEC)) continue;
+            Buffer_change_color(&art, 0x107, 0x109);
+            Buffer_change_color(&art, 0x106, 0x109);
+            pfncSpriteFromCanvasRectTrans(&icons[k], &art, 0x109, at[k][0], at[k][1], at[k][2], at[k][3], 0);
+        }
+    }
+    return &icons[alien ? 1 : 0];
+}
+}  // namespace
+
 void GAMEAPI base_draw(Buffer* dest, int32_t base_id, int32_t px, int32_t py, int32_t zoom, int32_t flags) {
     BASE& base = Bases[base_id];
     int32_t f = (uint8_t)base.faction_id;
@@ -141,7 +163,10 @@ void GAMEAPI base_draw(Buffer* dest, int32_t base_id, int32_t px, int32_t py, in
     MAP* sq = tile(base.x, base.y);
     bool water = (sq->climate & 0xE0) < 0x60;
     if (!(flags & 0x800)) {
-        Sprite* s = &BaseSprites[f][((water ? 1 : 0) * 4 + size) * 3 + def];
+        // The art of the faction that founded the base (BASE +5, faction_id_former; base_draw's
+        // index (water + former * 2) * 4 + size, * 3 + defence), not of its owner.
+        int32_t former = (uint8_t)base.faction_id_former & 7;
+        Sprite* s = &BaseSprites[former][((water ? 1 : 0) * 4 + size) * 3 + def];
         Sprite_draw_dest(s, dest, s->key, px, py, ShadowTable);
     }
     Font* font = label_font(zoom, 1, 3, 1);
@@ -183,7 +208,18 @@ void GAMEAPI base_draw(Buffer* dest, int32_t base_id, int32_t px, int32_t py, in
         Buffer_set_text_color(dest, is_spartans(f) ? 0x2C : 0, -1, 1, 1);
     }
     Buffer_write_l_3(dest, text, r.left + 2, r.top + 1, (int32_t)std::strlen(text));
-    // Not drawn yet: the drone riot / golden age icon right of the box (sprites not loaded).
+    // Drone riots (state 2): the riot icon right of the box (load_icons: 0x75AD88 of ICONS.PCX,
+    // aliens 0x791F98 of TER1WRECK.PCX, 6 pixels higher), at the base's scale.
+    if (base.state_flags & 2) {
+        bool alien = MFactions[f].rule_flags & 0x80;
+        Sprite* icon = riot_icon(alien);
+        int32_t ix = px + 2 + (r.right - r.left + 2), iy = py;
+        if (alien) {
+            iy -= 6;
+            ix += 2;
+        }
+        if (icon->width) pfncSpriteStretchCopyToCanvas(icon, dest, icon->key & 0xFF, ix, iy);
+    }
     BlitDestScale = 1;
     BlitSourceScale = 1;
 }

@@ -36,6 +36,9 @@ struct ScreenWin {
     std::vector<std::string> texts;
     // The palette layer of the window's canvas (win.h ui_layer_mark; 0: the game palette).
     uint8_t layer = 0;
+    // slide_show / slide_hide (slide.cpp) when the window opens / closes (the original's
+    // on_status of the datalinks, reports, design workshop, social engineering, preferences).
+    bool slide = false;
 
     virtual ~ScreenWin() {}
     virtual void redraw() = 0;

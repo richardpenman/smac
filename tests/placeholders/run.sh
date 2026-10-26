@@ -207,4 +207,44 @@ check energy "the list scrolled a line (its ninth row shown)" "^report labs list
 nocheck energy "not a page" "^report labs list 13 "
 nocrash energy
 
+# 13. The map view of turn_300 as faction 3 sees it, against the original (the oracle's mapdump of
+#     the same save and view: orig_t300_view.smxmap is its header, the pixels' MD5 below): the
+#     bases' art is their founder's (base_draw: faction_id_former), the drone riot icon, and
+#     faction 5's black population boxes (its search key is FUNGBOY, its art spartans.pcx: the
+#     original draws them so too).
+if [ -f "$ROOT/work/saves_late/turn_300.sav" ]; then
+    run map300 --save work/saves_late/turn_300.sav --human 0 --viewer 3 --nosound --turns 0 \
+        --dump "$OUT/map300.smxmap" --like "$ROOT/tests/placeholders/orig_t300_view.smxmap"
+    md5=$("$ROOT/tools/venv/bin/python" -c "import hashlib,sys; print(hashlib.md5(open(sys.argv[1],'rb').read()[808:]).hexdigest())" "$OUT/map300.smxmap" 2>/dev/null)
+    echo "map300 md5 $md5" >> "$OUT/map300.log"
+    check map300 "the original's pixels" "map300 md5 f895ca60f35e21d0cf931ff4029227ef"
+    nocrash map300
+fi
+
+# 14. The Help menu's tours (Console_menu_proc 0x720..0x725 -> TutWin_tour): the terraforming
+#     lessons (kind 3: the rainfall, altitude, rockiness and forest windows at the scored tiles),
+#     the base window's (TutWin_tour1, the window opened on the first base), social
+#     engineering's (tour5, the window shown for it), the design workshop's (tour7) and the drone
+#     riots' (tour6); Enter continues each window.
+D() { printf 'DOWN,%.0s' $(seq 1 $1); }
+E=$(printf 'ENTER,%.0s' $(seq 1 45))
+for t in 15 16 17 18 19; do
+    run tour$t $NEW --keys "ENTER,A-h,RIGHT,RIGHT,RIGHT,RIGHT,$(D $t)ENTER,${E}UNITS"
+done
+check tour15 "the terraforming lessons" "tutwin TOURRAIN: kind 2"
+check tour15 "altitude" "tutwin TOURALT: kind 2"
+check tour15 "the lessons' end" "tutwin TOURFORMDONE: kind 2"
+check tour16 "the base window's tour" "tutwin TOUR1GOVERNOR: kind 2"
+check tour16 "its end" "tutwin TOUR1OK: kind 2"
+check tour17 "social engineering's tour" "tutwin SOCTOURMAIN: kind 2"
+check tour17 "its end" "tutwin SOCTOUROK: kind 2"
+check tour18 "the design workshop's tour" "tutwin DESTOURCHAS: kind 2"
+check tour18 "its end" "tutwin DESTOURCANCEL: kind 2"
+check tour19 "the drone riots' tour" "tutwin DRONETOUR1: kind 2"
+check tour19 "its end" "tutwin TOUR1PSYCHBUTTON: kind 2"
+for t in 15 16 17 18 19; do
+    nocheck tour$t "no placeholder" "not reconstructed: TutWin_tour"
+    nocrash tour$t
+done
+
 exit $FAIL

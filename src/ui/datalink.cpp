@@ -648,6 +648,7 @@ void THISCALL Datalink_exec(uint8_t*, int32_t cat, int32_t id) {
     int32_t saved_kind = ReportWinKind, saved_tech = labs_tree_tech();
     DatalinkState w;
     w.name = "datalink";
+    w.slide = true;  // Datalink_on_status: slide_show / slide_hide
     int32_t extra = ScreenWidth == 800 ? 0 : 0x8A;
     int32_t H = (ScreenWidth == 800 ? 600 : 0x2E2) - 0xD5;
     int32_t X = (ScreenWidth - 800) / 2, Y = (ScreenHeight - 0xD5) - H;

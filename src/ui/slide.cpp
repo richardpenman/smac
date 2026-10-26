@@ -90,7 +90,7 @@ void wait_frame(uint32_t start) {
 
 }  // namespace
 
-void slide_show_window(Buffer* win, int32_t sx, int32_t sy, std::vector<uint8_t>* back) {
+void slide_show_window(Buffer* win, int32_t sx, int32_t sy, std::vector<uint8_t>* back, bool draw_arms) {
     load();
     if (GamePreferences & 0x400) Wave_play_2(main_menu_wave());
     Buffer* scr = ui_screen_canvas();
@@ -111,6 +111,7 @@ void slide_show_window(Buffer* win, int32_t sx, int32_t sy, std::vector<uint8_t>
         std::memcpy(scr->data, screen.data(), screen.size());
     }
     if (GamePreferences & 0x400) Sound_fade(main_menu_wave());
+    if (!draw_arms) return;
     // The arms in the window's canvas (and its background copy).
     int32_t ax[4];
     arm_x(win->width, ax);

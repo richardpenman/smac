@@ -23,3 +23,14 @@ void tutwin_draw_lines(Buffer* screen);
 void tutwin_button(int32_t button);
 // The base window's client point to the screen (Win_client_to_screen_2 of BaseWin).
 void basewin_client_to_screen(int32_t* x, int32_t* y);
+// The social engineering window for the tour (socialwin.cpp): open, closed after the tour's
+// display, and the screen centre of its rectangle `which` (see socialwin_point).
+bool socialwin_open();
+void socialwin_tour_close();
+void socialwin_point(int32_t which, int32_t* x, int32_t* y);
+// The design workshop for the tour (designwin.cpp): open, and the screen centre of its rectangle
+// `which` (see designwin_point); DesignWin_exec(faction, -2) shows it and runs
+// tutwin_tour7_steps (tutwin.cpp: TutWin_tour7's windows).
+bool designwin_open();
+void designwin_point(int32_t which, int32_t* x, int32_t* y);
+void tutwin_tour7_steps();
