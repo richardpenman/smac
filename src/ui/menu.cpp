@@ -5,9 +5,11 @@
 // command ids and separators of the original (table below, read from the asm) and the items it
 // hides at init.
 //
-// Approximated: the look (bar and pull-downs drawn with the interface's box tile and Arial 14,
-// not by Menu_on_redraw / PullDown_on_redraw; the pull-downs opened from the map's right-click menu
-// are the reconstructed PullDown of pulldown.cpp) and the item visibility of
+// The look from the asm (no screenshot of the original's menu could be taken: its XTEST Alt does not
+// open it): AlphaMenu's column of buttons above the console (AlphaMenu_init / compute / on_redraw /
+// adjust, menu2.pcx), the open menu's pull-down drawn by the reconstructed PullDown
+// (PullDown_on_redraw with AlphaMenu's fill functions, pulldown.cpp) at the column's right; the
+// item visibility of
 // pfncMainMenuUpdateVisible (only the init's hidden items and the menus of other modes: Network in
 // multiplayer, Scenario and Edit Map in the scenario editor). A chosen item runs its command id
 // through Console_menu_proc (console_menu.cpp), as Menu_menu_event does.
@@ -299,14 +301,14 @@ struct Menu {
     int32_t index = 0;
     char accel = 0;
     std::vector<Item> items;
-    int32_t x = 0, w = 0;  // on the bar
+    int32_t x = 0, w = 0;  // AlphaMenu's spot: its button (x, y, w, h) on the screen (w 0: not shown)
+    int32_t y = 0, h = 0;
 };
 std::vector<Menu> g_menus;
 bool g_built = false;
 bool g_open = false;   // the bar is shown
 int32_t g_cur = -1;    // open pull-down (-1: the bar only)
 int32_t g_sel = -1;    // selected item of the pull-down
-constexpr int32_t kBarH = 24, kItemH = 19;
 
 // "Ctrl+Shift+F1" -> virtual key with modifier bits; 0 when it is no key.
 int32_t parse_key(std::string s) {
@@ -417,48 +419,92 @@ bool menu_shown(const Menu& m) {
 
 int32_t color(int32_t r, int32_t g, int32_t b) { return Palette_get_nearest_palette_index(&GamePalette, r, g, b, 1); }
 
+// ---- AlphaMenu (0x402F40..0x403B70): the menus as a column of buttons above the console's MENU
+// button (AlphaMenu_init: menu2.pcx / menu.pcx at 800: the top 0x8B x 6, the buttons 0x8B x 0x12 in
+// three states at y 8, 0x1B, 0x2E; GraphicWin 0x51 x 0x8F, AlphaMenu_adjust: as tall as the top and
+// a button per menu, at the left of the 1024-wide layout, its bottom on the console's top).
+
+struct AlphaArt {
+    Sprite top, button[3];  // +0x10EC; +0x1118 normal, +0x1144 under the mouse, +0x1170 open
+    bool loaded = false;
+} g_art;
+// The menus in AlphaMenu's order (MainMenu_menu_init's pfncMainMenuAddBaseMenu calls: GAME, HQ,
+// NETWORK, MAP, ACTION, TERRAFORM, SCENARIO, EDITOR, HELP; HELP right-aligned: from the bottom).
+const int32_t kAddOrder[9] = {0, 1, 8, 2, 3, 9, 6, 10, 7};
+int32_t g_hover = -1;  // DAT_00696E3C: the button under the mouse
+
+void load_art() {
+    if (g_art.loaded) return;
+    g_art.loaded = true;
+    bool small = ScreenWidth == 800;
+    Buffer b;
+    Buffer_ctor(&b);
+    if (Buffer_load_pcx(&b, small ? "menu.pcx" : "menu2.pcx", nullptr, 10, 0xEC) != 0) return;
+    int32_t w = small ? 0x8A : 0x8B;
+    pfncSpriteFromCanvasRectTrans(&g_art.top, &b, 9, 1, 1, w, 6, 0);
+    for (int32_t k = 0; k < 3; k++) pfncSpriteFromCanvasRectTrans(&g_art.button[k], &b, 9, 1, 8 + 0x13 * k, w, 0x12, 0);
+}
+
+int32_t column_x() { return ScreenWidth == 800 ? 0 : (ScreenWidth - 0x400) / 2; }
+int32_t column_h() { return g_art.top.full_height + g_art.button[0].full_height * (int32_t)g_menus.size(); }
+// AlphaMenu_adjust: the column's top (its bottom on the main interface's top).
+int32_t column_y() {
+    const UiRect& pos = mi_rect(kMiPos);
+    return (pos.top - pos.bottom) - column_h() + ScreenHeight;
+}
+
+// AlphaMenu_compute: the shown menus' buttons from the top (right-aligned ones from the bottom).
 void layout(Buffer* s) {
-    Font* f = find_font(14, 1);
-    int32_t x = 8;
-    for (Menu& m : g_menus) {
-        if (!menu_shown(m)) {
-            m.w = 0;
+    load_art();
+    int32_t step = g_art.button[0].full_height, n = (int32_t)g_menus.size();
+    int32_t top = g_art.top.full_height, bottom = (n - 1) * step + top;
+    int32_t x0 = column_x(), y0 = column_y();
+    for (int32_t k = 0; k < 9 && k < n; k++) {
+        Menu* m = nullptr;
+        for (Menu& mm : g_menus)
+            if (mm.index == kAddOrder[k]) m = &mm;
+        if (!m) continue;
+        if (!menu_shown(*m)) {
+            m->w = 0;
             continue;
         }
-        m.x = x;
-        m.w = Font_width(f, m.title.c_str()) + 16;
-        x += m.w;
+        m->x = x0;
+        m->w = g_art.button[0].full_width;
+        m->h = step;
+        if (m->section == "HELP") {
+            m->y = y0 + bottom;
+            bottom -= step;
+        } else {
+            m->y = y0 + top;
+            top += step;
+        }
     }
     (void)s;
 }
 
-UiRect pulldown_rect(const Menu& m) {
-    Font* f = find_font(14, 1);
-    int32_t w = 0, h = 4;
+// The open menu's pull-down (AlphaMenu_on_adjust_pulldown_pos: at the column's right, level with
+// its button), drawn as the reconstructed PullDown (pulldown.cpp).
+PullDown g_pd;
+void build_pulldown(const Menu& m) {
+    PullDown_init(&g_pd, true);
     for (const Item& it : m.items) {
-        if (it.hidden) continue;
-        if (it.separator) {
-            h += 6;
-            continue;
-        }
-        int32_t iw = Font_width(f, it.text.c_str()) + Font_width(f, it.shortcut.c_str()) + 48;
-        if (iw > w) w = iw;
-        h += kItemH;
+        if (it.separator) PullDown_add_separator(&g_pd, 99);
+        else PullDown_add_item(&g_pd, it.id, it.raw.c_str());
+        if (it.hidden) PullDown_hide_item(&g_pd, it.separator ? 99 : it.id);
+        if (it.disabled && !it.separator) PullDown_disable_item(&g_pd, it.id);
+        if (it.checked) PullDown_check_item(&g_pd, it.id);
     }
-    return {m.x, kBarH, m.x + w, kBarH + h + 4};
+    pulldown_place(&g_pd, m.x + m.w, m.y);
+}
+UiRect pulldown_rect(const Menu& m) {
+    build_pulldown(m);
+    return {g_pd.x, g_pd.y, g_pd.x + g_pd.w, g_pd.y + g_pd.h};
 }
 
-// The visible item at y in the pull-down, -1 none.
+// The visible item at screen y in the pull-down, -1 none.
 int32_t item_at(const Menu& m, int32_t y) {
-    int32_t iy = kBarH + 4;
-    for (size_t i = 0; i < m.items.size(); i++) {
-        const Item& it = m.items[i];
-        if (it.hidden) continue;
-        int32_t h = it.separator ? 6 : kItemH;
-        if (y >= iy && y < iy + h) return it.separator ? -1 : (int32_t)i;
-        iy += h;
-    }
-    return -1;
+    build_pulldown(m);
+    return pulldown_row_at(&g_pd, y - g_pd.y);
 }
 
 void close_menus() {
@@ -479,6 +525,12 @@ void open_menu(int32_t i) {
     g_open = true;
     g_cur = i;
     g_sel = -1;
+    layout(nullptr);
+    if (i >= 0) {
+        const Menu& m = g_menus[i];
+        std::fprintf(stderr, "menu column at %d,%d (%dx%d): %s at %d,%d\n", column_x(), column_y(),
+                     g_art.top.full_width, column_h(), m.title.c_str(), m.x, m.y);
+    }
     if (i >= 0) {
         for (size_t k = 0; k < g_menus[i].items.size(); k++) {
             if (!g_menus[i].items[k].hidden && !g_menus[i].items[k].separator) {
@@ -572,6 +624,15 @@ bool console_menu_mouse(int32_t type, int32_t x, int32_t y) {
     build();
     if (!g_open) return false;
     if (type == UiInput::MOVE) {
+        int32_t hover = -1;  // AlphaMenu_on_mouse_move: the button under the mouse
+        for (size_t i = 0; i < g_menus.size(); i++) {
+            const Menu& m = g_menus[i];
+            if (m.w && x >= m.x && x < m.x + m.w && y >= m.y && y < m.y + m.h) hover = (int32_t)i;
+        }
+        if (hover != g_hover) {
+            g_hover = hover;
+            ui_invalidate();
+        }
         if (g_cur >= 0) {
             UiRect r = pulldown_rect(g_menus[g_cur]);
             if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) {
@@ -585,18 +646,12 @@ bool console_menu_mouse(int32_t type, int32_t x, int32_t y) {
         return true;
     }
     if (type != UiInput::LDOWN && type != UiInput::LUP) return true;
-    if (y < kBarH) {
-        if (type == UiInput::LDOWN) {
-            for (size_t i = 0; i < g_menus.size(); i++) {
-                const Menu& m = g_menus[i];
-                if (m.w && x >= m.x && x < m.x + m.w) {
-                    open_menu((int32_t)i);
-                    return true;
-                }
-            }
-            close_menus();
+    for (size_t i = 0; i < g_menus.size(); i++) {  // the column's buttons (AlphaMenu's spots)
+        const Menu& m = g_menus[i];
+        if (m.w && x >= m.x && x < m.x + m.w && y >= m.y && y < m.y + m.h) {
+            if (type == UiInput::LDOWN) open_menu((int32_t)i);
+            return true;
         }
-        return true;
     }
     if (g_cur >= 0) {
         UiRect r = pulldown_rect(g_menus[g_cur]);
@@ -646,50 +701,43 @@ void console_menu_draw(Buffer* s) {
     if (!g_open) return;
     build();
     layout(s);
-    BoxDef* b = box_def(9);
-    int32_t text = color(200, 220, 200), hi = color(228, 104, 24), dim = color(116, 156, 56);
-    UiRect bar = {0, 0, s->width, kBarH};
-    if (b && b->center) Buffer_tile(s, b->center, 0, 0, 0, 0, s->width, kBarH);
-    else Buffer_fill_3(s, &bar, 0);
-    Buffer_box_2(s, &bar, dim, 0);
-    Font* f = find_font(14, 1);
+    // AlphaMenu_on_redraw: the top, a button per menu (open: state 2, under the mouse: 1), the
+    // shown menus' titles in capitals 8 pixels inside their buttons, in the text colours of
+    // text.pcx (0x8C6BD4.. : open, normal; disabled).
+    const int32_t x0 = column_x(), y0 = column_y();
+    BlitDestScale = BlitSourceScale = 1;
+    if (g_art.top.width) pfncSpriteStretchCopyToCanvas(&g_art.top, s, g_art.top.key, x0, y0);
+    int32_t y = y0 + g_art.top.full_height;
+    std::vector<const Menu*> slots(g_menus.size(), nullptr);
+    for (size_t i = 0; i < g_menus.size(); i++) {
+        const Menu& m = g_menus[i];
+        if (m.w) slots[(m.y - y0 - g_art.top.full_height) / std::max(1, m.h)] = &m;
+    }
+    for (size_t k = 0; k < g_menus.size(); k++) {
+        const Menu* m = slots[k];
+        int32_t idx = m ? (int32_t)(m - g_menus.data()) : -1;
+        int32_t st = (idx >= 0 && idx == g_cur) ? 2 : (idx >= 0 && idx == g_hover ? 1 : 0);
+        Sprite* b = &g_art.button[st];
+        if (b->width) pfncSpriteStretchCopyToCanvas(b, s, b->key, x0, y);
+        y += g_art.button[0].full_height;
+    }
+    Font* f = find_font(ScreenWidth == 800 ? 12 : 16, 1);  // DAT_00945764
     Buffer_set_font(s, f, nullptr, nullptr, nullptr);
     for (size_t i = 0; i < g_menus.size(); i++) {
         const Menu& m = g_menus[i];
         if (!m.w) continue;
-        Buffer_set_text_color(s, (int32_t)i == g_cur ? hi : text, -1, 1, 1);
-        Buffer_write_l_3(s, m.title.c_str(), m.x + 8, 4, (int32_t)m.title.size());
+        bool open = (int32_t)i == g_cur;
+        int32_t c = text_color(open ? 0x8C6BD4 : 0x8C6BDC), sh = text_color(open ? 0x8C6BD8 : 0x8C6BE0);
+        Buffer_set_text_color(s, c, sh, 1, 1);
+        std::string t = m.title;
+        for (char& ch : t) ch = (char)std::toupper((unsigned char)ch);
+        UiRect r{m.x + 8, m.y, m.x + m.w - 8, m.y + m.h};
+        Buffer_write_l_4(s, t.c_str(), &r, (int32_t)t.size());
     }
     if (g_cur < 0) return;
-    const Menu& m = g_menus[g_cur];
-    UiRect r = pulldown_rect(m);
-    if (b && b->center) Buffer_tile(s, b->center, r.left, r.top, r.left, r.top, r.right - r.left, r.bottom - r.top);
-    else Buffer_fill_3(s, &r, 0);
-    Buffer_box_2(s, &r, dim, 0);
-    int32_t y = kBarH + 4;
-    for (size_t i = 0; i < m.items.size(); i++) {
-        const Item& it = m.items[i];
-        if (it.hidden) continue;
-        if (it.separator) {
-            Buffer_hline_2(s, r.left + 4, r.right - 4, y + 2, dim);
-            y += 6;
-            continue;
-        }
-        if ((int32_t)i == g_sel) {
-            UiRect h = {r.left + 2, y, r.right - 2, y + kItemH};
-            Buffer_fill_3(s, &h, color(40, 60, 40));
-        }
-        Buffer_set_text_color(s, it.disabled ? dim : ((int32_t)i == g_sel ? hi : text), -1, 1, 1);
-        Buffer_write_l_3(s, it.text.c_str(), r.left + 10, y + 1, (int32_t)it.text.size());
-        if (it.checked) {  // the check mark of Menu_check_menu_item
-            int32_t cx = r.left + 3, cy = y + kItemH / 2;
-            Buffer_line_2(s, cx, cy, cx + 2, cy + 3, (int32_t)i == g_sel ? hi : text);
-            Buffer_line_2(s, cx + 2, cy + 3, cx + 6, cy - 4, (int32_t)i == g_sel ? hi : text);
-        }
-        int32_t sw = Font_width(f, it.shortcut.c_str());
-        Buffer_write_l_3(s, it.shortcut.c_str(), r.right - 10 - sw, y + 1, (int32_t)it.shortcut.size());
-        y += kItemH;
-    }
+    build_pulldown(g_menus[g_cur]);
+    g_pd.selected = g_sel;
+    pulldown_render(&g_pd, s);
 }
 
 // ---- pfncMainMenuUpdateVisible (0x460DD0) ----

@@ -335,4 +335,13 @@ if [ -f "$ROOT/work/saves_late/turn_300.sav" ]; then
     nocrash opsrail
 fi
 
+# 20. The menus' look (AlphaMenu, menu.cpp, from the asm: no screenshot of the original's could be
+#     taken): a column of nine menu2.pcx buttons (0x8B x 0x12 under a 6 high top) above the
+#     console, the shown menus from the top (HELP at the bottom); the open menu's PullDown at its
+#     right (PullDown_on_redraw with AlphaMenu's fill functions).
+run menucol $NEW --keys "ENTER,A-m,DOWN,DOWN,SHOT:menu.bmp,ESC,A-h,ESC"
+check menucol "the column, MAP its third button" "^menu column at 0,343 \\(139x168\\): Map at 0,385"
+check menucol "HQ the second" "^menu column at 0,343 \\(139x168\\): HQ at 0,367"
+nocrash menucol
+
 exit $FAIL

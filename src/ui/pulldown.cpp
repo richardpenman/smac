@@ -354,3 +354,39 @@ void pulldown_draw_windows(Buffer* screen) {
         ui_layer_mark(p->x, p->y, &c, 0, kKey);
     }
 }
+
+// ---- the menu column's pull-downs (AlphaMenu: the open menu's PullDown, drawn while the column
+// runs its own input) ----
+
+void pulldown_place(PullDown* self, int32_t x, int32_t y) {
+    textcolor_load();
+    popup_art_init();
+    self->w = self->max_width + (kBorder + kMargin) * 2;
+    self->h = self->lines * line_height() + kBorder * 2;
+    x = std::max(x, 0);
+    y = std::max(y, 0);
+    if (x + self->w > ScreenWidth) x = ScreenWidth - self->w;
+    if (y + self->h > ScreenHeight) y = ScreenHeight - self->h;
+    self->x = x;
+    self->y = y;
+}
+
+void pulldown_render(PullDown* self, Buffer* screen) {
+    Buffer_ctor(&self->canvas);
+    Buffer_init(&self->canvas, std::max(1, self->w), std::max(1, self->h), 8, 0);
+    redraw(self);
+    const Buffer& c = self->canvas;
+    for (int32_t j = 0; j < c.height; j++) {
+        int32_t y = self->y + j;
+        if (y < 0 || y >= screen->height) continue;
+        const uint8_t* src = c.data + (size_t)j * c.stride;
+        uint8_t* dst = screen->data + (size_t)y * screen->stride;
+        for (int32_t i = 0; i < c.width; i++) {
+            int32_t x = self->x + i;
+            if (x < 0 || x >= screen->width || src[i] == kKey) continue;
+            dst[x] = src[i];
+        }
+    }
+}
+
+int32_t pulldown_row_at(const PullDown* self, int32_t y) { return row_at(self, y); }

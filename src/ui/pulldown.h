@@ -61,3 +61,8 @@ int32_t pulldown_item_id(const PullDown* self, int32_t index);
 // ---- not original functions ----
 // Composes the open pull-downs over the screen (win.cpp, ui_present).
 void pulldown_draw_windows(Buffer* screen);
+// The menu column's pull-down: placed at (x, y) (kept on the screen; PullDown_show's sizes),
+// drawn over the screen with its selection, and its row at y (window coordinates; -1 none).
+void pulldown_place(PullDown* self, int32_t x, int32_t y);
+void pulldown_render(PullDown* self, Buffer* screen);
+int32_t pulldown_row_at(const PullDown* self, int32_t y);
