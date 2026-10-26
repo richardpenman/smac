@@ -20,3 +20,6 @@ void reports_set_ops_view(int32_t view);
 // The commlink panel (multiwin.cpp): F12 and the console's COMMLINK button
 // (MainInterface_on_iface_button_clicked 0x3EC).
 ADDR_NATIVE(0x479970) void THISCALL MultiWin_show(uint8_t* self);
+
+// The base locator's timer (bl_daemon, 150 ms) while the reports are open (the modal pump).
+void reports_tick(uint32_t now_ms);

@@ -71,7 +71,7 @@ bool base_known(int32_t i, int32_t viewer) {
     if (GameState & 0x80) return true;
     const BASE& b = Bases[i];
     if (!(Factions[viewer].player_flags & 0x200) && !(map_tile(b.x, b.y)->visibility & (1 << viewer))) return false;
-    return (uint8_t)b.faction_id == viewer || (reinterpret_cast<const uint8_t*>(&b)[8] & (1 << viewer));
+    return (uint8_t)b.faction_id == viewer || (b.visibility & (1 << viewer));
 }
 
 }  // namespace

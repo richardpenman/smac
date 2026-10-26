@@ -872,8 +872,10 @@ int32_t worldwin_tile_to_pixel(int32_t x, int32_t y, int32_t* px, int32_t* py) {
     return 0;
 }
 
-// WorldWin_on_redraw (0x4C3EC0) into the main interface's canvas at the pane +0xCFC.
-void worldwin_draw() {
+void worldwin_draw() { worldwin_draw_to(canvas()); }
+
+// WorldWin_on_redraw (0x4C3EC0) into a main interface's canvas at the pane +0xCFC.
+void worldwin_draw_to(Buffer* c) {
     uint8_t* map = &WorldWin + 0x152C;
     int32_t q4 = (((ZoomNum < 1 ? 6 : ZoomNum * 0x32 / ZoomDenom) + 1) >> 2) * 4;
     int32_t w = (MapAreaX / 2) * q4 * 2, h = (MapAreaY / 2 - 2) * q4;
@@ -917,7 +919,6 @@ void worldwin_draw() {
     }
     Buffer_copy_4(&g_world_map, &g_world_final, 0, 0, 0, 0, w, h);
     // Into the pane: centred when it fits, else stretched.
-    Buffer* c = canvas();
     UiRect pane = rect(0xCFC);
     int32_t pw = pane.right - pane.left, ph = pane.bottom - pane.top;
     UiRect all{0, 0, c->width, c->height};

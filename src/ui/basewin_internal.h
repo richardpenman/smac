@@ -46,6 +46,7 @@ struct BaseButton {
     std::string name;          // +0xA7C
     bool has_name = false;
     int32_t set_state = 0;     // +0xA18 (BaseButton_set)
+    std::string bubble;        // +0xA80 (BaseButton_set_bubble_text): shown by a right click
     int32_t hover = 0;         // +0xA74
     int32_t pressed = 0;       // +0xA9C
     int32_t forced = -1;       // +0xAB8

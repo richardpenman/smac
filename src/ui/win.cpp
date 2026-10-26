@@ -4,6 +4,7 @@
 #include "ui/diplowin.h"
 #include "ui/win.h"
 #include "ui/planwin.h"
+#include "ui/reports.h"
 #include "ui/pulldown.h"
 #include "ui/texture.h"
 #include "ui/sprites.h"
@@ -423,8 +424,13 @@ UiRect g_bubble_r{};
 // The bubble's text (lines split at '^', find_font(12) plain): each line's width plus two space
 // widths, the box above the point (below when it would leave the screen's top), centred on it
 // and kept on the screen.
-void ui_bubble_set(const char* text, int32_t x, int32_t y) {
+void ui_bubble_set(const char* text, int32_t x, int32_t y) { ui_bubble_set_rect(text, UiRect{x, y, x, y}); }
+
+// Win_set_bubble_text (0x5F83D0) with its rectangle: the box above it (below when it would leave
+// the screen's top), centred on it, kept on the screen.
+void ui_bubble_set_rect(const char* text, const UiRect& at) {
     if (!text) return;
+    const int32_t x = at.left, y = at.top;
     Font* f = find_font(0xC, 0);
     g_bubble = text;
     int32_t w = 0, lines = 0;
@@ -440,8 +446,8 @@ void ui_bubble_set(const char* text, int32_t x, int32_t y) {
     int32_t lh = f->field_0 < 0 ? f->height : f->ascent_above + f->field_0;
     int32_t h = lh * lines;
     int32_t top = y - h;
-    if (top < 0) top = y;
-    int32_t left = ((x - w) + x) / 2;
+    if (top < 0) top = at.bottom;
+    int32_t left = ((at.right - w) + x) / 2;
     if (left < 0) left = 0;
     else if (ScreenWidth < left + w) left = ScreenWidth - w;
     g_bubble_r = {left, top, left + w, top + h};
@@ -654,6 +660,7 @@ int32_t ui_wait_key() {
         if (ControlTurnA) return 0;
         if (g_input.empty()) pump_platform(50);
         planwin_tick(platform::ticks_ms());  // the modal popup's timers: PlanWin_blink, line_timer
+        reports_tick(platform::ticks_ms());  // the reports' base locator (bl_daemon)
         if (g_input.empty()) continue;
         platform::Event ev = g_input.front();
         g_input.pop_front();
@@ -713,6 +720,7 @@ bool ui_wait_input(UiInput* in) {
         if (ControlTurnA) return false;
         if (g_input.empty()) pump_platform(50);
         planwin_tick(platform::ticks_ms());  // the modal popup's timers: PlanWin_blink, line_timer
+        reports_tick(platform::ticks_ms());  // the reports' base locator (bl_daemon)
         if (g_input.empty()) continue;
         platform::Event ev = g_input.front();
         g_input.pop_front();

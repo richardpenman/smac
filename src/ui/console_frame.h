@@ -48,6 +48,10 @@ int32_t console_view_height(int32_t screen_height);
 // and "TURN COMPLETE" (MainInterface_redraw_complete), into the main interface's canvas.
 void maininfc_geometry();
 void worldwin_draw();
+// The same into another main interface canvas (a screen's: the reports' WorldWin_show_all).
+void worldwin_draw_to(Buffer* mi);
+// WorldWin_tile_to_pixel (0x4C44E0): the pane coordinates of a tile; 1 when off the map.
+int32_t worldwin_tile_to_pixel(int32_t x, int32_t y, int32_t* px, int32_t* py);
 void maininfc_set_date();
 void maininfc_redraw_complete();
 

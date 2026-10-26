@@ -191,10 +191,12 @@ void sw_run(ScreenWin* s) {
         }
         bool right = in.type == UiInput::RDOWN || in.type == UiInput::RUP;
         if (in.type == UiInput::MOVE) {
+            ui_bubble_clear();  // (Win_clear_bubble_text)
             s->on_move(in.x - s->x, in.y - s->y);
             continue;
         }
         if (in.type == UiInput::RDOWN) continue;
+        if (in.type == UiInput::LDOWN) ui_bubble_clear();
         int32_t parent = -1, lx = 0, ly = 0;
         if (s->iface && in_box(in.x, in.y, mp) &&
             (opaque(&s->mi, in.x - mp.left, in.y - mp.top) || button_at(s, 1, in.x - mp.left, in.y - mp.top))) {
@@ -208,6 +210,12 @@ void sw_run(ScreenWin* s) {
         }
         if (parent < 0) continue;
         BaseButton* b = button_at(s, parent, lx, ly);
+        if (right && b && !b->bubble.empty()) {
+            // BaseButton_on_right_click -> BaseButton_timer_callback(0): its help bubble over it.
+            int32_t ox = parent ? mp.left : s->x, oy = parent ? mp.top : s->y;
+            ui_bubble_set_rect(b->bubble.c_str(), UiRect{b->r.left + ox, b->r.top + oy, b->r.right + ox, b->r.bottom + oy});
+            continue;
+        }
         if (right) {  // a right click (on release): the spot's menu
             int32_t index = -1, type = 0;
             spot_check(&s->spots[parent], lx, ly, &index, &type);

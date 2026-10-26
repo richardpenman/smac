@@ -163,6 +163,21 @@ has retire147 "the window" "^famestate faction 3 entries 1"
 check "hof_3_1.pcx written" "$(head -c 4 "$OUT/retire147/hof_3_1.pcx" 2>/dev/null | od -An -tx1 | tr -d ' ')" "0a050108"
 check "hallfame.jhh with the entry" "$(od -An -tx1 -j $((10 * 0x8C)) -N 2 "$OUT/retire147/hallfame.jhh" 2>/dev/null | tr -d ' ')" "010f"
 
+# 5c. The reports' hover help and base locator: a right click on a report button shows its name
+#     (BaseButton_set_bubble_text, ReportIf_on_status); a click on a base of base operations
+#     selects it alone: located on the world map pane (WorldWin_show_all, ReportIf_bl_anim's dot
+#     at its pixel less 7, 5).
+run locator147 --save work/saves_late/turn_147.sav --human 3 --keys "DOWN,ENTER,F4,RCLICK:360x732,CLICK:500x75,SHOT:loc.bmp,ESC"
+nocrash locator147
+has locator147 "the report button's help" "^bubble: BASE OPERATIONS"
+has locator147 "the base located" "^report locator: base 2 at 180,26"
+
+# 5d. The satellites report's ORBITAL ATTACK VIEW button (0xD3D, ReportWin_draw_sat's animation:
+#     satellite.flc in its box and the satellites of all factions as dots; none on turn_300).
+run satanim300 --save work/saves_late/turn_300.sav --human 3 --keys "ESC,ESC,ESC,ESC,ESC,ESC,ESC,F6,CLICK:700x41,SCREENSTATE,SHOT:sat.bmp,ESC"
+nocrash satanim300
+has satanim300 "the animation view" "^report sat anim satellites 0"
+
 # 6. Base operations' governor (turn_147, University Base selected: Set to BUILD, then off) and the
 #    commlink panel (F12): the contacts, a right click's menu, Faction Profile (the intelligence
 #    report), the Council button (call_council: COUNCILNEEDALL here).

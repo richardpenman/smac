@@ -21,11 +21,16 @@
 //     labs.cpp: its buttons move the centre, the mouse highlights them); the main interface's
 //     TECHNOLOGY / BASES list (a technology moves the tree, a base opens), the summary line and
 //     the progress per category (ReportIf_draw_labs).
+// From the asm too: the report buttons' help bubbles (a right click: BaseButton_set_bubble_text),
+// the base locator on the world map pane (WorldWin_show_all in base operations and secret
+// projects, ReportIf_bl_anim's dot0..3.pcx after a single base is selected or a project
+// clicked), the satellites' ORBITAL ATTACK VIEW (satellite.flc and the orbiting satellites,
+// ReportWin_sat_anim every 4000 ms), the production pictures of base operations.
 // Approximated (not compared with the original's pixels): the layout inside the window of the
 // other reports (rows and columns at the original's rectangles, text instead of some pictures:
-// the citizens of a base, the project pictures), the list boxes' look, the scroll bars, the
-// faction logo of the main interface's centre pane, the base locator map, the
-// satellite animation, the hover help. The faction buttons of ReportIf (viewing other factions'
+// the citizens of a base, the project pictures of the projects report), the list boxes' look,
+// the faction logo of the main interface's centre pane, the satellites' table and the orbital
+// attack (ReportWin_start_attack). The faction buttons of ReportIf (viewing other factions'
 // reports, only with GameState 0x80) are not drawn.
 #include <algorithm>
 #include <cstdio>
@@ -53,6 +58,9 @@
 #include "engine/net.h"
 #include "engine/zoc.h"
 #include "platform/ui_platform.h"
+#include "ui/console_frame.h"
+#include "ui/flic.h"
+#include <cmath>
 #include "ui/basewin.h"
 #include "ui/console.h"
 #include "ui/font_text.h"
@@ -96,6 +104,7 @@ struct ReportScreen : ScreenWin {
     Sprite buttons[7][3];        // report.pcx: the report buttons, three states
     BaseButton* report_btn[7]{};
     BaseButton* ops_btn[3]{};    // the views of base operations (ids 0x8B3..0x8B5)
+    BaseButton* sat_btn[2]{};    // the satellites' views: the table (0xD3C), the animation (0xD3D)
     std::vector<BaseButton*> ops_iface;  // GOVERNOR / BEST BASES tabs, the governor buttons
     bool ops_best = false;       // the BEST BASES tab (0xD0B) is shown
     std::vector<BaseButton*> labs_iface;  // TECHNOLOGY / BASES tabs (0x92, 0x93)
@@ -262,6 +271,16 @@ std::string governor_text(int32_t base_id) {
     return sw_label(0xBFC);
 }
 
+// FUN_00493B70: the mandate whose colour a facility is drawn in.
+int32_t report_facility_mandate(int32_t fac) {
+    switch (fac) {
+    case 3: case 0x1F: case 0x20: return 0;
+    case 4: case 0x1B: case 0x1C: case 0x1D: case 0x1E: case 0x44: return 3;
+    case 8: case 0xF: case 0x10: case 0x11: return 1;
+    default: return 2;
+    }
+}
+
 void ReportScreen::draw_ops() {
     Buffer* c = &canvas;
     std::string t = "[" + up(adj(faction)) + " " + up(sw_label(0xACC));
@@ -340,8 +359,37 @@ void ReportScreen::draw_ops() {
                 int32_t n = cost - have <= 0 ? 0 : (b.mineral_surplus - 1 + cost - have) / std::min(b.mineral_surplus, 99999);
                 turns = sw_label(0xC4) + ":  " + num(std::min(n, 999999));
             }
-            sw_font(c, f_text, 0xE1);
-            sw_text(this, c, what, col, row.top + 5);
+            // The item's picture (ReportWin_draw_ops 0x8B3): a facility's or project's in its
+            // mandate's colour scaled to the row (Sprite_draw_mono_2 with the row's height over
+            // the pictures' size), a unit's model (veh_fake, zoom -8, flags 0x4C); the name in the
+            // mandate's colour at 0x3C.
+            int32_t mandate;
+            if (item < 0) {
+                int32_t fac = -item;
+                Sprite* sp = basewin_facility_picture(fac);
+                int32_t od = BlitDestScale, os = BlitSourceScale;
+                BlitDestScale = (row.bottom - row.top) - 2;
+                BlitSourceScale = basewin_facility_picture(fac < 0x46 ? 0 : 0x46)->full_height;
+                mandate = fac < 0x46 ? report_facility_mandate(fac) : 1;
+                Buffer_set_clip(c, &row);
+                Sprite_draw_mono_2(sp, c, sp->key & 0xFF, col + 8, row.top + 4, mandate_color(mandate));
+                Buffer_set_clip(c, &all);
+                BlitDestScale = od;
+                BlitSourceScale = os;
+            } else {
+                const uint8_t* u = reinterpret_cast<const uint8_t*>(&Units[item]);
+                int32_t plan = (int8_t)u[0x2A];
+                mandate = (item > 0x3F && !(u[0x30] & 4)) ? 1
+                          : (plan == 3 || plan == 7 || plan == 8) ? 0
+                          : (plan == 9 || plan == 10) ? 2
+                          : plan == 11 ? 1 : 3;  // FUN_00493AF0
+                int32_t v = veh_fake(item, (uint8_t)b.faction_id);
+                Buffer_set_clip(c, &row);
+                veh_draw(c, v, col, row.top + 4, -8, 0x4C, 0);
+                Buffer_set_clip(c, &all);
+            }
+            sw_font(c, f_text, mandate_color(mandate));
+            sw_text(this, c, what, col + 0x3C, row.top + 5);
             sw_font(c, f_text, 0xF2);
             UiRect rr{col, row.bottom - line_h() - 1, row.right - 4, row.bottom - 1};
             std::string amount = "(" + num(have) + "/" + num(cost) + ")    " + turns;
@@ -988,10 +1036,95 @@ void ReportScreen::draw_projects() {
 
 // ---- satellites ----
 
+namespace {
+// ReportWin_draw_sat's animation view (button 0xD3D): satellite.flc in a box 0x240 x 0xD2 centred
+// in the window and sixteen satellites on spring orbits (the first N, N the satellites of all the
+// factions, shown as 2 x 2 dots); ReportWin_sat_anim every 4000 ms (sat_anim_daemon): the orbits
+// stepped (dt 0.02), the film's next frame, the dots.
+struct SatAnim {
+    float x[16], y[16], vx[16], vy[16], k[16];
+    int32_t on[16];
+    UiRect box{};
+    int32_t cx = 0, cy = 0, fx = 0, fy = 0, frame = 0;
+    uint32_t last = 0;
+    bool active = false;
+} g_sat;
+int32_t g_sat_view = 0xD3C;  // DAT_0088037C: the satellites report's view button (0xD3C the table)
+
+void sat_frame(Buffer* c) {
+    SatAnim& a = g_sat;
+    UiRect in{a.box.left + 3, a.box.top + 3, a.box.right - 3, a.box.bottom - 3};
+    Buffer_fill_3(c, &in, 0x41);  // GraphicWin_fill_2(+0xE2B0, 0x41)
+    const float dt = 0.02f;
+    for (int32_t i = 0; i < 16; i++) {
+        a.vx[i] = a.vx[i] - a.k[i] * a.x[i];
+        a.vy[i] = a.vy[i] - a.k[i] * a.y[i];
+        a.x[i] = a.vx[i] * dt + a.x[i];
+        a.y[i] = a.vy[i] * dt + a.y[i];
+    }
+    if (const Flc* f = flc_get("satellite.flc")) {
+        a.frame++;
+        Buffer_set_clip(c, &in);
+        flc_draw(c, f, a.fx, a.fy, a.frame);
+        UiRect all{0, 0, c->width, c->height};
+        Buffer_set_clip(c, &all);
+    }
+    for (int32_t i = 0; i < 16; i++) {
+        if (!a.on[i]) continue;
+        int32_t yy = (int32_t)a.y[i] + a.cy;
+        int32_t xx = (int32_t)a.x[i] + a.cx;
+        Buffer_fill(c, xx, yy, 2, 2, 0xFF);
+    }
+}
+
+void sat_start(Buffer* c, const UiRect& win) {
+    SatAnim& a = g_sat;
+    int32_t x0 = (win.right - 0x240 + win.left) / 2, y0 = (win.bottom - 0xD2 + win.top) / 2;
+    a.box = {x0, y0 + 0x14, x0 + 0x240, y0 + 0xE6};
+    a.cx = (a.box.right + a.box.left) / 2;
+    a.cy = (a.box.bottom + a.box.top) / 2;
+    const Flc* f = flc_get("satellite.flc");
+    a.fx = a.cx - (f ? f->width : 0) / 2;
+    a.fy = a.cy - (f ? f->height : 0) / 2;
+    a.frame = 0;
+    Buffer_box_sprite(c, &a.box, box_def(4));
+    a.box = {a.box.left + 3, a.box.top + 3, a.box.right - 3, a.box.bottom - 3};
+    int32_t total = 0;
+    for (int32_t fa = 1; fa < 8; fa++)
+        total += Factions[fa].satellites_nutrient + Factions[fa].satellites_mineral + Factions[fa].satellites_energy +
+                 Factions[fa].satellites_ODP;
+    for (int32_t i = 0; i < 16; i++) {
+        int32_t r = 0xD2 / 2 - 10;
+        float k = (float)std::sqrt((double)(int32_t)(float)(r * r * 2));
+        k = (float)(std::sqrt((double)(1.0f / (k * k * k))) * 700.0);
+        float p = (float)i * 0.0625f;
+        float a1 = p * 6.28f, a2 = ((i & 1) ? 0.125f : -0.125f) + p;
+        a2 *= 6.28f;
+        a.x[i] = (float)(std::cos((double)(k + a1)) * r);
+        a.y[i] = (float)(std::sin((double)(k + a2)) * r);
+        a.vx[i] = (float)(std::sin((double)(k + a1)) * -r * k);
+        a.vy[i] = (float)(std::cos((double)(k + a2)) * k * r);
+        a.k[i] = k * 0.02f * k;
+        a.on[i] = i < total;
+    }
+    a.active = true;
+    a.last = platform::ticks_ms();
+    sat_frame(c);
+}
+}  // namespace
+
 void ReportScreen::draw_sat() {
     Buffer* c = &canvas;
     title("[" + up(adj(faction)) + " " + up(sw_label(0xAD4)) + "]");
     UiRect in = inner(), tr = title_rect();
+    g_sat.active = false;
+    if (g_sat_view != 0xD3C) {
+        sat_start(c, in);
+        int32_t n = 0;
+        for (int32_t i = 0; i < 16; i++) n += g_sat.on[i];
+        state.push_back("sat anim satellites " + num(n));
+        return;
+    }
     // Nobody has the satellites' technology (the Sky Hydro Lab's): "Orbital Spaceflight not yet
     // achieved" (label 0xCC4) in the middle.
     bool any = false;
@@ -1228,6 +1361,8 @@ void ReportScreen::redraw() {
     UiRect frame{0x17, 0, 0x28A + 0x17, c->height};
     Buffer_box_sprite(c, &frame, box_def(9));
     sw_restore_iface(this);
+    // ReportIf_draw_ops / draw_projects: WorldWin_show_all (the world map pane, the base locator's).
+    if (kind() == kOps || kind() == kProjects) worldwin_draw_to(&mi);
     {
         // The centre pane's header (ReportIf_draw_*): the report, M.Y.; base operations: the
         // energy reserves.
@@ -1295,6 +1430,11 @@ void ReportScreen::redraw() {
         b->shown = kind() == kLabs;
         bw_button_set(b, (b->id == 0x92) == (labs_tab != 0));
     }
+    for (int32_t i = 0; i < 2; i++) {
+        if (!sat_btn[i]) continue;
+        sat_btn[i]->shown = kind() == kSat;
+        bw_button_set(sat_btn[i], g_sat_view == 0xD3C + i);
+    }
     for (int32_t i = 0; i < 3; i++) {
         if (!ops_btn[i]) continue;
         ops_btn[i]->shown = kind() == kOps;
@@ -1326,6 +1466,7 @@ void ReportScreen::on_button(int32_t id) {
     }
     // ReportWin_on_button_clicked: the views of base operations, DATALINKS (1), CLOSE (9).
     if (id >= 0x8B3 && id <= 0x8B5) g_ops_view = id - 0x8B3;
+    if (id == 0xD3C || id == 0xD3D) g_sat_view = id;  // ReportWin_on_group_clicked
     if (id == 9) sw_close(this);
     if (id == 1) {  // DATALINKS: the entry of the report's subject
         switch (kind()) {
@@ -1382,6 +1523,8 @@ void ReportScreen::on_key(int32_t key) {
     }
     scroll = std::max(0, std::min(scroll, last));
 }
+
+void locator_start(int32_t base_id);
 
 void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool, bool dbl) {
     if (type == 99) {  // the window's scroll bar (Scroll 0x882584): a line or a page
@@ -1476,6 +1619,13 @@ void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t
         bw_unlock_base(base_id);
         return;
     }
+    if (kind() == kProjects && index >= 0 && index < 0x800 && type == 0) {
+        // ReportWin_on_left_click (5): a project or a base under construction: its base located
+        // on the world map.
+        int32_t base_id = index < 0x400 ? SecretProjects[index] : index - 0x400;
+        if (base_id >= 0 && base_id < BaseCount) locator_start(base_id);
+        return;
+    }
     if (index >= 0x400 && index < 0x800) {
         // A row: the base selected (shift: a range, ctrl: toggled).
         int32_t id = index - 0x400;
@@ -1493,8 +1643,78 @@ void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t
             selected[id >> 5] |= 1u << (id & 31);
         }
         last_click = index;
+        // A single base selected (+0x5A04): located on the world map (ReportIf_bl_anim).
+        int32_t n = 0;
+        for (int32_t i = 0; i < 0x200; i++) n += (selected[i >> 5] >> (i & 31)) & 1;
+        if (n == 1) locator_start(id);
     }
 }
+
+// ---- the base locator (ReportIf_bl_anim 0x4A4060, bl_daemon every 150 ms) ----
+
+namespace {
+Sprite g_dots[4];          // ReportIf +0x20254: dot0.pcx .. dot3.pcx (12 x 12)
+int32_t g_bl = 11;         // +0x1E248: the animation's step (-1 .. 10)
+int32_t g_bl_x = 0, g_bl_y = 0;  // +0x1E24C: in the world map pane
+uint32_t g_bl_last = 0;
+}  // namespace
+
+// ReportIf_bl_anim: the world map redrawn, the step's dot (0 0 1 2 3 2 3 2 1 0 0) at the base;
+// the timer stops at step 10.
+void locator_step() {
+    if (g_bl > 10) return;
+    worldwin_draw_to(&g_rs.mi);
+    static const int8_t kFrame[12] = {0, 0, 1, 2, 3, 2, 3, 2, 1, 0, 0, -1};  // steps -1 .. 10
+    int32_t fr = kFrame[g_bl + 1];
+    if (fr >= 0 && g_dots[fr].width) {
+        UiRect pane = mi_rect(0xCFC);
+        BlitDestScale = BlitSourceScale = 1;
+        pfncSpriteStretchCopyToCanvas(&g_dots[fr], &g_rs.mi, g_dots[fr].key, pane.left + g_bl_x, pane.top + g_bl_y);
+    }
+    g_bl++;
+    ui_invalidate();
+}
+
+// ReportWin_on_left_click: a base the viewer knows (its own or seen) located: the dot's animation
+// at its world map pixel less (7, 5).
+void locator_start(int32_t base_id) {
+    const BASE& b = Bases[base_id];
+    if ((uint8_t)b.faction_id != CurrentPlayerFaction && !(b.visibility & (1 << CurrentPlayerFaction))) return;
+    static bool loaded = false;
+    if (!loaded) {
+        loaded = true;
+        for (int32_t i = 0; i < 4; i++) {
+            Buffer art;
+            Buffer_ctor(&art);
+            std::string file = "dot" + std::to_string(i) + ".pcx";
+            if (Buffer_load_pcx(&art, file.c_str(), nullptr, 0, 0xEC) == 0)
+                pfncSpriteFromCanvasRectTrans(&g_dots[i], &art, 9, 0, 0, 0xC, 0xC, 0);
+        }
+    }
+    int32_t px = 0, py = 0;
+    worldwin_tile_to_pixel(b.x, b.y, &px, &py);
+    g_bl_x = px - 7;
+    g_bl_y = py - 5;
+    g_bl = -1;
+    g_bl_last = platform::ticks_ms();
+    std::fprintf(stderr, "report locator: base %d at %d,%d\n", base_id, g_bl_x, g_bl_y);
+    locator_step();
+}
+
+}  // namespace
+
+void reports_tick(uint32_t now) {
+    if (g_rs.open && g_sat.active && kind() == kSat && now - g_sat.last >= 4000) {  // sat_anim_daemon
+        g_sat.last = now;
+        sat_frame(&g_rs.canvas);
+        ui_invalidate();
+    }
+    if (!g_rs.open || g_bl > 10 || now - g_bl_last < 150) return;
+    g_bl_last = now;
+    locator_step();
+}
+
+namespace {
 
 void load_buttons() {
     static bool loaded = false;
@@ -1539,6 +1759,8 @@ void open_reports(int32_t k) {
             bt->tl[st] = bt->top[st] = bt->tr[st] = nullptr;
             bt->sprite[st] = &s->buttons[i][st];
         }
+        // ReportIf_on_status: the report's name as its help bubble (labels 0xAC4..0xADC).
+        bt->bubble = label_get((0xAC4 + (uint32_t)i * 4) / 4);
         s->report_btn[i] = bt;
     }
     // The view buttons of base operations (production, citizens, garrison: ids 0x8B3..0x8B5)
@@ -1552,6 +1774,12 @@ void open_reports(int32_t k) {
         s->ops_btn[i] = sw_button(s, up(sw_label(labels[i])).c_str(), 0x8B3 + i, lefts[i], by, rights[i] - lefts[i], 0x14, 0,
                                   s->f_bold);
     }
+    // The satellites' two views (ReportIf_on_status: labels 0xCB0 / 0xCB4, the halves of the same
+    // row; the table set).
+    s->sat_btn[0] = sw_button(s, up(sw_label(0xCB0)).c_str(), 0xD3C, bx, by, bw / 2 - 1, 0x14, 0, s->f_bold);
+    s->sat_btn[1] = sw_button(s, up(sw_label(0xCB4)).c_str(), 0xD3D, bw / 2 + 1 + bx, by, bx + bw - (bw / 2 + 1 + bx), 0x14,
+                              0, s->f_bold);
+    g_sat_view = 0xD3C;
     // DATALINKS (1) and CLOSE (9) below the report (ReportIf_on_status).
     int32_t cx = (in.left + in.right) / 2, dl = in.left + 0x4B;
     sw_button(s, up(sw_label(0x86C)).c_str(), 1, dl, in.bottom + 7, cx - 1 - dl, 0x14, 0, s->f_bold);
