@@ -25,6 +25,7 @@
 #include "ui/console.h"
 #include "ui/console_frame.h"
 #include "ui/popup.h"
+#include "ui/pulldown.h"
 #include "ui/win.h"
 
 namespace {
@@ -280,7 +281,7 @@ const Entry kMenuInit[] = {
 const int32_t kHidden[] = {0x106, 0x107, 0x301, 0x309, 0x30A, 0x310, 0x306, 0x304, 0x5A};
 
 struct Item {
-    std::string text, shortcut;
+    std::string text, shortcut, raw;  // raw: the menu.txt line ('&', "|shortcut")
     int32_t id = 0, key = 0;
     bool separator = false, hidden = false;
     char accel = 0;
@@ -360,6 +361,7 @@ void build() {
             if (cur) {
                 Item it;
                 std::string line = text_get();
+                it.raw = line;
                 size_t bar = line.find('|');
                 it.text = strip_amp(line.substr(0, bar), &it.accel);
                 if (bar != std::string::npos) it.shortcut = line.substr(bar + 1);
@@ -375,6 +377,7 @@ void build() {
                     Item it;
                     it.text = strip_amp(Order[i + 4].order, &it.accel);
                     it.shortcut = Terraform[i].shortcuts ? Terraform[i].shortcuts : "";
+                    it.raw = std::string(Order[i + 4].order) + (it.shortcut.empty() ? "" : "|" + it.shortcut);
                     it.id = e.id + i;
                     it.key = parse_key(it.shortcut);
                     cur->items.push_back(it);
@@ -599,6 +602,25 @@ bool console_menu_mouse(int32_t type, int32_t x, int32_t y) {
     }
     if (type == UiInput::LDOWN) close_menus();
     return true;
+}
+
+void console_menu_popup(int32_t index, int32_t x, int32_t y) {
+    build();
+    for (const Menu& m : g_menus) {
+        if (m.index != index || m.title.empty()) continue;
+        // Menu_id_to_index + PullDown_show(x, y, 0) of the menu's pull-down; the chosen item goes to
+        // Menu_menu_event (the console's menu procedure).
+        PullDown pd;
+        PullDown_init(&pd, true);
+        for (const Item& it : m.items) {
+            if (it.separator) PullDown_add_separator(&pd, 99);
+            else PullDown_add_item(&pd, it.id, it.raw.c_str());
+            if (it.hidden) PullDown_hide_item(&pd, it.separator ? 99 : it.id);
+        }
+        int32_t sel = PullDown_show(&pd, x, y);
+        if (sel >= 0 && sel < (int32_t)m.items.size() && PullDown_get_selected(&pd) >= 0) choose(m.items[sel]);
+        return;
+    }
 }
 
 void console_menu_draw(Buffer* s) {

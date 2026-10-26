@@ -1,6 +1,7 @@
 // Window layer of smacx (see win.h): screen, message pump, keyboard, placeholder console panel.
 #include "ui/diplowin.h"
 #include "ui/win.h"
+#include "ui/pulldown.h"
 #include "ui/sound.h"
 
 #include <algorithm>
@@ -392,6 +393,7 @@ void ui_present() {
     screens_compose(&g_canvas);  // full-screen windows (reports, social engineering; screenwin.h)
     basewin_compose(&g_canvas);  // the base window over the console frame
     console_menu_draw(&g_canvas);
+    pulldown_draw_windows(&g_canvas);
     popup_draw_windows(&g_canvas);
     console_draw_cursor(&g_canvas);
     set_layers();
@@ -453,7 +455,9 @@ void GAMEAPI wait_task() {
             ui_mouse(UiInput::LUP, x1, y1);
         } else if (std::sscanf(k.command.c_str(), "rclick %d %d", &x1, &y1) == 2) {
             ui_mouse(UiInput::MOVE, x1, y1);
+            g_script_mods = k.vk & 0x30000;  // S-RCLICK / C-RCLICK: shift / ctrl held
             ui_mouse(UiInput::RDOWN, x1, y1);
+            g_script_mods = 0;
             ui_mouse(UiInput::RUP, x1, y1);
         } else if (std::sscanf(k.command.c_str(), "drag %d %d %d %d", &x1, &y1, &x2, &y2) == 4) {
             ui_mouse(UiInput::MOVE, x1, y1);

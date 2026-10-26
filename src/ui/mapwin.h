@@ -20,6 +20,7 @@ constexpr uint32_t kMwTileCache = 0x4;        // per-tile terrain cache pointer 
 constexpr uint32_t kMwElevScale = 0x1DD6C;    // corner height step: 25 (8 with "flat terrain")
 constexpr uint32_t kMwOptions = 0x1DD70;      // display option bits (MapWinOptions for the main view)
 constexpr uint32_t kMwActive = 0x1DD74;
+constexpr uint32_t kMwIndex = 0x1DD78;        // index in MapWins (0: main view, 1: world map)
 constexpr uint32_t kMwTracking = 0x1DD80;     // mouse-over tracking active
 constexpr uint32_t kMwZoom = 0x1DD98;         // zoom step (0: normal; < 0: smaller)
 constexpr uint32_t kMwCenterX = 0x1DD9C;

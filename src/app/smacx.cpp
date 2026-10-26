@@ -25,7 +25,8 @@
 //
 // --keys: scripted input, consumed before real input. Tokens: a character (b, B = shift+b, ., [ ...),
 // LEFT RIGHT UP DOWN HOME END PGUP PGDN ENTER SPACE TAB BACK ESC F1..F12, KP1..KP9 (keypad),
-// C-x (ctrl), S-x (shift), CLICK:XxY (a left click in a popup), POPUP:FILE/LABEL[/FLAGS[/PCX]]
+// C-x (ctrl), S-x (shift), CLICK:XxY (a left click in a popup), RCLICK:XxY (a right click; S-RCLICK /
+// C-RCLICK with shift / ctrl held: the map's right-click menu), POPUP:FILE/LABEL[/FLAGS[/PCX]]
 // (shows a script popup, a test aid), PLAYSOUND:FILE (decodes and plays a WAV / MP3 file on the
 // voice object, logging its length), MUSICRENDER:FILE:SECONDS (the music's next seconds into a WAV
 // file in --outdir), MOVIE:NAME (plays movies\NAME.wve), BASEDUMP:FILE (the open base window's canvases in the
@@ -526,6 +527,11 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         bool dbl = tok[0] == 'D';
         if (std::sscanf(tok.c_str() + (dbl ? 7 : 6), "%dx%d", &x, &y) != 2) return false;
         out->command = (dbl ? "dclick " : "click ") + std::to_string(x) + " " + std::to_string(y);
+        return true;
+    }
+        if (tok.rfind("S-RCLICK:", 0) == 0 || tok.rfind("C-RCLICK:", 0) == 0) {  // with shift / ctrl held
+        if (!parse_key(tok.substr(2), out)) return false;
+        out->vk |= tok[0] == 'S' ? 0x10000 : 0x20000;
         return true;
     }
         if (tok.rfind("RCLICK:", 0) == 0 || tok.rfind("MOVE:", 0) == 0) {  // a right click / mouse move

@@ -32,6 +32,9 @@ void ui_set_drag_target(int32_t x, int32_t y);
 bool console_menu_mouse(int32_t type, int32_t x, int32_t y);
 bool console_menu_key(int32_t key);
 void console_menu_draw(Buffer* screen);
+// The pull-down of menu `index` (Menu_id_to_index: 3 Action, 9 Terraform, ...) shown at the screen
+// position (x, y) as MapWin_right_menu shows it; the chosen command runs (menu.cpp).
+void console_menu_popup(int32_t index, int32_t x, int32_t y);
 // Height of the main view (the map window): the screen minus the console's lower part.
 int32_t console_view_height(int32_t screen_height);
 

@@ -27,9 +27,7 @@ void THISCALL Console_zoom_to_upkeep_base(uint8_t*) { console_not_reconstructed(
 void THISCALL Console_show_scen_objectives(uint8_t*) { console_not_reconstructed("Console_show_scen_objectives"); }
 void THISCALL Console_custom_my_faction(uint8_t*) { console_not_reconstructed("Console_custom_my_faction"); }
 void THISCALL Console_corner_the_market(uint8_t*) { console_not_reconstructed("Console_corner_the_market"); }
-// The unit menu of a right click (ui module, not reconstructed: logs).
-void THISCALL MapWin_right_menu(uint8_t*, int32_t, int32_t, int32_t, int32_t) {
-    console_not_reconstructed("MapWin_right_menu");
-}
+void THISCALL Console_editor_edit_veh(uint8_t*, int32_t) { console_not_reconstructed("Console_editor_edit_veh"); }
+void THISCALL Console_editor_kill_veh(uint8_t*, int32_t) { console_not_reconstructed("Console_editor_kill_veh"); }
 // Scenario editor brush (ui module, not reconstructed).
 void THISCALL MapWin_editor(uint8_t*, int32_t, int32_t, int32_t) { console_not_reconstructed("MapWin_editor"); }

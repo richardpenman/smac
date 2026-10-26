@@ -1,0 +1,26 @@
+; The plain original under Xvfb (tests/popups/orig_drive.py): QUICK START, the start-of-game
+; popups answered, then the map's right-click menu (shift + right click on the first base's tile).
+wait 10
+click 835 362
+wait 7
+key Return
+wait 4
+key Return
+wait 4
+key Return
+wait 3
+shot start
+rclick 512 300 S
+wait 2
+shot rmenu
+key Escape
+wait 1
+rclick 600 330 S
+wait 2
+shot rmenu2
+key Escape
+wait 1
+key C+q
+wait 2
+key Return
+wait 1

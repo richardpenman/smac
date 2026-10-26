@@ -153,6 +153,14 @@ ADDR_NATIVE(0x46D5D0) void THISCALL MapWin_click(uint8_t* win, int32_t px, int32
 ADDR_NATIVE(0x50F170) void GAMEAPI go_timer();
 ADDR_NATIVE(0x5147E0) int32_t THISCALL Console_set_cursor(uint8_t* console, int32_t x, int32_t y);
 
+// Landmarks (mapwin_menu.cpp): name / rename the landmark at (x, y) (off the map: the cursor's
+// tile; LANDMARK text entry) and erase it (LANDMARKKILL).
+ADDR_NATIVE(0x5162A0) void THISCALL Console_name_landmark(uint8_t* console, int32_t x, int32_t y);
+ADDR_NATIVE(0x516490) void THISCALL Console_erase_landmark(uint8_t* console, int32_t x, int32_t y);
+// Scenario editor: edit / kill the unit (veh -1: the one at the cursor).
+ADDR_NATIVE(0x4DDA50) void THISCALL Console_editor_edit_veh(uint8_t* console, int32_t veh_id);
+ADDR_NATIVE(0x4DE960) void THISCALL Console_editor_kill_veh(uint8_t* console, int32_t veh_id);
+
 // ---- placeholders: original functions the console calls that are not reconstructed yet
 // (console_placeholders.cpp). Each logs its name once and does nothing unless noted. ----
 ADDR_NATIVE(0x46AE00) void GAMEAPI draw_cursor();

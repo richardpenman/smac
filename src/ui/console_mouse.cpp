@@ -38,7 +38,6 @@ GLOBAL(int32_t, MouseMoveBusy, 0x7F67C4);     // MapWin_on_mouse_move re-entry g
 GLOBAL(int32_t, WorldBuildBrush, 0x945AE0);   // scenario editor brush (0, 2, 0x12: climate changes)
 
 // MapWin fields used by the mouse code (byte offsets of the MapWin object).
-constexpr uint32_t kMwIndex = 0x1DD78;        // index in MapWins (0: main view, 1: world map)
 constexpr uint32_t kMwRightCount = 0x1DD7C;
 constexpr uint32_t kMwGroupDrag = 0x1DD84;    // the drag moves the stack (Console_group)
 constexpr uint32_t kMwIgnoreClick = 0x1DD88;  // the next click is ignored (set by go_reset)

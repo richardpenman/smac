@@ -203,8 +203,12 @@ computer players move with the engine.
   selected; CURSOR.PCX cursors drawn in software), MapWin_on_left_down / left_click /
   right_click / right_down / mouse_move, MapWin_click (select, centre, open bases, the modes'
   targets, rally-point drag), the go-to drag (go_timer, go_reset) and its keys (g, space, j).
-  say_orders (statuswin.cpp). Not reconstructed: MapWin_right_menu, MapWin_editor, the path
-  preview (MapWin_dest_line, Console_goto_routine's PlanWin). Sounds: section 12.
+  say_orders (statuswin.cpp). The map's right-click menu (MapWin_right_menu, mapwin_menu.cpp) on
+  the reconstructed PullDown (pulldown.cpp: items, separators, disabled rows, AlphaMenu's row
+  fill, keys and mouse), with its Action... / Terraform... sub-menus (the menu bar's pull-downs)
+  and the landmark commands (Console_name_landmark, Console_erase_landmark; shift+N,
+  ctrl+shift+N). Not reconstructed: MapWin_editor, the path preview (MapWin_dest_line,
+  Console_goto_routine's PlanWin). Sounds: section 12.
 * **Main interface** (console_frame.cpp; approximated, see its header): console2_A.pcx frame,
   pane backgrounds, menu / commlink buttons, "TURN COMPLETE", the unit, tile, stack, info and
   date panes and a simple world map, drawn with the original's art, fonts and colours at the
@@ -215,8 +219,7 @@ computer players move with the engine.
 * **Save / load**: ctrl+S / ctrl+L (and the Game menu) run the engine's save_game / load_game with
   a simple file box (console_filebox.cpp): a name field, a list of saves; original naming.
 * **Placeholders** (src/ui/console_placeholders.cpp): the map cursor and selected unit are
-  diamonds; preferences, landmarks, the scenario
-  editor, the unit menu of a right click, time controls, survey, assemble, tutorial hints log
+  diamonds; the scenario editor, time controls, survey, assemble, tutorial hints log
   "not reconstructed". Multiplayer paths stop at the first network call.
 * **Testing**: `--keys` scripts input (characters, `C-`/`S-`/`A-` modifiers, `ALT`, `CLICK:XxY`,
   `RCLICK:XxY`, `MOVE:XxY`, `DRAG:X1xY1:X2xY2` (a held left button: the go-to drag), KP1..KP9, named keys, and
