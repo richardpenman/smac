@@ -2,7 +2,7 @@
 
 A native, cross-platform reconstruction of *Sid Meier's Alpha Centauri: Alien Crossfire*,
 rebuilt from the original game and verified to play identically to it. It runs on Windows, macOS
-and Linux. You need your own copy of the game (GOG's Planetary Pack, Alien Crossfire v2.0).
+and Linux. You need your own copy of the game.
 
 | | |
 |---|---|
@@ -44,6 +44,6 @@ make clean      # start the build again from scratch
 
 The whole single-player game works: game setup, the map, units, bases, research, the design
 workshop, diplomacy, the Planetary Council, reports, saving and loading, sound, music and movies.
-Multiplayer is not supported. Known gaps are listed in `docs/UI_PLAN.md` (section 13).
+Multiplayer is not supported. Known gaps are listed in the [UI plan](docs/UI_PLAN.md) (section 13).
 
-Development details (how the reconstruction is verified, releases, layout): `docs/DEVELOPMENT.md`.
+Development details (how the reconstruction is verified, releases, layout): [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
