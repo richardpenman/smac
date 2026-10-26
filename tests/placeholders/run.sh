@@ -272,7 +272,7 @@ nocrash bubbles
 #     cleared to 0 (radius 0, 2, and 1 across the map's wrap), the AI goals (options 0x2000:
 #     MapWin_gen_overlays), the keypad legend and the diplomatic table (0x20000 MapWin_draw_legend,
 #     0x100000 MapWin_draw_wars; their MD5s are smacx's: the original's differs in 10 pixels of the
-#     legend's bold digits, the font rasteriser's).
+#     legend's bold digits, the font rasteriser's); and two scrolled redraws.
 if [ -f "$ROOT/work/saves_late/turn_300.sav" ]; then
     mapcase() {  # mapcase NAME MD5 ARGS...
         local name=$1 want=$2; shift 2
@@ -290,6 +290,13 @@ if [ -f "$ROOT/work/saves_late/turn_300.sav" ]; then
     mapcase map_goals 1df5c340869907f34a3598a600d76145 --dump-options 2000
     mapcase map_legend b4433f7bd947debba97a24d0795292b4 --dump-options 120000
     mapcase map_legend_r a57f4a5d64a402e94e7abf13bafc4883 --dump-radius 1,13,1 --dump-options 22000
+    # Scrolled redraws (pfncRedrawMap with the scroll flag: the old canvas shifted, the uncovered
+    # columns and rows drawn): from 60,9 the original's picture is its full redraw's; from 7,17
+    # it differs from it (the oracle's mapdump scrollfrom=). The unit at the left edge turns by
+    # the camera yaw of its own tilt, not the last unit drawn's (vehdraw_draw: compute_camera
+    # before the rotation).
+    mapcase map_scroll eca8a12b4ebf3931a16f1a69b0f5ef09 --scroll-from 60,9
+    mapcase map_scroll2 df47e3c947c6a1a0082d4d0b57c8fe80 --scroll-from 7,17
 fi
 
 # 18. Palette cycling (load_cycling, Palette_init_cycle / start_cycle, Palette_timer_callback): the

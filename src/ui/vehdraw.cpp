@@ -979,8 +979,11 @@ void tile_up(int32_t veh_id, int32_t x, int32_t y, bool tilt, float* up) {
 // The model of veh_id at (px, py) with the camera tilted by `up`, turned by `angle` (radians,
 // before the camera's yaw); the shield of armour 5 over it (vehdraw_draw, vehdraw_turn,
 // vehdraw_scoot).
+// `angle`: the facing in the x87 register; less the camera's yaw (CameraYaw) once the camera is
+// computed when `less_yaw` (vehdraw_draw, vehdraw_scoot: compute_camera runs before the
+// rotation), else already final (vehdraw_turn, which keeps the last camera).
 void render_vehicle(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t mode, int32_t zoom, const float* up_in,
-                    float angle) {
+                    double angle, bool less_yaw) {
     const float light[3] = {fbits(0xBF13CD36), fbits(0x3F13CD36), fbits(0x3F13CD36)};
     const float ldir[3] = {VehLightDir[0], VehLightDir[1], VehLightDir[2]};
     const UNIT& u = Units[Vehs[veh_id].unit_id];
@@ -1004,7 +1007,7 @@ void render_vehicle(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_
     Scene_set_scale(sc, scale);
     Scene_set_camera(sc, pos, cam);
     vehdraw_construct_vehicle(veh_id, sc);
-    Scene_set_rotation(sc, angle, 0.0f, 0.0f);
+    Scene_set_rotation(sc, (float)(less_yaw ? angle - (double)CameraYaw : angle), 0.0f, 0.0f);
     const int32_t ox = ZoomNum > 0 ? ZoomNum * 0x32 / ZoomDenom : trunc_div16((zoom * 5 + 0x50) * 10);
     const int32_t oy = ox;
     Scene_render(sc, dest, px + ox, py + oy, (uint32_t)((mode & 0x2000) | 0x1000) >> 12);
@@ -1048,7 +1051,7 @@ void GAMEAPI vehdraw_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, 
     if (rot == -1) rot = 0;
     float up[3];
     tile_up(veh_id, x, y, a7 != 0, up);
-    render_vehicle(dest, veh_id, px, py, mode, zoom, up, (float)((double)((rot - 3) & 7) * fbits(0x3F490E56) - CameraYaw));
+    render_vehicle(dest, veh_id, px, py, mode, zoom, up, (double)((rot - 3) & 7) * fbits(0x3F490E56), true);
 }
 
 // vehdraw_turn_start (0x4BF8D0): the unit (the top of its stack for flags 1) turns from its facing
@@ -1085,7 +1088,8 @@ int32_t GAMEAPI vehdraw_turn_start(int32_t veh_id, int32_t dir, int32_t per_turn
 // vehdraw_turn (0x4BFC70): frame `frame` of the turn.
 void GAMEAPI vehdraw_turn(Buffer* dest, int32_t px, int32_t py, int32_t frame, int32_t zoom) {
     if (g_turn.veh < 0) return;
-    render_vehicle(dest, g_turn.veh, px, py, 0, zoom, g_turn.up, ((float)frame * g_turn.step + g_turn.start) - CameraYaw);
+    render_vehicle(dest, g_turn.veh, px, py, 0, zoom, g_turn.up,
+                   (double)frame * g_turn.step + g_turn.start - (double)CameraYaw, false);
 }
 
 // vehdraw_scoot_start (0x4BFE00): the unit's slide toward `dir` in `frames` frames, its tilt
@@ -1121,7 +1125,7 @@ void GAMEAPI vehdraw_scoot(Buffer* dest, int32_t px, int32_t py, int32_t frame, 
     float up[3] = {a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t};
     vec3_normalize(up, up);
     VehAnimFrame++;
-    render_vehicle(dest, g_scoot.veh, px, py, 0, zoom, up, (float)((double)g_scoot.dir * fbits(0x3F490E56)) - CameraYaw);
+    render_vehicle(dest, g_scoot.veh, px, py, 0, zoom, up, (double)g_scoot.dir * fbits(0x3F490E56), true);
 }
 
 int32_t GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t zoom, int32_t mode, int32_t a7) {
