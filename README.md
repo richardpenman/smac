@@ -97,10 +97,32 @@ code, no Wine) and its game state matches the original's after every turn on all
 (`harness/scenarios/`, from tiny maps to 300-turn games through Planetary Council sessions and the
 end of the game). Progress per function: `build/*/generated/status.tsv`.
 
-The user interface (SDL2 port of the original windows, map view and dialogs; target `smacx`) is in
-progress; see `docs/UI_PLAN.md`. smacx draws the map and lets a human play a faction against the
-computer players (`smacx --new --human 1`: move units, the basic orders, build bases, terraform,
-end turns, with the original key bindings); panes, menus and popups are placeholders so far.
+The user interface (SDL2 port of the original windows, map view and dialogs; target `smacx`) covers
+the whole single-player game: main menu and game setup, the map with 3D units, unit orders, the
+base window, research, the design workshop, social engineering and the reports, diplomacy and the
+Planetary Council, Datalinks, load/save, preferences, sound, music and movies. What is still
+approximated or missing is listed in `docs/UI_PLAN.md` section 13; multiplayer is not supported.
+
+## Playing on macOS
+
+1. Tools: Xcode command line tools (`xcode-select --install`) and Homebrew, then
+   `brew install cmake sdl2 sdl2_ttf python`.
+2. Game files: `game/` must hold the installed game (the same files as the Windows install, with
+   `game/terranx.exe` v2.0, md5 `cc659f53cb6fa0eaaddccd0a54176647`). Either copy `game/` from a
+   machine where it is installed, or take the game folder out of the GOG Mac app (a Wineskin
+   wrapper: right-click the app, Show Package Contents, then `Contents/Resources/drive_c/...`, the
+   folder that contains `terranx.exe`).
+3. Data image: `python3 src/tools/gen_data_image.py game/terranx.exe src/data/data_image.bin`.
+4. Build and run from the repository root:
+
+```sh
+cmake -S . -B build/native -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build build/native -j8 --target smacx
+build/native/smacx                       # main menu; or: --new --human 1, --save FILE.SAV
+```
+
+CMake builds `smacx` only when it finds SDL2 and SDL2\_ttf (the configure step prints a message
+otherwise). smacx writes its settings and saves under `smacx_out/` by default (`--outdir`).
 
 ## Getting started
 
