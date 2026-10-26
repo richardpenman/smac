@@ -4,11 +4,7 @@ A native, cross-platform reconstruction of *Sid Meier's Alpha Centauri: Alien Cr
 rebuilt from the original game and verified to play identically to it. It runs on Windows, macOS
 and Linux.
 
-You need your own copy of the original game (for example from GOG). smacx contains only the
-game's code, rebuilt from scratch; the game's content stays with your copy. On first start smacx
-reads from it the graphics, sounds, music, movies and text, and the game rules and starting data,
-which it takes from the original `terranx.exe`. None of this can be included here, because it is
-copyrighted by the game's owners.
+You need your own copy of the game to load the original art, music, movies, text, and rules.
 
 ## Play
 
