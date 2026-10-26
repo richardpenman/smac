@@ -1,4 +1,4 @@
-// Pure rules of the base upkeep (engine/base_rules.h). Rows marked "recorded" are inputs and results
+// Pure rules of the base upkeep and of base_build (engine/base_rules.h). Rows marked "recorded" are inputs and results
 // taken from native games of the harness scenarios (tiny20, late140, cov_late300, small_wet), which
 // are identical to the original's; the other expectations follow the original's code.
 #include "engine/base_rules.h"
@@ -166,4 +166,41 @@ TEST_CASE("facility_voice_number: satellites use 34..38") {
     CHECK(facility_voice_number(65) == 34);
     CHECK(facility_voice_number(69) == 38);
     CHECK(facility_voice_number(70) == 70);
+}
+
+TEST_CASE("extra_unit_support: one more unit beyond the free support") {
+    // recorded: SUPPORT rating, population, units supported -> extra minerals
+    CHECK(extra_unit_support(-3, 10, 3) == 1);
+    CHECK(extra_unit_support(-2, 2, 0) == 0);
+    CHECK(extra_unit_support(-2, 10, 6) == 1);
+    CHECK(extra_unit_support(-1, 1, 0) == 0);
+    CHECK(extra_unit_support(-1, 1, 1) == 1);
+    CHECK(extra_unit_support(0, 1, 0) == 0);
+    CHECK(extra_unit_support(0, 10, 6) == 1);
+    CHECK(extra_unit_support(1, 10, 5) == 1);
+    CHECK(extra_unit_support(2, 1, 0) == 0);
+    CHECK(extra_unit_support(2, 10, 4) == 1);
+    CHECK(extra_unit_support(4, 10, 5) == 0);
+    CHECK(extra_unit_support(4, 4, 4) == 1);
+    // from the code: support -4 or less costs 2, -3 costs 1 from the first unit
+    CHECK(extra_unit_support(-4, 5, 0) == 2);
+    CHECK(extra_unit_support(-3, 5, 0) == 1);
+    CHECK(extra_unit_support(-2, 5, 1) == 1);
+    CHECK(extra_unit_support(1, 5, 2) == 0);
+    CHECK(extra_unit_support(1, 5, 3) == 1);
+}
+
+TEST_CASE("governor_unit_mask: permissions a governed base needs per unit plan") {
+    CHECK(governor_unit_mask(0, 0, 0, false) == 0x200u);
+    CHECK(governor_unit_mask(1, 0, 0, false) == 0x1000u);
+    CHECK(governor_unit_mask(1, 0x200, 0, false) == 0x200u);
+    CHECK(governor_unit_mask(2, 0, 0, false) == 0x1000u);
+    CHECK(governor_unit_mask(3, 0x1000, 0, false) == 0x1000u);  // land scout as defense
+    CHECK(governor_unit_mask(3, 0x1000, 1, false) == 0x400000u);
+    CHECK(governor_unit_mask(3, 0, 0, false) == 0x400000u);
+    CHECK(governor_unit_mask(7, 0, 0, false) == 0x800000u);
+    CHECK(governor_unit_mask(10, 0, 0, false) == 0x800000u);
+    CHECK(governor_unit_mask(8, 0, 0, true) == 0xA0000u);
+    CHECK(governor_unit_mask(12, 0, 0, false) == 0u);
+    CHECK(governor_unit_mask(12, 0, 0, true) == 0x80000u);
 }

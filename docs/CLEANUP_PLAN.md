@@ -225,7 +225,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 9 | `compat.h`: name and isolate all 173 `BUG(original)` sites | M | done (see note 9) |
 | 10 | Split `base_production` / yields + unit tests | M | done (see note 10) |
 | 11 | Split combat (`battle_resolve`, odds) + unit tests | M | done (see note 11) |
-| 12 | Split `base_build` | L | |
+| 12 | Split `base_build` | L | done (see note 12) |
 | 13 | Split `goody_box`, `probe`, `random_events` (gotos out) | M | |
 | 14 | Split `order_veh` (176 gotos) | L | |
 | 15 | Methods on layout structs (`Base::`, `Faction::`, `Veh::`) with `ADDR` forwarders | L | |
@@ -381,3 +381,26 @@ Notes on the increments:
     one UI dword written during displayed battles (0x90FC90, next to boom()'s ignored objects)
     differs between the two calls, and the game crashes a few turns later. Real battles are proven
     by the native scenarios and the hybrid games (all patches).
+
+12. `base_build` (base_misc.cpp, ~2.2k lines) keeps its `ADDR` and became a driver over a
+    `BaseBuild` object (anonymous namespace) whose members are the original's locals, each with its
+    stack slot in the comment, and whose member functions are the phases, so every block moved
+    verbatim (only `continue` became `return`, `skip = true; break;` became `return false`):
+    `init_priorities`, `scan_factions`, `scan_projects`, `scan_bases` (`count_garrison`),
+    `scan_vehicles`, `scan_radius`, `compute_defense`, `compute_need`, `compute_frontier`, then
+    `score_units` → `score_unit` per unit: `triad_weight`, `plan_weight` (the long plans in
+    `weigh_planet_buster`, `weigh_naval`, `weigh_transport`, `weigh_colony`, `weigh_terraformer`,
+    `weigh_supply`, `weigh_probe`), `weigh_prototype`, `weigh_need`, `weigh_situation`,
+    `unit_value`, `rank_unit`; `score_facilities` → `rate_facility` (the facility switch),
+    `rank_facility`; `want_projects`, `score_project`; `finish`. Members rather than a context
+    struct passed around: the original reuses several locals across candidates (`prio`, `need`,
+    `unk1_flag`, `regions_with_bases`, `stack`; the `base_build_persisting_locals` and
+    `base_build_stack_adjust` compat notes), which stays explicit this way, and the moved code
+    keeps reading like the original's. The candidate's scratch values (`w`, `plan`, `flag78`,
+    `value`, `bonus`, ...) are members set at the start of each candidate, as the original sets
+    its locals. The three 2 KB per-unit tables stay static (namespace scope). Pure parts went to
+    `engine/base_rules.h`: `extra_unit_support` (the SUPPORT rating's cost of one more unit,
+    values recorded from tiny20, late140, cov_late300) and `governor_unit_mask` (human bases,
+    from the code), tested in tests/unit/test_base_rules.cpp. Coverage before the split: 91% of
+    the function's lines run in the 29 scenarios; the rest are governor (human) branches and rare
+    plan/facility cases, moved verbatim. fcompare: `none +base_build`.

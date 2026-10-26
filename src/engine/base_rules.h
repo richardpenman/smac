@@ -1,6 +1,6 @@
-// Pure rule computations of the base upkeep (base_yield, base_growth, base_production), extracted
-// so they can be unit tested (tests/unit/test_base_rules.cpp). No game state: every input is a
-// parameter. These are pieces of original functions, not original functions themselves (no ADDR).
+// Pure rule computations of the base upkeep (base_yield, base_growth, base_production) and of the
+// AI production choice (base_build), extracted so they can be unit tested
+// (tests/unit/test_base_rules.cpp). No game state: every input is a parameter. These are pieces of original functions, not original functions themselves (no ADDR).
 #pragma once
 #include <cstdint>
 
@@ -119,6 +119,54 @@ inline int32_t carried_minerals(int32_t accumulated, int32_t surplus, int32_t ex
 inline bool low_nutrients_due(int32_t stock, int32_t surplus) {
     if (surplus >= 0) return false;
     return !(stock - surplus < 0 || stock + 5 * surplus >= 0);
+}
+
+// Extra minerals one more unit costs a base (base_build): beyond the units the SUPPORT rating
+// lets it support for free (pop_size at 3 or more, else support + 2, 1 at -2, none below), a unit
+// costs 1 mineral more, 2 at support -4 or less.
+inline int32_t extra_unit_support(int32_t support, int32_t pop_size, int32_t units_supported) {
+    int32_t limit, add;
+    if (support >= 3) {
+        limit = pop_size;
+        add = 1;
+    } else if (support <= -4) {
+        limit = 0;
+        add = 2;
+    } else if (support <= -3) {
+        limit = 0;
+        add = 1;
+    } else if (support == -2) {
+        limit = 1;
+        add = 1;
+    } else {
+        limit = support + 2;
+        add = 1;
+    }
+    return units_supported >= limit ? add : 0;
+}
+
+// Governor permission bits (governor_flags) a human base needs to build a unit of this plan
+// (base_build); a prototype also needs 0x80000. Combat units count as defense (0x1000) unless
+// offense (0x200) is allowed, land scouts as defense when it is allowed.
+inline uint32_t governor_unit_mask(int32_t plan, uint32_t governor_flags, int32_t chassis_id, bool prototype) {
+    uint32_t mask;
+    switch (plan) {
+    case 0: mask = 0x200; break;
+    case 1: mask = (governor_flags & 0x200) ? 0x200 : 0x1000; break;
+    case 2: mask = 0x1000; break;
+    case 3: mask = ((governor_flags & 0x1000) && !chassis_id) ? 0x1000 : 0x400000; break;
+    case 4: mask = 0x2000; break;
+    case 5: mask = 0x800; break;
+    case 6: mask = 0x400; break;
+    case 7: mask = 0x800000; break;
+    case 8: mask = 0x20000; break;
+    case 9: mask = 0x8000; break;
+    case 10: mask = 0x800000; break;
+    case 11: mask = 0x100000; break;
+    default: mask = 0; break;
+    }
+    if (prototype) mask |= 0x80000;
+    return mask;
 }
 
 // Voice file number of a completed facility (voices\facNN.mp3): satellites 65..69 use 34..38.
