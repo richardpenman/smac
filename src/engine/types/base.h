@@ -227,6 +227,19 @@ struct BASE {
     Specialist types (CCitizen, 4 bits per id) for the first 16 specialists in the base.
     These are assigned in base_yield and base_energy and chosen by best_specialist.
     */
+
+    // Logic on one base (engine/base.cpp). The original's free functions (base_mark, pop_goal,
+    // ...) keep their ADDR and forward here while the hybrid build lives (docs/CLEANUP_PLAN.md,
+    // section 3.2); callers still use them.
+    int32_t id() const;  // index in game().bases
+    void mark();
+    int32_t lose_minerals() const;
+    void change(int32_t item_id);
+    int32_t pop_goal_fac() const;
+    int32_t pop_goal() const;
+    int32_t queue_next();
 };
 
 #pragma pack(pop)
+
+using Base = BASE;

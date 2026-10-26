@@ -114,38 +114,116 @@
 #include "engine/util.h"
 #include "engine/veh.h"
 
-void GAMEAPI treaty_off(int32_t faction_id, int32_t faction_id_with, uint32_t status) {
+// ---- Faction: diplomatic relations ---------------------------------------------------------------
+
+int32_t Faction::id() const { return (int32_t)(this - &game().factions[0]); }
+
+uint32_t Faction::has_treaty(int32_t with, uint32_t treaty) const { return diplo_status[with] & treaty; }
+
+uint32_t Faction::has_agenda(int32_t with, uint32_t agenda) const { return diplo_agenda[with] & agenda; }
+
+// One side of the relation only.
+void Faction::set_treaty(int32_t with, uint32_t status, int32_t add) {
+    if (!add) {
+        diplo_status[with] &= ~status;
+        return;
+    }
+    diplo_status[with] |= status;
+    if (status & 0x40) diplo_merc[with] = 50;
+}
+
+void Faction::set_agenda(int32_t with, uint32_t agenda, int32_t add) {
+    if (add) diplo_agenda[with] |= agenda;
+    else diplo_agenda[with] &= ~agenda;
+}
+
+// Both sides: a new truce, treaty or pact ends the states it replaces; a vendetta ends them all.
+void Faction::treaty_on(int32_t with, uint32_t status) {
+    int32_t faction_id = id();
+    uint32_t& mine = diplo_status[with];
+    uint32_t& theirs = game().factions[with].diplo_status[faction_id];
+    bool viewer = faction_id == CurrentPlayerFaction || with == CurrentPlayerFaction;
+    if (status & 7) {
+        // A truce, treaty or pact ends the viewer's war music.
+        if (viewer && (mine & DIPLO_VENDETTA)) AmbienceFlags &= ~1;
+        mine &= 0xFFEE7FAF;
+        theirs &= 0xFFEE7FAF;
+    }
+    if (status & 1) status |= 2;
+    if (status & DIPLO_VENDETTA) {
+        if (mine & 7) {
+            game().factions[with].diplo_combat_count[faction_id] = 0;
+            diplo_combat_count[with] = 0;
+        }
+        status |= 0x80000108;
+        mine &= 0xFAEEF378;
+        theirs &= 0xFAEEF378;
+        if (viewer) {
+            AmbienceFlags |= 1;
+            ambience(0xCC);
+        }
+    }
+    if (status & 0x17) {
+        mine &= 0xFF7FFFFF;
+        theirs &= 0xFF7FFFFF;
+    }
+    mine |= status;
+    theirs |= status;
+    if ((faction_id == CurrentPlayerFaction || with == CurrentPlayerFaction) && (status & 0x1F) && MultiWinVisible)
+        GraphicWin_redraw(&MultiWin);
+}
+
+// Both sides; ending a truce, treaty or pact also ends the states that go with it.
+void Faction::treaty_off(int32_t with, uint32_t status) {
+    int32_t faction_id = id();
     if (status & 7) status |= 0x1100000;
     if (status & 0x10) status |= 0x8040;
     if (status & 0x20) {
-        game().factions[faction_id].diplo_agenda[faction_id_with] &= 0xFFFFF3FF;
-        game().factions[faction_id_with].diplo_agenda[faction_id] &= 0xFFFFF3FF;
+        diplo_agenda[with] &= 0xFFFFF3FF;
+        game().factions[with].diplo_agenda[faction_id] &= 0xFFFFF3FF;
     }
-    game().factions[faction_id].diplo_status[faction_id_with] &= ~status;
-    game().factions[faction_id_with].diplo_status[faction_id] &= ~status;
+    diplo_status[with] &= ~status;
+    game().factions[with].diplo_status[faction_id] &= ~status;
+}
+
+// Both sides.
+void Faction::agenda_on(int32_t with, uint32_t agenda) {
+    int32_t faction_id = id();
+    if (agenda & 0x20) {
+        diplo_agenda[with] &= 0xFFFFFFBF;
+        game().factions[with].diplo_agenda[faction_id] &= 0xFFFFFFBF;
+    }
+    diplo_agenda[with] |= agenda;
+    game().factions[with].diplo_agenda[faction_id] |= agenda;
+}
+
+void Faction::agenda_off(int32_t with, uint32_t agenda) {
+    diplo_agenda[with] &= ~agenda;
+    game().factions[with].diplo_agenda[id()] &= ~agenda;
+}
+
+// Broken promises less gifts to the other faction, 0-99.
+int32_t Faction::reputation(int32_t with) const {
+    int32_t value = integrity_blemishes - diplo_gifts[with];
+    if (value < 0) return 0;
+    if (value > 99) return 99;
+    return value;
+}
+
+void GAMEAPI treaty_off(int32_t faction_id, int32_t faction_id_with, uint32_t status) {
+    game().factions[faction_id].treaty_off(faction_id_with, status);
 }
 
 void GAMEAPI agenda_on(int32_t faction_id, int32_t faction_id_with, uint32_t agenda) {
-    if (agenda & 0x20) {
-        game().factions[faction_id].diplo_agenda[faction_id_with] &= 0xFFFFFFBF;
-        game().factions[faction_id_with].diplo_agenda[faction_id] &= 0xFFFFFFBF;
-    }
-    game().factions[faction_id].diplo_agenda[faction_id_with] |= agenda;
-    game().factions[faction_id_with].diplo_agenda[faction_id] |= agenda;
+    game().factions[faction_id].agenda_on(faction_id_with, agenda);
 }
 
 void GAMEAPI set_treaty(int32_t faction_id, int32_t faction_id_with, uint32_t status, int32_t add) {
-    if (!add) {
-        game().factions[faction_id].diplo_status[faction_id_with] &= ~status;
-        return;
-    }
-    game().factions[faction_id].diplo_status[faction_id_with] |= status;
-    if (status & 0x40) game().factions[faction_id].diplo_merc[faction_id_with] = 50;
+    game().factions[faction_id].set_treaty(faction_id_with, status, add);
 }
 
 void GAMEAPI set_agenda(int32_t faction_id, int32_t faction_id_with, uint32_t agenda, int32_t add) {
-    if (add) game().factions[faction_id].diplo_agenda[faction_id_with] |= agenda;
-    else game().factions[faction_id].diplo_agenda[faction_id_with] &= ~agenda;
+    game().factions[faction_id].set_agenda(faction_id_with, agenda, add);
 }
 
 int32_t GAMEAPI great_satan(int32_t faction_id, int32_t is_aggressive) {
@@ -217,51 +295,15 @@ int32_t GAMEAPI climactic_battle() {
 }
 
 int32_t GAMEAPI reputation(int32_t faction_id, int32_t faction_id_with) {
-    int32_t value =
-        game().factions[faction_id].integrity_blemishes - game().factions[faction_id].diplo_gifts[faction_id_with];
-    if (value < 0) return 0;
-    if (value > 99) return 99;
-    return value;
+    return game().factions[faction_id].reputation(faction_id_with);
 }
 
 void GAMEAPI agenda_off(int32_t faction_id, int32_t faction_id_with, uint32_t agenda) {
-    game().factions[faction_id].diplo_agenda[faction_id_with] &= ~agenda;
-    game().factions[faction_id_with].diplo_agenda[faction_id] &= ~agenda;
+    game().factions[faction_id].agenda_off(faction_id_with, agenda);
 }
 
 void GAMEAPI treaty_on(int32_t faction_id, int32_t faction_id_with, uint32_t status) {
-    uint32_t& mine = game().factions[faction_id].diplo_status[faction_id_with];
-    uint32_t& theirs = game().factions[faction_id_with].diplo_status[faction_id];
-    bool viewer = faction_id == CurrentPlayerFaction || faction_id_with == CurrentPlayerFaction;
-    if (status & 7) {
-        // A truce, treaty or pact ends the viewer's war music.
-        if (viewer && (mine & DIPLO_VENDETTA)) AmbienceFlags &= ~1;
-        mine &= 0xFFEE7FAF;
-        theirs &= 0xFFEE7FAF;
-    }
-    if (status & 1) status |= 2;
-    if (status & DIPLO_VENDETTA) {
-        if (mine & 7) {
-            game().factions[faction_id_with].diplo_combat_count[faction_id] = 0;
-            game().factions[faction_id].diplo_combat_count[faction_id_with] = 0;
-        }
-        status |= 0x80000108;
-        mine &= 0xFAEEF378;
-        theirs &= 0xFAEEF378;
-        if (viewer) {
-            AmbienceFlags |= 1;
-            ambience(0xCC);
-        }
-    }
-    if (status & 0x17) {
-        mine &= 0xFF7FFFFF;
-        theirs &= 0xFF7FFFFF;
-    }
-    mine |= status;
-    theirs |= status;
-    if ((faction_id == CurrentPlayerFaction || faction_id_with == CurrentPlayerFaction) && (status & 0x1F) &&
-        MultiWinVisible)
-        GraphicWin_redraw(&MultiWin);
+    game().factions[faction_id].treaty_on(faction_id_with, status);
 }
 
 // ---- pact ends ------------------------------------------------------------------------------------

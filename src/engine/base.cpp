@@ -281,22 +281,27 @@ void GAMEAPI name_base(int32_t faction_id, char* name, int32_t is_final, int32_t
     text_close();
 }
 
-void GAMEAPI base_mark(int32_t base_id) {
-    int32_t x = 0, y = 0;
+int32_t Base::id() const { return (int32_t)(this - &game().bases[0]); }
+
+void GAMEAPI base_mark(int32_t base_id) { game().bases[base_id].mark(); }
+
+// Marks the base's radius as its own (worked by it) and clears the sites around it.
+void Base::mark() {
+    int32_t tile_x = 0, tile_y = 0;
     for (int32_t i = 0; i < 49; i++) {
-        x = wrap_x(game().bases[base_id].x + TableOffsetX[i]);
-        y = game().bases[base_id].y + TableOffsetY[i];
-        if (y < 0 || y >= game().map.y || x < 0 || x >= game().map.x) continue;
+        tile_x = wrap_x(x + TableOffsetX[i]);
+        tile_y = y + TableOffsetY[i];
+        if (tile_y < 0 || tile_y >= game().map.y || tile_x < 0 || tile_x >= game().map.x) continue;
         if (i < 21) {
-            bit_set(x, y, 0x1000, 1);
-            using_set(x, y, (uint8_t)game().bases[base_id].faction_id);
+            bit_set(tile_x, tile_y, 0x1000, 1);
+            using_set(tile_x, tile_y, (uint8_t)faction_id);
         } else {
-            site_set(x, y, 0);
+            site_set(tile_x, tile_y, 0);
         }
     }
     // BUG(original): the sites are deleted around the last radius tile instead of the base.
     COMPAT_ORIGINAL(del_site_last_radius_tile);
-    for (int32_t f = 0; f < 8; f++) del_site(f, 8, x, y, 3);
+    for (int32_t f = 0; f < 8; f++) del_site(f, 8, tile_x, tile_y, 3);
 }
 
 int32_t GAMEAPI cost_factor(int32_t faction_id, int32_t is_mineral, int32_t base_id) {
@@ -355,13 +360,16 @@ int32_t GAMEAPI base_making(int32_t item_id, int32_t base_id) {
     return (item_id > -65) + 2;
 }
 
-int32_t GAMEAPI base_lose_minerals(int32_t base_id, int32_t) {
+int32_t GAMEAPI base_lose_minerals(int32_t base_id, int32_t) { return game().bases[base_id].lose_minerals(); }
+
+// Minerals a human player's base loses by changing production (retooling penalty).
+int32_t Base::lose_minerals() const {
     if (!Rules.retool_penalty_prod_change) return 0;
-    BASE& base = game().bases[base_id];
-    if (!((uint8_t)(1 << ((uint8_t)base.faction_id & 31)) & FactionStatus[0])) return 0;
-    int32_t last = base_making(base.production_id_last, base_id);
-    if (base_making(base.queue_items[0], base_id) == last) return 0;
-    int32_t minerals = base.minerals_accumulated_2;
+    if (!((uint8_t)(1 << ((uint8_t)faction_id & 31)) & FactionStatus[0])) return 0;
+    int32_t base_id = id();
+    int32_t last = base_making(production_id_last, base_id);
+    if (base_making(queue_items[0], base_id) == last) return 0;
+    int32_t minerals = minerals_accumulated_2;
     int32_t exempt = Rules.retool_exemption;
     if (minerals <= exempt) return 0;
     return minerals - (minerals - exempt) * (100 - Rules.retool_penalty_prod_change) / 100 - exempt;
@@ -633,35 +641,41 @@ void GAMEAPI base_kill(int32_t base_id) {
 
 void GAMEAPI base_change(int32_t base_id, int32_t item_id) {
     if (item_id == 99999) return;
-    BASE& base = game().bases[base_id];
-    int32_t old = base.queue_items[0];
-    base.queue_items[0] = item_id;
+    game().bases[base_id].change(item_id);
+}
+
+// Changes the item in production (the minerals lose the retooling penalty); other factions'
+// secret projects begun or switched are announced to the viewer.
+void Base::change(int32_t item_id) {
+    int32_t base_id = id();
+    int32_t old = queue_items[0];
+    queue_items[0] = item_id;
     if (item_id == old) return;
-    int32_t faction_id = (uint8_t)base.faction_id;
-    Faction& f = game().factions[faction_id];
+    int32_t owner = (uint8_t)faction_id;
+    Faction& f = game().factions[owner];
     if (old >= 0) f.units_queue[old]--;
     if (item_id >= 0) f.units_queue[item_id]++;
     int32_t penalty = 0;
-    if (Rules.retool_penalty_prod_change && (FactionStatus[0] & (uint8_t)(1 << faction_id))) {
-        int32_t last = base_making(base.production_id_last, base_id);
-        if (base_making(base.queue_items[0], base_id) != last) {
-            int32_t minerals = base.minerals_accumulated_2;
+    if (Rules.retool_penalty_prod_change && (FactionStatus[0] & (uint8_t)(1 << owner))) {
+        int32_t last = base_making(production_id_last, base_id);
+        if (base_making(queue_items[0], base_id) != last) {
+            int32_t minerals = minerals_accumulated_2;
             int32_t exempt = Rules.retool_exemption;
             if (minerals > exempt)
                 penalty = minerals - (minerals - exempt) * (100 - Rules.retool_penalty_prod_change) / 100 - exempt;
         }
     }
-    base.minerals_accumulated = base.minerals_accumulated_2 - penalty;
-    draw_radius(base.x, base.y, 2, 2);
-    if (faction_id == CurrentPlayerFaction || SkipTechScreenB) return;
+    minerals_accumulated = minerals_accumulated_2 - penalty;
+    draw_radius(x, y, 2, 2);
+    if (owner == CurrentPlayerFaction || SkipTechScreenB) return;
     // Announcements of secret projects begun or switched by other factions.
-    int32_t current = base.queue_items[0];
+    int32_t current = queue_items[0];
     bool new_project = current <= -70 && SecretProjects[-current - 70] == -1;
     bool old_project = false;
     if (old <= -70 && (new_project || SecretProjects[-old - 70] == -1)) {
         old_project = true;
         int32_t owner_base = SecretProjects[std::abs(old) - 70];
-        if (owner_base >= 0 && (uint8_t)game().bases[owner_base].faction_id == faction_id) old_project = false;
+        if (owner_base >= 0 && (uint8_t)game().bases[owner_base].faction_id == owner) old_project = false;
     }
     if (!new_project && !old_project) return;
     if ((GameState & STATE_GAME_DONE) && !(GameState & STATE_FINAL_SCORE_DONE)) return;
@@ -671,17 +685,17 @@ void GAMEAPI base_change(int32_t base_id, int32_t item_id) {
     bitmask(new_project ? current_sp : std::abs(old) - 70, &offset, &mask);
     int32_t others_old = 0, others_new = 0;
     for (int32_t i = 0; i < game().base_count; i++) {
-        if (game().bases[i].faction_id != base.faction_id || i == base_id) continue;
+        if (game().bases[i].faction_id != faction_id || i == base_id) continue;
         if (game().bases[i].queue_items[0] == old) others_old++;
-        if (game().bases[i].queue_items[0] == base.queue_items[0]) others_new++;
+        if (game().bases[i].queue_items[0] == queue_items[0]) others_new++;
     }
     if (!new_project || others_new) return;
-    MFaction& m = game().mfactions[faction_id];
+    MFaction& m = game().mfactions[owner];
     if (old_project && (!others_old || SecretProjects[-old - 70] != -1)) {
         // The project moves to this base: every base of the faction building the old one switches.
         for (int32_t i = 0; i < game().base_count; i++)
-            if ((uint8_t)game().bases[i].faction_id == faction_id && game().bases[i].queue_items[0] == old)
-                game().bases[i].queue_items[0] = base.queue_items[0];
+            if ((uint8_t)game().bases[i].faction_id == owner && game().bases[i].queue_items[0] == old)
+                game().bases[i].queue_items[0] = queue_items[0];
         if (SunspotDuration > 0) return;
         parse_says(0, m.adj_name_faction, -1, -1);
         parse_say(1, Facility[std::abs(old)].name, -1, -1);
@@ -707,7 +721,7 @@ void GAMEAPI base_change(int32_t base_id, int32_t item_id) {
         PluralDefault = m.is_noun_plural;
         parse_says(2, m.noun_faction, -1, -1);
         parse_say(3, Facility[current_fac].name, -1, -1);
-        wave_it((game().factions[CurrentPlayerFaction].diplo_status[faction_id] & DIPLO_PACT) ? 0x24 : 0x26);
+        wave_it((game().factions[CurrentPlayerFaction].diplo_status[owner] & DIPLO_PACT) ? 0x24 : 0x26);
         popp(ScriptFileName, "BEGINPROJECT", 0, "secproj_sm.pcx", 0);
         f.secret_project_intel[offset] |= (uint32_t)mask;
     }
@@ -2193,54 +2207,64 @@ int32_t GAMEAPI crappy(int32_t x, int32_t y) {
     return value;
 }
 
-int32_t GAMEAPI pop_goal_fac(int32_t base_id) {
-    BASE& base = game().bases[base_id];
-    int32_t faction_id = (uint8_t)base.faction_id;
-    int32_t bonus = has_sp(FAC_ASCETIC_VIRTUES - 70, faction_id) ? 2 : 0;
-    int32_t size = base.pop_size - bonus + game().mfactions[faction_id].rule_population;
+int32_t GAMEAPI pop_goal_fac(int32_t base_id) { return game().bases[base_id].pop_goal_fac(); }
+
+// The facility the base needs to grow further (Hab Complex, then Habitation Dome), or 0.
+int32_t Base::pop_goal_fac() const {
+    int32_t base_id = id();
+    int32_t owner = (uint8_t)faction_id;
+    int32_t bonus = has_sp(FAC_ASCETIC_VIRTUES - 70, owner) ? 2 : 0;
+    int32_t size = pop_size - bonus + game().mfactions[owner].rule_population;
     if (size >= Rules.pop_limit_wo_hab_complex && !base_fac(base_id, FAC_HAB_COMPLEX)) return FAC_HAB_COMPLEX;
-    size = base.pop_size - bonus + game().mfactions[faction_id].rule_population;
+    size = pop_size - bonus + game().mfactions[owner].rule_population;
     if (size >= Rules.pop_limit_wo_hab_dome && !base_fac(base_id, FAC_HABITATION_DOME)) return FAC_HABITATION_DOME;
     return 0;
 }
 
-int32_t GAMEAPI pop_goal(int32_t base_id) {
-    BASE& base = game().bases[base_id];
-    int32_t faction_id = (uint8_t)base.faction_id;
-    int32_t bonus = has_sp(FAC_ASCETIC_VIRTUES - 70, faction_id) ? 2 : 0;
-    int32_t pop = base.pop_size;
+int32_t GAMEAPI pop_goal(int32_t base_id) { return game().bases[base_id].pop_goal(); }
+
+// The size the AI wants the base to reach (at least 6), within the limits of its habitation
+// facilities.
+int32_t Base::pop_goal() const {
+    int32_t base_id = id();
+    int32_t owner = (uint8_t)faction_id;
+    int32_t bonus = has_sp(FAC_ASCETIC_VIRTUES - 70, owner) ? 2 : 0;
+    int32_t pop = pop_size;
     int32_t goal = (36 - pop) / 6 + pop;
     if (goal <= 6) goal = 6;
     if (!base_fac(base_id, FAC_HAB_COMPLEX)) {
-        int32_t limit = Rules.pop_limit_wo_hab_complex - game().mfactions[faction_id].rule_population + bonus;
+        int32_t limit = Rules.pop_limit_wo_hab_complex - game().mfactions[owner].rule_population + bonus;
         if (goal >= limit) goal = limit;
     }
     if (!base_fac(base_id, FAC_HABITATION_DOME)) {
-        int32_t limit = Rules.pop_limit_wo_hab_dome - game().mfactions[faction_id].rule_population + bonus;
+        int32_t limit = Rules.pop_limit_wo_hab_dome - game().mfactions[owner].rule_population + bonus;
         if (goal >= limit) return limit;
     }
     return goal;
 }
 
-int32_t GAMEAPI base_queue(int32_t base_id) {
-    BASE& base = game().bases[base_id];
-    int32_t faction_id = (uint8_t)base.faction_id;
-    if (!base.queue_size) return 0;
+int32_t GAMEAPI base_queue(int32_t base_id) { return game().bases[base_id].queue_next(); }
+
+// Production moves on to the next item of the queue that is still available (unavailable ones are
+// dropped). Returns 0 when the queue runs out.
+int32_t Base::queue_next() {
+    int32_t base_id = id();
+    int32_t owner = (uint8_t)faction_id;
+    if (!queue_size) return 0;
     for (;;) {
-        if (base.queue_items[0] >= 0) game().factions[faction_id].units_queue[base.queue_items[0]]--;
+        if (queue_items[0] >= 0) game().factions[owner].units_queue[queue_items[0]]--;
         // BUG(original): with a full queue the shift reads the word after queue_items (worked_tiles).
         COMPAT_ORIGINAL(queue_shift_past_end);
-        int32_t* items = base.queue_items;
-        for (int32_t i = 0; i < base.queue_size; i++) items[i] = items[i + 1];
-        base.queue_size--;
-        int32_t item = base.queue_items[0];
-        bool ok =
-            item >= 0 ? veh_avail(item, faction_id, base_id) != 0 : facility_avail(-item, faction_id, base_id, 0) != 0;
+        int32_t* items = queue_items;
+        for (int32_t i = 0; i < queue_size; i++) items[i] = items[i + 1];
+        queue_size--;
+        int32_t item = queue_items[0];
+        bool ok = item >= 0 ? veh_avail(item, owner, base_id) != 0 : facility_avail(-item, owner, base_id, 0) != 0;
         if (ok) break;
-        if (!base.queue_size) return 0;
+        if (!queue_size) return 0;
     }
-    if (base.queue_items[0] <= -70) wave_it(0x24);
-    draw_radius(base.x, base.y, 2, 2);
+    if (queue_items[0] <= -70) wave_it(0x24);
+    draw_radius(x, y, 2, 2);
     return 1;
 }
 

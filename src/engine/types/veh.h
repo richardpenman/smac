@@ -437,6 +437,23 @@ struct VEH {
     int16_t next_veh_id_stack;
     int16_t prev_veh_id_stack;
 
+    // Logic on one vehicle (engine/veh.cpp). The original's free functions (veh_lift, veh_skip,
+    // ...) keep their ADDR and forward here while the hybrid build lives (docs/CLEANUP_PLAN.md,
+    // section 3.2); callers still use them.
+    int32_t id() const;  // index in game().vehs
+    int32_t lift();
+    int32_t drop(int32_t to_x, int32_t to_y);
+    void sleep();
+    void demote();
+    void promote();
+    int32_t cargo() const;
+    int32_t selectable() const;
+    int32_t unmoved() const;
+    int32_t ready() const;
+    int32_t jail() const;
+    void skip();
+    int32_t wake();
+
     // Determine if native unit modifiers apply in this case. Multiple original functions
     // may check separately unit_id == BSC_SPORE_LAUNCHER for native units but this condition
     // is redundant since they will always have PSI weapon equipped in the default config.
@@ -444,3 +461,5 @@ struct VEH {
 };
 
 #pragma pack(pop)
+
+using Veh = VEH;

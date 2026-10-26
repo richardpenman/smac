@@ -1082,7 +1082,7 @@ const char* GAMEAPI get_insult_leader(int32_t faction_id) {
 }
 int32_t GAMEAPI bad_reg(int32_t region) { return (region & 0x3F) == 0x3F || (region & 0x3F) == 0; }
 uint32_t GAMEAPI has_agenda(int32_t faction_id, int32_t faction_id_with, uint32_t agenda) {
-    return game().factions[faction_id].diplo_agenda[faction_id_with] & agenda;
+    return game().factions[faction_id].has_agenda(faction_id_with, agenda);
 }
 int32_t GAMEAPI round_down(int32_t value, int32_t step) { return value / step * step; }
 

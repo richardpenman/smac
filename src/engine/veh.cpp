@@ -267,75 +267,100 @@ int32_t GAMEAPI veh_at(int32_t x, int32_t y) {
     return -1;
 }
 
-int32_t GAMEAPI veh_lift(int32_t veh_id) {
-    VEH& veh = game().vehs[veh_id];
-    int16_t prev = veh.prev_veh_id_stack;
-    if (prev >= 0) game().vehs[prev].next_veh_id_stack = veh.next_veh_id_stack;
-    if (veh.next_veh_id_stack < 0) {
+int32_t Veh::id() const { return (int32_t)(this - &game().vehs[0]); }
+
+int32_t GAMEAPI veh_lift(int32_t veh_id) { return game().vehs[veh_id].lift(); }
+
+// Takes the vehicle off its tile's stack (the tile loses its unit bit when it was the last one).
+int32_t Veh::lift() {
+    int32_t veh_id = id();
+    int16_t prev = prev_veh_id_stack;
+    if (prev >= 0) game().vehs[prev].next_veh_id_stack = next_veh_id_stack;
+    if (next_veh_id_stack < 0) {
         if (prev < 0) {  // last vehicle of the tile
-            int32_t x = veh.x, y = veh.y;
-            if (y >= 0 && y < game().map.y && x >= 0 && x < game().map.x) bit_set(x, y, 2, 0);
+            int32_t tile_x = x, tile_y = y;
+            if (tile_y >= 0 && tile_y < game().map.y && tile_x >= 0 && tile_x < game().map.x)
+                bit_set(tile_x, tile_y, 2, 0);
         }
     } else {
-        game().vehs[veh.next_veh_id_stack].prev_veh_id_stack = veh.prev_veh_id_stack;
+        game().vehs[next_veh_id_stack].prev_veh_id_stack = prev_veh_id_stack;
     }
-    VehLiftX = veh.x;
-    VehLiftY = veh.y;
+    VehLiftX = x;
+    VehLiftY = y;
     VehDropLiftVehID = veh_id;
-    veh.x = -1;
-    veh.y = -1;
-    veh.next_veh_id_stack = -1;
-    veh.prev_veh_id_stack = -1;
+    x = -1;
+    y = -1;
+    next_veh_id_stack = -1;
+    prev_veh_id_stack = -1;
     return veh_id;
 }
 
-int32_t GAMEAPI veh_drop(int32_t veh_id, int32_t x, int32_t y) {
-    int32_t top = veh_at(x, y);
-    VEH& veh = game().vehs[veh_id];
-    veh.next_veh_id_stack = (int16_t)top;
-    veh.prev_veh_id_stack = -1;
-    veh.x = (int16_t)x;
-    veh.y = (int16_t)y;
+int32_t GAMEAPI veh_drop(int32_t veh_id, int32_t x, int32_t y) { return game().vehs[veh_id].drop(x, y); }
+
+// Puts the vehicle on top of the stack at (to_x, to_y); the tile gets the unit bit and, without
+// a base, the owner.
+int32_t Veh::drop(int32_t to_x, int32_t to_y) {
+    int32_t veh_id = id();
+    int32_t top = veh_at(to_x, to_y);
+    next_veh_id_stack = (int16_t)top;
+    prev_veh_id_stack = -1;
+    x = (int16_t)to_x;
+    y = (int16_t)to_y;
     VehDropLiftVehID = -1;
     if (top < 0) {
-        if (y < 0) return veh_id;
-        if (y < game().map.y && x >= 0 && x < game().map.x && !(map_tile(x, y)->items & BIT_BASE_IN_TILE))
-            owner_set(x, y, veh.faction_id);
+        if (to_y < 0) return veh_id;
+        if (to_y < game().map.y && to_x >= 0 && to_x < game().map.x &&
+            !(map_tile(to_x, to_y)->items & BIT_BASE_IN_TILE))
+            owner_set(to_x, to_y, faction_id);
     } else {
         game().vehs[top].prev_veh_id_stack = (int16_t)veh_id;
     }
-    if (y >= 0 && y < game().map.y && x >= 0 && x < game().map.x) {
-        uint32_t bits = (veh.faction_id == 0 || unit_triad(veh.unit_id) == 2) ? 0 : 0x100000;
-        bit_set(x, y, bits | 2, 1);
+    if (to_y >= 0 && to_y < game().map.y && to_x >= 0 && to_x < game().map.x) {
+        uint32_t bits = (faction_id == 0 || unit_triad(unit_id) == 2) ? 0 : 0x100000;
+        bit_set(to_x, to_y, bits | 2, 1);
     }
     return veh_id;
 }
 
-void GAMEAPI sleep(int32_t veh_id) {
-    game().vehs[veh_id].order = ORDER_SENTRY_BOARD;
-    game().vehs[veh_id].waypoint_x[0] = -1;
-    game().vehs[veh_id].waypoint_y[0] = 0;
+void GAMEAPI sleep(int32_t veh_id) { game().vehs[veh_id].sleep(); }
+
+// Sentry on board (no transport yet).
+void Veh::sleep() {
+    order = ORDER_SENTRY_BOARD;
+    waypoint_x[0] = -1;
+    waypoint_y[0] = 0;
 }
 
 void GAMEAPI veh_demote(int32_t veh_id) {
-    if (veh_id < 0 || game().vehs[veh_id].next_veh_id_stack < 0) return;
-    int32_t last = game().vehs[veh_id].next_veh_id_stack;
+    if (veh_id < 0) return;
+    game().vehs[veh_id].demote();
+}
+
+// Moves the vehicle to the bottom of its stack.
+void Veh::demote() {
+    if (next_veh_id_stack < 0) return;
+    int32_t veh_id = id();
+    int32_t last = next_veh_id_stack;
     while (game().vehs[last].next_veh_id_stack >= 0) last = game().vehs[last].next_veh_id_stack;
     if (last != veh_id) {
-        veh_lift(veh_id);
+        lift();
         game().vehs[last].next_veh_id_stack = (int16_t)veh_id;
-        game().vehs[veh_id].prev_veh_id_stack = (int16_t)last;
-        game().vehs[veh_id].next_veh_id_stack = -1;
-        game().vehs[veh_id].x = game().vehs[last].x;
-        game().vehs[veh_id].y = game().vehs[last].y;
+        prev_veh_id_stack = (int16_t)last;
+        next_veh_id_stack = -1;
+        x = game().vehs[last].x;
+        y = game().vehs[last].y;
     }
 }
 
-void GAMEAPI veh_promote(int32_t veh_id) {
+void GAMEAPI veh_promote(int32_t veh_id) { game().vehs[veh_id].promote(); }
+
+// Moves the vehicle to the top of its stack.
+void Veh::promote() {
+    int32_t veh_id = id();
     int32_t top = stack_top(veh_id);
     if (top != veh_id) {
-        veh_lift(veh_id);
-        veh_drop(veh_id, game().vehs[top].x, game().vehs[top].y);
+        lift();
+        drop(game().vehs[top].x, game().vehs[top].y);
     }
 }
 
@@ -692,9 +717,11 @@ int32_t GAMEAPI SHADOWABLE(speed)(int32_t veh_id, int32_t skip_morale) {
     return veh.unit_id != 19 ? value : 0;
 }
 
-int32_t GAMEAPI veh_cargo(int32_t veh_id) {
-    int32_t unit_id = game().vehs[veh_id].unit_id;
-    if (Units[unit_id].carry_capacity && unit_is_native(unit_id)) return game().vehs[veh_id].morale + 1;
+int32_t GAMEAPI veh_cargo(int32_t veh_id) { return game().vehs[veh_id].cargo(); }
+
+// Transport capacity (native transports, the Isles of the Deep: morale + 1).
+int32_t Veh::cargo() const {
+    if (Units[unit_id].carry_capacity && unit_is_native(unit_id)) return morale + 1;
     return Units[unit_id].carry_capacity;
 }
 
@@ -739,8 +766,7 @@ int32_t GAMEAPI veh_cost(int32_t unit_id, int32_t base_id, int32_t* has_proto_co
 
 namespace {
 // Common test of veh_selectable/veh_unmoved/veh_ready: the viewer's own, selectable vehicle.
-bool veh_is_viewers(int32_t veh_id) {
-    VEH& veh = game().vehs[veh_id];
+bool veh_is_viewers(const VEH& veh) {
     return veh.y >= 0 && veh.y < game().map.y && veh.x >= 0 && veh.x < game().map.x &&
            veh.faction_id == CurrentPlayerFaction && (!(veh.flags & VFLAG_LURKER) || !(veh.flags & VFLAG_INVISIBLE));
 }
@@ -748,41 +774,57 @@ bool veh_is_viewers(int32_t veh_id) {
 
 int32_t GAMEAPI veh_selectable(int32_t veh_id) {
     if (veh_id < 0) return 0;
-    VEH& veh = game().vehs[veh_id];
-    if (veh.y < 0 || veh.y >= game().map.y || veh.x < 0 || veh.x >= game().map.x) return 0;
-    if (veh.faction_id != CurrentPlayerFaction) return 0;
-    if ((veh.flags & VFLAG_LURKER) && (veh.flags & VFLAG_INVISIBLE)) return 0;
-    return veh_jail(veh_id) == 0;
+    return game().vehs[veh_id].selectable();
+}
+
+// The viewer's own vehicle on the map, not hidden, not jailed.
+int32_t Veh::selectable() const {
+    if (y < 0 || y >= game().map.y || x < 0 || x >= game().map.x) return 0;
+    if (faction_id != CurrentPlayerFaction) return 0;
+    if ((flags & VFLAG_LURKER) && (flags & VFLAG_INVISIBLE)) return 0;
+    return jail() == 0;
 }
 
 int32_t GAMEAPI veh_unmoved(int32_t veh_id) {
-    if (veh_id < 0 || !veh_is_viewers(veh_id) || veh_jail(veh_id)) return 0;
-    VEH& veh = game().vehs[veh_id];
-    int8_t order = (int8_t)veh.order;
-    if ((veh.state & VSTATE_WORKING) || order < 4 || order > 23) {
-        int32_t moves = speed(veh_id, 0);
-        int32_t left = moves - veh.moves_spent;
-        if (left < 0 || (left < 1000 && moves == veh.moves_spent)) return 0;
+    if (veh_id < 0) return 0;
+    return game().vehs[veh_id].unmoved();
+}
+
+// A selectable vehicle of the viewer that has moves left (or is terraforming).
+int32_t Veh::unmoved() const {
+    if (!veh_is_viewers(*this) || jail()) return 0;
+    int8_t current = (int8_t)order;
+    if ((state & VSTATE_WORKING) || current < 4 || current > 23) {
+        int32_t moves = speed(id(), 0);
+        int32_t left = moves - moves_spent;
+        if (left < 0 || (left < 1000 && moves == moves_spent)) return 0;
     }
     return 1;
 }
 
 int32_t GAMEAPI veh_ready(int32_t veh_id) {
-    if (veh_id < 0 || !veh_is_viewers(veh_id) || veh_jail(veh_id)) return 0;
-    VEH& veh = game().vehs[veh_id];
-    if (!(veh.state & (VSTATE_ON_ALERT | VSTATE_EXPLORE)) &&
-        (veh.order == ORDER_SENTRY_BOARD || veh.order == ORDER_HOLD || veh.order == ORDER_CONVOY))
-        return 0;
-    int32_t moves = speed(veh_id, 0);
-    int32_t left = moves - veh.moves_spent;
-    return left >= 0 && (left > 999 || moves != veh.moves_spent);
+    if (veh_id < 0) return 0;
+    return game().vehs[veh_id].ready();
 }
 
-int32_t GAMEAPI veh_jail(int32_t veh_id) {
-    VEH& veh = game().vehs[veh_id];
-    if (veh_triad(veh_id) == 0 && veh.order == ORDER_SENTRY_BOARD && veh.waypoint_x[0] >= 0 &&
-        veh_triad(veh.waypoint_x[0]) == 2) {
-        MAP* sq = map_tile(veh.x, veh.y);
+// A selectable vehicle of the viewer waiting for orders, with moves left.
+int32_t Veh::ready() const {
+    if (!veh_is_viewers(*this) || jail()) return 0;
+    if (!(state & (VSTATE_ON_ALERT | VSTATE_EXPLORE)) &&
+        (order == ORDER_SENTRY_BOARD || order == ORDER_HOLD || order == ORDER_CONVOY))
+        return 0;
+    int32_t moves = speed(id(), 0);
+    int32_t left = moves - moves_spent;
+    return left >= 0 && (left > 999 || moves != moves_spent);
+}
+
+int32_t GAMEAPI veh_jail(int32_t veh_id) { return game().vehs[veh_id].jail(); }
+
+// A land unit sentried aboard an aircraft, outside a base or airbase: it cannot move.
+int32_t Veh::jail() const {
+    if (unit_triad(unit_id) == 0 && order == ORDER_SENTRY_BOARD && waypoint_x[0] >= 0 &&
+        veh_triad(waypoint_x[0]) == 2) {
+        MAP* sq = map_tile(x, y);
         if ((!(sq->items & BIT_BASE_IN_TILE) || (sq->val2 & 0xF) > 7 || (sq->val2 & 0xF) == 0) &&
             !(sq->items & BIT_AIRBASE))
             return 1;
@@ -790,29 +832,35 @@ int32_t GAMEAPI veh_jail(int32_t veh_id) {
     return 0;
 }
 
-void GAMEAPI veh_skip(int32_t veh_id) { game().vehs[veh_id].moves_spent = (uint8_t)speed(veh_id, 0); }
+void GAMEAPI veh_skip(int32_t veh_id) { game().vehs[veh_id].skip(); }
+
+// Spends all the vehicle's moves.
+void Veh::skip() { moves_spent = (uint8_t)speed(id(), 0); }
 
 int32_t GAMEAPI veh_fake(int32_t unit_id, int32_t faction_id) {
     veh_clear(0x800, unit_id, faction_id);
     return 0x800;
 }
 
-int32_t GAMEAPI veh_wake(int32_t veh_id) {
-    VEH& veh = game().vehs[veh_id];
-    int8_t order = (int8_t)veh.order;
-    if (order > 3 && order < 24 && !(veh.state & VSTATE_WORKING)) {  // terraforming
-        veh.moves_spent = (uint8_t)(speed(veh_id, 0) - Rules.move_rate_roads);
-        uint8_t turns = veh.movement_turns;
+int32_t GAMEAPI veh_wake(int32_t veh_id) { return game().vehs[veh_id].wake(); }
+
+// Wakes the vehicle: a terraformer keeps the work done (its moves are spent), a unit on alert that
+// has not moved gets its moves back; the order and the alert/explore states are cleared.
+int32_t Veh::wake() {
+    int32_t veh_id = id();
+    int8_t current = (int8_t)order;
+    if (current > 3 && current < 24 && !(state & VSTATE_WORKING)) {  // terraforming
+        moves_spent = (uint8_t)(speed(veh_id, 0) - Rules.move_rate_roads);
+        uint8_t turns = movement_turns;
         if (turns) {
-            int32_t left = turns - contribution(veh_id, (int8_t)veh.order - 4);
+            int32_t left = turns - contribution(veh_id, (int8_t)order - 4);
             if (left < 0) left = 0;
-            veh.movement_turns = (uint8_t)left;
+            movement_turns = (uint8_t)left;
         }
     }
-    if ((veh.state & VSTATE_ON_ALERT) && veh.order_auto_type == ORDERA_ON_ALERT && !(veh.state & VSTATE_HAS_MOVED))
-        veh.moves_spent = 0;
-    veh.order = ORDER_NONE;
-    veh.state &= 0xF4FFBDFF;
+    if ((state & VSTATE_ON_ALERT) && order_auto_type == ORDERA_ON_ALERT && !(state & VSTATE_HAS_MOVED)) moves_spent = 0;
+    order = ORDER_NONE;
+    state &= 0xF4FFBDFF;
     return veh_id;
 }
 

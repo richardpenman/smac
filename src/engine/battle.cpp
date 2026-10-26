@@ -137,7 +137,7 @@ int32_t GAMEAPI has_fac_built(int32_t facility_id) {
 int32_t GAMEAPI base_project(int32_t project_id) { return SecretProjects[project_id]; }
 
 uint32_t GAMEAPI has_treaty(int32_t faction_id, int32_t faction_id_with, uint32_t treaty) {
-    return game().factions[faction_id].diplo_status[faction_id_with] & treaty;
+    return game().factions[faction_id].has_treaty(faction_id_with, treaty);
 }
 
 int32_t GAMEAPI drop_range(int32_t faction_id) {

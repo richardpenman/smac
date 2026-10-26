@@ -228,7 +228,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 12 | Split `base_build` | L | done (see note 12) |
 | 13 | Split `goody_box`, `probe`, `random_events` (gotos out) | M | done (see note 13) |
 | 14 | Split `order_veh` (176 gotos) | L | done (see note 14) |
-| 15 | Methods on layout structs (`Base::`, `Faction::`, `Veh::`) with `ADDR` forwarders | L | |
+| 15 | Methods on layout structs (`Base::`, `Faction::`, `Veh::`) with `ADDR` forwarders | L | first pass done (see note 15) |
 | 16 | Scratch globals → contexts/locals | L | |
 | 17 | Golden-record fcompare mode + data-dependent unit tests | M | |
 | 18 | `diffnative.sh` (native-vs-baseline on new seeds); tag `hybrid-final` | S | |
@@ -475,3 +475,32 @@ Notes on the increments:
     moved verbatim. fcompare cannot check `order_veh` (fcompare_table.h: real battles free UI heap
     objects twice), as before the split; it is proven by the native scenarios, the observer and
     ASan games and the hybrid games (all patches).
+
+15. First pass. `using Base = BASE;` and `using Veh = VEH;` (types/base.h, types/veh.h; section 5:
+    the alias first); `Faction` already had its name. Each struct got `id()` (its index in
+    `game().bases` / `vehs` / `factions`) and non-virtual member functions holding the bodies of
+    original functions about one record; the free functions keep their `ADDR` and signature and
+    became one-line forwarders (`void GAMEAPI veh_skip(int32_t veh_id) { game().vehs[veh_id].skip(); }`),
+    so the hybrid build patches and fcompare checks them as before. Layout and `SMAC_LAYOUT`
+    asserts are untouched (no data member, no virtual function). Moved:
+    * `Veh` (veh.cpp): `lift`, `drop`, `sleep`, `demote`, `promote`, `cargo`, `selectable`,
+      `unmoved`, `ready`, `jail`, `skip`, `wake`;
+    * `Base` (base.cpp): `mark`, `lose_minerals`, `change`, `pop_goal_fac`, `pop_goal`,
+      `queue_next` (`base_queue`);
+    * `Faction` (diplomacy.cpp): `has_treaty`, `has_agenda`, `set_treaty`, `set_agenda`,
+      `treaty_on`, `treaty_off`, `agenda_on`, `agenda_off`, `reputation`.
+    Fields are used directly (`order = ORDER_NONE`), the id only where another id-based function
+    needs it; locals that shadowed a field were renamed (`owner` for a base's faction, `to_x` /
+    `to_y`, `tile_x` / `tile_y`, `current` for an order). A test of a negative id that the
+    original makes before touching the record stays in the forwarder (`veh_demote`,
+    `veh_selectable`, `veh_unmoved`, `veh_ready`). Callers still call the free functions: in the
+    hybrid build both are native code, so moving callers to the methods changes nothing, but it is
+    left for after the freeze so that call sites keep naming the original's functions. Not moved
+    here: the base cycle (`base_growth`, `base_production`, `base_yield`, ... on
+    `CurrentBaseID`) works through the scratch globals of the current base and moves with them
+    (increment 16); `has_fac` / `set_fac` and other functions the original calls with id -1
+    (out-of-range reads through `base_raw`) stay free functions; `speed` and `morale_veh` stay
+    as they are because the hybrid build shadows them (hybrid_shadow.h). tests/unit/
+    test_layout_methods.cpp checks `id()`, `sleep`, `wake`, `pop_goal`, `pop_goal_fac` and the
+    treaty functions through both the forwarders and the methods. fcompare: all 27 moved
+    functions.

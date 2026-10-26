@@ -383,6 +383,20 @@ struct Faction {
     int32_t unk_116;
     int32_t unk_117;
     int32_t unk_118;
+
+    // Diplomatic relations of this faction with another (engine/diplomacy.cpp). The original's
+    // free functions (treaty_on, has_treaty, ...) keep their ADDR and forward here while the
+    // hybrid build lives (docs/CLEANUP_PLAN.md, section 3.2); callers still use them.
+    int32_t id() const;  // index in game().factions
+    uint32_t has_treaty(int32_t with, uint32_t treaty) const;
+    uint32_t has_agenda(int32_t with, uint32_t agenda) const;
+    void set_treaty(int32_t with, uint32_t status, int32_t add);
+    void set_agenda(int32_t with, uint32_t agenda, int32_t add);
+    void treaty_on(int32_t with, uint32_t status);
+    void treaty_off(int32_t with, uint32_t status);
+    void agenda_on(int32_t with, uint32_t agenda);
+    void agenda_off(int32_t with, uint32_t agenda);
+    int32_t reputation(int32_t with) const;
 };
 
 struct CRules {
