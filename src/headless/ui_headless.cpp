@@ -76,7 +76,6 @@ void THISCALL BaseButton_set_bubble_text(uint8_t*, const char*) {}
 void THISCALL InfoWin_on_redraw(uint8_t*) {}
 // ---- save module: map windows, editor panel, PBEM message lists ----
 void THISCALL MapWin_close(uint8_t*) {}
-void ui_editor_panel_show(bool) {}
 // List entries live outside the memory image (they are heap objects in the original); the
 // count (+0x10) and position (+0x14) fields of the image objects are kept as the original does.
 static std::map<const uint8_t*, std::vector<std::pair<int32_t, std::string>>>& headless_stringlists() {

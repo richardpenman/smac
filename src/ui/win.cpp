@@ -193,6 +193,14 @@ bool run_command(const std::string& cmd) {
         basewin_log_state();
         return true;
     }
+    if (cmd.rfind("cmd ", 0) == 0) {  // test aid: a menu command (Console_menu_proc)
+        Console_menu_proc(&MainConsole, (int32_t)std::strtol(arg.c_str(), nullptr, 0));
+        return true;
+    }
+    if (cmd == "editstate") {  // test aid: the scenario editor's pane (editpane.cpp)
+        editpane_log_state();
+        return true;
+    }
     if (cmd.rfind("base ", 0) == 0) {  // test aid: opens a base window (basewin.h)
         int32_t id = std::atoi(arg.c_str());
         if (id >= 0 && id < BaseCount) BaseWin_zoom(&BaseWin, id, 0);

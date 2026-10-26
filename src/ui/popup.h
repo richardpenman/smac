@@ -121,6 +121,8 @@ int32_t BasePop_selected_id(BasePop* self);
 int32_t Popup_start(BasePop* pop, const char* file, const char* label, int32_t active, const char* edit,
                     uint32_t flags);
 std::string BasePop_text(BasePop* self);
+// StringList_sort (0x6087A0) of the popup's list: the items in text order (strcmp, stable).
+void BasePop_sort_items(BasePop* self);
 // The #caption of the section(s) read (null for none).
 const char* BasePop_caption(BasePop* self);
 

@@ -364,4 +364,43 @@ if [ "$(grep -c '^unit 19 f1 Colony Pod' "$OUT/editor.log")" = 1 ]; then echo "P
 check editor "off" "^scenario editor off"
 nocrash editor
 
+# 22. The rest of the scenario editor (editor.cpp, editpane.cpp, editor_diplo.cpp, editor_base.cpp):
+#     the interface pane (the 0x3EA button shown with the omniscient view, the paint and brush
+#     buttons, '2' presses Rockiness's), the unit's DATA (EDITVEH's button 2: EDITVEH2's first field),
+#     the difficulty, the personality and strategy (AIEDITOR / AIEDITOR2's check boxes), the
+#     scenario's parameters, rules and victory conditions, a natural landmark placed and removed,
+#     the factions reset, the diplomacy editor's window (the pact box clicked, another faction
+#     selected: the boxes applied; INTEGRITY; OK), the view (ALL: EDITORCONTROLALL), F10, the base
+#     window's editor menu (the population, a secret project made unbuilt).
+run editor2 $NEW --keys "ENTER,C-k,DOWN,ENTER,ENTER,EDITSTATE,2,EDITSTATE,C-S-F1,CLICK:332x472,BACK,5,ENTER,\
+CMD:0x607,DOWN,ENTER,CMD:0x612,ENTER,SPACE,ENTER,CMD:0x613,ENTER,DOWN,SPACE,ENTER,CMD:0x616,ENTER,CMD:0x615,SPACE,ENTER,\
+CMD:0x617,ENTER,CMD:0xA17,ENTER,CMD:0xA18,ENTER,CMD:0x610,DOWN,ENTER,\
+S-F9,ENTER,CLICK:560x324,SCREENSTATE,CLICK:200x243,CLICK:420x569,ENTER,CLICK:794x569,\
+CMD:0x606,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,ENTER,F10,EDITSTATE,F10,EDITSTATE,BASE:0,e,DOWN,ENTER,BASESTATE,\
+e,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,ENTER,ENTER"
+check editor2 "the pane shown with its buttons" "^editpane shown 1 mode 1002 paint 0 \\(button 1011\\) brush 0 \\(button 1036\\)"
+check editor2 "the paint buttons' bubbles" "^editpane button 3FA at 313,110 43x18: Soil Enricher"
+check editor2 "the brush buttons" "^editpane button 411 at 522,132 24x24"
+check editor2 "a paint key presses its button" "^editpane shown 1 mode 1002 paint 1 \\(button 1012\\)"
+check editor2 "the unit's data" "^editor: unit 4 data damage 5 moves 0 lurking 0 turns 0"
+check editor2 "difficulty" "^editor: difficulty 4"
+check editor2 "personality" "^editor: faction 1 personality 0 0 0 0 fight -1"
+check editor2 "strategy" "^editor: faction 1 strategy flags 08000000 ext 00000000"
+check editor2 "parameters" "^editor: parameters 9999 9999 0 0 2100 2500 -1"
+check editor2 "rules" "^editor: rules 00201A0E more 00000000"
+check editor2 "victory" "^editor: victory rules 00201A0E state 000000E0"
+check editor2 "a crater placed" "^editor: natural 0 placed at 35,7"
+check editor2 "and removed" "^editor: natural 0 removed at 35,7"
+check editor2 "factions reset" "^editor: factions reset"
+check editor2 "diplomacy: the pact box" "^diploedit state 1-2: 8=0 10=0 4=0 2=0 1=1 "
+check editor2 "diplomacy: applied on selecting another faction" "^diploedit 1-2: status 00000003 agenda 00000000"
+check editor2 "diplomacy: integrity" "^diploedit 1: integrity 0"
+check editor2 "diplomacy: closed" "^diploedit closed"
+check editor2 "view: all factions" "^editor: view all \\(humans 02\\)"
+check editor2 "F10: the pane's button hidden" "^editpane shown 0 mode 1002"
+check editor2 "base editor: population" "^basestate base 0 .* f1 pop 2 "
+check editor2 "base editor: a project made unbuilt" "^base editor: project 2 at -1"
+nocheck editor2 "no placeholder" "not reconstructed"
+nocrash editor2
+
 exit $FAIL

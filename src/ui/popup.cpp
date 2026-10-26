@@ -385,6 +385,7 @@ public:
     std::vector<Item> items;           // dialog items (+0xC4 list of the Dialog)
     std::vector<std::string> edit;     // EditGroup texts (one per item)
     std::string edit_default;          // EditGroup_set_default
+    bool edit_default_given = false;   // BasePop_start's edit default argument was given
     uint32_t flags = 0;                // +0x30A8
     int32_t mode = 0;                  // +0x30AC: #extra + PopupDialogState * 10000
     int32_t wave = -1, wave_vol = 0x7F;  // the show sound block (+0x2E64): #wave (+0x104), #vol (+0x108)
@@ -407,7 +408,7 @@ public:
     int32_t spacing = 3;               // +0x2214
     int32_t row_h = 0x13;              // +0x2218
     int32_t cols = 1;                  // +0x221C (#col)
-    int32_t max_rows = 1000;           // +0x2220 (#listbox N / #checkbox N)
+    int32_t max_rows = 12;             // +0x2220 (#listbox N / #checkbox N; Dialog_close: DAT_006970A4, 12)
     int32_t total_w = 0;               // +0x222C
     int32_t total_h = 0;               // +0x2230
     int32_t item_w = 0;                // +0x2234
@@ -496,7 +497,7 @@ void basepop_init(BasePop* p, uint32_t flags) {
     p->dlg_width = 0;
     p->dlg_height = 0;
     p->cols = 1;
-    p->max_rows = 1000;
+    p->max_rows = 12;  // BasePop_close -> ListBox_close -> Dialog_close (DAT_006970A4)
     p->req_x = p->req_y = 0x1000;
     p->text_x = -1;
     p->text_indent = 0;
@@ -558,6 +559,15 @@ void popup_delete(BasePop* pop) {
 
 // ---- BasePop_start (0x601BF0) ----
 
+// BasePop_start's default of the next edit field (EditGroup_edit): the edit default for the first
+// field when one was given, else field n's $STRn (n < 10), else empty.
+static std::string edit_field_default(BasePop* self) {
+    size_t n = self->edit.size();
+    if (n >= 10) return std::string();
+    if (self->edit_default_given && n == 0) return self->edit_default;
+    return ParseStrBuffer[n];
+}
+
 int32_t BasePop_start(BasePop* self, const char* file, const char* label, int32_t active, const char* edit_default,
                       uint32_t flags, uint8_t*) {
     bool text_mode = true;
@@ -569,6 +579,7 @@ int32_t BasePop_start(BasePop* self, const char* file, const char* label, int32_
     else self->item_type = 0x10;
     self->active = active;
     if (!label) return 3;
+    self->edit_default_given = edit_default != nullptr;
     if (edit_default) self->edit_default = edit_default;
     self->label = label;
     if (text_open(file ? file : ScriptFileName, label)) return 1;
@@ -650,9 +661,10 @@ int32_t BasePop_start(BasePop* self, const char* file, const char* label, int32_
         if (text_mode) {
             BasePop_string(self, buf);
         } else if (self->item_type == 4) {
-            // EditGroup_edit(label, default): the default text goes to the first field.
+            // EditGroup_edit(label, default): the edit default for the first field when given,
+            // else field n's default is $STRn (ParseStrBuffer[n], n < 10).
             self->items.push_back({self->keep(buf), (int32_t)self->items.size(), 1});
-            self->edit.push_back(self->edit.empty() ? self->edit_default : std::string());
+            self->edit.push_back(edit_field_default(self));
         } else {
             BasePop_item(self, buf, (int32_t)self->items.size());
         }
@@ -676,6 +688,11 @@ int32_t BasePop_string(BasePop* self, const char* text) {
     }
     self->strings.push_back({const_cast<char*>(self->keep(text)), mode});
     return 0;
+}
+
+void BasePop_sort_items(BasePop* self) {
+    std::stable_sort(self->items.begin(), self->items.end(),
+                     [](const auto& a, const auto& b) { return std::strcmp(a.text, b.text) < 0; });
 }
 
 int32_t BasePop_item(BasePop* self, const char* text, int32_t id) {
@@ -1360,6 +1377,11 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
     ui_invalidate();
     std::fprintf(stderr, "popup %s shown: %dx%d at %d,%d (%d items)\n", p->label.c_str(), p->width, p->height,
                  p->win_x, p->win_y, (int32_t)p->items.size());
+    // The #buttons' centres on the screen (a test can click them).
+    for (const auto& b : p->btns)
+        if (b.id > 0)
+            std::fprintf(stderr, "popup %s button %d at %d,%d\n", p->label.c_str(), b.id,
+                         p->win_x + (b.r.left + b.r.right) / 2, p->win_y + (b.r.top + b.r.bottom) / 2);
     ui_trace("popup shown");
     // Test aid: SMACX_POPUP_SHOTS=DIR writes a screenshot of every popup when it opens.
     if (const char* dir = std::getenv("SMACX_POPUP_SHOTS")) {

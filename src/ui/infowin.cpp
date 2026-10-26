@@ -212,6 +212,7 @@ void msg_draw(Buffer* c) {
 
 BaseButton g_btn[3];  // 1000, 0x3E9, 0x3EA
 Font g_btn_font;
+bool g_editor_button = false;  // EditorPanelWin shown (before the buttons exist too)
 
 }  // namespace
 
@@ -927,7 +928,7 @@ void infowin_setup() {
         const UiRect& r = mi_rect(kRect[i]);
         bw_button_init(&b, name, kId[i], r.left, r.top, r.right - r.left, r.bottom - r.top, 1);
         b.font = &g_btn_font;
-        b.shown = i < 2;
+        b.shown = i < 2 || g_editor_button;
         bw_button_set(&b, kId[i] == 0x3E9);
     }
     // MainInterface_on_redraw (mode 0x3E9): the empty panes, the timer started.
@@ -936,11 +937,18 @@ void infowin_setup() {
     save_pixels();
 }
 
+void infowin_editor_button(bool show) {
+    g_editor_button = show;
+    g_btn[2].shown = show;
+    ui_invalidate();
+}
+
 void infowin_compose(Buffer* mi) {
     infowin_setup();
     if (!g_inited) return;
     if (mi_mode() == 1000) msg_draw(mi);
     else if (mi_mode() == 0x3E9) restore_pixels(mi);
+    else if (mi_mode() == 0x3EA) editpane_compose(mi);
     for (BaseButton& b : g_btn) {
         if (!b.shown) continue;
         bw_button_draw(&b);
@@ -971,6 +979,7 @@ bool infowin_mouse(int32_t type, int32_t x, int32_t y) {
         return true;
     }
     for (BaseButton& b : g_btn) b.pressed = 0;
+    if (editpane_mouse(type, x, y)) return true;
     if (mi_mode() == 1000) {
         UiRect r = msg_rect();
         if (x < r.left || x >= r.right || y < r.top || y >= r.bottom) return false;

@@ -197,3 +197,9 @@ Buffer* basewin_mi_canvas();
 bool basewin_dump(const char* path);
 // The open base's state on stderr ("basestate ..." lines; smacx --keys BASESTATE).
 void basewin_log_state();
+
+// ---- the scenario editor's base menu (editor_base.cpp) ----
+ADDR_NATIVE(0x41C7A0) void THISCALL BaseWin_base_editor(uint8_t* win);
+ADDR_NATIVE(0x41B790) void THISCALL BaseWin_base_editor_fac(uint8_t* win);
+ADDR_NATIVE(0x41BBC0) void THISCALL BaseWin_base_editor_proj(uint8_t* win);
+ADDR_NATIVE(0x41C240) void THISCALL BaseWin_base_editor_copy(uint8_t* win, int32_t to);

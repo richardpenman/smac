@@ -6,6 +6,7 @@
 // versions; their game-state effects, where they have any, are noted at the call.
 #include "ui/statuswin.h"
 #include "ui/console.h"
+#include "ui/infowin.h"
 #include "ui/mapwin.h"
 #include "ui/help.h"
 #include "ui/techwin.h"
@@ -1538,7 +1539,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     if (TutWin_reset(&TutWin) && (vk == 0xD || vk == 0x1B)) return 1;
     // Enter or space dismiss the message boxes first.
     bool dismiss = false;
-    if (vk == 0x91) console_not_reconstructed("MainInterface_draw_edit_pane");
+    if (vk == 0x91) MainInterface_draw_edit_pane(&MainInterfaceWin);
     if (vk == 0xD || ch == ' ') {
         if (NetMsgShownA || NetMsgShownB || InterfaceMessageShown ||
             (InterfaceButtonState == 1000 && !Win_is_visible(&BaseWin)))

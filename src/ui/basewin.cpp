@@ -944,7 +944,7 @@ int32_t basewin_console_key(uint8_t* console, int32_t ch, int32_t vk, int32_t ke
         BaseWin_rename(self);
         return 1;
     case 'e':
-        if (GameState & 0x40) console_not_reconstructed("BaseWin_base_editor");
+        if (GameState & 0x40) BaseWin_base_editor(self);
         return 1;
     case '+': case '=':  // scenario editor: population
         if (GameState & 0x40) {

@@ -864,7 +864,7 @@ void THISCALL BaseWin_on_button_clicked(uint8_t* self, int32_t id) {
         return;
     }
     case 0x15:
-        if (own) console_not_reconstructed("BaseWin_base_editor");
+        if (own) BaseWin_base_editor(self);
         return;
     case -2:
     case 0:

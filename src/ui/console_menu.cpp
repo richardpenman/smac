@@ -477,9 +477,7 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
     if (!(GameState & 0x40)) return;
     if ((id >= 0x601 && id <= 0x61B) || id >= 0xA00) {
         if (id == 0x601) {  // omniscient view
-            GameState ^= 0x80;
-            draw_map(1);
-            console_not_reconstructed("Console_menu_proc: omniscient view (the editor's windows)");
+            editor_toggle_omniscient();
             return;
         }
         if (id == 0x604) {
@@ -512,6 +510,22 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
         }
         switch (id) {  // editor.cpp
         case 0x602: Console_editor_veh(); return;
+        case 0x605: Console_editor_tech(); return;
+        case 0x606: Console_editor_view(); return;
+        case 0x607: Console_editor_diff(); return;
+        case 0x60A: Console_editor_eliminate(); return;
+        case 0x60B: Console_editor_reload(); return;
+        case 0x60E: Console_show_movies(self); return;
+        case 0x60F: Console_editor_reset_tech(self); return;
+        case 0x610: Console_editor_reset_faction(); return;
+        case 0x611: Console_editor_diplomacy(); return;
+        case 0x612: Console_editor_personality(); return;
+        case 0x613: Console_editor_strategy(); return;
+        case 0x615: Console_editor_scen_rules(); return;
+        case 0x616: Console_editor_scen_param(); return;
+        case 0x617: Console_editor_scen_victory(); return;
+        case 0xA17: Console_editor_natural(1); return;
+        case 0xA18: Console_editor_natural(0); return;
         case 0x608: Console_editor_energy(); return;
         case 0x609: Console_editor_date(); return;
         case 0x60C: Console_editor_kill_vehicles(); return;

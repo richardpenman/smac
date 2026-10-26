@@ -219,6 +219,26 @@ ADDR_NATIVE(0x4E0120) void GAMEAPI Console_editor_energy();
 ADDR_NATIVE(0x4E0210) void GAMEAPI Console_editor_date();
 ADDR_NATIVE(0x4E09B0) void GAMEAPI Console_editor_kill_vehicles();
 ADDR_NATIVE(0x4DED00) void GAMEAPI Console_editor_veh();
+ADDR_NATIVE(0x4DBD20) void GAMEAPI Console_editor_personality();
+ADDR_NATIVE(0x4DBFB0) void GAMEAPI Console_editor_strategy();
+ADDR_NATIVE(0x4DBB40) void GAMEAPI Console_editor_reset_faction();
+ADDR_NATIVE(0x4DBC40) void THISCALL Console_editor_reset_tech(uint8_t* console);
+ADDR_NATIVE(0x4DD6F0) void GAMEAPI Console_editor_diff();
+ADDR_NATIVE(0x4E0290) void GAMEAPI Console_editor_reload();
+ADDR_NATIVE(0x4E05E0) void GAMEAPI Console_editor_eliminate();
+ADDR_NATIVE(0x4DC520) void GAMEAPI Console_editor_scen_rules();
+ADDR_NATIVE(0x4DC860) void GAMEAPI Console_editor_scen_victory();
+ADDR_NATIVE(0x4DCCC0) void GAMEAPI Console_editor_scen_param();
+ADDR_NATIVE(0x4DFAD0) void GAMEAPI Console_editor_tech();
+ADDR_NATIVE(0x4DF4F0) void GAMEAPI Console_editor_view();
+ADDR_NATIVE(0x4E14D0) void GAMEAPI Console_editor_natural(int32_t place);
+ADDR_NATIVE(0x4DB870) void GAMEAPI Console_editor_diplomacy();
+ADDR_NATIVE(0x515F70) void THISCALL Console_show_movies(uint8_t* console);
+// Console_on_key_click's ctrl+shift+F2 (inline in the original): every technology given / taken.
+void editor_all_techs();
+// The omniscient view toggled (F10 / the Scenario menu's 0x601): the editor's panel button shown
+// or hidden (EditorPanelWin's slots 1 / 2) and the panes redrawn.
+void editor_toggle_omniscient();
 // Console_on_key_click's editor keys (F10, shift / ctrl / ctrl+shift F-keys, the digits); true
 // when the key was the editor's.
 bool editor_key(uint8_t* console, int32_t key);

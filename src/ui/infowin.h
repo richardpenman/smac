@@ -48,5 +48,15 @@ void infowin_compose(Buffer* mi);
 bool infowin_mouse(int32_t type, int32_t x, int32_t y);
 // The timer (every 50 ms, InfoWin_init's pfncStartTimer) from the pump.
 void infowin_tick();
+// EditorPanelWin's show / hide: the 0x3EA mode button (the scenario editor's pane).
+void infowin_editor_button(bool show);
+// editpane.cpp: the editor's pane (mode 0x3EA) composed into the main interface's canvas, its
+// clicks (main interface coordinates), ButtonGroup_set of its groups (2 paints, 3 brushes), and
+// its state on stderr (EDITSTATE).
+void editpane_compose(Buffer* mi);
+bool editpane_mouse(int32_t type, int32_t x, int32_t y);
+void editpane_group_set(int32_t group, int32_t id);
+void editpane_log_state();
+ADDR_NATIVE(0x45B550) void THISCALL MainInterface_draw_edit_pane(uint8_t* self);
 // Test aid (scripted INFOSTATE): the panes' states and texts on stderr.
 void infowin_log_state();

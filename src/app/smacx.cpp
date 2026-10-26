@@ -31,7 +31,8 @@
 // voice object, logging its length), MUSICRENDER:FILE:SECONDS (the music's next seconds into a WAV
 // file in --outdir), MOVIE:NAME (plays movies\NAME.wve), BASEDUMP:FILE (the open base window's canvases in the
 // oracle's basedump format), BASE:N (opens base N's window, a test aid), BASESTATE (the open
-// base's production, queue, workers and stores on stderr), SCREENSTATE (the open report / social
+// base's production, queue, workers and stores on stderr), CMD:ID (Console_menu_proc's command ID,
+// e.g. CMD:0x605, a test aid), EDITSTATE (the scenario editor's pane), SCREENSTATE (the open report / social
 // engineering / monuments screen: its texts and state), FACTIONSTATE (the viewer's social choice,
 // energy allocation, credits and upheaval paid), TECHSTATE (the viewer's research goal and
 // points, blind research priorities), PROTOSTATE (the viewer's prototypes), MENUSTATE (the open
@@ -492,6 +493,14 @@ bool parse_key(std::string tok, ScriptedKey* out) {
     }
     if (tok.rfind("BASEDUMP:", 0) == 0) {  // BASEDUMP:FILE, the base window's canvases (basewin.h)
         out->command = "basedump " + tok.substr(9);
+        return true;
+    }
+    if (tok.rfind("CMD:", 0) == 0) {  // CMD:ID, Console_menu_proc(ID) (a menu command by its id, test aid)
+        out->command = "cmd " + tok.substr(4);
+        return true;
+    }
+    if (tok == "EDITSTATE") {  // the scenario editor's pane (editpane.cpp, test aid)
+        out->command = "editstate";
         return true;
     }
     if (tok.rfind("BASE:", 0) == 0) {  // BASE:N, opens the base window of base N (test aid)
