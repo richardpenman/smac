@@ -28,6 +28,7 @@
 #include "engine/move.h"
 #include "engine/net.h"
 #include "engine/parse.h"
+#include "engine/prefs.h"
 #include "engine/path.h"
 #include "engine/probe.h"
 #include "engine/random.h"
@@ -1785,7 +1786,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         X_pop((GameMorePreferences & 0x200000) ? "MENUDETAIL" : "MENUSIMPLE", 0);
         break;
     case 0x7B: MultiWin_show(nullptr); break;  // F12: MainInterface_on_iface_button_clicked(0x3EC)
-    case 0x10008: console_not_reconstructed("Console_next_cursor"); break;  // shift+Backspace
+    case 0x10008: Console_next_cursor(self); break;  // shift+Backspace
     case 0x1004E: Console_name_landmark(self, -1, -1); break;   // shift+N
     case 0x3004E: Console_erase_landmark(self, -1, -1); break;  // ctrl+shift+N
     case 0x10051: Console_retire_game(self); break;  // shift+Q: Resign
@@ -1806,11 +1807,24 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     case 0x20041: prefwin_display(3); break;  // ctrl+A: Console_set_auto_preferences
     case 0x20049: prefwin_display(4); break;  // ctrl+I: Console_set_audiovisual
     case 0x2004D: prefwin_display(5); break;  // ctrl+M: Console_set_map_display
-    case 0x20047: case 0x2004B: case 0x2004E: case 0x20073: case 0x30041: case 0x30047: case 0x3004C:
-    case 0x30057: case 0x30058: case 0x30073:
-        // Preferences, landmarks, load, editor, version, credits (menu commands).
-        console_not_reconstructed("Console_on_key_click: menu command");
+    case 0x20047: console_toggle_pref(0x20A); break;  // ctrl+G
+    case 0x30047: console_toggle_pref(0x20B); break;  // ctrl+shift+G
+    case 0x2004E: console_toggle_pref(0x210); break;  // ctrl+N: base names
+    case 0x30041: console_toggle_pref(0x20C); break;  // ctrl+shift+A: rally points
+    case 0x30058: console_toggle_pref(0x209); break;  // ctrl+shift+X: flat terrain
+    case 0x30057:                                     // ctrl+shift+W
+        GameMorePreferences ^= 1;
+        draw_map(1);
+        prefs_save(0);
         break;
+    case 0x2004B: console_not_reconstructed("Console_editor_on"); break;  // ctrl+K: scenario editor
+    case 0x3004C: Console_load_proc(self, 0, 0); break;                    // ctrl+shift+L
+    case 0x20073:                                                          // ctrl+F4: version
+        parse_says(0, "RELEASE 2.0", -1, -1);
+        parse_says(1, "20-Dec-1999", -1, -1);
+        popp(ScriptFileName, "VERSIONCONTROLX", 0, "ac_logo_sm.pcx", 0);
+        break;
+    case 0x30073: show_credits(); break;  // ctrl+shift+F4
     default: break;
     }
     // Movement: keypad, arrows, Home/End/PgUp/PgDn (ctrl: a move order; shift: scroll the view).

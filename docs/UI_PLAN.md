@@ -217,13 +217,16 @@ computer players move with the engine.
   pane backgrounds, menu / commlink buttons, "TURN COMPLETE", the unit, tile, stack, info and
   date panes and a simple world map, drawn with the original's art, fonts and colours at the
   measured positions, not by StatusWin_draw_* / InfoWin_setup_text / WorldWin_on_redraw.
-* **Menus** (menu.cpp; approximated): the bar and pull-downs of menu.txt with the original's
-  command ids and init-hidden items (Alt, Alt+letter, arrows, Enter, mouse); a command sends its
-  shortcut key to Console_on_key_click (Console_menu_proc is not reconstructed).
+* **Menus** (menu.cpp; the look approximated): the bar and pull-downs of menu.txt with the
+  original's command ids and init-hidden items (Alt, Alt+letter, arrows, Enter, mouse); a command
+  runs Console_menu_proc (console_menu.cpp, reconstructed: every Game / HQ / Map / Action /
+  Terraform / Help / Network command, the display toggles with their check marks and keys,
+  Console_next_cursor, Console_survey, Console_zoom_to_upkeep_base, Console_show_scen_objectives,
+  Console_corner_the_market). The scenario editor's commands and the multiplayer ones log.
 * **Save / load**: ctrl+S / ctrl+L (and the Game menu) run the engine's save_game / load_game with
   a simple file box (console_filebox.cpp): a name field, a list of saves; original naming.
 * **Placeholders** (src/ui/console_placeholders.cpp): the map cursor and selected unit are
-  diamonds; the scenario editor, time controls, survey, assemble, tutorial hints log
+  diamonds; the scenario editor, time controls, assemble, tutorial hints log
   "not reconstructed". Multiplayer paths stop at the first network call.
 * **Testing**: `--keys` scripts input (characters, `C-`/`S-`/`A-` modifiers, `ALT`, `CLICK:XxY`,
   `RCLICK:XxY`, `MOVE:XxY`, `DRAG:X1xY1:X2xY2` (a held left button: the go-to drag), KP1..KP9, named keys, and

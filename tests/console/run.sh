@@ -57,9 +57,10 @@ run mouse $NEW --keys "ENTER,DRAG:530x200:640x260,UNITS,v,CLICK:300x300,UNITS,SH
 check mouse "drag: go-to order 24" "unit 4 f1 Scout Patrol \(35,9\) order 24"
 nocrash mouse
 
-# 4. Unit orders through the menus (Alt+A: Action; the items send their shortcut keys).
+# 4. Unit orders through the menus (Alt+A: Action; the items run Console_menu_proc).
 run menu $NEW --keys "ENTER,A-a,SHOT:menu_action.bmp,ESC,ALT,RIGHT,SHOT:menu_game.bmp,ESC,A-a,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,UNITS"
-check menu "a menu command chosen" "menu command [0-9A-F]+ "
+check menu "a menu command chosen" "menu item [0-9A-F]+ "
+check menu "Console_menu_proc ran it" "^menu command 3[0-9A-F]{2}$"
 nocrash menu
 
 # 5. Save (ctrl+S, the name typed) and load (ctrl+L, the newest save): the hold order of the

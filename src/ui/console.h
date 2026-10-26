@@ -153,6 +153,10 @@ ADDR_NATIVE(0x46D5D0) void THISCALL MapWin_click(uint8_t* win, int32_t px, int32
 ADDR_NATIVE(0x50F170) void GAMEAPI go_timer();
 ADDR_NATIVE(0x5147E0) int32_t THISCALL Console_set_cursor(uint8_t* console, int32_t x, int32_t y);
 
+// The menu bar's commands by command id (console_menu.cpp; Menu_menu_event -> Console_menu_daemon).
+ADDR_NATIVE(0x51BC70) void THISCALL Console_menu_proc(uint8_t* console, int32_t id);
+// The next position of the cursor history (shift+Backspace).
+ADDR_NATIVE(0x510B70) void THISCALL Console_next_cursor(uint8_t* console);
 // Landmarks (mapwin_menu.cpp): name / rename the landmark at (x, y) (off the map: the cursor's
 // tile; LANDMARK text entry) and erase it (LANDMARKKILL).
 ADDR_NATIVE(0x5162A0) void THISCALL Console_name_landmark(uint8_t* console, int32_t x, int32_t y);

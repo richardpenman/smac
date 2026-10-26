@@ -79,4 +79,16 @@ CLICK:340x724,DOWN,DOWN,ENTER,BASESTATE,UNITS"
     nocrash basewin
 fi
 
+# 5. Console_menu_proc: the Map menu's items without a shortcut through the menu bar (Alt+M, the
+#    menu's accelerators): the right-click menu's Action... sub-menu (the Action menu's pull-down)
+#    with an order; the base names toggle (ctrl+N) and its menu id 0x210.
+run menuproc $NEW --keys "ENTER,S-RCLICK:530x200,UP,UP,UP,UP,UP,UP,UP,ENTER,DOWN,ENTER,UNITS,C-n,SHOT:names.bmp"
+check menuproc "a sub-menu item chosen" "menu item [0-9A-F]+ "
+check menuproc "run by Console_menu_proc" "^menu command [0-9A-F]+$"
+nocrash menuproc
+D13=$(printf 'DOWN,%.0s' $(seq 1 13))
+run survey $NEW --keys "ENTER,A-m,${D13}ENTER,SHOT:survey1.bmp,A-m,${D13}ENTER,SHOT:survey2.bmp"
+check survey "Map menu: Terrain Survey (0x20F)" "^menu command 20F$"
+nocrash survey
+
 exit $FAIL

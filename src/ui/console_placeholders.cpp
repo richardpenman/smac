@@ -19,13 +19,8 @@ int32_t THISCALL TutWin_reset(uint8_t*) { return 0; }
 // Tutorial hints for the selected unit (game state: tut_check bits; only with tutorial hints on).
 void THISCALL Console_give_hints(uint8_t*) { console_not_reconstructed("Console_give_hints"); }
 void THISCALL Console_assemble(uint8_t*) { console_not_reconstructed("Console_assemble"); }
-void THISCALL Console_survey(uint8_t*) { console_not_reconstructed("Console_survey"); }
 void THISCALL Console_time_controls(uint8_t*) { console_not_reconstructed("Console_time_controls"); }
-void THISCALL Console_use_time_bonus(uint8_t*) { console_not_reconstructed("Console_use_time_bonus"); }
-void THISCALL Console_zoom_to_upkeep_base(uint8_t*) { console_not_reconstructed("Console_zoom_to_upkeep_base"); }
-void THISCALL Console_show_scen_objectives(uint8_t*) { console_not_reconstructed("Console_show_scen_objectives"); }
 void THISCALL Console_custom_my_faction(uint8_t*) { console_not_reconstructed("Console_custom_my_faction"); }
-void THISCALL Console_corner_the_market(uint8_t*) { console_not_reconstructed("Console_corner_the_market"); }
 void THISCALL Console_editor_edit_veh(uint8_t*, int32_t) { console_not_reconstructed("Console_editor_edit_veh"); }
 void THISCALL Console_editor_kill_veh(uint8_t*, int32_t) { console_not_reconstructed("Console_editor_kill_veh"); }
 // Scenario editor brush (ui module, not reconstructed).

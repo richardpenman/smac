@@ -6,11 +6,11 @@
 // hides at init.
 //
 // Approximated: the look (bar and pull-downs drawn with the interface's box tile and Arial 14,
-// not by Menu_on_redraw / PullDown_on_redraw), the item visibility of pfncMainMenuUpdateVisible
-// (only the init's hidden items and the menus of other modes: Network in multiplayer, Scenario and
-// Edit Map in the scenario editor), and the commands: Console_menu_proc (0x51BC70) is not
-// reconstructed; an item sends its shortcut key to the console (Console_on_key_click), which
-// calls the same functions for the commands that have a key; items without one are logged.
+// not by Menu_on_redraw / PullDown_on_redraw; the pull-downs opened from the map's right-click menu
+// are the reconstructed PullDown of pulldown.cpp) and the item visibility of
+// pfncMainMenuUpdateVisible (only the init's hidden items and the menus of other modes: Network in
+// multiplayer, Scenario and Edit Map in the scenario editor). A chosen item runs its command id
+// through Console_menu_proc (console_menu.cpp), as Menu_menu_event does.
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -283,7 +283,7 @@ const int32_t kHidden[] = {0x106, 0x107, 0x301, 0x309, 0x30A, 0x310, 0x306, 0x30
 struct Item {
     std::string text, shortcut, raw;  // raw: the menu.txt line ('&', "|shortcut")
     int32_t id = 0, key = 0;
-    bool separator = false, hidden = false;
+    bool separator = false, hidden = false, checked = false;
     char accel = 0;
 };
 struct Menu {
@@ -330,7 +330,7 @@ int32_t parse_key(std::string s) {
 std::string strip_amp(const std::string& s, char* accel) {
     std::string out;
     for (size_t i = 0; i < s.size(); i++) {
-        if (s[i] == '&' && i + 1 < s.size()) {
+        if (s[i] == '&' && i + 1 < s.size() && s[i + 1] != ' ') {  // "& " stays (PullDown_add_item)
             if (accel) *accel = (char)std::toupper((uint8_t)s[i + 1]);
             continue;
         }
@@ -462,9 +462,8 @@ void close_menus() {
 
 void choose(const Item& it) {
     close_menus();
-    std::fprintf(stderr, "menu command %03X %s\n", it.id, it.text.c_str());
-    if (it.key) ui_dispatch_key(it.key);
-    else console_not_reconstructed(("menu: " + it.text).c_str());
+    std::fprintf(stderr, "menu item %03X %s\n", it.id, it.text.c_str());
+    Console_menu_proc(&MainConsole, it.id);  // Menu_menu_event -> Console_menu_daemon
 }
 
 void open_menu(int32_t i) {
@@ -604,6 +603,15 @@ bool console_menu_mouse(int32_t type, int32_t x, int32_t y) {
     return true;
 }
 
+void console_menu_check(int32_t index, int32_t id, bool on) {
+    build();
+    for (Menu& m : g_menus)
+        if (m.index == index)
+            for (Item& it : m.items)
+                if (it.id == id && !it.separator) it.checked = on;
+    ui_invalidate();
+}
+
 void console_menu_popup(int32_t index, int32_t x, int32_t y) {
     build();
     for (const Menu& m : g_menus) {
@@ -616,6 +624,7 @@ void console_menu_popup(int32_t index, int32_t x, int32_t y) {
             if (it.separator) PullDown_add_separator(&pd, 99);
             else PullDown_add_item(&pd, it.id, it.raw.c_str());
             if (it.hidden) PullDown_hide_item(&pd, it.separator ? 99 : it.id);
+            if (it.checked) PullDown_check_item(&pd, it.id);
         }
         int32_t sel = PullDown_show(&pd, x, y);
         if (sel >= 0 && sel < (int32_t)m.items.size() && PullDown_get_selected(&pd) >= 0) choose(m.items[sel]);
@@ -662,6 +671,11 @@ void console_menu_draw(Buffer* s) {
         }
         Buffer_set_text_color(s, (int32_t)i == g_sel ? hi : text, -1, 1, 1);
         Buffer_write_l_3(s, it.text.c_str(), r.left + 10, y + 1, (int32_t)it.text.size());
+        if (it.checked) {  // the check mark of Menu_check_menu_item
+            int32_t cx = r.left + 3, cy = y + kItemH / 2;
+            Buffer_line_2(s, cx, cy, cx + 2, cy + 3, (int32_t)i == g_sel ? hi : text);
+            Buffer_line_2(s, cx + 2, cy + 3, cx + 6, cy - 4, (int32_t)i == g_sel ? hi : text);
+        }
         int32_t sw = Font_width(f, it.shortcut.c_str());
         Buffer_write_l_3(s, it.shortcut.c_str(), r.right - 10 - sw, y + 1, (int32_t)it.shortcut.size());
         y += kItemH;

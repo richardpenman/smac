@@ -36,6 +36,10 @@ void console_menu_draw(Buffer* screen);
 // The pull-down of menu `index` (Menu_id_to_index: 3 Action, 9 Terraform, ...) shown at the screen
 // position (x, y) as MapWin_right_menu shows it; the chosen command runs (menu.cpp).
 void console_menu_popup(int32_t index, int32_t x, int32_t y);
+// Menu_check_menu_item / Menu_uncheck_menu_item (0x5FB760 / 0x5FB7C0) of the console's menu bar.
+void console_menu_check(int32_t index, int32_t id, bool on);
+// The Map menu's display toggles (console_menu.cpp), also bound to keys.
+void console_toggle_pref(int32_t id);
 // Height of the main view (the map window): the screen minus the console's lower part.
 int32_t console_view_height(int32_t screen_height);
 
