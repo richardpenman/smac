@@ -136,7 +136,8 @@ bool ui_mapdump_write(uint8_t* win, const char* path, int32_t viewer) {
     return std::fclose(f) == 0;
 }
 
-bool ui_mapdump_like(uint8_t* win, const char* path, const char* like, int32_t scroll_from_x, int32_t scroll_from_y) {
+bool ui_mapdump_like(uint8_t* win, const char* path, const char* like, int32_t scroll_from_x, int32_t scroll_from_y,
+                     uint32_t options, int32_t radius_x, int32_t radius_y, int32_t radius_r) {
     MapWinNative* n = ui_mapwin_native(win);
     if (!n || !n->canvas) return false;
     int32_t viewer = CurrentPlayerFaction;
@@ -168,7 +169,15 @@ bool ui_mapdump_like(uint8_t* win, const char* path, const char* like, int32_t s
         pfncMoveMap(win, tx, ty, 0);
         mw(win, kMwScrolling) = 0;
     } else {
+        uint32_t old_options = (uint32_t)mw(win, kMwOptions);
+        mw(win, kMwOptions) = (int32_t)(old_options | options);
         pfncRedrawMap(win, 1);
+        if (radius_r >= 0) {  // on the canvas cleared to 0, as the oracle
+            Buffer_fill_2(n->canvas, 0);
+            // MapWin_draw_radius(.., 0) (without its check for a pending full redraw)
+            MapWin_gen_radius(win, radius_x, radius_y, radius_r, (GameState & 0x80) ? -1 : CurrentPlayerFaction, 0);
+        }
+        mw(win, kMwOptions) = (int32_t)old_options;
     }
     bool ok = ui_mapdump_write(win, path, CurrentPlayerFaction);
     // <path>.pt: pfncPtToTile for every 4th pixel (int32 result, x, y), as the oracle writes it.
@@ -669,8 +678,11 @@ void THISCALL pfncDrawMap(uint8_t* win, int32_t faction_id, int32_t terrain_only
         MapWin_draw_vehicles(win, tx, ty, tpx, tpy - mw(win, kMwHalfH), faction_id);
     });
     MapWin_draw_base_names(win);
-    // Options 0x2000 (MapWin_gen_overlays), 0x20000 (MapWin_draw_legend) and 0x100000
-    // (MapWin_draw_wars) are not used by the main view and not reconstructed.
+    if (mw(win, kMwOptions) & 0x2000) {
+        for_each_tile(2, [&](int32_t tx, int32_t ty) { MapWin_gen_overlays(win, tx, ty); });
+    }
+    if (mw(win, kMwOptions) & 0x20000) MapWin_draw_legend(win);
+    if (mw(win, kMwOptions) & 0x100000) MapWin_draw_wars(win);
 }
 
 void THISCALL pfncRedrawMap(uint8_t* win, int32_t flag) {

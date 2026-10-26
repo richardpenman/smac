@@ -976,6 +976,8 @@ struct MapDump {
     std::string file;
     int viewer, zoom, cx, cy; /* kMapDumpKeep: unchanged */
     int fx, fy;               /* scrollfrom=X,Y: full redraw there first, then a scrolled move */
+    unsigned options;         /* options=HEX: OR'd into the window's options for the dump */
+    int rx, ry, rr;           /* radius=X,Y,R: then MapWin_draw_radius(X, Y, R, 0) (partial redraw) */
 };
 static const int kMapDumpKeep = -99999;
 static std::vector<MapDump> g_mapdumps;
@@ -1016,7 +1018,8 @@ static void cmd_fontmetrics(char *args) {
 }
 
 static void cmd_mapdump(char *args) {
-    MapDump d = {"", kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, kMapDumpKeep};
+    MapDump d = {"", kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, kMapDumpKeep, 0,
+                 kMapDumpKeep, 0, 0};
     char *tok = strtok(args, " \t");
     if (tok) d.file = tok;
     while ((tok = strtok(NULL, " \t"))) {
@@ -1024,6 +1027,8 @@ static void cmd_mapdump(char *args) {
         else if (!strncmp(tok, "zoom=", 5)) d.zoom = atoi(tok + 5);
         else if (!strncmp(tok, "center=", 7)) sscanf(tok + 7, "%d,%d", &d.cx, &d.cy);
         else if (!strncmp(tok, "scrollfrom=", 11)) sscanf(tok + 11, "%d,%d", &d.fx, &d.fy);
+        else if (!strncmp(tok, "options=", 8)) d.options = (unsigned)strtoul(tok + 8, NULL, 16);
+        else if (!strncmp(tok, "radius=", 7)) sscanf(tok + 7, "%d,%d,%d", &d.rx, &d.ry, &d.rr);
     }
     if (d.file.empty()) logf_("mapdump: no file\n");
     else g_mapdumps.push_back(d);
@@ -1054,7 +1059,20 @@ static void run_map_dumps() {
             ((f_move)0x46B1F0)(win, tx, ty, 0);
             *(int32_t *)(win + 0x21A44) = 0;
         } else {
+            unsigned old_options = *(uint32_t *)(win + 0x1DD70);
+            *(uint32_t *)(win + 0x1DD70) |= d.options;
             o_pfncRedrawMap(win, 0);
+            if (d.rx != kMapDumpKeep) {
+                /* the canvas cleared to 0 first: the dump shows what the partial redraw paints */
+                const uint8_t *cb = win + vbase + 0x444;
+                uint8_t *cbits = *(uint8_t *const *)(cb + 0x54);
+                int cw = *(const int32_t *)(cb + 0x80), ch = -*(const int32_t *)(cb + 0x84);
+                int cs = *(const int32_t *)(cb + 0x4A8);
+                for (int y = 0; cbits && y < ch; y++) memset(cbits + (size_t)y * cs, 0, cw);
+                typedef void(__thiscall * f_radius)(void *, int, int, int, int);
+                ((f_radius)0x46A2A0)(win, d.rx, d.ry, d.rr, 0);
+            }
+            *(uint32_t *)(win + 0x1DD70) = old_options;
         }
         crt_set_state(crt);
         GameRandomState = game;

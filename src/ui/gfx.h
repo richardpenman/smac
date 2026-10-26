@@ -29,6 +29,25 @@ extern Palette GamePalette;  // 0x94C590, loaded by load_palette
 ADDR_NATIVE(0x451A10) void GAMEAPI load_palette();
 // Colour tables (shadow, tints) and the nearest-colour searches are in ui/colortables.h.
 
+// ---- palette cycles (Palette +0x404: 5 slots of id, timer, first entry, count; saved colours at
+// +0x410) ----
+// Palette_init_cycle: cycle `id` rotates entries first..first+count-1 every `period` ms (a Time
+// object with Palette_timer_callback). Returns 0, 3 (bad range or id -1). The cycles are kept for
+// GamePalette only. load_cycling (system.txt #CYCLING) sets them up; the shipped file has none.
+ADDR_NATIVE(0x5FE700) int32_t THISCALL Palette_init_cycle(Palette* self, int32_t id, int32_t first, int32_t count,
+                                                          int32_t period);
+// Starts the cycle's timer (0; 0xB: no such cycle).
+ADDR_NATIVE(0x5FE8B0) int32_t THISCALL Palette_start_cycle(Palette* self, int32_t id);
+// Palette_timer_callback (0x5FEAD0): every entry of the cycle takes the next one's colour, the
+// last takes the first's.
+void palette_cycle_rotate(Palette* self, int32_t id);
+// The timers: runs the callbacks that are due (the message pump); true when the palette changed.
+bool palette_cycles_tick(uint32_t now_ms);
+// Test aid (PALTICK): n steps of every running cycle, then each cycle's colours on stderr.
+void palette_cycles_step(int32_t n);
+// Whether entry i belongs to a cycle (the nearest-colour searches skip it).
+bool palette_cycle_excluded(const Palette* self, int32_t i);
+
 // ---- Font (0x2C bytes; Font_ctor 0x618EA0) ----
 // All fields are 32-bit: the HFONT is a platform font handle, so Font objects can also live in
 // the memory image (MapWin's map fonts at +0x1EEC8, +0x1EEF4, +0x1EF20).

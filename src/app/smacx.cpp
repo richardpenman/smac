@@ -36,7 +36,8 @@
 // energy allocation, credits and upheaval paid), TECHSTATE (the viewer's research goal and
 // points, blind research priorities), PROTOSTATE (the viewer's prototypes), MENUSTATE (the open
 // menu column of the opening screens: caption, items, selection), INFOSTATE (the info pane's
-// displays and texts), INFOTICK:N (N steps of the info pane's 50 ms timer), and the commands SHOT[:FILE]
+// displays and texts), INFOTICK:N (N steps of the info pane's 50 ms timer), PALTICK:N (N steps of
+// every palette cycle's timer, then the cycles' colours on stderr), and the commands SHOT[:FILE]
 // (screenshot), SAVE:FILE (save the game
 // and its generators in FILE.rng, relative to --outdir), UNITS (list the human's units on
 // stderr), QUIT. --exit-after-keys (default with --hidden) quits when they run out.
@@ -59,7 +60,10 @@
 // --dump FILE: observer mode: instead of the screenshot, the main map view's canvas after a full
 // redraw (format of the oracle's mapdump); --like REF takes the view of an oracle dump (canvas
 // size, viewer, zoom, centre, tile address); --scroll-from X,Y makes it a scrolled redraw from a
-// view centred there (the oracle's mapdump scrollfrom=). Compare with work/ui/mapcmp.py.
+// view centred there (the oracle's mapdump scrollfrom=); --dump-options HEX ORs display options
+// into the window for it (options=: 0x2000 AI goals, 0x20000 keypad legend, 0x100000 diplomatic
+// table); --dump-radius X,Y,R follows the full redraw by MapWin_draw_radius (radius=). Compare
+// with work/ui/mapcmp.py.
 // --basedump BASE:FILE[:TILES]: observer mode: the base window of base BASE as its owner sees it, in the
 // format of the oracle's basedump (and the screen in FILE.bmp; tests/basewin/compare.sh); TILES:
 // the oracle's tile array address in hex (terrain variants).
@@ -109,6 +113,8 @@ struct Options {
     std::string dump, like;  // --dump FILE [--like REF]: map canvas dump (ui_mapdump_like)
     std::string basedump;    // --basedump BASE:FILE: the base window's canvases (the oracle's basedump)
     int scroll_x = -1, scroll_y = -1;  // --scroll-from X,Y: the dump's redraw scrolls from there
+    unsigned dump_options = 0;         // --dump-options HEX: display options OR'd in for the dump
+    int radius_x = 0, radius_y = 0, radius_r = -1;  // --dump-radius X,Y,R: then a partial redraw
     bool new_game = false;
     std::string new_args;
     int human = -1, viewer = -1, zoom = 0x7FFF, cx = -1, cy = -1, width = 1024, height = 768, turns = 0;
@@ -215,7 +221,8 @@ void observer_pause() {
         return;
     }
     if (!g_opt.dump.empty()) {
-        bool ok = ui_mapdump_like(&MainConsole, g_opt.dump.c_str(), g_opt.like.c_str(), g_opt.scroll_x, g_opt.scroll_y);
+        bool ok = ui_mapdump_like(&MainConsole, g_opt.dump.c_str(), g_opt.like.c_str(), g_opt.scroll_x, g_opt.scroll_y,
+                                  g_opt.dump_options, g_opt.radius_x, g_opt.radius_y, g_opt.radius_r);
         std::fprintf(stderr, "dump %s: %s\n", g_opt.dump.c_str(), ok ? "ok" : "failed");
         g_quit = true;
         return;
@@ -510,6 +517,10 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         out->command = "infotick " + tok.substr(9);
         return true;
     }
+    if (tok.rfind("PALTICK:", 0) == 0) {  // PALTICK:N, N steps of every palette cycle, then their colours (test aid)
+        out->command = "paltick " + tok.substr(8);
+        return true;
+    }
     if (tok == "MENUSTATE") {  // the open menu column of the opening screens (topmenu.h, test aid)
         out->command = "menustate";
         return true;
@@ -621,7 +632,8 @@ int usage() {
                  "usage: smacx [--new [k=v ...] | --save FILE.sav] [--human N] [--viewer N] [--seed CRT,GAME|clock]\n"
                  "             [--keys K1,K2,..] [--exit-after-keys] [--turns N] [--shot FILE.bmp] [--snapshots DIR] [--rng FILE]\n"
                  "             [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR] [--gamedir DIR]\n"
-                 "             [--image FILE] [--ini FILE] [--dump FILE.smxmap [--like REF.smxmap] [--scroll-from X,Y]]\n"
+                 "             [--image FILE] [--ini FILE] [--dump FILE.smxmap [--like REF.smxmap] [--scroll-from X,Y]\n"
+                 "             [--dump-options HEX] [--dump-radius X,Y,R]]\n"
                  "             [--nosound]\n");
     return 2;
 }
@@ -658,6 +670,9 @@ int main(int argc, char** argv) {
         else if (a == "--basedump") g_opt.basedump = next();
         else if (a == "--like") g_opt.like = fs::absolute(next()).string();
         else if (a == "--scroll-from") std::sscanf(next().c_str(), "%d,%d", &g_opt.scroll_x, &g_opt.scroll_y);
+        else if (a == "--dump-options") g_opt.dump_options = (unsigned)std::strtoul(next().c_str(), nullptr, 16);
+        else if (a == "--dump-radius")
+            std::sscanf(next().c_str(), "%d,%d,%d", &g_opt.radius_x, &g_opt.radius_y, &g_opt.radius_r);
         else if (a == "--snapshots") g_opt.snapshots = next();
         else if (a == "--rng") g_opt.rng = fs::absolute(next()).string();
         else if (a == "--hidden") g_opt.hidden = true;

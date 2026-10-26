@@ -163,10 +163,14 @@ void GAMEAPI load_cycling() {
     if (text_open("system", "cycling") != 0) return;
     text_get();
     int32_t count = text_item_number();
+    // (The shipped system.txt has none.)
     for (int32_t i = 0; i < count; i++) {
-        // Palette_init_cycle(i, first + 10, length, period); Palette_start_cycle(i): not
-        // reconstructed (no cycles in the shipped system.txt).
         text_get();
+        int32_t first = text_item_number();
+        int32_t length = text_item_number();
+        int32_t period = text_item_number();
+        Palette_init_cycle(&GamePalette, i, first + 10, length, period);
+        Palette_start_cycle(&GamePalette, i);
     }
     if (text_open("system", "oceanoffsets") != 0) return;
     // Every following line that starts with a digit gives the next entry, until the table is

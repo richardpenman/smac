@@ -92,7 +92,7 @@ snapshot <name>       write <name>.state/.rng/.sav now (headless: no .sav before
 dumprules <file>      write all rule tables as text into the output directory (harness/rules_dump.h)
 turns <n>             run the real turn loop; snapshot turn_NNN before each turn_upkeep; exit after n
 viewer <faction>      faction whose view is shown (default 0)
-mapdump <file> [viewer=N] [zoom=Z] [center=X,Y] [scrollfrom=X,Y]
+mapdump <file> [viewer=N] [zoom=Z] [center=X,Y] [scrollfrom=X,Y] [options=HEX] [radius=X,Y,R]
                       at the first turn_upkeep: redraw the main map view for that view and dump
                       its canvas (see "Map view dumps"); repeatable
 basedump <file> base=N [viewer=N]
@@ -177,7 +177,11 @@ the address of the tile array (the original seeds each tile's texture variant wi
 `Random_reseed(tile address)`; smacx reads it back), then 256 RGB palette entries (0x94C590) and
 the 8-bit pixels. Two side files: `<file>.pt` (pfncPtToTile at every 4th pixel) and `<file>.co`
 (pfncMapGetCornerYOffset of every tile, corners 0..4). With `scrollfrom=X,Y` the view is first
-fully drawn centred on X,Y and then moved with pfncMoveMap (the scrolled, partial redraw). The
+fully drawn centred on X,Y and then moved with pfncMoveMap (the scrolled, partial redraw). With
+`options=HEX` the bits are OR'd into the window's display options (MapWin +0x1DD70: 0x2000 the AI
+goals, 0x20000 the keypad legend, 0x100000 the diplomatic table) for the redraw; with
+`radius=X,Y,R` the full redraw is followed by MapWin_draw_radius(X, Y, R, 0) (0x46A2A0, the
+partial redraw of draw_tile / draw_radius) on the canvas cleared to 0: the dump shows what it paints. The
 game RNG and the viewer are restored afterwards. Defaults: the current viewer, zoom and centre.
 Dumps of one run share the map window's terrain cache (the outline of an unexplored tile reads
 cached corner heights that earlier redraws left), so a later dump can differ from a single-dump

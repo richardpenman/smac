@@ -266,4 +266,49 @@ check bubbles "the resource map's" "^bubble: RESOURCES: "
 check bubbles "the facilities'" "^bubble: FACILITIES: "
 nocrash bubbles
 
+# 17. The map view's partial redraws and overlays (mapwin_radius.cpp) on turn_300 as faction 3 sees
+#     it, against the original (the oracle's mapdump with options= / radius=, same view; the
+#     pixels' MD5 below; orig_t300_r4.smxmap is its header): MapWin_draw_radius on a canvas
+#     cleared to 0 (radius 0, 2, and 1 across the map's wrap), the AI goals (options 0x2000:
+#     MapWin_gen_overlays), the keypad legend and the diplomatic table (0x20000 MapWin_draw_legend,
+#     0x100000 MapWin_draw_wars; their MD5s are smacx's: the original's differs in 10 pixels of the
+#     legend's bold digits, the font rasteriser's).
+if [ -f "$ROOT/work/saves_late/turn_300.sav" ]; then
+    mapcase() {  # mapcase NAME MD5 ARGS...
+        local name=$1 want=$2; shift 2
+        run $name --save work/saves_late/turn_300.sav --human 0 --viewer 3 --nosound --turns 0 \
+            --dump "$OUT/$name.smxmap" --like "$ROOT/tests/placeholders/orig_t300_r4.smxmap" "$@"
+        local md5=$("$ROOT/tools/venv/bin/python" -c "import hashlib,sys; print(hashlib.md5(open(sys.argv[1],'rb').read()[808:]).hexdigest())" "$OUT/$name.smxmap" 2>/dev/null)
+        echo "$name md5 $md5" >> "$OUT/$name.log"
+        check $name "the original's pixels" "$name md5 $want"
+        nocrash $name
+    }
+    mapcase map_base eca8a12b4ebf3931a16f1a69b0f5ef09
+    mapcase map_r0 83d3c1b4cf47c9b9652285f0b28eaebf --dump-radius 3,15,0
+    mapcase map_r2 a774f8162217db2fe7ade169baa9ff6f --dump-radius 4,16,2
+    mapcase map_r1e ee008b079a3459cc0f83707454bf8511 --dump-radius 40,2,1
+    mapcase map_goals 1df5c340869907f34a3598a600d76145 --dump-options 2000
+    mapcase map_legend b4433f7bd947debba97a24d0795292b4 --dump-options 120000
+    mapcase map_legend_r a57f4a5d64a402e94e7abf13bafc4883 --dump-radius 1,13,1 --dump-options 22000
+fi
+
+# 18. Palette cycling (load_cycling, Palette_init_cycle / start_cycle, Palette_timer_callback): the
+#     shipped system.txt has no cycles; a game directory whose #CYCLING lists three gets them, and
+#     each step of a cycle's timer moves its colours down one entry (PALTICK:N runs N steps).
+mkdir -p "$OUT/cyclegame"
+for f in "$ROOT"/game/*; do ln -sfn "$f" "$OUT/cyclegame/"; done
+rm -f "$OUT/cyclegame/system.txt"
+sed '/^#CYCLING/{n;s/^0/3/}' "$ROOT/game/system.txt" > "$OUT/cyclegame/system.txt"
+run cycle $NEW --gamedir "$OUT/cyclegame" --keys "ENTER,PALTICK:0,PALTICK:1,PALTICK:4"
+check cycle "the three cycles" "^palette cycle 2: entries 241..245 every 300 ms"
+if "$ROOT/tools/venv/bin/python" - "$OUT/cycle.log" <<'PY'
+import sys
+l = [x.split(':', 2)[2].split() for x in open(sys.argv[1]) if x.startswith('palette cycle 0:')]
+sys.exit(0 if len(l) == 3 and l[1] == l[0][1:] + l[0][:1] and l[2] == l[0] else 1)
+PY
+then echo "PASS cycle: a step rotates the colours, five steps go round"; else echo "FAIL cycle: the rotation"; FAIL=1; fi
+run nocycle $NEW --keys "ENTER,PALTICK:1"
+nocheck nocycle "no cycles in the shipped system.txt" "^palette cycle"
+nocrash cycle
+
 exit $FAIL

@@ -54,6 +54,93 @@ void GAMEAPI load_palette() {
     }
 }
 
+// ---- palette cycles -----------------------------------------------------------------------------
+
+namespace {
+struct PaletteCycle {
+    int32_t id = -1;
+    uint8_t first = 0, count = 0;
+    int32_t period = 0;
+    bool running = false;
+    uint32_t next = 0;
+};
+PaletteCycle g_cycles[5];
+// The slot of `id`: its own, or the first free one (the original's search; 5 when full).
+int32_t cycle_slot(int32_t id) {
+    int32_t i = 0;
+    for (; i < 5; i++)
+        if (g_cycles[i].id == id || g_cycles[i].id == -1) break;
+    return i;
+}
+}  // namespace
+
+int32_t THISCALL Palette_init_cycle(Palette* self, int32_t id, int32_t first, int32_t count, int32_t period) {
+    first &= 0xFF;
+    if (first < 10 || 0xF6 - first < count || id == -1) return 3;
+    if (self != &GamePalette) return 7;
+    int32_t i = cycle_slot(id);
+    if (i >= 5) i = 4;  // (the original then writes the slot past the table)
+    PaletteCycle& c = g_cycles[i];
+    c.id = id;
+    c.count = (uint8_t)count;
+    c.first = (uint8_t)first;
+    c.period = period;
+    c.running = false;
+    return 0;
+}
+
+int32_t THISCALL Palette_start_cycle(Palette*, int32_t id) {
+    int32_t i = cycle_slot(id);
+    if (i >= 5 || g_cycles[i].id != id) return 0xB;
+    g_cycles[i].running = true;  // Time_start_3
+    g_cycles[i].next = platform::ticks_ms() + (uint32_t)g_cycles[i].period;
+    return 0;
+}
+
+void palette_cycle_rotate(Palette* self, int32_t id) {
+    int32_t i = cycle_slot(id);
+    if (i >= 5 || g_cycles[i].id != id) return;
+    int32_t first = g_cycles[i].first, n = g_cycles[i].count;
+    uint8_t keep[3] = {self->rgb[first][0], self->rgb[first][1], self->rgb[first][2]};
+    for (int32_t k = 0; k < n - 1; k++)
+        for (int32_t c = 0; c < 3; c++) self->rgb[first + k][c] = self->rgb[first + k + 1][c];
+    for (int32_t c = 0; c < 3; c++) self->rgb[first + n - 1][c] = keep[c];
+}
+
+bool palette_cycles_tick(uint32_t now) {
+    bool changed = false;
+    for (PaletteCycle& c : g_cycles) {
+        if (c.id == -1 || !c.running || c.period <= 0 || (int32_t)(now - c.next) < 0) continue;
+        palette_cycle_rotate(&GamePalette, c.id);
+        c.next = now + (uint32_t)c.period;
+        changed = true;
+    }
+    return changed;
+}
+
+void palette_cycles_step(int32_t n) {
+    for (const PaletteCycle& c : g_cycles) {
+        if (c.id == -1) continue;
+        if (c.running)
+            for (int32_t k = 0; k < n; k++) palette_cycle_rotate(&GamePalette, c.id);
+        std::string line;
+        for (int32_t e = c.first; e < c.first + c.count; e++) {
+            char b[24];
+            std::snprintf(b, sizeof(b), " %02X%02X%02X", GamePalette.rgb[e][0], GamePalette.rgb[e][1], GamePalette.rgb[e][2]);
+            line += b;
+        }
+        std::fprintf(stderr, "palette cycle %d: entries %d..%d every %d ms:%s\n", c.id, c.first, c.first + c.count - 1,
+                     c.period, line.c_str());
+    }
+}
+
+bool palette_cycle_excluded(const Palette* self, int32_t i) {
+    if (self != &GamePalette) return false;
+    for (const PaletteCycle& c : g_cycles)
+        if (c.id != -1 && i >= c.first && i < c.first + c.count) return true;
+    return false;
+}
+
 // ---- Font ---------------------------------------------------------------------------------------
 
 void THISCALL Font_ctor(Font* self) {

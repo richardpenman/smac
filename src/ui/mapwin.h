@@ -122,8 +122,12 @@ bool ui_mapdump_write(uint8_t* win, const char* path, int32_t viewer);
 // restored afterwards). Without `like`, dumps the current view.
 // scroll_from (x >= 0): the dumped redraw is a scrolled one, from a full redraw centred there
 // (the oracle's mapdump scrollfrom=X,Y).
+// options: bits OR'd into the window's options for the redraw (the oracle's options=); radius_r
+// >= 0: the full redraw is followed by MapWin_draw_radius(radius_x, radius_y, radius_r, 0) on the
+// canvas cleared to 0 (radius=).
 bool ui_mapdump_like(uint8_t* win, const char* path, const char* like, int32_t scroll_from_x = -1,
-                     int32_t scroll_from_y = -1);
+                     int32_t scroll_from_y = -1, uint32_t options = 0, int32_t radius_x = 0, int32_t radius_y = 0,
+                     int32_t radius_r = -1);
 
 // ---- original functions ----
 // Resets a window (desktop_init -> mapwin_system_init): options cleared, zoom 0 (-6 below 1000
@@ -161,8 +165,35 @@ ADDR_NATIVE(0x55AF20) void GAMEAPI base_draw(Buffer* dest, int32_t base_id, int3
 // three fonts kept, least recently used replaced.
 Font* ui_label_font(int32_t zoom, int32_t num, int32_t den, int32_t style);
 
-// Full redraw of the view (scrolled redraws are not reconstructed yet: always full).
+// Redraws the view: in full, or (MapWin +0x21A44 set) moved by the scroll with only the uncovered
+// rows and columns drawn.
 void THISCALL pfncRedrawMap(uint8_t* win, int32_t flag);  // 0x46A550
+
+// ---- partial redraws and overlays (mapwin_radius.cpp) ----
+// The screen rectangle of the tiles within `radius` of (x, y) (radius 0: the tile widened by a
+// quarter on each side), clipped to the client area; 0 when empty.
+ADDR_NATIVE(0x468CD0) int32_t THISCALL MapWin_compute_clip(uint8_t* win, int32_t x, int32_t y, int32_t radius,
+                                                           UiRect* out);
+// Redraws the tiles around (x, y) inside MapWin_compute_clip's rectangle: the terrain (unless
+// no_terrain), the units and bases, the base names, the overlays and legend when shown.
+ADDR_NATIVE(0x469190) void THISCALL MapWin_gen_radius(uint8_t* win, int32_t x, int32_t y, int32_t radius,
+                                                      int32_t faction_id, int32_t no_terrain);
+ADDR_NATIVE(0x468F90) void THISCALL MapWin_draw_vehicles_2(uint8_t* win, int32_t x, int32_t y, int32_t radius,
+                                                           int32_t faction_id);
+// MapWin_gen_radius for the viewer (mode < 0: without the terrain); mode != 0 shows the change.
+ADDR_NATIVE(0x46A2A0) void THISCALL MapWin_draw_radius(uint8_t* win, int32_t x, int32_t y, int32_t radius, int32_t mode);
+// MapWin_draw_radius (radius 0) when (x, y) is in the window's tile range.
+ADDR_NATIVE(0x46A4A0) void THISCALL MapWin_draw_tile(uint8_t* win, int32_t x, int32_t y, int32_t mode);
+ADDR_NATIVE(0x468C20) void THISCALL MapWin_gen_tile(uint8_t* win, int32_t x, int32_t y, int32_t faction_id, int32_t units);
+// Options 0x2000: the AI goals at (x, y) (the faction's initial when omniscient, the goal's letter
+// and priority).
+ADDR_NATIVE(0x4688E0) void THISCALL MapWin_gen_overlays(uint8_t* win, int32_t x, int32_t y);
+// Options 0x20000: the keypad digits on the 8 tiles around the cursor.
+ADDR_NATIVE(0x469720) void THISCALL MapWin_draw_legend(uint8_t* win);
+// Options 0x100000: the factions' names and the table of their diplomatic states.
+ADDR_NATIVE(0x4698D0) void THISCALL MapWin_draw_wars(uint8_t* win);
+// FUN_004216F0 (basewin.cpp): (x, y) is in the view at least `margin` tiles from its edges.
+bool mapwin_tile_in_view(uint8_t* win, int32_t x, int32_t y, int32_t margin);
 // Centres the view on (x, y) and redraws it.
 void THISCALL pfncMoveMap(uint8_t* win, int32_t x, int32_t y, int32_t redraw);  // 0x46B1F0
 

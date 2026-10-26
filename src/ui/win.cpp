@@ -224,6 +224,11 @@ bool run_command(const std::string& cmd) {
         for (int32_t i = std::atoi(arg.c_str()); i > 0; i--) infowin_tick();
         return true;
     }
+    if (cmd.rfind("paltick", 0) == 0) {  // test aid: N steps of the palette cycles (gfx.h)
+        palette_cycles_step(std::atoi(arg.c_str()));
+        g_dirty = true;
+        return true;
+    }
     if (cmd == "factionstate") {  // test aid: the viewer's social choice and allocation (screenwin.h)
         screens_log_faction();
         return true;
@@ -587,6 +592,9 @@ void GAMEAPI wait_task() {
         return;
     }
     console_ui_tick();
+    // The palette cycles' timers (Palette_timer_callback; AnimatePalette shows them at once). As
+    // the other timers, not while scripted keys remain (PALTICK steps them).
+    if (palette_cycles_tick(platform::ticks_ms())) g_dirty = true;
     if (g_script_given && g_ui_exit_when_script_done) {
         std::fprintf(stderr, "scripted keys done (turn %d): quitting\n", CurrentTurn);
         ControlTurnA = 1;
@@ -608,6 +616,7 @@ void GAMEAPI wait_task() {
 }
 
 int32_t GAMEAPI do_non_input() {
+    if (g_script.empty() && palette_cycles_tick(platform::ticks_ms())) g_dirty = true;
     // Presents at most every 50 ms while the engine runs (the AI's turns call this per unit).
     if ((g_dirty || g_map_dirty) && platform::ticks_ms() - g_last_present >= 50) ui_present();
     return pump_platform(0) ? 1 : 0;

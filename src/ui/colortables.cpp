@@ -36,8 +36,8 @@ void GAMEAPI RGB_to_HSV(const uint8_t* rgb, Hsv* out) {
 
 int32_t THISCALL Palette_get_nearest_palette_index(Palette* pal, int32_t r, int32_t g, int32_t b, int32_t game_only) {
     int32_t best_d = 200000, best = 0;
-    // No palette cycles are active (load_cycling): no entries are excluded.
     for (int32_t i = game_only ? 10 : 0; i < (game_only ? 0xF6 : 0x100); i++) {
+        if (game_only && palette_cycle_excluded(pal, i)) continue;  // the cycles' entries
         int32_t dr = pal->rgb[i][0] - (r & 0xFF), dg = pal->rgb[i][1] - (g & 0xFF), db = pal->rgb[i][2] - (b & 0xFF);
         int32_t d = dg * dg + dr * dr + db * db;
         if (d < best_d) {
@@ -48,11 +48,12 @@ int32_t THISCALL Palette_get_nearest_palette_index(Palette* pal, int32_t r, int3
     return best;
 }
 
-int32_t THISCALL Palette_get_nearest_palette_index_2(Palette*, const Hsv* t, const Hsv* table, int32_t game_only) {
+int32_t THISCALL Palette_get_nearest_palette_index_2(Palette* pal, const Hsv* t, const Hsv* table, int32_t game_only) {
     const long double rad = 0.017453292519444445;
     double best_d = 200000.0;
     int32_t best = 0;
     for (int32_t i = game_only ? 10 : 0; i < (game_only ? 0xF6 : 0x100); i++) {
+        if (game_only && palette_cycle_excluded(pal, i)) continue;
         const Hsv& c = table[i];
         long double dv = (long double)(t->v - c.v);
         long double th = (long double)t->h * rad, ch = (long double)c.h * rad;

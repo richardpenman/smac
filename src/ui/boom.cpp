@@ -14,8 +14,7 @@
 // tinted with the attacker's faction table. The end waits 50 ms (clock_wait, not with shift or
 // quick battles). The sounds: a missile's launch (0x52), the explosion (0x3D big, 0x3E, 0x5A a
 // spore launcher's), the weapon of the second unit (energy 1, 4, 0x49..0x59 by weapon; psi 0).
-// Approximated: the tile drawn again for a destroyed unit is a full redraw of the window
-// (MapWin_draw_tile is not reconstructed); the buster's frames use the sprite blitter's scaling.
+// Approximated: the buster's frames use the sprite blitter's scaling.
 // Unattended runs (--hidden with scripted keys) skip the frames (their sounds and the game-state
 // calls stay); SMACX_ANIM=1 draws them without waiting (SMACX_ANIM_SHOT=FILE: the screen after
 // the middle frame, a test aid).
@@ -194,7 +193,7 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
             save_rect(&sv.bg1, canvas, r.left, r.top, w, h);
             int32_t keep = VehMovingID;
             VehMovingID = (flags & 8) ? VehDrawDefendID : VehDrawAttackID;
-            pfncRedrawMap(win, 1);  // MapWin_draw_tile (approximated: the whole window)
+            MapWin_draw_tile(win, x, y, 0);
             VehMovingID = keep;
         }
         save_rect(&sv.bg2, canvas, r.left, r.top, w, h);
