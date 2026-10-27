@@ -714,6 +714,13 @@ are replaced by smacx (src/ui/sound.cpp, music.cpp, movie.cpp).
 
 ## 13. Remaining work
 
+**Deliberate differences from the original.** A player's first start (no `--outdir`) seeds the
+per-user `Alpha Centauri.Ini` with "Sliding windows" (PREF_AV_SLIDING_WINDOWS, 0x8000000) off:
+gamedata.cpp `seed_ini` writes the original's default preferences (0xBBE1DD96 and the tutorial bit
+0x20) without it, under "Prefs Format=12" (tests/placeholders case 26). Preferences turn it back on;
+an existing ini keeps its setting; the tests and the harness (`--outdir`, the harness ini) keep the
+original's default.
+
 The placeholder sweep (phase 11): the placeholders, "not reconstructed" parts and approximations of
 the native UI, with their state after the sweep. Size: S (under ~1 KB of the original's code, an
 hour), M (a few KB, a day), L (more, several days). Checks of the items done:

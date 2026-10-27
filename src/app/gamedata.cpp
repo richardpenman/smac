@@ -25,6 +25,7 @@
 #endif
 
 #include "default_ini.h"  // generated: kDefaultIni, the bundled default ini (harness/oracle/runtime)
+#include "platform/win32.h"
 
 namespace fs = std::filesystem;
 
@@ -565,15 +566,49 @@ std::string data_image(const std::string& gamedir, const std::string& udir) {
     return path;
 }
 
+// A deliberate difference from the original: a player's new settings have "Sliding windows"
+// (PREF_AV_SLIDING_WINDOWS, 0x8000000) off; Preferences can turn it on. The original's default
+// preferences (prefs_load: default_prefs 0xBBE1DD96, the tutorial bit 0x20 below difficulty 2)
+// are written with it cleared, under the current preferences format (12), so that prefs_load reads
+// them; every other key keeps its default. An ini that already has preferences only loses the bit.
+static void default_sliding_windows_off(const std::string& path) {
+    char buf[256] = "";
+    win32::GetPrivateProfileStringA("Alpha Centauri", "Prefs Format", "0", buf, sizeof(buf), path.c_str());
+    uint32_t prefs = 0xBBE1DD96u | 0x20u;
+    bool current = std::atoi(buf) == 12;
+    if (current) {
+        win32::GetPrivateProfileStringA("Alpha Centauri", "Preferences", "", buf, sizeof(buf), path.c_str());
+        if (buf[0]) {
+            prefs = 0;
+            for (const char* c = buf; *c == '0' || *c == '1'; c++) prefs = prefs * 2 + (uint32_t)(*c - '0');
+        }
+    }
+    prefs &= ~0x8000000u;
+    std::string bits;
+    bool started = false;
+    for (int32_t bit = 31; bit >= 0; bit--) {  // prefs_save's str_binary
+        if (prefs & (1u << bit)) {
+            started = true;
+            bits += '1';
+        } else if (started || bit < 8) {
+            bits += '0';
+        }
+    }
+    if (!current) win32::WritePrivateProfileStringA("Alpha Centauri", "Prefs Format", "12", path.c_str());
+    win32::WritePrivateProfileStringA("Alpha Centauri", "Preferences", bits.c_str(), path.c_str());
+}
+
 void seed_ini(const std::string& path) {
     std::error_code ec;
     if (fs::exists(path, ec)) return;
+    bool copied = false;
     if (char* base = SDL_GetBasePath()) {
         std::string bundled = std::string(base) + "Alpha Centauri.Ini";
         SDL_free(base);
-        if (fs::copy_file(bundled, path, ec)) return;
+        copied = fs::copy_file(bundled, path, ec);
     }
-    write_file(path, kDefaultIni, sizeof(kDefaultIni));
+    if (!copied) write_file(path, kDefaultIni, sizeof(kDefaultIni));
+    default_sliding_windows_off(path);
 }
 
 void show_error(const std::string& text) {
