@@ -112,6 +112,8 @@ bool intersect(UiRect* out, const UiRect& a, const UiRect& b) {
 
 BoxDef* box_def(int32_t index) { return (index >= 0 && index < 51) ? &g_boxes[index] : nullptr; }
 BoxDef* box_def_large() { return &g_box_large; }
+Sprite g_message_icon;  // 0x7F67C8
+Sprite* message_icon_sprite() { return &g_message_icon; }
 Sprite* popup_check_sprite(int32_t state) { return &g_checks[state < 0 ? 0 : state > 2 ? 2 : state]; }
 Sprite* newtech_button_sprite(int32_t button, int32_t state) {
     return (button >= 0 && button < 2 && state >= 0 && state < 3) ? &g_newtech_buttons[button][state] : nullptr;
@@ -150,6 +152,8 @@ void GAMEAPI load_box_sprites() {
             b.key = 7;
         }
     }
+    // The message list's icon (0x7F67C8: MessageWin_listbox_draw).
+    pfncSpriteFromCanvasRectTrans(&g_message_icon, &canvas, kKey, 0x267, 0x212, 0x10, 0xF, 0);
     // The large frame (rest of load_box_sprites): TL, top, TR / left, right / BL, bottom, BR.
     static const int32_t kAt[8][2] = {{0x128, 0x2C7}, {0x166, 0x2C7}, {0x1A4, 0x2C7}, {0x128, 0x2F4},
                                       {0x1A4, 0x2F4}, {0x128, 0x321}, {0x166, 0x321}, {0x1A4, 0x321}};

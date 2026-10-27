@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include "engine/compat.h"
 #include "engine/map.h"
@@ -1081,8 +1082,24 @@ struct TurnAnim {
 } g_turn;
 struct ScootAnim {
     int32_t veh = -1, frames = 0, dir = 0;  // 0x8CC820, 0x8CDCF8, 0x8CC25C
-    float up_src[3] = {0, 0, 1}, up_mid[3] = {0, 0, 1}, up_dst[3] = {0, 0, 1};
+    float up_src[3] = {0, 0, 1}, up_mid[3] = {0, 0, 1};  // 0x8CDD00, 0x8CC288
+    float step1[3] = {0, 0, 0}, step2[3] = {0, 0, 0};  // 0x8CC268, 0x8CC278: per frame of each half
 } g_scoot;
+
+// MapWin_get_relative_alt (0x46FE00) of the main view: a tile corner's height (1..4), from the
+// view's terrain cache (pfncMapGetCornerYOffset fills it). 0 off the map (the original reads past
+// its cache there).
+int32_t relative_alt(int32_t x, int32_t y, int32_t corner) {
+    if (x < 0 || y < 0 || x >= MapAreaX || y >= MapAreaY) return 0;
+    uint8_t* win = &MainConsole;
+    pfncMapGetCornerYOffset(win, x, y, corner);
+    const uint8_t* e = ui_mapwin_cache_entry(win, x, y);
+    return e ? ((e[10] | e[11] << 8) >> ((corner - 1) * 4)) & 0xF : 0;
+}
+
+// The tile facet normal tables (0x8CDD10 - 0x12C0, 0x8D3ADC, 0x8DAB68, 0x8E1BF4): facet j of a tile
+// whose corner heights give the key k (((c1 * 7 + c2) * 7 + c3) * 7 + c4).
+const float* facet(int32_t j, int32_t k) { return fptr(0x8CDD10) + (k - 400) * 3 + j * 0x1C23; }
 
 }  // namespace
 
@@ -1143,40 +1160,105 @@ void GAMEAPI vehdraw_turn(Buffer* dest, int32_t px, int32_t py, int32_t frame, i
                    (double)frame * g_turn.step + g_turn.start - (double)CameraYaw, false);
 }
 
-// vehdraw_scoot_start (0x4BFE00): the unit's slide toward `dir` in `frames` frames, its tilt
-// going from its tile's to the next tile's (approximated: through their mean at the half way).
+// vehdraw_scoot_start (0x4BFE00): the unit's slide toward `dir` in `frames` frames. Its tilt goes
+// from its tile's (the four facets' normals) to the tile's edge toward `dir` (the facets either side
+// of the edge: an even direction one facet of each tile, an odd one the corner's eight facets of
+// the four tiles) in the first frames / 2 frames, then on to the next tile's; a tile that is not
+// rolling or rocky (or infantry with a hand weapon) keeps the unit upright.
 void GAMEAPI vehdraw_scoot_start(int32_t veh_id, int32_t dir, int32_t frames, uint32_t flags) {
     if (flags & 1) veh_id = pick_top_veh(veh_id);
     g_scoot.frames = frames;
     g_scoot.veh = veh_id;
     g_scoot.dir = (dir - 3) & 7;
-    int32_t x2 = VehLiftX + NearOffsetX[dir & 7], y2 = VehLiftY + NearOffsetY[dir & 7];
+    // The corner keys of the eight tiles around the lifted unit and of its own (index 8).
+    int32_t key[9];
+    int32_t tx = 0, ty = 0;
+    for (int32_t n = 0; n < 9; n++) {
+        tx = NearOffsetX[n] + VehLiftX;
+        if (!(MapToggleFlat & 1)) {
+            if (tx < 0) tx += MapAreaX;
+            else if (tx >= MapAreaX) tx -= MapAreaX;
+        }
+        ty = NearOffsetY[n] + VehLiftY;
+        key[n] = ((relative_alt(tx, ty, 1) * 7 + relative_alt(tx, ty, 2)) * 7 + relative_alt(tx, ty, 3)) * 7 +
+                 relative_alt(tx, ty, 4);
+    }
+    const UNIT& u = Units[Vehs[veh_id].unit_id];
+    const bool hand = u.chassis_id == 0 && Weapon[u.weapon_id].mode < 3;
+    auto upright = [&](int32_t x, int32_t y) {
+        if (x < 0 || y < 0 || x >= MapAreaX || y >= MapAreaY) return true;  // (the original reads past the map)
+        return (MapTiles[MapHalfX * y + (x >> 1)].climate & 0xE0) < 0x60 || hand;
+    };
+    auto tile_normal = [&](int32_t k, float* out) {
+        vec3_add(facet(0, k), facet(1, k), out);
+        vec3_add(out, facet(2, k), out);
+        vec3_add(out, facet(3, k), out);
+        vec3_normalize(out, out);
+    };
+    float src[3] = {0.0f, 0.0f, 1.0f}, dst[3] = {0.0f, 0.0f, 1.0f}, mid[3] = {0.0f, 0.0f, 1.0f};
+    if (!upright(tx, ty)) tile_normal(key[8], src);  // (tx, ty: the lifted unit's tile, index 8)
+    VehAnimFrame = 1;
+    int32_t x2 = NearOffsetX[dir] + VehLiftX, y2 = NearOffsetY[dir] + VehLiftY;
     if (!(MapToggleFlat & 1)) {
         if (x2 < 0) x2 += MapAreaX;
         else if (x2 >= MapAreaX) x2 -= MapAreaX;
     }
-    tile_up(veh_id, VehLiftX, VehLiftY, true, g_scoot.up_src);
-    if (y2 >= 0 && y2 < MapAreaY && x2 >= 0 && x2 < MapAreaX) tile_up(veh_id, x2, y2, true, g_scoot.up_dst);
-    else std::memcpy(g_scoot.up_dst, g_scoot.up_src, 12);
-    vec3_add(g_scoot.up_src, g_scoot.up_dst, g_scoot.up_mid);
-    vec3_normalize(g_scoot.up_mid, g_scoot.up_mid);
+    if (!upright(x2, y2)) {
+        tile_normal(key[dir], dst);
+        const int32_t c = key[8];
+        // The facets along the edge (or around the corner) between the two tiles.
+        std::vector<const float*> f;
+        switch (dir) {
+        case 1:
+            f = {facet(1, c), facet(2, c), facet(2, key[0]), facet(3, key[0]), facet(3, key[1]), facet(0, key[1]),
+                 facet(0, key[2]), facet(1, key[2])};
+            break;
+        case 3:
+            f = {facet(2, c), facet(3, c), facet(3, key[2]), facet(0, key[2]), facet(0, key[3]), facet(1, key[3]),
+                 facet(1, key[4]), facet(2, key[4])};
+            break;
+        case 5:
+            f = {facet(3, c), facet(0, c), facet(0, key[4]), facet(1, key[4]), facet(1, key[5]), facet(2, key[5]),
+                 facet(2, key[6]), facet(3, key[6])};
+            break;
+        case 7:
+            f = {facet(0, c), facet(1, c), facet(1, key[6]), facet(2, key[6]), facet(2, key[7]), facet(3, key[7]),
+                 facet(3, key[0]), facet(0, key[0])};
+            break;
+        default:  // 0, 2, 4, 6: the same two facets whichever the side (the original's)
+            f = {facet(3, key[dir]), facet(1, c)};
+            break;
+        }
+        vec3_add(f[0], f[1], mid);
+        for (size_t i = 2; i < f.size(); i++) vec3_add(mid, f[i], mid);
+        vec3_normalize(mid, mid);
+    }
+    vec3_sub(mid, src, g_scoot.step1);
+    vec3_sub(dst, mid, g_scoot.step2);
+    vec3_scale(g_scoot.step1, (float)(1.0 / (double)(float)(frames >> 1)), g_scoot.step1);
+    vec3_scale(g_scoot.step2, (float)(1.0 / (double)(float)(frames - (frames >> 1))), g_scoot.step2);
+    std::memcpy(g_scoot.up_src, src, 12);
+    std::memcpy(g_scoot.up_mid, mid, 12);
 }
 
-// vehdraw_scoot (0x4C0F50): frame `frame` of the slide (the animated parts step on).
+// vehdraw_scoot (0x4C0F50): frame `frame` of the slide (the animated parts step on): the tilt the
+// first half's start plus `frame` steps, then the edge's plus the second half's steps.
 void GAMEAPI vehdraw_scoot(Buffer* dest, int32_t px, int32_t py, int32_t frame, int32_t zoom) {
     if (g_scoot.veh < 0) return;
-    int32_t half = g_scoot.frames >> 1;
-    const float *a = g_scoot.up_src, *b = g_scoot.up_mid;
-    if (half < frame) {
-        frame -= half;
-        a = g_scoot.up_mid;
-        b = g_scoot.up_dst;
+    const float* base = g_scoot.up_src;
+    const float* step = g_scoot.step1;
+    if (g_scoot.frames >> 1 < frame) {
+        frame -= g_scoot.frames >> 1;
+        base = g_scoot.up_mid;
+        step = g_scoot.step2;
     }
-    float t = half > 0 ? (float)frame / (float)half : 1.0f;
-    float up[3] = {a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t};
+    float up[3];
+    vec3_scale(step, (float)frame, up);
+    vec3_add(up, base, up);
     vec3_normalize(up, up);
-    VehAnimFrame++;
+    // (the animated parts take the frame before it steps on: vehdraw_construct_vehicle, then +1)
     render_vehicle(dest, g_scoot.veh, px, py, 0, zoom, up, (double)g_scoot.dir * fbits(0x3F490E56), true);
+    VehAnimFrame++;
 }
 
 int32_t GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, int32_t zoom, int32_t mode, int32_t a7) {

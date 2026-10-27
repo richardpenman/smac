@@ -4,9 +4,12 @@
 // over the pane: MapWin_init_2's rectangle 0x939F08, zoom -8, MapWin_clear's options 0), the
 // first (0x3EE) the world map again; WorldWin +0x239CC keeps the choice. DiploPop's globe
 // buttons (DiploPop_on_iface_group_clicked) do the same in the diplomacy mode.
+// WorldWin_click's shift click and the world map menu's item 4 (worldwin_show_detail_at) move
+// MapWins[1] to the main view's centre (pfncMoveMap) before showing it.
 // Approximated: the detail map takes the main view's display options (MapWin_clear leaves 0,
-// which draws no unit; the original's MapWins[1] shows them) and is centred on the map cursor at each console redraw (the original's
-// MapWins[1] follows the cursor through the map's focus calls).
+// which draws no unit; the original's MapWins[1] shows them) and is centred on the map cursor at
+// each console redraw once the cursor moves (the original's MapWins[1] follows the cursor through
+// the map's focus calls).
 #include <algorithm>
 #include <cstdio>
 #include <vector>
@@ -24,6 +27,8 @@ namespace {
 std::vector<uint8_t> g_obj(0x22600);  // the MapWin object (GraphicWin virtual base at +0x21A6C)
 Buffer g_canvas;
 bool g_detail = false;  // WorldWin +0x239CC
+// A centre given by worldwin_show_detail_at, kept while the cursor stays where it was then.
+int32_t g_cx = -1, g_cy = -1, g_cur_x = -1, g_cur_y = -1;
 
 uint8_t* dm() { return g_obj.data(); }
 
@@ -36,6 +41,15 @@ void THISCALL WorldWin_set_detail_map(uint8_t*) {
     g_detail = true;
     std::fprintf(stderr, "worldwin detail map\n");
     ui_invalidate();
+}
+
+void worldwin_show_detail_at(int32_t x, int32_t y) {
+    g_cx = x;
+    g_cy = y;
+    g_cur_x = MapWinCursorX[MapWinCursorIndex];
+    g_cur_y = MapWinCursorY[MapWinCursorIndex];
+    std::fprintf(stderr, "worldwin detail map at %d,%d\n", x, y);
+    WorldWin_set_detail_map(&WorldWin);
 }
 
 // WorldWin_set_world_map (0x4C3990).
@@ -62,8 +76,15 @@ void worldpane_draw(Buffer* mi) {
         mw(dm(), kMwZoom) = -8;
     }
     if (MapWins[0]) mw(dm(), kMwOptions) = mw(MapWins[0], kMwOptions);
-    mw(dm(), kMwCenterX) = MapWinCursorX[MapWinCursorIndex];
-    mw(dm(), kMwCenterY) = MapWinCursorY[MapWinCursorIndex];
+    int32_t cx = MapWinCursorX[MapWinCursorIndex], cy = MapWinCursorY[MapWinCursorIndex];
+    if (g_cx >= 0 && cx == g_cur_x && cy == g_cur_y) {
+        cx = g_cx;
+        cy = g_cy;
+    } else {
+        g_cx = -1;
+    }
+    mw(dm(), kMwCenterX) = cx;
+    mw(dm(), kMwCenterY) = cy;
     pfncZoomProcessing(dm());
     pfncRedrawMap(dm(), 0);
     Buffer_copy_4(&g_canvas, mi, 0, 0, pane.left, pane.top, w, h);

@@ -12,13 +12,17 @@
 // unit's 4, no delay) of 16 ms (10 in multiplayer; sea units 2/3, air units 1/3), the unit drawn
 // at the source point plus (frame + 1) steps of the way. At the end the unit is drawn on the
 // next tile (VehScootX / Y there) and the input flushed.
-// Approximated: the background rectangle (MapWin_compute_clip is not reconstructed: the tiles'
-// rectangles with a quarter tile around and the unit's height above); the redraw before the
-// animation is a full one (draw_tile's partial redraws are not reconstructed).
+// The background rectangle of a window: the union of MapWin_compute_clip of both tiles, a quarter
+// of its size added on every side; copied from the canvas before the frames. Each frame draws the
+// unit, shows the rectangle (GraphicWin_update_2) and copies the saved background back over a
+// rectangle of the same size at the unit's position less the quarters (so only what the unit can
+// have covered). The slide's position is a float point stepped by (next - source) / frames each
+// frame (the first step before the first frame), drawn at its truncated coordinates.
 // Unattended runs (--hidden with scripted keys) skip the frames; SMACX_ANIM=1 draws them without
 // waiting (SMACX_SCOOT_SHOT=FILE: the screen at the half way of a slide, a test aid). The facing (the
 // only game state) is set in every case.
 #include <cstdio>
+#include <algorithm>
 #include <cstdlib>
 #include <vector>
 
@@ -30,6 +34,7 @@
 #include "ui/mapwin.h"
 #include "ui/sound.h"
 #include "ui/vehdraw.h"
+#include "ui/voxel.h"
 #include "ui/win.h"
 
 namespace {
@@ -45,6 +50,19 @@ bool tile_in_window(uint8_t* win, int32_t x, int32_t y) {
         if (mwi(win, kMwColsEven) + mwi(win, kMwColsOdd) + ox <= tx) tx -= MapAreaX;
     }
     return tx >= ox && tx < mwi(win, kMwColsEven) + mwi(win, kMwColsOdd) + ox;
+}
+
+UiRect union_rect(const UiRect& a, const UiRect& b) {  // UnionRect
+    bool ea = a.right <= a.left || a.bottom <= a.top, eb = b.right <= b.left || b.bottom <= b.top;
+    if (ea && eb) return UiRect{0, 0, 0, 0};
+    if (ea) return b;
+    if (eb) return a;
+    return UiRect{std::min(a.left, b.left), std::min(a.top, b.top), std::max(a.right, b.right),
+                  std::max(a.bottom, b.bottom)};
+}
+
+bool intersects(const UiRect& a, const UiRect& b) {  // IntersectRect's result
+    return std::max(a.left, b.left) < std::min(a.right, b.right) && std::max(a.top, b.top) < std::min(a.bottom, b.bottom);
 }
 
 bool animate() { return !g_ui_unattended || std::getenv("SMACX_ANIM"); }
@@ -63,6 +81,8 @@ struct WinMove {
     bool on = false;
     int32_t sx = 0, sy = 0, dx = 0, dy = 0;  // tile points (minus the half tile height)
     UiRect r{};  // the saved background
+    int32_t qw = 0, qh = 0;  // a quarter of the rectangle's width and height
+    float pos[3] = {}, step[3] = {};  // the slide's point and its step per frame
     Buffer bg;
 };
 
@@ -114,11 +134,24 @@ void GAMEAPI veh_scoot(int32_t veh_id, int32_t x, int32_t y, int32_t dir, int32_
                 pfncTileToPoint(win, x2, y2, &m.dx, &m.dy);
                 m.sy -= mwi(win, kMwHalfH);
                 m.dy -= mwi(win, kMwHalfH);
-                int32_t tw = mwi(win, kMwTileW), th = mwi(win, kMwTileH), hh = mwi(win, kMwHalfH);
-                UiRect r{std::min(m.sx, m.dx), std::min(m.sy, m.dy), std::max(m.sx, m.dx) + tw,
-                         std::max(m.sy, m.dy) + th + hh};
-                int32_t qw = (r.right - r.left) / 4, qh = (r.bottom - r.top) / 4;
-                r = {r.left - qw, r.top - qh - th, r.right + qw, r.bottom + qh};
+                // The slide: from the source point, (next - source) / frames a frame.
+                m.pos[0] = (float)m.sx;
+                m.pos[1] = (float)m.sy;
+                const float to[3] = {(float)m.dx, (float)m.dy, 0.0f};
+                vec3_sub(to, m.pos, m.step);
+                vec3_scale(m.step, (float)(1.0 / (double)(float)frames), m.step);
+                vec3_add(m.pos, m.step, m.pos);
+                // The background: both tiles' clips (the tiles' points' rectangle the original
+                // computes first is overwritten by their union), a quarter wider and higher on
+                // each side.
+                UiRect r1{}, r2{}, r;
+                MapWin_compute_clip(win, x2, y2, 0, &r1);
+                MapWin_compute_clip(win, x, y, 0, &r2);
+                r = union_rect(r1, r2);
+                auto div4 = [](int32_t v) { return (v + ((v >> 31) & 3)) >> 2; };
+                m.qw = div4(r.right - r.left);
+                m.qh = div4(r.bottom - r.top);
+                r = {r.left - m.qw, r.top - m.qh, r.right + m.qw, r.bottom + m.qh};
                 m.r = r;
                 Buffer_ctor(&m.bg);
                 Buffer_init(&m.bg, r.right - r.left, r.bottom - r.top, 8, 0);
@@ -130,7 +163,9 @@ void GAMEAPI veh_scoot(int32_t veh_id, int32_t x, int32_t y, int32_t dir, int32_
         if (drawing) turn = vehdraw_turn_start(veh_id, dir, per_turn, 2);
         else Vehs[veh_id].rotate_angle = (int8_t)dir;  // (vehdraw_turn_start's facing)
         uint32_t last = platform::ticks_ms();
-        auto frame = [&](int32_t mode, int32_t f, bool slide, float t) {
+        // A frame in each window: the unit drawn where it is when that rectangle meets the saved
+        // one, shown, and the background put back around it; the slide's point steps on.
+        auto frame = [&](int32_t mode, int32_t f, bool slide) {
             for (int32_t i = 0; i < 8; i++) {
                 WinMove& m = mv[i];
                 if (!m.on) continue;
@@ -138,36 +173,41 @@ void GAMEAPI veh_scoot(int32_t veh_id, int32_t x, int32_t y, int32_t dir, int32_
                 Buffer* c = ui_mapwin_native(win)->canvas;
                 int32_t px = m.sx, py = m.sy;
                 if (slide) {
-                    px = (int32_t)((float)m.sx + (float)(m.dx - m.sx) * t);
-                    py = (int32_t)((float)m.sy + (float)(m.dy - m.sy) * t);
+                    px = (int32_t)m.pos[0];
+                    py = (int32_t)m.pos[1];
                 }
-                veh_draw(c, veh_id, px, py, mwi(win, kMwZoom), mode, f);
-                ui_present();  // GraphicWin_update_2
-                Buffer_copy_4(&m.bg, c, 0, 0, m.r.left, m.r.top, m.bg.width, m.bg.height);
+                int32_t w = m.r.right - m.r.left, h = m.r.bottom - m.r.top;
+                UiRect at{px, py, px + w, py + h};
+                if (intersects(at, m.r)) {
+                    veh_draw(c, veh_id, px, py, mwi(win, kMwZoom), mode, f);
+                    ui_present();  // GraphicWin_update_2 of the rectangle
+                    Buffer_copy_4(&m.bg, c, px - m.qw - m.r.left, py - m.qh - m.r.top, px - m.qw, py - m.qh, w, h);
+                }
+                if (slide) vec3_add(m.pos, m.step, m.pos);
             }
         };
         if (drawing)
             for (int32_t f = 0; f < turn; f++) {
-                frame(0x12, f, false, 0.0f);
+                frame(0x12, f, false);
                 wait_ms(&last, delay / 2);
             }
         if (!(flags & 1)) {
             if (drawing) {
                 vehdraw_scoot_start(veh_id, dir, frames, 2);
                 for (int32_t f = 0; f < frames; f++) {
-                    frame(0x22, f, true, (float)(f + 1) * (1.0f / (float)frames));
                     const char* shot = std::getenv("SMACX_SCOOT_SHOT");
-                    if (shot && *shot && f == frames / 2) {  // test aid: the screen at the half way
+                    if (shot && *shot && f == frames / 2) {  // test aid: the screen of this frame
                         for (int32_t i = 0; i < 8; i++)
                             if (mv[i].on)
-                                veh_draw(ui_mapwin_native(MapWins[i])->canvas, veh_id, (mv[i].sx + mv[i].dx) / 2,
-                                         (mv[i].sy + mv[i].dy) / 2, mwi(MapWins[i], kMwZoom), 0x22, f);
+                                veh_draw(ui_mapwin_native(MapWins[i])->canvas, veh_id, (int32_t)mv[i].pos[0],
+                                         (int32_t)mv[i].pos[1], mwi(MapWins[i], kMwZoom), 0x22, f);
                         ui_screenshot(g_ui_outdir + "/" + shot);
                         for (int32_t i = 0; i < 8; i++)
                             if (mv[i].on)
                                 Buffer_copy_4(&mv[i].bg, ui_mapwin_native(MapWins[i])->canvas, 0, 0, mv[i].r.left,
                                               mv[i].r.top, mv[i].bg.width, mv[i].bg.height);
                     }
+                    frame(0x22, f, true);
                     wait_ms(&last, delay);
                 }
             }

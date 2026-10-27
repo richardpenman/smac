@@ -14,8 +14,7 @@
 // MainInterface_on_iface_mouse_move), the stack row's scroll arrows (buttons 0x3F0 / 0x3F2 of
 // MainInterface_on_iface_button_clicked), StatusWin_arrow_left / right, the world map's clicks
 // (WorldWin_click, WorldWin_right_menu) and spot 5 (TURN COMPLETE: Console_end_my_turn) are at the
-// end of the file. Not reconstructed: the world map window of WorldWin_click's shift click and
-// its menu's item 4 (the view is centred instead), the world map's StretchBlt when the map is larger than the pane (nearest pixel here; the
+// end of the file. Not reconstructed: the world map's StretchBlt when the map is larger than the pane (nearest pixel here; the
 // original's GDI stretch mode is BLACKONWHITE).
 #include <algorithm>
 #include <cstdio>
@@ -1318,14 +1317,14 @@ static void worldwin_right_menu(int32_t px, int32_t py, int32_t sx, int32_t sy) 
     switch (id) {
     case 1: pfncMoveMap(&MainConsole, tx, ty, 1); break;
     case 2: ui_invalidate(); break;  // WorldWin's redraw
-    case 4: pfncMoveMap(&MainConsole, mw(MapWins[0], kMwCenterX), mw(MapWins[0], kMwCenterY), 1); break;
+    case 4: worldwin_show_detail_at(mw(MapWins[0], kMwCenterX), mw(MapWins[0], kMwCenterY)); break;
     case 0x14: help_any(); break;
     default: break;
     }
 }
 
-// WorldWin_click (0x4C3D40): the view centred on the tile clicked (shift: the world map window,
-// not reconstructed: the view stays); the right button's menu.
+// WorldWin_click (0x4C3D40): the view centred on the tile clicked (shift: the detail map, MapWins[1]
+// at the main view's centre, shown in the pane); the right button's menu.
 static void worldwin_click(int32_t px, int32_t py, int32_t sx, int32_t sy, bool right) {
     BaseWinMultiplayerRefresh = 0;
     const UiRect& pane = rect(0xCFC);
@@ -1336,7 +1335,7 @@ static void worldwin_click(int32_t px, int32_t py, int32_t sx, int32_t sy, bool 
     int32_t tx = 0, ty = 0;
     if (worldwin_pixel_to_tile(px - pane.left, py - pane.top, &tx, &ty)) return;
     if (!(ui_key_state(VKEY_SHIFT) & 0x8000)) pfncMoveMap(&MainConsole, tx, ty, 1);
-    else pfncMoveMap(&MainConsole, mw(MapWins[0], kMwCenterX), mw(MapWins[0], kMwCenterY), 1);
+    else worldwin_show_detail_at(mw(MapWins[0], kMwCenterX), mw(MapWins[0], kMwCenterY));
 }
 
 // The stack arrows in the base window's copy of the main interface (BaseWin_draw_garrison shows

@@ -578,4 +578,12 @@ if grep -qa "^unit 20 f1 Alien Artifact" <(sed -n '/popup ARTIFACT answer/,$p' "
     echo "FAIL artifact: the artifact consumed"; FAIL=1; else echo "PASS artifact: the artifact consumed"; fi
 nocrash artifact
 
+# 35. The world map pane's detail map (WorldWin_click with shift; WorldWin_right_menu's item 4,
+#     "Switch to Detail Map"): MapWins[1] centred on the main view's centre, shown in the pane with
+#     the second globe button pressed (compared with the original's menu item: the same).
+run worldshift $NEW --keys "ENTER,S-CLICK:930x635,SHOT:detail.bmp"
+check worldshift "shift click: the detail map at the view's centre" "^worldwin detail map at 35,7"
+check worldshift "shown" "^worldwin detail map$"
+nocrash worldshift
+
 exit $FAIL

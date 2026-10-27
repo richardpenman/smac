@@ -8,8 +8,9 @@
 // (DAT_00691AF8; slide_hide: 3 during the computer players' turns), the window's picture rising
 // from the bottom by a fifth of its height per frame (slide_hide: sinking, its side strips of
 // 0x17 pixels cleared) with the four arms of console_x2_A.pcx (0x2C9, 0x2D9, 0x2E2, 0x2EB: 15,
-// 8, 8, 15 x 0x211) along its sides, the outer ones not above y 0xEE (0x5E at 800); at the end
-// slide_show draws the arms into the window's canvas.
+// 8, 8, 15 x 0x211) along its sides, the outer ones not above y 0xEE (0x5E at 800), all clipped
+// to the window's place, and the main interface's upper edge (its top 0x39 rows) drawn over them
+// each frame; at the end slide_show draws the arms into the window's canvas.
 // Unattended runs (--hidden with scripted keys) skip the frames (the sound and the arms stay).
 #include <cstdlib>
 #include <cstring>
@@ -70,29 +71,40 @@ void arm_x(int32_t w, int32_t* x) {
     x[3] = (w - g_arm[3].full_width) - 0x20;
 }
 
-// One frame: the screen as it was, the window's picture at (sx, y), the arms beside it.
-void frame(const std::vector<uint8_t>& screen, Buffer* scr, const Buffer* win, int32_t sx, int32_t y) {
+// One frame: the screen as it was, the window's picture at (sx, y) and the arms beside it, both
+// clipped to the window's place (sx, sy and its size: the picture rises from behind its bottom
+// edge), then the main interface's top 0x39 rows across the window's columns drawn again from
+// its picture (slide_show / slide_hide: MainInterface's buffer at its position, clipped to that
+// strip), so the window passes behind the console's upper edge.
+void frame(const std::vector<uint8_t>& screen, Buffer* scr, const Buffer* win, int32_t sx, int32_t sy, int32_t y) {
     std::memcpy(scr->data, screen.data(), screen.size());
     int32_t w = win->width;
+    UiRect clip{std::max(0, sx), std::max(0, sy), std::min(scr->width, sx + w), std::min(scr->height, sy + win->height)};
     for (int32_t j = 0; j < win->height; j++) {
         int32_t dy = y + j;
-        if (dy < 0 || dy >= scr->height) continue;
+        if (dy < clip.top || dy >= clip.bottom) continue;
         const uint8_t* s = win->data + (size_t)j * win->stride;
         uint8_t* d = scr->data + (size_t)dy * scr->stride;
         for (int32_t i = 0; i < w; i++) {
             int32_t dx = sx + i;
-            if (dx >= 0 && dx < scr->width && s[i] != 9) d[dx] = s[i];
+            if (dx >= clip.left && dx < clip.right && s[i] != 9) d[dx] = s[i];
         }
     }
     int32_t ax[4];
     arm_x(w, ax);
-    UiRect all{0, 0, scr->width, scr->height};
-    Buffer_set_clip(scr, &all);
+    Buffer_set_clip(scr, &clip);
     BlitDestScale = BlitSourceScale = 1;
     for (int32_t k = 0; k < 4; k++) {
         int32_t ay = (k == 0 || k == 3) ? std::max(y, outer_top()) : y;
         if (g_arm[k].width) pfncSpriteStretchCopyToCanvas(&g_arm[k], scr, 9, sx + ax[k], ay);
     }
+    UiRect all{0, 0, scr->width, scr->height};
+    Buffer_set_clip(scr, &all);
+    const UiRect& mi = mi_rect(kMiPos);
+    int32_t lx0 = std::max({0, sx, mi.left}), lx1 = std::min({scr->width, sx + w, mi.right});
+    for (int32_t dy = std::max(0, mi.top); dy < std::min(scr->height, mi.top + 0x39) && lx0 < lx1; dy++)
+        std::memcpy(scr->data + (size_t)dy * scr->stride + lx0, screen.data() + (size_t)dy * scr->stride + lx0,
+                    (size_t)(lx1 - lx0));
     platform::video_present(scr->data, scr->stride, scr->width, scr->height,
                             reinterpret_cast<const platform::Rgb*>(GamePalette.rgb));
 }
@@ -121,7 +133,7 @@ void slide_show_window(Buffer* win, int32_t sx, int32_t sy, std::vector<uint8_t>
         int32_t y = sy + h - step;
         for (int32_t f = 0; f < frames; f++) {
             uint32_t t = platform::ticks_ms();
-            frame(screen, scr, win, sx, y);
+            frame(screen, scr, win, sx, sy, y);
             y -= step;
             if (y <= sy) y = sy;
             wait_frame(t);
@@ -168,7 +180,7 @@ void slide_hide_window(const Buffer* win, int32_t sx, int32_t sy) {
     for (int32_t f = 0; f < frames; f++) {
         uint32_t t = platform::ticks_ms();
         y += step;
-        frame(screen, scr, &pic, sx, y);
+        frame(screen, scr, &pic, sx, sy, y);
         wait_frame(t);
     }
     std::memcpy(scr->data, screen.data(), screen.size());

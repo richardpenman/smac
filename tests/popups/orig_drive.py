@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Drive the plain original (no oracle) under Xvfb: run terranx.exe, then follow a step file:
-#   wait SECONDS | key KEYSYM [n] | text STRING | shot NAME | click X Y | rclick X Y [S|C] | move X Y
+#   wait SECONDS | key KEYSYM [n] | text STRING | shot NAME | click X Y [S|C] | rclick X Y [S|C] | move X Y
 #   | press X Y | release (the left button held / let go: drags) | quit
 # Screenshots go to OUTDIR/NAME.png. Usage: orig_drive.py STEPFILE OUTDIR [extra ini lines file]
 # Keys are X keysyms with C+/S+/A+ modifiers (sent with XTEST to the game's Xvfb display). The game
@@ -56,9 +56,15 @@ try:
             for ch in arg: key({' ':'space','.':'period','-':'minus'}.get(ch,ch))
         elif c=='shot':
             img=s.grab(s.monitors[0]); mss.tools.to_png(img.rgb,img.size,output=f'{out}/{arg}.png'); print('shot',arg)
-        elif c=='click':
-            x,y=map(int,arg.split()); xtest.fake_input(d,XX.MotionNotify,x=x,y=y); d.sync(); time.sleep(0.1)
-            xtest.fake_input(d,XX.ButtonPress,1); d.sync(); time.sleep(0.05); xtest.fake_input(d,XX.ButtonRelease,1); d.sync(); time.sleep(0.2)
+        elif c=='click':  # a left click, shift (S) / ctrl (C) held when given
+            b=arg.split(); x,y=int(b[0]),int(b[1])
+            mk=[d.keysym_to_keycode(XK.string_to_keysym({'S':'Shift_L','C':'Control_L'}[m])) for m in b[2:]]
+            xtest.fake_input(d,XX.MotionNotify,x=x,y=y); d.sync(); time.sleep(0.1)
+            for m in mk: xtest.fake_input(d,XX.KeyPress,m)
+            d.sync(); time.sleep(0.05)
+            xtest.fake_input(d,XX.ButtonPress,1); d.sync(); time.sleep(0.05); xtest.fake_input(d,XX.ButtonRelease,1); d.sync()
+            for m in mk: xtest.fake_input(d,XX.KeyRelease,m)
+            d.sync(); time.sleep(0.2)
         elif c=='rclick':  # a right click, shift (S) / ctrl (C) held when given
             b=arg.split(); x,y=int(b[0]),int(b[1])
             mk=[d.keysym_to_keycode(XK.string_to_keysym({'S':'Shift_L','C':'Control_L'}[m])) for m in b[2:]]

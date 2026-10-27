@@ -181,6 +181,9 @@ ADDR_NATIVE(0x4C3990) void THISCALL WorldWin_set_world_map(uint8_t* win);
 ADDR_NATIVE(0x4C3950) void THISCALL WorldWin_set_detail_map(uint8_t* win);
 // detailmap.cpp: the world map pane's detail map (MapWins[1]) is shown in place of the world map.
 bool worldwin_detail_shown();
+// WorldWin_click's shift click and WorldWin_right_menu's item 4: MapWins[1] moved to (x, y) (the
+// main view's centre) and shown in the pane (WorldWin_set_detail_map's steps).
+void worldwin_show_detail_at(int32_t x, int32_t y);
 // The world map pane into the main interface's canvas: the detail map or WorldWin's map.
 void worldpane_draw(Buffer* mi);
 ADDR_NATIVE(0x460DD0) void THISCALL pfncMainMenuUpdateVisible(uint8_t* menu, int32_t veh_id);

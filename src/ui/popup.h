@@ -41,6 +41,8 @@ BoxDef* box_def(int32_t index);  // 0x78D528 + index * 0x28
 BoxDef* box_def_large();  // 0x6846B0: the larger frame (interface windows)
 // interface.pcx's check box marks (0x7794D8): 0 off, 1 under the mouse, 2 checked.
 Sprite* popup_check_sprite(int32_t state);
+// The info pane message list's icon (load_box_sprites: interface.pcx 0x267, 0x212, 16 x 15).
+Sprite* message_icon_sprite();
 // NewTechWin's picture buttons (0x822610 [2][3], load_box_sprites): button 0 the quote, 1 the long
 // description; states normal, highlighted, pressed.
 Sprite* newtech_button_sprite(int32_t button, int32_t state);

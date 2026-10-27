@@ -15,8 +15,8 @@
 // column's line count (its text stays from the typing); the ranking names of the power graph are
 // cut to nothing (their width is compared with an absolute x; the right-aligned writes use pane
 // relative x) so the graph shows without them.
-// Approximated: the message list's ListBox look (ListBox_draw_item: rows of the list font from
-// the top of the box, the newest at the bottom; no scroll bar); the character drawn for a
+// The message list: ListBox_draw_item's rows with MessageWin's callbacks (see msg_draw).
+// Approximated: the message list's scroll bar is not drawn; the character drawn for a
 // progress exactly at a line's start (the original writes the byte below its stack buffer, the
 // high byte of a saved register).
 // Not reconstructed: control_turn's faction boxes in the pane during the computer players' turns
@@ -178,11 +178,16 @@ int32_t g_msg_first = 0;  // first row shown
 
 UiRect msg_rect() { return mi_rect(0xD1C); }
 
-int32_t msg_rows() {
-    if (!g_msg_font_ok) return 1;
+// MessageWin_init's ListBox (Dialog_init_6 on MainInfc +0xD1C): rows a fifth of the box high
+// (+0x48) less the items' spacing (6, the Dialog default), 3 pixels above and below (+0x38 /
+// +0x3C), no left margin, the text after a column a quarter of the box's height (+0x34) and a
+// pixel.
+constexpr int32_t kMsgSpacing = 6, kMsgMargin = 3;
+int32_t msg_pitch() { return std::max(1, (msg_rect().bottom - msg_rect().top) / 5); }
+
+int32_t msg_rows() {  // ListBox_calculate_dimensions' rows
     UiRect r = msg_rect();
-    int32_t lh = font_lh(&g_msg_font);
-    return lh > 0 ? std::max(1, (r.bottom - r.top - 6) / lh) : 1;
+    return std::max(1, (r.bottom - r.top - 2 * kMsgMargin + kMsgSpacing) / msg_pitch());
 }
 
 void msg_scroll_end() {  // ListBox_set_selected_pos(-1, 1)
@@ -190,23 +195,33 @@ void msg_scroll_end() {  // ListBox_set_selected_pos(-1, 1)
     ui_invalidate();
 }
 
-// MessageWin's ListBox: fill 9 and box 18 (MessageWin_listbox_fill), the rows in the list font with
-// the colours of MessageWin_listbox_write.
+// ListBox_on_redraw with MessageWin's callbacks: the box (MessageWin_listbox_fill: fill 9 and box
+// 18), each row's icon (MessageWin_listbox_draw: 4 pixels in, centred on the row) and its text
+// (ListBox_draw_item: Buffer_write_l_4 at the row's top in the list font, the colours of
+// MessageWin_listbox_write).
 void msg_draw(Buffer* c) {
     UiRect r = msg_rect();
     Buffer_fill_3(c, &r, 9);
     Buffer_box_sprite(c, &r, box_def(18));
     if (!g_msg_font_ok) return;
+    const int32_t h = r.bottom - r.top, pitch = msg_pitch(), row_h = pitch - kMsgSpacing, col = h / 4;
+    Sprite* icon = message_icon_sprite();
     Buffer_set_font(c, &g_msg_font, nullptr, nullptr, nullptr);
-    UiRect clip{r.left + 3, r.top + 3, r.right - 3, r.bottom - 3};
-    Buffer_set_clip(c, &clip);
-    int32_t lh = font_lh(&g_msg_font), y = r.top + 3;
-    for (int32_t i = g_msg_first; i < (int32_t)g_msgs.size() && y + lh <= r.bottom - 3 + lh; i++, y += lh) {
+    for (int32_t i = g_msg_first, k = 0; i < (int32_t)g_msgs.size() && k < msg_rows(); i++, k++) {
         const Message& m = g_msgs[(size_t)i];
+        int32_t top = r.top + kMsgMargin + k * pitch;
+        UiRect item{r.left, top, r.right, top + row_h};
+        Buffer_set_clip(c, &item);
+        if (icon->width) {
+            BlitDestScale = BlitSourceScale = 1;
+            pfncSpriteStretchCopyToCanvas(icon, c, icon->key & 0xFF, r.left + 4, top + (row_h - icon->full_height) / 2);
+        }
         int32_t shadow = mem_i(0x68A5B0);
         if ((m.id & 0x10000000) && (m.id & 0xEFFFFFFF)) shadow = -1;
         Buffer_set_text_color(c, mem_i(0x68A5A4), shadow, 1, 1);
-        Buffer_write_l_3(c, m.text.c_str(), r.left + 6, y, (int32_t)m.text.size());
+        UiRect text{r.left + col + 1, top, r.right, top + row_h};
+        Buffer_set_clip(c, &text);
+        Buffer_write_l_3(c, m.text.c_str(), text.left, top, (int32_t)m.text.size());
     }
     UiRect all{0, 0, c->width, c->height};
     Buffer_set_clip(c, &all);
@@ -992,7 +1007,7 @@ bool infowin_mouse(int32_t type, int32_t x, int32_t y) {
         if (x < r.left || x >= r.right || y < r.top || y >= r.bottom) return false;
         if (type == UiInput::LUP && g_msg_font_ok) {
             // ListBox: the row under the mouse selected (MainInterface_on_iface_selected).
-            int32_t row = (y - r.top - 3) / std::max(1, font_lh(&g_msg_font)) + g_msg_first;
+            int32_t row = (y - r.top - kMsgMargin) / msg_pitch() + g_msg_first;
             if (row >= 0 && row < (int32_t)g_msgs.size()) MessageWin_on_selected(&MessageWin, g_msgs[(size_t)row].id);
         }
         return true;

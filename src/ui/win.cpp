@@ -732,8 +732,10 @@ void GAMEAPI wait_task() {
         int32_t x1, y1, x2, y2;
         if (std::sscanf(k.command.c_str(), "click %d %d", &x1, &y1) == 2) {
             ui_mouse(UiInput::MOVE, x1, y1);
+            g_script_mods = k.vk & 0x30000;  // S-CLICK: shift held
             ui_mouse(UiInput::LDOWN, x1, y1);
             ui_mouse(UiInput::LUP, x1, y1);
+            g_script_mods = 0;
         } else if (std::sscanf(k.command.c_str(), "rclick %d %d", &x1, &y1) == 2) {
             ui_mouse(UiInput::MOVE, x1, y1);
             g_script_mods = k.vk & 0x30000;  // S-RCLICK / C-RCLICK: shift / ctrl held
