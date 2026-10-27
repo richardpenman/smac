@@ -1528,6 +1528,13 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t callback) {
             int32_t key = in.key, vk = key & 0xFFFF;
             if (edit_key(p, key, &fresh)) {
                 dirty = true;
+            } else if (p->item_type == 4 && (vk == VKEY_DOWN || vk == VKEY_UP || vk == VKEY_TAB) &&
+                       p->edit.size() > 1) {
+                // EditGroup: the arrows (and Tab) move to the next / previous field, its text selected.
+                int32_t m = (int32_t)p->edit.size(), s = std::max(0, std::min(p->selected, m - 1));
+                p->selected = vk == VKEY_UP || (key & 0x10000) ? (s + m - 1) % m : (s + 1) % m;
+                fresh = true;
+                dirty = true;
             } else if (vk == VKEY_RETURN) {
                 on_button_clicked(p, -1);
                 done = true;

@@ -1579,7 +1579,18 @@ void console_function_keys(uint8_t* self, int32_t vk, bool in_base) {
         break;
     }
     case 0x13:  // Pause
-        if (MultiplayerActive) console_not_reconstructed("Console_on_key_click: multiplayer pause");
+        // The pause asked or lifted (0x4C00 / 0x4C01, NetState +0x1B50 the players pausing); not
+        // with one player at a time (SIMULNOT).
+        if (MultiplayerActive) {
+            int32_t paused = *reinterpret_cast<int32_t*>(&NetState + 0x1B50);
+            if (!(paused & (1 << (CurrentPlayerFaction & 31))) && (GameMoreRules & 0x10)) {
+                NetMsg_pop(&NetMsg, "SIMULNOT", 5000, 0, nullptr);
+                ui_multiwin_draw();
+                break;
+            }
+            message_data((paused & (1 << (CurrentPlayerFaction & 31))) ? 0x4C01 : 0x4C00, 0, 0, 0, 0, 0);
+            ui_multiwin_draw();
+        }
         break;
     case 0x1B:  // Esc
         if (InfcList[InfcUsed] != 5) confirm_quit();

@@ -123,7 +123,7 @@ fi
 # (0x1506) and agrees (0x1509), the client sees the offers and agrees: MAYBE / YES DEAL
 # (0x150A / 0x150B), the host (the lower faction) executes the deal (net_treaty_on, net_energy)
 # and tells the client (0x150D). The treaty and the credits must agree on both machines.
-HDIPLO="WAITFOR:player turn faction 1,ENTER,WAIT:500,F12,CLICK:950x366,WAITFOR:diplo 1 2,h,i,ENTER,\
+HDIPLO="WAITFOR:player turn faction 1,ENTER,WAIT:500,F12,WAIT:300,SCREENSTATE,SHOT:commlink.bmp,CLICK:950x348,WAITFOR:diplo 1 2,h,i,ENTER,\
 CLICK:790x467,CLICK:400x467,5,ENTER,CLICK:330x519,WAITFOR:diplo: deal done between 1 and 2,WAIT:300,DIPLOSTATE,ESC,ESC,$END"
 CDIPLO="WAITFOR:COMMDIPLO from faction 1,ENTER,WAITFOR:diplo 2 1,WAITFOR:diplo chat: ,\
 WAITFOR:diplo: faction 1 state 1,CLICK:330x519,WAITFOR:diplo: deal done by faction 1,WAITFOR:diplo: closed by faction 1,DIPLOSTATE"
@@ -141,6 +141,11 @@ for side in host client; do
     nocheck $log "the checksums agree" "checksum [0-9]+ differs"
     nocheck $log "no crash" "not reconstructed|abort|Assertion"
 done
+# The commlink panel's network rows (MultiWin_draw / MultiWin_draw_time / MultiWin_draw_player):
+# the time row, the other human with the chat flag and "(+)" (moves after the current player).
+check diplo-host "the panel's time row" "^screentext No Time Control$"
+check diplo-host "the client's row" "^screentext 1\. Yang$"
+check diplo-host "the client's state (moves after us)" "^screentext \(\+\)$"
 check diplo-client "the call answered (COMMDIPLO)" "^net: COMMDIPLO from faction 1: 0"
 check diplo-host "the treaty and credits offered" "^diplo offer: side 0 type 1 value 5"
 check diplo-client "the offers seen" "^diplo offer: side 1 type 3 value 0"
@@ -148,5 +153,36 @@ check diplo-host "the host gave 5 credits" "^diplostate f1 credits 95 "
 check diplo-client "the client got them" "^diplostate f2 credits 105 "
 check diplo-client "the host's credits as the client sees them" "^diplo 1 status .* credits 95 "
 compare diplo "host and client states equal each turn"
+
+# 4. Time controls: at its first turn the host opens Console_time_controls (T: TIMECONTROLS), picks
+# CUSTOM and sets 5 seconds a turn (CUSTOMTIME; no time per base, unit or event; 10 seconds a bonus
+# pill, a pill each turn, at most 2), sent to the client (NetDaemon_synch 0x85, 0x4C02). The first
+# turns count double: 10 seconds. The host's turn and then the client's run out (turn_timer:
+# GameState 0x800 ends the turn); at its second turn the host uses a bonus pill (S-6, ^: 0x2306 / 0x4306).
+HTIMER="WAITFOR:player turn faction 1,ENTER,WAIT:500,T,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,\
+0,DOWN,0,DOWN,0,DOWN,5,DOWN,1,0,DOWN,1,DOWN,2,ENTER,WAITFOR:turn time out"
+HBONUS="WAITFOR:player turn faction 1,ENTER,WAIT:500,S-6,WAIT:1500,$END"
+CTIMER="WAITFOR:player turn faction 2,ENTER,WAITFOR:turn time out"
+HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:player 2 ready 1,ENTER,WAITFOR:game started,ENTER,\
+$HTIMER,$HBONUS,$HTURN,WAITFOR:player turn faction 1,WAIT:2000"
+CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAIT:500,ENTER,\
+WAITFOR:game started,ENTER,$CTIMER,$CTURN,$CTURN,WAITFOR:player turn faction 1,WAIT:1000"
+game timer
+for side in host client; do
+    log="timer-$side"
+    check $log "the custom time controls set" "^netmsg (WE|HE)CHANGEDTIME[01]?: .*Custom"
+    check $log "a turn ran out" "^net: turn time out"
+    count $log "the turns' upkeep in lockstep" "^net: turn [0-9]+ upkeep" 3
+    check $log "the bonus pill used" "^netmsg (WE|HE)BONUSED"
+    nocheck $log "the checksums agree" "checksum [0-9]+ differs"
+    nocheck $log "no crash" "not reconstructed|abort|Assertion"
+done
+check timer-host "the host's CUSTOMTIME answered" "^popup CUSTOMTIME answer: [0-9]"
+check timer-host "the custom values" "^time controls custom: base 0 unit 0 event 0 turn 5 extra 10 refresh 1 max 2"
+# (The original sends the table to the server (0x2101, relayed as 0x4101) and 0x4C02 to everyone at
+# once: the client applies 0x4C02 before the new table, so its turn's total time at that turn's
+# snapshot (GamePrefs.GameTimeControl[1], 0x9A64E4) is the old table's until the next turn.)
+compare timer "host and client states equal each turn" 'GamePrefs\.GameTimeControl\[1\]'
+
 
 exit $FAIL

@@ -184,8 +184,28 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   Approximated: NetMsg_pop in a network game writes to the message line instead of its timed box.
 * Group 4 (in part): the chat (Console_chat: CHATASK, message_chat 0x4E00 / 0x1E00, shown on the
   message line; the setup window's chat), the time-control and time-bonus messages (0x4C02,
-  0x4306), pause (0x4C00/01). Not done: Console_time_controls' dialog, MultiWin's network rows
-  (time, locks, the chat button) and the scenario file transfer.
+  0x4306), pause (0x4C00/01). Not done: the scenario file transfer.
+* Time controls (done): Console_time_controls (T, the panel's time row: HOSTTIME for a client;
+  time_controls_dialog's TIMECONTROLS with the current one selected; CUSTOM asks CUSTOMTIME's seven
+  values, 0..9999, and sends the table (NetDaemon_synch 0x85); 0x4C02 to everyone, its handler
+  with WECHANGEDTIME / HECHANGEDTIME0 / HECHANGEDTIME1 and the table's values), Console_use_time_bonus
+  (^, the panel's pills: SIMULNO, NOTIMEBONUSES, NOBONUSATEND, NOBONUSDONE, 0x2306), the pause key
+  (0x4C00 / 0x4C01, SIMULNOT with one player at a time), turn_timer (every 500 ms of real time,
+  from wait_task and the modal waits) and MultiWin_draw_time's countdown: not while paused or in
+  a network wait (blinking then), TIMEWARNING and a tick in the last fifteen seconds, the time run
+  out: GameState 0x800 (the turn ends, net_control_turn) and the alarm. EditGroup popups now move
+  between their fields with the arrows / Tab (the original dialog's focus). As the original, the
+  custom table travels through the server (0x2101 -> 0x4101) while 0x4C02 goes to everyone at
+  once, so a client applies 0x4C02 with the old table (its HECHANGEDTIME1 shows the old values
+  and that turn's total time is the old one).
+* The commlink panel's network rows (done, src/ui/multiwin.cpp): MultiWin_draw's network path (the
+  top art, the time row, the bonus pills' row "^", the chat button under the Council button),
+  MultiWin_draw_player's chat flag (multi.pcx's three flags: none, refused (0x7FFF74), left out
+  of the chat (0x93E960); a click cycles them as MultiWin_on_left_click) and the players' states
+  (PAUSED, (*), (+), (-), the upkeep's count, (?) / (@) the server's locks, the treaty's short
+  name), the time and pills spots (Console_time_controls, Console_use_time_bonus). Approximated:
+  the original's panel is modeless beside the map; closed, it keeps its time and pills rows on
+  the screen: here that closed panel is drawn over the screen but not clickable (T and ^).
 * The DiploWin between online players (done): commlink_attempt's network path (another human:
   0x1501 and DIPLOCOMM; a computer faction: NetDaemon_open_channel / NOCHANNEL, communicate, the
   commlink treaty through 0x2441), commlink_attempter's ALREADYDONE / DIPLOALREADY / input-lock
@@ -213,4 +233,6 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   states compared each turn and no checksum difference; then a desync provoked on the client
   (SMACX_NET_DESYNC) found by the host's checksums and its units resent; a third game has the
   two humans trade in the DiploWin (the call answered, a chat line, a treaty and 5 credits
-  offered, both agree, the deal done by the host) with the treaty and credits checked on both.
+  offered, both agree, the deal done by the host) with the treaty and credits checked on both;
+  a fourth game sets custom time controls (5 s a turn, doubled the first turns), lets the host's
+  and the client's turns run out and uses a bonus pill.

@@ -718,6 +718,7 @@ static bool script_ready() {
 
 void GAMEAPI wait_task() {
     if (MultiplayerActive) Net_handle_sys_msg(&NetState);  // (do_all_tasks: the session's events)
+    if (MultiplayerActive) multiwin_net_tick();             // (the turn_timer's WM_TIMER)
     // do_video: the window is presented when it changed.
     if (g_dirty || g_map_dirty) ui_present();
     if (script_ready()) {
@@ -871,6 +872,7 @@ int32_t ui_wait_key() {
         if (ControlTurnA) return 0;
         if (g_input.empty()) pump_platform(50);
         planwin_tick(platform::ticks_ms());  // the modal popup's timers: PlanWin_blink, line_timer
+        multiwin_net_tick();                 // a network game's turn_timer
         reports_tick(platform::ticks_ms());  // the reports' base locator (bl_daemon)
         auto_play_tick(false);
         if (g_input.empty()) continue;
@@ -935,6 +937,7 @@ bool ui_wait_input(UiInput* in) {
         if (MultiplayerActive && g_modal_open && !*g_modal_open) return false;
         if (g_input.empty()) pump_platform(g_idle_hook ? 10 : 50);
         planwin_tick(platform::ticks_ms());  // the modal popup's timers: PlanWin_blink, line_timer
+        multiwin_net_tick();                 // a network game's turn_timer
         reports_tick(platform::ticks_ms());  // the reports' base locator (bl_daemon)
         auto_play_tick(false);
         if (g_input.empty()) continue;

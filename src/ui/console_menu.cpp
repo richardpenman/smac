@@ -211,9 +211,30 @@ void THISCALL Console_corner_the_market(uint8_t* self) {
 }
 
 // Console_use_time_bonus (0x517060): multiplayer time controls only (message_data 0x2306).
+// Console_use_time_bonus (0x517060, ^ / the commlink panel's pills): a bonus pill asked of the
+// server (0x2306, relayed as 0x4306: the turn's time extended); SIMULNO when not our move (one
+// player at a time), NOTIMEBONUSES without pills, NOBONUSATEND once the time ran out, NOBONUSDONE
+// after the turn ended.
 void THISCALL Console_use_time_bonus(uint8_t* self) {
     if (ControlTurnC || !GameTimeControl || !MultiplayerActive) return;
-    console_not_reconstructed("Console_use_time_bonus (multiplayer)");
+    if ((GameMoreRules & 0x10) && CurrentFaction != CurrentPlayerFaction) {
+        NetMsg_pop(&NetMsg, "SIMULNO", 5000, 0, nullptr);
+        return;
+    }
+    if (*reinterpret_cast<int32_t*>(mem::host(0x96EA34 + (uint32_t)CurrentPlayerFaction * 0x20CC)) < 1) {
+        parse_num(0, TimeControl[GameTimeControl].refresh);
+        NetMsg_pop(&NetMsg, "NOTIMEBONUSES", 5000, 0, nullptr);
+        return;
+    }
+    if (GameState & 0x800) {
+        NetMsg_pop(&NetMsg, "NOBONUSATEND", 5000, 0, nullptr);
+        return;
+    }
+    if ((GameState & 2) && (NetTurnDoneMask & (1 << (mw(self, kConFaction) & 31)))) {
+        NetMsg_pop(&NetMsg, "NOBONUSDONE", 5000, 0, nullptr);
+        return;
+    }
+    message_data(0x2306, 0, 0, 0, 0, 0);
 }
 
 void THISCALL Console_next_cursor(uint8_t* self) {

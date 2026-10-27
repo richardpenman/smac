@@ -764,7 +764,22 @@ void THISCALL NetDaemon_process_message(uint8_t* net, uint8_t* msg, int32_t size
         const char* name = Net_get_player_name(net, from_pid);
         parse_says(0, name ? name : "", -1, -1);
         parse_say(1, TimeControl[GameTimeControl].name, -1, -1);
-        NetMsg_pop(&NetMsg, sender == CurrentPlayerFaction ? "WECHANGEDTIME" : "HECHANGEDTIME", 5000, 2, nullptr);
+        if (sender == CurrentPlayerFaction) {
+            NetMsg_pop(&NetMsg, "WECHANGEDTIME", 5000, 0, nullptr);
+            break;
+        }
+        // Another player's change: HECHANGEDTIME0 (none) / HECHANGEDTIME1 with the table's values.
+        const CTimeControl& tc = TimeControl[GameTimeControl];
+        parse_num(0, tc.turn);
+        parse_num(1, tc.base);
+        parse_num(2, tc.unit);
+        parse_num(3, tc.extra);
+        parse_num(4, tc.refresh);
+        parse_num(5, tc.accumulated);
+        char label[32];
+        std::snprintf(label, sizeof(label), "HECHANGEDTIME%d", GameTimeControl != 0);
+        log_say("He Changed:", label, 0, 0, 0);
+        NetMsg_pop(&NetMsg, label, 5000, 0, nullptr);
         break;
     }
     case 0x4B00:

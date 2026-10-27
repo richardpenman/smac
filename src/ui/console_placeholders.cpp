@@ -15,6 +15,7 @@
 #include "ui/popup.h"
 
 #include <cctype>
+#include <cstdlib>
 #include <cstdio>
 #include <string>
 
@@ -27,9 +28,61 @@ void GAMEAPI draw_cursor() {
     else ui_invalidate();
 }
 void THISCALL MapWin_draw_cursor(uint8_t*) { ui_invalidate_map(); }
-// Console_time_controls (0x515900): outside multiplayer it only builds and closes its popup (the
-// TIMECONTROLS dialog, HOSTTIME and the synchronisation are multiplayer's, out of scope).
-void THISCALL Console_time_controls(uint8_t*) {}
+// time_controls_dialog (0x589330): the TIMECONTROLS popup's six items, "NAME|(TURN sec/turn ...
+// BASE sec/base + UNIT sec/unit)" (the first, no time controls: its label only).
+void time_controls_dialog(BasePop* pop) {
+    Popup_start(pop, ScriptFileName, "TIMECONTROLS", -1, nullptr, 0x40);
+    auto lab = [](uint32_t off) { return std::string(label_get(off / 4)); };
+    for (int32_t i = 0; i < 6; i++) {
+        const CTimeControl& tc = TimeControl[i];
+        std::string t = std::string(tc.name ? tc.name : "") + "|(";
+        if (i == 0) {
+            t += lab(0x474);
+        } else {
+            t += std::to_string(tc.turn) + " " + lab(0x468) + " " + lab(0x1094) + " " + std::to_string(tc.base) +
+                 " " + lab(0x46C) + " + " + std::to_string(tc.unit) + " " + lab(0x470);
+        }
+        t += ")";
+        BasePop_item(pop, t.c_str(), i);
+    }
+}
+
+// Console_time_controls (0x515900, T / the commlink panel's time): outside multiplayer nothing;
+// a client: HOSTTIME; the host: TIMECONTROLS (the current one selected); CUSTOM (5) asks its seven
+// values (CUSTOMTIME, each 0..9999) and sends the table (NetDaemon_synch 0x85); the choice goes to
+// everyone (0x4C02: set_time_controls, the turn's time left kept, HECHANGEDTIME / WECHANGEDTIME).
+void THISCALL Console_time_controls(uint8_t*) {
+    if (!MultiplayerActive) return;
+    if (!NetSessionState[0]) {
+        NetMsg_pop(&NetMsg, "HOSTTIME", 5000, 0, nullptr);
+        return;
+    }
+    BasePop* pop = popup_new();
+    time_controls_dialog(pop);
+    BasePop_set_active(pop, GameTimeControl);
+    int32_t r = BasePop_exec_3(pop, 0, 0);
+    popup_delete(pop);
+    if (r < 0) return;
+    if (r == 5) {
+        CTimeControl& tc = TimeControl[5];
+        int32_t* fields[7] = {&tc.base, &tc.unit, &tc.event, &tc.turn, &tc.extra, &tc.refresh, &tc.accumulated};
+        for (int32_t i = 0; i < 7; i++) parse_says(i, std::to_string(*fields[i]).c_str(), -1, -1);
+        BasePop* ask = popup_new();
+        int32_t a = -1;
+        if (!Popup_start(ask, ScriptFileName, "CUSTOMTIME", -1, nullptr, 0x44)) a = BasePop_exec_3(ask, 0, 0);
+        popup_delete(ask);
+        if (a >= 0) {
+            for (int32_t i = 0; i < 7; i++) {
+                int32_t v = std::atoi(ParseStrBuffer[i]);
+                *fields[i] = v < 0 ? 0 : (v > 9999 ? 9999 : v);
+            }
+            std::fprintf(stderr, "time controls custom: base %d unit %d event %d turn %d extra %d refresh %d max %d\n",
+                         tc.base, tc.unit, tc.event, tc.turn, tc.extra, tc.refresh, tc.accumulated);
+            NetDaemon_synch(&NetState, 0x85, 0, 0, 0, nullptr, 1, 0x2101);
+        }
+    }
+    message_data(0x4C02, 0, r, 0, 0, 0);
+}
 
 // Console_chat (0x515770, ctrl+C / the Network menu): outside multiplayer nothing. During the
 // upkeep not yet reached: FINISHUPKEEP. Else CHATASK (the text, 255 characters): a text starting
