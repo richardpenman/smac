@@ -222,7 +222,7 @@ GLOBAL(int32_t, MapErosiveForces, 0x94A2AC);
 GLOBAL(int32_t, MapPlanetaryOrbit, 0x94A2B0);  // affects temperature
 GLOBAL(int32_t, MapCloudCover, 0x94A2B4);  // affects rainfall, rivers
 GLOBAL(int32_t, MapNativeLifeForms, 0x94A2B8);
-GLOBAL(char[256], MapFilePath, 0x94A2BC);
+GLOBAL(char[0x50], MapFilePath, 0x94A2BC);  // the map header's 80 bytes (MapHeader::file_path)
 GLOBAL(MapHeader, MapHeaderBlock, 0x949870);  // MapAreaX .. the MapTiles/MapAbstract slots as one record
 GLOBAL_NATIVE(CEnergy[3], Energy, 0x94A318);  // [3]
 GLOBAL_NATIVE(CChassis[9], Chassis, 0x94A330);  // [9]

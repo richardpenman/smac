@@ -33,6 +33,7 @@
 #include "engine/ui_bridge.h"
 #include "engine/veh.h"
 #include "engine/zoc.h"
+#include "engine/table_at.h"
 
 namespace {
 inline bool is_human(int32_t faction_id) { return (FactionStatus[0] & (uint8_t)(1u << (faction_id & 31))) != 0; }
@@ -500,7 +501,7 @@ Step OrderVeh::natives_spawned() {
     bit_set(tx, ty, 0x100000, 1);
     if (faction_id != CurrentPlayerFaction) return Step::end;
     FX_play(&Sounds, 13);
-    parse_says(0, (&game().mfactions[0])[tgt_faction].adj_name_faction, -1, -1);
+    parse_says(0, table_at(game().mfactions, kMFactionsAddr, tgt_faction).adj_name_faction, -1, -1);
     parse_says(1, veh_unit(stack_id).name, -1, -1);
     NetMsg_pop(&NetMsg, tgt_sea ? "ISLESPOTTED" : "WORMSSPOTTED", 5000, 0, nullptr);
     return Step::end;
@@ -732,7 +733,7 @@ void OrderVeh::take_natives(Faction& f) {
             game().vehs[v].faction_id = (uint8_t)faction_id;
             game().vehs[v].morale = (uint8_t)morale_alien(v, 0);
             int32_t b = base_find(tx, ty);
-            const BASE& base = (&game().bases[0])[b];
+            const BASE& base = table_at(game().bases, kBasesAddr, b);
             if ((uint8_t)base.faction_id == (uint32_t)faction_id && base.pop_size >= 3)
                 game().vehs[v].home_base_id = (int16_t)b;
             else game().vehs[v].home_base_id = -1;

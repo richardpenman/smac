@@ -3,6 +3,7 @@
 // loop (net_*) is not reconstructed (single player only).
 #pragma once
 #include "engine/globals.h"
+#include "engine/table_at.h"
 
 // ---- harness hooks (not in the original) ----------------------------------------------------------
 // When set, control_turn / control_game call the hook instead of the original callee; the hook must
@@ -26,8 +27,7 @@ GLOBAL(int32_t[8], HotseatTamperFaction, 0x93A9B8);  // hotseat: faction caught 
 GLOBAL(int32_t[8], HotseatTamperCount, 0x93A9D8);
 GLOBAL(char[4], ControlTurnPlayerText, 0x93AA04);  // hotseat: player name text ($STR0 of SWITCHING)
 GLOBAL(uint8_t, LobbyParam, 0x689218);  // Net_check_for_lobby's second argument
-// Image address of MFactions (texts passed to interlude by address).
-constexpr uint32_t kMFactionsAddr = 0x946A50;
+// kMFactionsAddr (engine/table_at.h): texts passed to interlude by address.
 
 // ---- callees of other modules (declared here; reconstructed in later packages) ---------------------
 // Probe module: energy needed to corner the Global Energy Market (sum of mind_control costs of

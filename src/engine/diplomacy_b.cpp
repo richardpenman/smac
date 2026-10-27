@@ -29,6 +29,7 @@
 #include "platform/win32.h"
 #ifdef SMACX_HYBRID
 #include "engine/hybrid_shadow.h"
+#include "engine/table_at.h"
 #endif
 
 namespace {
@@ -431,10 +432,12 @@ static bool tech_tradeable(int32_t owner, int32_t tech_id, uint32_t pact_status,
     // source of the tech (friction_of is the receiver in both directions).
     if (!g_compat.tech_friction_receiver) friction_of = owner;  // fixed: the giver's friction and source
     int32_t src2 = game().factions[friction_of].tech_trade_source[tech_id];
-    const int32_t* friction = reinterpret_cast<const int32_t*>(
-        reinterpret_cast<const uint8_t*>(&game().factions[0].diplo_friction[0]) +
-        friction_of * (int32_t)sizeof(Faction) + (owner == friction_of ? src : src2) * 4);
-    return *friction >= ((pact_status & 1) ? 6 : 16);
+    int32_t friction;
+    std::memcpy(&friction,
+                table_bytes(game().factions, kFactionsAddr, friction_of) + offsetof(Faction, diplo_friction) +
+                    (owner == friction_of ? src : src2) * 4,
+                4);
+    return friction >= ((pact_status & 1) ? 6 : 16);
 }
 
 void GAMEAPI enemies_trade_tech(int32_t faction_id, int32_t faction_id_with) {

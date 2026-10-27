@@ -11,6 +11,7 @@
 #include "engine/game_state.h"
 #include "engine/globals.h"
 #include "engine/rules.h"
+#include "engine/table_at.h"
 
 // Address of Vehs in the original's memory (0x952828), records of 0x34 bytes.
 inline uint32_t compat_veh_addr(int32_t veh_id, uint32_t offset) { return 0x952828 + (uint32_t)veh_id * 0x34 + offset; }
@@ -40,7 +41,7 @@ inline int32_t compat_veh_pos(int32_t veh_id, int32_t i, int32_t none) {
 // or none for an index outside the table (fixed).
 inline uint32_t compat_base_faction(int32_t base_id, uint32_t none) {
     if (!g_compat.out_of_range_reads && (base_id < 0 || base_id >= 512)) return none;
-    return reinterpret_cast<const uint8_t*>(&game().bases[0])[base_id * (int32_t)sizeof(BASE) + offsetof(BASE, faction_id)];
+    return table_bytes(game().bases, kBasesAddr, base_id)[offsetof(BASE, faction_id)];
 }
 
 // TechOwners[tech_id]; ids past the 89 entries (-1, prototype ids 97 + unit) read the memory

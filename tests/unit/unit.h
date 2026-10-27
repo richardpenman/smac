@@ -6,8 +6,8 @@
 #include "doctest/doctest.h"
 #include "engine/globals.h"
 
-// Saves a global on construction and restores it on destruction, so a test can set game state in
-// the memory image without leaking it into other tests.
+// Saves a global on construction and restores it on destruction, so a test can set game state (the
+// memory image or the game-state records) without leaking it into other tests.
 template <class T>
 class SaveGlobal {
 public:

@@ -4,8 +4,11 @@
 // returns its top (no previous vehicle). The X_pop* popup wrappers in this address range are UI
 // (see ui_bridge.h); fractal_init/fractal_at at its end belong to world generation (world.h).
 #pragma once
+#include <cstring>
+
 #include "engine/game_state.h"
 #include "engine/globals.h"
+#include "engine/table_at.h"
 
 // ---- helpers (not original functions) -----------------------------------------------------------
 
@@ -18,16 +21,17 @@ inline bool unit_psi_armor(int32_t unit_id) { return Armor[Units[unit_id].armor_
 inline bool unit_is_native(int32_t unit_id) { return unit_id < 64 && (unit_psi_weapon(unit_id) || unit_id == 15); }
 // Whether a base (any id: the original indexes Bases[] without a range check) has a facility.
 inline bool base_has_fac(int32_t base_id, int32_t facility_id) {
-    const uint8_t* built = reinterpret_cast<const uint8_t*>(&game().bases[0]) + base_id * (int32_t)sizeof(BASE) +
-                           offsetof(BASE, facilities_built);
+    const uint8_t* built = table_bytes(game().bases, kBasesAddr, base_id) + offsetof(BASE, facilities_built);
     return (built[facility_id / 8] & (1 << (facility_id & 7))) != 0;
 }
 // Faction's diplomatic status with another faction. The original indexes the table without a range
 // check (other_id -1 reads the preceding field, faction_id -1 the memory before Factions[0]).
 inline uint32_t diplo_status_raw(int32_t faction_id, int32_t other_id) {
-    const uint8_t* p = reinterpret_cast<const uint8_t*>(&game().factions[0].diplo_status[0]) +
-                       faction_id * (int32_t)sizeof(Faction) + other_id * 4;
-    return *reinterpret_cast<const uint32_t*>(p);
+    const uint8_t* p =
+        table_bytes(game().factions, kFactionsAddr, faction_id) + offsetof(Faction, diplo_status) + other_id * 4;
+    uint32_t v;
+    std::memcpy(&v, p, 4);
+    return v;
 }
 // Top of the stack containing veh_id (inline copy of veh_top); -1 for -1.
 inline int32_t stack_top(int32_t veh_id) {

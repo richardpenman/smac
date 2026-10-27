@@ -73,7 +73,7 @@ TEST_CASE("compat out_of_range_reads: Bases[-1] is the end of Factions[7] with t
     CompatScope scope;
     SaveGlobal<Faction[8]> factions(Factions);
     // Bases[-1].faction_id lies in the last 0x134 bytes of Factions[7].
-    uint8_t* bases = reinterpret_cast<uint8_t*>(&game().bases[0]);
+    uint8_t* bases = reinterpret_cast<uint8_t*>(&game().factions[8]);  // Bases' address in the original
     bases[-(int32_t)sizeof(BASE) + offsetof(BASE, faction_id)] = 3;
     g_compat.out_of_range_reads = true;
     CHECK(compat_base_faction(-1, 0xFF) == 3);
@@ -88,7 +88,7 @@ TEST_CASE("compat out_of_range_reads: veh_cost without a base has no Brood Pit")
     Units[15].cost = 8;  // the Spore Launcher, a native unit
     Units[15].plan = 0;
     // Bases[-1]'s Brood Pit (facility 0x23) bit, in the end of Factions[7].
-    uint8_t* bases = reinterpret_cast<uint8_t*>(&game().bases[0]);
+    uint8_t* bases = reinterpret_cast<uint8_t*>(&game().factions[8]);  // Bases' address in the original
     bases[-(int32_t)sizeof(BASE) + offsetof(BASE, facilities_built) + 0x23 / 8] |= 1 << (0x23 & 7);
     CHECK(veh_cost(15, -1, nullptr) == 8);
     g_compat.out_of_range_reads = true;

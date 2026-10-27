@@ -32,6 +32,7 @@
 #include "engine/veh.h"
 #include "engine/world.h"
 #include "engine/zoc.h"
+#include "engine/table_at.h"
 #include "platform/win32.h"
 
 #ifdef FC_ORIG_BASE_BUILD  // Test builds only (-DFC_ORIG_BASE_BUILD): route base_build to the original, to verify this module apart from base_misc
@@ -48,9 +49,7 @@ inline void base_energy_call() {
 #endif
 }
 // Raw byte view of the base table (the original indexes it without range checks).
-uint8_t* base_raw(int32_t base_id) {
-    return reinterpret_cast<uint8_t*>(&game().bases[0]) + base_id * (int32_t)sizeof(BASE);
-}
+uint8_t* base_raw(int32_t base_id) { return table_bytes(game().bases, kBasesAddr, base_id); }
 // Wrapped horizontal distance |x1 - x2| as the original computes it.
 int32_t wrap_dx(int32_t x1, int32_t x2) {
     int32_t dx = std::abs(x1 - x2);

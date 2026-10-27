@@ -21,6 +21,7 @@
 #include "engine/turn.h"
 #include "engine/util.h"
 #include "engine/veh.h"
+#include "engine/table_at.h"
 
 int32_t GAMEAPI vector_dist(int32_t dx, int32_t dy) {
     int32_t a = std::abs(dx), b = std::abs(dy);
@@ -60,13 +61,11 @@ int32_t wrap_dx(int32_t x1, int32_t x2) {
 // notes at the call sites). Hybrid builds read the original memory; native builds read the
 // memory image (tables with pointers live outside it, so out-of-range reads there differ).
 int16_t raw_veh_unit_id(int32_t veh_id) {
-    const uint8_t* p = reinterpret_cast<const uint8_t*>(&game().vehs[0]) + veh_id * (int32_t)sizeof(VEH);
-    return *reinterpret_cast<const int16_t*>(p + offsetof(VEH, unit_id));
+    int16_t v;
+    std::memcpy(&v, table_bytes(game().vehs, kVehsAddr, veh_id) + offsetof(VEH, unit_id), 2);
+    return v;
 }
-uint8_t raw_unit_chassis(int32_t unit_id) {
-    const uint8_t* p = reinterpret_cast<const uint8_t*>(&Units[0]) + unit_id * (int32_t)sizeof(UNIT);
-    return p[offsetof(UNIT, chassis_id)];
-}
+uint8_t raw_unit_chassis(int32_t unit_id) { return table_at(Units, kUnitsAddr, unit_id).chassis_id; }
 uint8_t raw_chassis_speed(int32_t chassis_id) {
 #ifdef SMACX_HYBRID
     return reinterpret_cast<const uint8_t*>(&Chassis[0])[chassis_id * 0x90 + 0x48];

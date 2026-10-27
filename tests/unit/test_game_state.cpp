@@ -1,5 +1,5 @@
-// The game() view (engine/game_state.h) is the memory image itself: every member aliases its
-// global, so code moved from the globals to game() reads and writes the same bytes.
+// The game() view (engine/game_state.h): every member aliases its global (the native records of
+// engine/state.h), so code moved from the globals to game() reads and writes the same bytes.
 #include "engine/game_state.h"
 #include "unit.h"
 

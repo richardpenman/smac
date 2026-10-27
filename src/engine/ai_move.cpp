@@ -43,6 +43,7 @@
 #include "engine/util.h"
 #include "engine/veh.h"
 #include "engine/zoc.h"
+#include "engine/table_at.h"
 
 namespace {
 
@@ -54,10 +55,8 @@ inline bool is_human(int32_t faction_id) { return (FactionStatus[0] & (uint8_t)(
 // diplo_status[other] for any index, as the original reads it (other -1: the field before).
 inline uint32_t dstat_raw(int32_t faction_id, int32_t other) {
     uint32_t r;
-    std::memcpy(&r,
-                reinterpret_cast<const uint8_t*>(&game().factions[0].diplo_status[0]) +
-                    faction_id * (int32_t)sizeof(Faction) + 4 * other,
-                4);
+    std::memcpy(
+        &r, table_bytes(game().factions, kFactionsAddr, faction_id) + offsetof(Faction, diplo_status) + 4 * other, 4);
     return r;
 }
 // The original has no range check here: other may be the faction of Bases[-1] (255) or a zoc
@@ -69,9 +68,7 @@ inline int32_t veh_triad_of(int32_t veh_id) { return Chassis[unit_of(veh_id).cha
 inline int32_t veh_offense(int32_t veh_id) { return Weapon[unit_of(veh_id).weapon_id].offense_value; }
 // base_id may be -1 (no base) where the original reads Bases[-1]: the last 0x134 bytes of
 // Factions[7] (plain data in the memory image), so read through the raw table.
-inline const uint8_t* base_raw(int32_t base_id) {
-    return reinterpret_cast<const uint8_t*>(&game().bases[0]) + base_id * (int32_t)sizeof(BASE);
-}
+inline const uint8_t* base_raw(int32_t base_id) { return table_bytes(game().bases, kBasesAddr, base_id); }
 inline int32_t base_faction(int32_t base_id) { return base_raw(base_id)[offsetof(BASE, faction_id)]; }
 inline int32_t base_x_raw(int32_t base_id) {
     int16_t v;

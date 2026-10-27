@@ -15,6 +15,7 @@
 #include "engine/veh.h"
 #include "engine/zoc.h"
 #include "engine/ui_bridge.h"
+#include "engine/table_at.h"
 
 void THISCALL Path_init(Path* self) {
     if (self->mapTable) mem_free(self->mapTable);
@@ -256,9 +257,9 @@ int32_t THISCALL Path_zoc_path(Path* self, int32_t x, int32_t y, int32_t faction
 
 namespace {
 // Unit table entry; Path_find reads it without checking unit_id.
-const UNIT& unit_raw(int32_t unit_id) { return (&Units[0])[unit_id]; }
+const UNIT& unit_raw(int32_t unit_id) { return table_at(Units, kUnitsAddr, unit_id); }
 // Factions entry; callers pass faction_id -1 ("any") and the original still reads diplomacy flags.
-Faction& faction_raw(int32_t faction_id) { return (&game().factions[0])[faction_id]; }
+Faction& faction_raw(int32_t faction_id) { return table_at(game().factions, kFactionsAddr, faction_id); }
 inline int32_t path_index(int32_t x, int32_t y) { return (game().map.x >> 1) * y + (x >> 1); }
 inline uint32_t owner_bit(const MAP* sq) { return 1u << ((uint8_t)sq->owner & 31); }
 // Distance test of the ZOC rule: true when (x, y) is within two steps of (x2, y2).

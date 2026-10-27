@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "engine/state.h"
 #include "engine/base.h"
 #include "engine/clock.h"
 #include "engine/globals.h"
@@ -47,8 +48,7 @@ Result invoke(R (*fn)(A...), const int64_t* a, std::index_sequence<I...>) {
     } else if constexpr (std::is_pointer_v<R>) {
         auto p = reinterpret_cast<const uint8_t*>(fn(arg_as<A>(a[I])...));
         r.mask = 0xFFFFFFFFu;
-        if (p >= mem::g_image && p < mem::g_image + sizeof(mem::g_image))
-            r.value = mem::kImageBase + static_cast<uint32_t>(p - mem::g_image);
+        if (uint32_t addr = mem::address_of(p)) r.value = addr;  // the image or a game-state record
         else r.ok = p == nullptr;
     } else {
         R v = fn(arg_as<A>(a[I])...);
@@ -300,7 +300,7 @@ void golden_hook(FILE* log) {
     }
     // The calls change no game memory except set_base's (FC_SETBASE); the generators and the logic
     // clock are reset before each call, as fcompare does.
-    std::vector<uint8_t> image(mem::g_image, mem::g_image + sizeof(mem::g_image));
+    std::vector<uint8_t> image = state_capture();  // the memory image and the game-state records
     size_t map_size = static_cast<size_t>(MapAreaTiles) * sizeof(MAP);
     std::vector<uint8_t> map(reinterpret_cast<uint8_t*>(MapTiles), reinterpret_cast<uint8_t*>(MapTiles) + map_size);
     uint32_t crt = crt_rand_state(), game = game_random_state(), clock = engine_logic_clock_state();
@@ -309,10 +309,10 @@ void golden_hook(FILE* log) {
     const Func* prev = nullptr;
     auto check_memory = [&](const Func* f) {
         if (!f) return;
-        if (std::memcmp(image.data(), mem::g_image, image.size()) || std::memcmp(map.data(), MapTiles, map_size)) {
+        if (!state_equals(image) || std::memcmp(map.data(), MapTiles, map_size)) {
             g_stats[f->name].bad++;
             glog(log, "golden: turn %d: %s changed game memory (restored)\n", CurrentTurn, f->name);
-            std::memcpy(mem::g_image, image.data(), image.size());
+            state_restore(image);
             std::memcpy(MapTiles, map.data(), map_size);
         }
     };
@@ -324,7 +324,7 @@ void golden_hook(FILE* log) {
         engine_set_logic_clock_state(clock);
         std::string why = replay(r);
         if (r.entry->flags & FC_SETBASE) {
-            std::memcpy(mem::g_image, image.data(), image.size());
+            state_restore(image);
             std::memcpy(MapTiles, map.data(), map_size);
         }
         Stats& st = g_stats[r.func->name];

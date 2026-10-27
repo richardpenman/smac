@@ -30,6 +30,7 @@ extern "C" int32_t GAMEAPI morale_veh_impl_c(int32_t veh_id, int32_t check_drone
 #include "engine/stack.h"
 #include "engine/tech.h"
 #include "engine/ui_bridge.h"
+#include "engine/table_at.h"
 
 #ifdef SMACX_HYBRID
 // Hybrid builds: stack image of the original has_abil.
@@ -145,7 +146,7 @@ int32_t veh_vector_dist(int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
 
 namespace {
 // Raw view of the vehicle table: the original reads Vehs[-1] in a few places.
-uint8_t* veh_raw(int32_t veh_id) { return reinterpret_cast<uint8_t*>(&game().vehs[0]) + veh_id * (int32_t)sizeof(VEH); }
+uint8_t* veh_raw(int32_t veh_id) { return table_bytes(game().vehs, kVehsAddr, veh_id); }
 // Vehs[-1] lies in the Reactor table (string pointers in the original): see rules_orig_byte.
 // (Fixed with compat out_of_range_reads: no vehicle has no unit, -1.)
 int16_t veh_unit_raw(int32_t veh_id) { return (int16_t)compat_veh_unit(veh_id); }

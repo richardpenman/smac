@@ -33,6 +33,7 @@
 #include "engine/veh.h"
 #include "engine/world.h"
 #include "engine/zoc.h"
+#include "engine/table_at.h"
 
 #ifdef SMACX_HYBRID
 extern "C" int32_t GAMEAPI morale_alien_impl_c(int32_t veh_id, int32_t faction_id_vs_native);
@@ -1294,11 +1295,7 @@ int32_t GAMEAPI interceptor(int32_t faction_id_def, int32_t faction_id_atk, int3
         // BUG(original): base_find may return -1 (no bases): the name before Bases[0] is used.
         int32_t near_base = base_find(cx, cy);
         if (near_base < 0 && !g_compat.out_of_range_reads) parse_says(1, "", -1, -1);  // fixed: no name
-        else
-            parse_says(1,
-                       reinterpret_cast<const char*>(&game().bases[0]) + near_base * (int32_t)sizeof(BASE) +
-                           offsetof(BASE, name),
-                       -1, -1);
+        else parse_says(1, table_at(game().bases, kBasesAddr, near_base).name, -1, -1);
         Console_focus(&MainConsole, cx, cy, faction_id_def);
         NetMsg_pop(&NetMsg, "AIRSCRAMBLE", 5000, 0, nullptr);
         // Show the flight to the target, one tile at a time.
@@ -1926,7 +1923,7 @@ void capture_by_marines(Battle& b) {
             parse_says(0, Units[game().vehs[v].unit_id].name, -1, -1);
             int32_t base = base_find(x, y);
             // BUG(original): base_find may return -1 (no bases): Bases[-1] is read.
-            const uint8_t* braw = reinterpret_cast<const uint8_t*>(&game().bases[0]) + base * (int32_t)sizeof(BASE);
+            const uint8_t* braw = table_bytes(game().bases, kBasesAddr, base);
             if ((base >= 0 || g_compat.out_of_range_reads) &&  // fixed: no base, no home base
                 braw[offsetof(BASE, faction_id)] == game().vehs[veh_id].faction_id &&
                 (int8_t)braw[offsetof(BASE, pop_size)] > 2)

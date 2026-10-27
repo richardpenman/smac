@@ -7,6 +7,10 @@
 //
 // Native builds back the original data segment (0x682000-0x9CA000) with mem::g_image, initialised
 // from the original .data contents, so plain-data globals keep their exact layout and aliasing.
+// The game state's records (engine/state.h: factions, bases, vehicles, the map header, ...) are
+// native objects: an address inside one of them resolves to the object (mem::host), so their
+// globals, and every alias inside them (VehCount is a field of GamePrefs), bind to it. The image
+// keeps the rest (rule tables, the engine's scratch globals, the UI) and seeds the records.
 // Hybrid builds (SMACX_HYBRID, a 32-bit DLL injected into terranx.exe) bind the same names to the
 // original process memory.
 //
@@ -21,12 +25,21 @@ constexpr uint32_t kImageBase = 0x682000;
 constexpr uint32_t kImageEnd = 0x9CA000;
 #ifdef SMACX_HYBRID
 inline uint8_t* host(uint32_t addr) { return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(addr)); }
+inline uint8_t* bind(uint32_t addr, uint32_t, const char*) { return host(addr); }
 #else
 // Page-aligned like the original segment, so every global keeps its natural alignment.
 alignas(4096) extern uint8_t g_image[kImageEnd - kImageBase];
-inline uint8_t* host(uint32_t addr) { return g_image + (addr - kImageBase); }
+// Where the original's address lives: inside a game-state record (engine/state.h) the native
+// object, else the image.
+uint8_t* host(uint32_t addr);
+// host() for a global of size bytes (GLOBAL); notes a global that lies partly in a record, which
+// init() reports (it cannot be bound to one object).
+uint8_t* bind(uint32_t addr, uint32_t size, const char* name);
+// The original's address of p (the image or a record), 0 for any other pointer.
+uint32_t address_of(const void* p);
 #endif
-// Load the initial data image (native builds). Returns false if the image is missing.
+// Load the initial data image (native builds) and seed the game-state records from it. Returns
+// false if the image is missing (or a global straddles a record).
 bool init(const char* image_path);
 // Copy n bytes of the original's memory at addr: for the original's reads and writes past the end
 // of a table (compat out_of_range_reads, replay_events_overflow), which reach whatever the
@@ -36,13 +49,13 @@ void write_bytes(uint32_t addr, const void* src, uint32_t n);
 }  // namespace mem
 
 template <class T>
-T& smac_bind(uint32_t addr) {
-    return *reinterpret_cast<T*>(mem::host(addr));
+T& smac_bind(uint32_t addr, const char* name) {
+    return *reinterpret_cast<T*>(mem::bind(addr, sizeof(T), name));
 }
 template <class T>
 using smac_type_t = T;  // lets array types appear in declarator position
 
-#define GLOBAL(type, name, addr) inline std::add_lvalue_reference_t<type> name = smac_bind<type>(addr)
+#define GLOBAL(type, name, addr) inline std::add_lvalue_reference_t<type> name = smac_bind<type>(addr, #name)
 #ifdef SMACX_HYBRID
 #define GLOBAL_NATIVE(type, name, addr) GLOBAL(type, name, addr)
 #else

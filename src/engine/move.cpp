@@ -14,19 +14,17 @@
 #include "engine/parse.h"
 #include "engine/ui_bridge.h"
 #include "engine/veh.h"
+#include "engine/table_at.h"
 
 namespace {
 // Unit table entry; the original indexes it without checking unit_id (-1 reads the bytes before).
-const UNIT& unit_raw(int32_t unit_id) { return (&Units[0])[unit_id]; }
+const UNIT& unit_raw(int32_t unit_id) { return table_at(Units, kUnitsAddr, unit_id); }
 int32_t unit_raw_triad(int32_t unit_id) { return Chassis[unit_raw(unit_id).chassis_id].triad; }
 // Factions[faction_id].SE_planet without a range check: hex_cost is called with faction -1
 // (Path_move for some units); Factions[-1] lies in the vehicle table (plain data in the image).
 int32_t se_planet_raw(int32_t faction_id) {
     int32_t v;
-    std::memcpy(&v,
-                reinterpret_cast<const uint8_t*>(&game().factions[0]) + faction_id * (int32_t)sizeof(Faction) +
-                    offsetof(Faction, SE_planet),
-                4);
+    std::memcpy(&v, table_bytes(game().factions, kFactionsAddr, faction_id) + offsetof(Faction, SE_planet), 4);
     return v;
 }
 // Whether faction_id owns the Xenoempathy Dome (secret project 8).

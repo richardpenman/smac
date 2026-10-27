@@ -20,6 +20,7 @@
 #include "engine/tech.h"
 #include "engine/ui_bridge.h"
 #include "engine/veh.h"
+#include "engine/table_at.h"
 
 namespace {
 // Unit flags (UNIT.unit_flags).
@@ -42,9 +43,7 @@ inline bool is_human(int32_t faction_id) { return (FactionStatus[0] & faction_bi
 // Unit slot of the i-th (0..127) entry of a faction's design list: basic units, then its prototypes.
 inline int32_t proto_slot(int32_t i, int32_t faction_id) { return i < 64 ? i : faction_id * 64 + i % 64; }
 // Units[unit_id].name without a range check (the original reads Units[-1] in name_proto).
-inline const char* unit_name_raw(int32_t unit_id) {
-    return reinterpret_cast<const char*>(&Units[0]) + unit_id * (int32_t)sizeof(UNIT);
-}
+inline const char* unit_name_raw(int32_t unit_id) { return table_at(Units, kUnitsAddr, unit_id).name; }
 // Reactor short name (reactor_id 1-4).
 inline char* reactor_name(int32_t reactor_id) { return S(Reactor[reactor_id - 1].name_short); }
 inline int32_t abil_preq(int32_t ability_id) { return Ability[ability_id].preq_tech; }

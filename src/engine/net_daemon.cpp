@@ -1422,7 +1422,10 @@ void THISCALL NetDaemon_synch(uint8_t* net, int32_t type, int32_t a2, int32_t a3
                     else message_data(0x2308, 0, 0, 0, 0, 0);
                 }
             }
-            if (copy && part && block) std::memcpy(block + offset, data, (size_t)part);
+            // The replay (0x22) may run past its table (compat replay_events_overflow): the original's
+            // bytes after it, wherever they are kept (mem::write_bytes).
+            if (copy && part && type == 0x22) mem::write_bytes(0x950324 + (uint32_t)offset, data, (uint32_t)part);
+            else if (copy && part && block) std::memcpy(block + offset, data, (size_t)part);
             if (index == chunks - 1) {
                 if (type == 0x12) rebuild_vehicle_bits();
                 else if (type == 0x14) rebuild_base_bits();
@@ -1439,7 +1442,8 @@ void THISCALL NetDaemon_synch(uint8_t* net, int32_t type, int32_t a2, int32_t a3
         *reinterpret_cast<int32_t*>(&m[0x18]) = a3;
         *reinterpret_cast<int32_t*>(&m[0x1C]) = a4;
         *reinterpret_cast<uint16_t*>(&m[0x12]) = (uint16_t)chunk;
-        if (part && block) std::memcpy(&m[0x24], block + offset, (size_t)part);
+        if (part && type == 0x22) mem::read_bytes(0x950324 + (uint32_t)offset, &m[0x24], (uint32_t)part);
+        else if (part && block) std::memcpy(&m[0x24], block + offset, (size_t)part);
         NetDaemon_send_message(net, m.data(), part + 0x24, 0);
     }
     if (chunks == 0 && send) {  // an empty block (0x28): the header alone

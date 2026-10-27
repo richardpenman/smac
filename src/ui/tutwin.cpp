@@ -273,7 +273,7 @@ int32_t tut_map(uint8_t* self, const char* label, int32_t x, int32_t y, int32_t 
 void THISCALL TutWin_tut_map(uint8_t* self, const char* label, int32_t x, int32_t y, int32_t veh_id, uint8_t* image,
                              int32_t flags, int32_t x2, int32_t y2) {
     const Sprite* s = nullptr;
-    if (image) s = ArtSprite((uint32_t)(image - mem::host(mem::kImageBase)) + mem::kImageBase);
+    if (image) s = ArtSprite(mem::address_of(image));
     tut_map(self, label, x, y, veh_id, s, (uint32_t)flags, x2, y2);
 }
 

@@ -33,6 +33,7 @@
 #include "engine/veh.h"
 #include "engine/world.h"
 #include "engine/zoc.h"
+#include "engine/table_at.h"
 
 namespace {
 inline int32_t tile_region(int32_t x, int32_t y) { return map_tile(x, y)->region; }
@@ -775,7 +776,7 @@ int32_t GAMEAPI can_terraform(int32_t faction_id, int32_t x, int32_t y, int32_t 
 
 namespace {
 // Bases[base_id] also for base_id -1 (the original reads the bytes before the table then).
-inline BASE& base_any(int32_t base_id) { return (&game().bases[0])[base_id]; }
+inline BASE& base_any(int32_t base_id) { return table_at(game().bases, kBasesAddr, base_id); }
 // Tile with no unit/base of a non-native faction (owner nibble 0 or >= 8, or no such item bits).
 inline bool tile_native_or_free(const MAP* sq, uint32_t bits) {
     int32_t owner = sq->val2 & 0xF;
