@@ -16,6 +16,9 @@ ADDR(0x530D50) int32_t THISCALL NetDaemon_lock_base(uint8_t* net, int32_t base_i
 ADDR(0x530E50) void THISCALL NetDaemon_unlock_base(uint8_t* net, int32_t base_id);
 // Multiplayer session state cleared when an iron man game is saved (0x93E8C0-0x93E96C).
 GLOBAL(int32_t[44], NetSessionState, 0x93E8C0);
+// The sequence number of the session's events (the dword before NetSessionState; carried in every
+// message header and reset with the session).
+GLOBAL(int32_t, NetEventSequence, 0x93E8BC);
 GLOBAL(uint8_t, NetLock, 0x93E230);  // Lock object (multiplayer)
 // Multiplayer: sends faction_id's social choice to the other players.
 ADDR(0x5933C0) void GAMEAPI synch_soc(int32_t faction_id);

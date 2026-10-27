@@ -229,7 +229,7 @@ void GAMEAPI net_upkeep() {
     if (net_upkeep_phase(NetUpkeepCount)) return;
     NetUpkeepCount++;
     NetMsg_pop(&NetMsg, "UPKEEP6", 0, 1, nullptr);
-    Sess(-1) = 0;  // 0x93E8BC: the event sequence
+    NetEventSequence = 0;
     for (int32_t i = 0; i < 0x18; i++) DeletionList_clear(&DeleteList, i);
     do_checksums(4);
     if (GameMorePreferences & 2) auto_save();  // (Multi Debug: k:\breynolds\multisaves\ instead)
@@ -438,7 +438,7 @@ void GAMEAPI net_end_of_turn() {
     while (NetDaemon_receive(&NetState)) {}
     mash_planes();
     do_checksums(0);
-    Sess(-1)++;  // 0x93E8BC
+    NetEventSequence++;
 }
 
 void GAMEAPI net_control_turn() {

@@ -461,7 +461,7 @@ void header(int32_t* m, int32_t type) {
     m[0] = type & 0xFFFF;
     m[1] = CurrentPlayerFaction;
     m[2] = (int32_t)now_ms();  // (replaced by the server's stamp when it relays the event)
-    m[3] = NetSessionState[-1];  // 0x93E8BC: the sequence number
+    m[3] = NetEventSequence;
 }
 void send(int32_t* m, int32_t size, int32_t to) {
     NetBusy()++;
