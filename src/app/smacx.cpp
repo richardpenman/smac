@@ -53,8 +53,9 @@
 // map preview: its zoom, centre and route lines), and the commands SHOT[:FILE]
 // (screenshot), SAVE:FILE (save the game
 // and its generators in FILE.rng, relative to --outdir), UNITS (list the human's units on
-// stderr), WAIT:MS (real time passing, then the screen presented), QUIT. --exit-after-keys
-// (default with --hidden) quits when they run out.
+// stderr), WAIT:MS (no scripted input for MS ms: the waiting loop runs its timers and animations
+// as for a player who waits), QUIT. --exit-after-keys (default with --hidden) quits when they run
+// out.
 // Such unattended runs skip the animations (window slides, unit moves, booms, battle reports,
 // movies); --animate (or SMACX_ANIMATE=1) plays them all with their waits as an interactive game
 // does and still quits at the end of the keys (the test suites' default; TEST_FAST=1: unattended).

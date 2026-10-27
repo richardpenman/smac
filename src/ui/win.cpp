@@ -201,13 +201,6 @@ bool run_command(const std::string& cmd) {
         }
         return true;
     }
-    if (cmd.rfind("wait ", 0) == 0) {  // test aid: WAIT:MS, real time passing (the screen left dirty)
-        uint32_t t = platform::ticks_ms(), ms = (uint32_t)std::strtoul(arg.c_str(), nullptr, 0);
-        while (platform::ticks_ms() - t < ms) platform::delay_ms(5);
-        ui_invalidate();
-        ui_present();
-        return true;
-    }
     if (cmd.rfind("basedump", 0) == 0) {  // test aid: the base window's canvases (basewin.h)
         basewin_dump((arg[0] == '/' ? arg : g_ui_outdir + "/" + arg).c_str());
         return true;
@@ -611,10 +604,29 @@ static void ui_mouse(int32_t type, int32_t x, int32_t y) {
     console_ui_mouse(type, x, y);
 }
 
+// WAIT:MS at the front of the script: no scripted input until MS have passed, the waiting loop
+// running as without input (its timers, animations and presents), as a player who waits.
+static bool script_ready() {
+    static bool waiting = false;
+    static uint32_t deadline = 0;
+    while (!g_script.empty() && g_script.front().command.rfind("wait ", 0) == 0) {
+        uint32_t now = platform::ticks_ms();
+        if (!waiting) {
+            waiting = true;
+            deadline = now + (uint32_t)std::strtoul(g_script.front().command.c_str() + 5, nullptr, 0);
+        }
+        if ((int32_t)(now - deadline) < 0) return false;
+        waiting = false;
+        g_script.pop_front();
+        ui_trace("wait done");
+    }
+    return !g_script.empty();
+}
+
 void GAMEAPI wait_task() {
     // do_video: the window is presented when it changed.
     if (g_dirty || g_map_dirty) ui_present();
-    if (!g_script.empty()) {
+    if (script_ready()) {
         ScriptedKey k = g_script.front();
         g_script.pop_front();
         ui_trace(("wait_task key " + std::to_string(k.vk) + " " + k.command).c_str());
@@ -649,7 +661,7 @@ void GAMEAPI wait_task() {
     // The palette cycles' timers (Palette_timer_callback; AnimatePalette shows them at once). As
     // the other timers, not while scripted keys remain (PALTICK steps them).
     if (palette_cycles_tick(platform::ticks_ms())) g_dirty = true;
-    if (g_script_given && g_ui_exit_when_script_done) {
+    if (g_script_given && g_ui_exit_when_script_done && g_script.empty()) {
         std::fprintf(stderr, "scripted keys done (turn %d): quitting\n", CurrentTurn);
         ControlTurnA = 1;
         return;
@@ -688,7 +700,7 @@ void GAMEAPI flush_input() {
 int32_t ui_wait_key() {
     for (;;) {
         ui_present();
-        if (!g_script.empty()) {
+        if (script_ready()) {
             ScriptedKey k = g_script.front();
             g_script.pop_front();
             ui_trace(("wait_key key " + std::to_string(k.vk) + " " + k.command).c_str());
@@ -698,7 +710,7 @@ int32_t ui_wait_key() {
             }
             return k.vk;
         }
-        if (g_script_given && g_ui_exit_when_script_done) return 0;
+        if (g_script_given && g_ui_exit_when_script_done && g_script.empty()) return 0;
         if (ControlTurnA) return 0;
         if (g_input.empty()) pump_platform(50);
         planwin_tick(platform::ticks_ms());  // the modal popup's timers: PlanWin_blink, line_timer
@@ -724,7 +736,7 @@ bool ui_wait_input(UiInput* in) {
     }
     for (;;) {
         ui_present();
-        if (!g_script.empty()) {
+        if (script_ready()) {
             ScriptedKey k = g_script.front();
             g_script.pop_front();
             ui_trace(("wait_input key " + std::to_string(k.vk) + " " + k.command).c_str());
@@ -758,7 +770,7 @@ bool ui_wait_input(UiInput* in) {
             in->key = k.vk;
             return true;
         }
-        if (g_script_given && g_ui_exit_when_script_done) return false;
+        if (g_script_given && g_ui_exit_when_script_done && g_script.empty()) return false;
         if (ControlTurnA) return false;
         if (g_input.empty()) pump_platform(50);
         planwin_tick(platform::ticks_ms());  // the modal popup's timers: PlanWin_blink, line_timer

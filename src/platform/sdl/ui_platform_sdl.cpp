@@ -153,6 +153,8 @@ struct FontEntry {
     int32_t pixels = 0;  // em height (-lfHeight)
     // GDI text metrics (computed as Wine's GDI does from the OS/2 and hhea tables).
     int32_t ascent = 0, descent = 0, internal_leading = 0, external_leading = 0;
+    int32_t refs = 1;  // font_open calls of the same font (one handle; font_close releases one)
+    std::string key;
 };
 
 // The font's vertical metrics in font units (OS/2 usWinAscent/usWinDescent, hhea ascender,
@@ -204,8 +206,11 @@ std::map<int32_t, FontEntry> g_fonts;
 // the reconstructed windows' Font objects are locals whose handles are never closed (the original's
 // Font destructors), and a battle report alone made three a frame. Opening a file per handle ran
 // out of file descriptors on macOS (256 by default) after a few battles, and every later
-// text_open failed: blank 100-pixel popups. The instances stay open until video_shutdown.
+// text_open failed: blank 100-pixel popups. The instances stay open until video_shutdown, read
+// from memory (no file kept open), and the same font opened again gets the same handle (counted),
+// so a Font never closed costs nothing more.
 std::map<std::string, std::pair<TTF_Font*, TTF_Font*>> g_ttf_cache;
+std::map<std::string, int32_t> g_font_handles;  // the open handle of each font (file, size, style)
 // The font files' bytes: the instances read them from memory, holding no file open.
 std::map<std::string, std::vector<uint8_t>> g_ttf_files;
 TTF_Font* open_ttf(const std::string& path, int32_t pixels) {
@@ -314,6 +319,7 @@ void video_shutdown() {
         if (f.second.second) TTF_CloseFont(f.second.second);
     }
     g_ttf_cache.clear();
+    g_font_handles.clear();
     g_fonts.clear();
     if (g_texture) SDL_DestroyTexture(g_texture);
     if (g_renderer) SDL_DestroyRenderer(g_renderer);
@@ -429,6 +435,11 @@ int32_t font_open(const char* face, int32_t pixels, bool bold, bool italic, bool
         style |= TTF_STYLE_ITALIC;
     if (underline) style |= TTF_STYLE_UNDERLINE;
     std::string key = path + "|" + std::to_string(pixels) + "|" + std::to_string(style);
+    auto open = g_font_handles.find(key);
+    if (open != g_font_handles.end()) {
+        g_fonts[open->second].refs++;
+        return open->second;
+    }
     TTF_Font *f = nullptr, *measure = nullptr;
     auto cached = g_ttf_cache.find(key);
     if (cached != g_ttf_cache.end()) {
@@ -452,6 +463,8 @@ int32_t font_open(const char* face, int32_t pixels, bool bold, bool italic, bool
         g_ttf_cache[key] = {f, measure};
     }
     int32_t h = g_next_font++;
+    g_font_handles[key] = h;
+    g_fonts[h].key = key;
     g_fonts[h].font = f;
     g_fonts[h].pixels = pixels;
     g_fonts[h].measure = measure;
@@ -478,6 +491,8 @@ int32_t font_open(const char* face, int32_t pixels, bool bold, bool italic, bool
 void font_close(int32_t handle) {
     auto it = g_fonts.find(handle);
     if (it == g_fonts.end()) return;
+    if (--it->second.refs > 0) return;
+    g_font_handles.erase(it->second.key);
     g_fonts.erase(it);  // the TTF instances stay shared (g_ttf_cache)
 }
 

@@ -192,10 +192,11 @@ has satanim300 "the animation view" "^report sat anim satellites 0"
 #     adds a satellite (sat_edit: two ODPs for the University, a Sky Hydroponics Lab for the
 #     Spartans); reopened, ORBITAL ATTACK VIEW, the Spartans (target button), their Lab (kind
 #     button), ATTACK (0xD3E): sat_attack, ReportWin_start_attack's explosion, action_sat_attack
-#     (WEMUFFEDIT: the pod failed), one satellite fewer in the view.
+#     (WEMUFFEDIT: the pod failed), one satellite fewer in the view (reopened: animated, the
+#     explosion ends on its timer after the click, WAIT, and does not redraw the report).
 run satattack300 --save work/saves_late/turn_300.sav --human 3 --keys \
 "ESC,ESC,ESC,ESC,ESC,ESC,ESC,F6,SCREENSTATE,ESC,C-k,DOWN,ENTER,ENTER,F6,RCLICK:677x227,RCLICK:677x227,RCLICK:371x325,ESC,F6,\
-CLICK:700x41,CLICK:63x631,CLICK:838x609,SCREENSTATE,SHOT:attack.bmp,CLICK:563x487,ENTER,SCREENSTATE"
+CLICK:700x41,CLICK:63x631,CLICK:838x609,SCREENSTATE,SHOT:attack.bmp,CLICK:563x487,WAIT:1500,ENTER,SCREENSTATE,ESC,F6,CLICK:700x41,SCREENSTATE"
 nocrash satattack300
 has satattack300 "the table's rows" "^report sat Peacekeepers 0 0 0 0/0 0"
 has satattack300 "SAT0 in the left pane" "^screentext Each satellite \\(Lab, Mining Station"

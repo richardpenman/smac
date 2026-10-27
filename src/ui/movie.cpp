@@ -83,17 +83,16 @@ bool movie_play(const char* path) {
     std::fprintf(stderr, "movie %s: %dx%d, %d frames, sound %u ms\n", path, m.width(), m.height(), m.frames(),
                  snd ? snd->ms() : 0);
     std::vector<uint32_t> rgb;
-    if (g_ui_unattended) {
-        const char* e = std::getenv("SMACX_MOVIE_FRAMES");
-        int32_t n = std::min(e ? std::atoi(e) : 0, m.frames());
+    if (const char* e = std::getenv("SMACX_MOVIE_FRAMES")) {  // test aid: the first N frames decoded
+        int32_t n = std::min(std::atoi(e), m.frames());
         int32_t good = 0;
         for (int32_t i = 0; i < n; i++) good += m.decode(i, &rgb) ? 1 : 0;
         if (n > 0) {
             std::fprintf(stderr, "movie %s: %d of %d frames decoded\n", path, good, n);
             write_bmp(g_ui_outdir + "/movie.bmp", rgb, m.width(), m.height());
         }
-        return true;
     }
+    if (g_ui_unattended) return true;
     sound_enable_master(false);
     int32_t voice = snd ? platform::audio_play(snd, platform::VoiceParams{}) : 0;
     uint32_t start = platform::ticks_ms();
