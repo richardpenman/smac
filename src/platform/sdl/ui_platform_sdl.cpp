@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <string>
@@ -516,15 +517,22 @@ bool font_metrics(int32_t handle, FontMetrics* out) {
     return true;
 }
 
+static bool g_wine_extents = false;
+void font_set_wine_extents(bool on) { g_wine_extents = on; }
+
 int32_t font_text_width(int32_t handle, const char* text, int32_t len) {
     auto it = g_fonts.find(handle);
     if (it == g_fonts.end() || !text) return 0;
-    // GetTextExtentPoint32: the sum of the (hinted) advance widths. TTF_SizeText would also count
-    // the last glyph's ink beyond its advance.
+    // GetTextExtentPoint32: the sum of the (hinted) advance widths, of the instance that draws
+    // (font_render): a line is exactly as wide as measured, so text wrapped to a box stays in it.
+    // (The NORMAL-hinted "measure" instance, Wine's GetTextExtentPoint32, measures some lines
+    // narrower than they are drawn, and text overran its boxes; font_set_wine_extents keeps it for
+    // the pixel comparisons with the original under Wine.)
+    // TTF_SizeText would also count the last glyph's ink beyond its advance.
     int32_t w = 0;
     for (int32_t i = 0; i < len; i++) {
         int minx, maxx, miny, maxy, advance;
-        TTF_Font* m = it->second.measure ? it->second.measure : it->second.font;
+        TTF_Font* m = g_wine_extents && it->second.measure ? it->second.measure : it->second.font;
         if (TTF_GlyphMetrics(m, (uint8_t)text[i], &minx, &maxx, &miny, &maxy, &advance) == 0) w += advance;
     }
     return w;

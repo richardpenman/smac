@@ -82,6 +82,11 @@ void font_close(int32_t handle);
 bool font_metrics(int32_t handle, FontMetrics* out);
 // GetTextExtentPoint32 width of text.
 int32_t font_text_width(int32_t handle, const char* text, int32_t len);
+// Text extents as Wine's GetTextExtentPoint32 gives them to the original (the advances of the
+// normal hinting target, while its TextOut draws with mono hinting): only for pixel comparisons
+// with the original's dumps under Wine (smacx --dump / --basedump). Otherwise a text is measured
+// exactly as wide as it is drawn, as GDI does on Windows.
+void font_set_wine_extents(bool on);
 // Rasterises text without antialiasing (as GDI on an 8-bit DIB): mask is w*h bytes, 1 = ink.
 // The mask is one text cell high (tmHeight); x advances by the text extent.
 bool font_render(int32_t handle, const char* text, int32_t len, std::vector<uint8_t>* mask, int32_t* w, int32_t* h);

@@ -1,4 +1,6 @@
 // Text layout of the original UI's Buffer (see font_text.h).
+#include <cstdio>
+#include <cstdlib>
 #include "ui/font_text.h"
 
 #include <cstring>
@@ -36,11 +38,24 @@ bool is_markup(char c, bool links) {
     return c == '{' || c == '}' || c == '[' || c == ']' || c == '$' || (links && c == '=');
 }
 
+// SMACX_TEXTCHECK=1 (a test aid): the right edge of the box Buffer_write_strings wraps its text in
+// (-1: none); a run whose ink passes it is reported ("text beyond its box").
+int32_t g_box_right = -1;
+
 // TextOut (TA_BASELINE) of one run in a palette colour, transparent background.
 void text_out(Buffer* self, Font* font, int32_t x, int32_t baseline, const char* text, int32_t len, int32_t color) {
     std::vector<uint8_t> mask;
     int32_t w = 0, h = 0;
     if (!platform::font_render(font->handle, text, len, &mask, &w, &h)) return;
+    static const bool check = std::getenv("SMACX_TEXTCHECK") != nullptr;
+    if (check && g_box_right >= 0) {
+        int32_t ink = -1;  // the rightmost ink column
+        for (int32_t j = 0; j < h; j++)
+            for (int32_t i = w - 1; i > ink; i--)
+                if (mask[(size_t)j * w + i]) ink = i;
+        if (ink >= 0 && x + ink >= g_box_right)
+            std::fprintf(stderr, "text beyond its box: ink to %d, box right %d: %.*s\n", x + ink, g_box_right, len, text);
+    }
     int32_t top = baseline - font->ascent;
     const UiRect& c = self->clip;
     for (int32_t j = 0; j < h; j++) {
@@ -581,6 +596,10 @@ int32_t THISCALL Buffer_write_strings(Buffer* self, const TextLine* lines, int32
                                       int32_t w, int32_t) {
     if (!lines || count <= 0) return y;
     BufferText& bt = buffer_text(self);
+    struct BoxCheck {  // SMACX_TEXTCHECK: the box of this text
+        BoxCheck(int32_t right) { g_box_right = right; }
+        ~BoxCheck() { g_box_right = -1; }
+    } box_check(x + w);
     auto start = [&](const char* text, int32_t sy) {
         bt.indent = bt.hang;
         bt.lines = 0;

@@ -11,6 +11,8 @@ set -u
 # Animated by default (smacx --animate: slides, unit moves, booms, battle reports and movies play
 # with their waits, as in an interactive game); TEST_FAST=1 runs unattended (skips them).
 if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
+# Every wrapped text is checked against its box (SMACX_TEXTCHECK: ink right of the box is logged).
+export SMACX_TEXTCHECK=1
 # No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -83,5 +85,11 @@ for l in FACVIRUS1 DRONEINCITE1; do
 done
 grep -q "abort\|not reconstructed yet" "$OUT/late200.log" && { echo "FAIL late200 (abort)"; FAIL=1; }
 echo "late200 checked"
+
+# No wrapped text drawn beyond its box (a text measured narrower than drawn overran popups, the
+# new technology window's description, ...).
+if grep -l "text beyond its box" "$OUT"/*.log > /dev/null 2>&1; then
+    echo "FAIL text: drawn beyond its box ($(grep -h "text beyond its box" "$OUT"/*.log | head -1))"; FAIL=1
+else echo "PASS text: every wrapped text inside its box"; fi
 
 exit $FAIL

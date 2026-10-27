@@ -827,6 +827,9 @@ int main(int argc, char** argv) {
     load_vehicles();
     MapWin_compute_lighting_table();
     ui_screen_init(g_opt.width, g_opt.height);
+    // Dumps compared pixel by pixel with the original's under Wine: Wine's text extents.
+    if (!g_opt.dump.empty() || !g_opt.basedump.empty() || std::getenv("SMACX_WINE_TEXT_EXTENTS"))
+        platform::font_set_wine_extents(true);
     g_ui_outdir = g_opt.outdir;
     g_ui_exit_when_script_done = g_opt.exit_after_keys || g_opt.hidden;
     if (const char* e = std::getenv("SMACX_ANIMATE")) g_opt.animate |= std::atoi(e) != 0;
