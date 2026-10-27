@@ -22,7 +22,7 @@ NEW="--new size=0 --human 1 --seed 1,2"
 run() {  # run CASE ARGS... : log in OUT/CASE.log
     local name="$1"; shift
     mkdir -p "$OUT/$name"
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --original-bugs --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
 check() {  # check CASE DESCRIPTION REGEX: the log matches (grep -E)
@@ -461,7 +461,7 @@ fi
 #     section 13), so the menu column opens without its slide; the tests' ini keeps it on (case 20).
 if [ "$(uname)" = Linux ]; then
     rm -rf "$OUT/firstrun"; mkdir -p "$OUT/firstrun"
-    (cd "$ROOT" && XDG_DATA_HOME="$OUT/firstrun" SMACX_GAMEDIR="$ROOT/game" SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" \
+    (cd "$ROOT" && XDG_DATA_HOME="$OUT/firstrun" SMACX_GAMEDIR="$ROOT/game" SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --original-bugs \
         --hidden $NEW --keys "ENTER,A-m,ESC" > "$OUT/firstrun.log" 2>&1; echo "$?" > "$OUT/firstrun.rc")
     check firstrun "the seeded ini's preferences without 0x8000000" "^alphamenu show \\(sound [01], slide 0\\)"
     if grep -q "^Preferences=10110011111000011101110110110110" "$OUT/firstrun/smacx/Alpha Centauri.Ini"; then
@@ -475,7 +475,7 @@ if [ "$(uname)" = Linux ]; then
     sed -i "s/^Preferences=.*/Preferences=$on/" "$ini"
     for pass in 1 2; do
         (cd "$ROOT" && XDG_DATA_HOME="$OUT/firstrun" SMACX_GAMEDIR="$ROOT/game" SDL_VIDEODRIVER=dummy timeout 600 \
-            "$SMACX" --hidden $NEW --keys "ENTER" > "$OUT/migrate$pass.log" 2>&1)
+            "$SMACX" --original-bugs --hidden $NEW --keys "ENTER" > "$OUT/migrate$pass.log" 2>&1)
         grep "^Preferences=" "$ini" > "$OUT/migrate$pass.prefs"
         sed -i "s/^Preferences=.*/Preferences=$on/" "$ini"
     done

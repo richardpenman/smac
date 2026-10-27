@@ -92,6 +92,7 @@
 #include "engine/base.h"
 #include "engine/clock.h"
 #include "engine/compat.h"
+#include "engine/compat_reads.h"
 #include "engine/council.h"
 #include "engine/crt.h"
 #include "engine/design.h"
@@ -264,10 +265,12 @@ int32_t GAMEAPI aah_ooga(int32_t faction_id, int32_t faction_id_vs) {
         if (i == faction_id_vs) continue;
         // BUG(original): with faction_id_vs == -1 this reads the word before diplo_status
         // (last_base_turn).
-        COMPAT_ORIGINAL(out_of_range_reads);
+        // Fixed (compat out_of_range_reads): no faction (-1) has no pact.
         const uint32_t* status =
             reinterpret_cast<const uint32_t*>(&game().factions[i]) + offsetof(Faction, diplo_status) / 4;
-        if (faction_id_vs && (status[faction_id_vs] & DIPLO_PACT) && (GameRules & RULES_VICTORY_COOPERATIVE)) continue;
+        if (faction_id_vs && (faction_id_vs >= 0 || g_compat.out_of_range_reads) && (status[faction_id_vs] & DIPLO_PACT) &&
+            (GameRules & RULES_VICTORY_COOPERATIVE))
+            continue;
         int32_t tech_id = Proposal[1].preq_tech;
         if (!has_tech(tech_id, faction_id)) {
             if (tech_id < 0) continue;
@@ -326,9 +329,12 @@ int32_t GAMEAPI pact_withdraw(int32_t faction_id, int32_t faction_id_with) {
             if (veh_triad(veh_id) == TRIAD_SEA) {
                 // BUG(original): is_coast is given the location of the base whose id is this
                 // base's x coordinate, and this base's y coordinate as the radius flag.
-                COMPAT_ORIGINAL(is_coast_base_x);
-                const BASE& odd = game().bases[base.x];
-                if (!is_coast(odd.x, odd.y, base.y)) continue;
+                if (g_compat.is_coast_base_x) {
+                    const BASE& odd = game().bases[base.x];
+                    if (!is_coast(odd.x, odd.y, base.y)) continue;
+                } else if (!is_coast(base.x, base.y, 0)) {
+                    continue;
+                }
             }
             if (veh_triad(veh_id) == TRIAD_SEA && map_is_ocean(veh.x, veh.y) &&
                 !base_on_sea(i, map_tile(veh.x, veh.y)->region)) {
@@ -426,10 +432,8 @@ int32_t tile_veh_owner(const MAP* sq) {
     return f > 7 ? -1 : (int32_t)f;
 }
 // Vehs[veh_id].faction_id; veh_id -1 (no unit) reads Vehs[-1], which lies in the Reactor table.
-uint32_t veh_faction_or_oob(int32_t veh_id) {
-    return (uint32_t)veh_id < 2049 ? game().vehs[veh_id].faction_id
-                                   : rules_orig_byte(0x952828 + (uint32_t)veh_id * 0x34 + offsetof(VEH, faction_id));
-}
+// Fixed (compat out_of_range_reads): no vehicle is no faction's (0xFF).
+uint32_t veh_faction_or_oob(int32_t veh_id) { return compat_veh_faction(veh_id, 0xFF); }
 // strcat of label + the decimal number n (the original's "LABELn" popup names).
 void label_with_number(char* buffer, int32_t n) {
     char num[80];
@@ -709,9 +713,8 @@ void GAMEAPI scan_prototypes(int32_t faction_id, int32_t faction_id_with) {
             int32_t weap_v = weap_strat(v.weapon_id, faction_id);
             int32_t weap_u = weap_strat(u.weapon_id, faction_id);
             // BUG(original): the armor values are arm_strat of the weapon ids.
-            COMPAT_ORIGINAL(armor_from_weapon_ids);
-            int32_t arm_v = arm_strat(v.weapon_id, faction_id);
-            int32_t arm_u = arm_strat(u.weapon_id, faction_id);
+            int32_t arm_v = arm_strat(g_compat.armor_from_weapon_ids ? v.weapon_id : v.armor_id, faction_id);
+            int32_t arm_u = arm_strat(g_compat.armor_from_weapon_ids ? u.weapon_id : u.armor_id, faction_id);
             if (Chassis[v.chassis_id].speed >= Chassis[u.chassis_id].speed && weap_v >= weap_u && arm_v >= arm_u &&
                 (weap_v > weap_u || arm_v > arm_u)) {
                 unmatched = false;
@@ -861,7 +864,7 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
                 if (!map_in_bounds(nx, ny)) continue;
                 int32_t veh_id = stack_fix(veh_at(nx, ny));
                 // BUG(original): with no unit there (-1) the owner is read from Vehs[-1].
-                COMPAT_ORIGINAL(out_of_range_reads);
+                // (compat out_of_range_reads: fixed in veh_faction_or_oob.)
                 if (veh_faction_or_oob(veh_id) == (uint32_t)r) {
                     int32_t a = stack_check(veh_id, 2, 1, -1, -1);
                     int32_t c = stack_check(veh_id, 2, 0, -1, -1);
@@ -1030,9 +1033,9 @@ void GAMEAPI diplomacy_check(int32_t faction_id, int32_t faction_id_with, int32_
     if (!(R.diplo_status[p] & 0x60) && (!DiploGreatSatan || (R.diplo_status[p] & 0x4000000))) {
         energy_compute(p, 0);
         // BUG(original): divides by faction_id's ranking, which may be 0.
-        COMPAT_ORIGINAL(ranking_divide_zero);
+        const int32_t p_rank = g_compat.ranking_divide_zero || P.ranking ? P.ranking : 1;
         if (FactionCurrentNetIncome * 5 < DiploTributeDemand &&
-            (int32_t)((uint32_t)credits << 1) / 3 * R.ranking / P.ranking <= R.energy_credits) {
+            (int32_t)((uint32_t)credits << 1) / 3 * R.ranking / p_rank <= R.energy_credits) {
             DiploTributeDemand = FactionCurrentNetIncome * 5 / 25 * 25;
             if (DiploTributeDemand < 50) DiploTributeDemand = 50;
         }
@@ -1886,10 +1889,8 @@ void GAMEAPI introduce(int32_t faction_id, int32_t faction_id_with) {
 namespace {
 // TechOwners[tech_id]. BUG(original): callers pass technology ids that may be -1 or prototype
 // ids (97 + unit_id), past the 89 entries of the table; those bytes are read from the memory image.
-uint8_t tech_owners(int32_t tech_id) {
-    COMPAT_ORIGINAL(out_of_range_reads);
-    return (uint32_t)tech_id < 89 ? TechOwners[tech_id] : rules_orig_byte(0x9A6670 + (uint32_t)tech_id);
-}
+// Fixed (compat out_of_range_reads): such ids have no owner.
+uint8_t tech_owners(int32_t tech_id) { return compat_tech_owners(tech_id); }
 }  // namespace
 
 int32_t GAMEAPI buy_tech(int32_t faction_id, int32_t faction_id_with, int32_t offer, int32_t eager, int32_t mode) {
@@ -1972,8 +1973,7 @@ int32_t GAMEAPI energy_trade(int32_t faction_id, int32_t faction_id_with) {
             int32_t gift = clamp(credits / 8, 1, 500);
             gift = (gift + 24) / 25 * 25;
             // BUG(original): max instead of min: the whole treasury is given.
-            COMPAT_ORIGINAL(gift_whole_treasury);
-            if (gift < credits) gift = credits;
+            if (g_compat.gift_whole_treasury ? gift < credits : gift > credits) gift = credits;
             net_energy(r, -gift, f, gift, 1);
             StrBuffer[0] = 0;
             R.diplo_patience[f] += 2;
@@ -2479,9 +2479,9 @@ int32_t GAMEAPI propose_pact(int32_t faction_id, int32_t faction_id_with) {
                 parse_says(3, get_noun_phrase(r, 9), -1, -1);
                 if (DiploTradeWantTech2 >= 0) {
                     // BUG(original): the second technology's name is written and then discarded.
-                    COMPAT_ORIGINAL(trade_tech2_name_discarded);
                     StrBuffer[0] = 0;
                     say_tech_2(StrBuffer, DiploTradeWantTech2, 1);
+                    if (!g_compat.trade_tech2_name_discarded) parse_says(4, StrBuffer, -1, -1);  // $TECH4
                 }
                 StrBuffer[0] = 0;
                 crt_strcat(StrBuffer, "GIMMETECH");
@@ -2783,8 +2783,8 @@ int32_t GAMEAPI base_swap(int32_t faction_id, int32_t faction_id_with) {
         const Faction& P = game().factions[f];
         const Faction& R = game().factions[r];
         // BUG(original): divides by faction_id_with's ranking, which may be 0.
-        COMPAT_ORIGINAL(ranking_divide_zero);
-        int32_t price = (P.ranking + R.ranking) * ask / (R.ranking * 2);
+        const int32_t r_rank = g_compat.ranking_divide_zero || R.ranking ? R.ranking : 1;
+        int32_t price = (P.ranking + R.ranking) * ask / (r_rank * 2);
         if (FactionRankings[7] == f) price *= 2;
         if (DiploCounterProposal == 5 || DiploCounterProposal == 2) {
             if (price <= game().factions[f].energy_credits) {
@@ -2976,9 +2976,8 @@ void GAMEAPI make_gift(int32_t faction_id, int32_t faction_id_with) {
     if (!std::strcmp(game().mfactions[f].filename, "BELIEVE")) large = true;
     diplo_lock(0);  // inlined in the original
     diplomacy_caption(f, r);
-    // BUG(original): the label with the suffix is built in a local buffer that is never used; the
-    // popup shows plain BASEGIFT.
-    COMPAT_ORIGINAL(basegift_label_unused);
+    // BUG(original), compat basegift_label_unused: the label with the suffix is built in a local
+    // buffer that is never used; the popup shows plain BASEGIFT.
     char label[80];
     label[0] = 0;
     crt_strcat(label, "BASEGIFT");
@@ -2995,7 +2994,7 @@ void GAMEAPI make_gift(int32_t faction_id, int32_t faction_id_with) {
     net_cede_base(DiploBidBaseSwapID, r, 1);
     diplo_unlock();  // inlined in the original
     game().factions[r].diplo_patience[f] += -2 - (large ? 1 : 0);
-    X_pops_11("BASEGIFT", 0x100000, portrait, kPopWait);
+    X_pops_11(g_compat.basegift_label_unused ? "BASEGIFT" : label, 0x100000, portrait, kPopWait);
 }
 
 // ---- the human asks faction_id_with to end a vendetta -------------------------------------------
@@ -3187,9 +3186,14 @@ int32_t GAMEAPI propose_attack(int32_t faction_id, int32_t faction_id_with) {
             v3 *= 2;
         } else if (!std::strcmp(filename, "PEACE")) {
             // BUG(original): the partial sums all take 1.5 times the scaled total.
-            COMPAT_ORIGINAL(peace_partial_sums);
             v4 = v4 * 3 / 2;
-            v1 = v2 = v3 = v4 * 3 / 2;
+            if (g_compat.peace_partial_sums) {
+                v1 = v2 = v3 = v4 * 3 / 2;
+            } else {
+                v1 = v1 * 3 / 2;
+                v2 = v2 * 3 / 2;
+                v3 = v3 * 3 / 2;
+            }
         } else if (!std::strcmp(filename, "MORGAN")) {
             v4 /= 2;
             v1 /= 2;
@@ -3438,14 +3442,16 @@ void GAMEAPI buy_council_vote(int32_t faction_id, int32_t faction_id_with, int32
         say_leader(2, f);
         // BUG(original): with a YEA/NAY/ABSTAIN vote (candidate < 0) the candidate's leader is
         // read from before MFactions (memory image).
-        COMPAT_ORIGINAL(out_of_range_reads);
-        const MFaction& c = *reinterpret_cast<const MFaction*>(mem::host(0x946A50 + (uint32_t)candidate * 0x59C));
-        PluralDefault = 0;
-        GenderDefault = c.is_leader_female;
-        parse_says(6, c.title_leader, -1, -1);
-        GenderDefault = c.is_leader_female;
-        PluralDefault = 0;
-        parse_says(8, c.name_leader, -1, -1);
+        // Fixed (compat out_of_range_reads): a vote names no candidate.
+        if (candidate >= 0 || g_compat.out_of_range_reads) {
+            const MFaction& c = *reinterpret_cast<const MFaction*>(mem::host(0x946A50 + (uint32_t)candidate * 0x59C));
+            PluralDefault = 0;
+            GenderDefault = c.is_leader_female;
+            parse_says(6, c.title_leader, -1, -1);
+            GenderDefault = c.is_leader_female;
+            PluralDefault = 0;
+            parse_says(8, c.name_leader, -1, -1);
+        }
         parse_num(0, price);
         if (DiploTradeWantTech1 >= 0) {
             parse_say(0, Tech[DiploTradeWantTech1].name, -1, -1);

@@ -46,8 +46,7 @@ int32_t GAMEAPI encrypt_write(const void* buf, uint32_t size, uint32_t count, Cr
         uint8_t first = *src++;
         // BUG(original): compares the pair index with the byte count, so an odd-sized buffer has
         // one byte past its end read as the padding byte (all callers use even sizes).
-        COMPAT_ORIGINAL(encrypt_odd_size);
-        uint8_t second = i < n ? *src++ : 0;
+        uint8_t second = (g_compat.encrypt_odd_size ? i < n : i * 2 + 1 < n) ? *src++ : 0;
         if (first && (uint8_t)(first ^ key1)) first ^= key1;
         if (second && (uint8_t)(second ^ key2)) second ^= key2;
         *dst++ = second;
@@ -161,9 +160,13 @@ static void convert_faction_v10(Faction* faction, const uint8_t* src) {
     std::memcpy(dst, src, 0x20BC);
     // BUG(original): of the 8 old facility_announced bytes only 5 are kept and bytes 5-8 cleared;
     // bytes 9-11 keep what the first copy put there (the old clean_minerals_modifier's high bytes).
-    COMPAT_ORIGINAL(faction_convert_facility_bytes);
-    std::memcpy(dst + 0x458, src + 0x458, 5);
-    std::memset(dst + 0x45D, 0, 4);
+    if (g_compat.faction_convert_facility_bytes) {
+        std::memcpy(dst + 0x458, src + 0x458, 5);
+        std::memset(dst + 0x45D, 0, 4);
+    } else {  // fixed: all 8 bytes, the 4 new ones cleared
+        std::memcpy(dst + 0x458, src + 0x458, 8);
+        std::memset(dst + 0x460, 0, 4);
+    }
     std::memcpy(dst + offsetof(Faction, clean_minerals_modifier), src + 0x460, 0x205C - 0x464);
     std::memcpy(faction->secret_project_intel, src + 0x2058, 5 * 4);
     for (int32_t i = 5; i < 8; i++) faction->secret_project_intel[i] = 0;
@@ -210,10 +213,15 @@ static void convert_base_v10(BASE* base, const uint8_t* src) {
     // BUG(original): as for factions, 5 of the 8 facility bytes are kept, bytes 5-8 cleared and
     // bytes 9-11 keep the old mineral_surplus_final's high bytes; pad_5 is not copied either and
     // keeps the old talent_total's high half.
-    COMPAT_ORIGINAL(base_convert_facility_bytes);
-    std::memcpy(dst + 0x8C, src + 0x8C, 5);
-    std::memset(dst + 0x91, 0, 4);
+    if (g_compat.base_convert_facility_bytes) {
+        std::memcpy(dst + 0x8C, src + 0x8C, 5);
+        std::memset(dst + 0x91, 0, 4);
+    } else {  // fixed: all 8 bytes, the 4 new ones cleared
+        std::memcpy(dst + 0x8C, src + 0x8C, 8);
+        std::memset(dst + 0x94, 0, 4);
+    }
     std::memcpy(dst + 0x98, src + 0x94, 0x116 - 0x98);
+    if (!g_compat.base_convert_facility_bytes) std::memset(dst + 0x116, 0, 2);  // fixed: pad_5 cleared
     std::memcpy(dst + 0x118, src + 0x114, 0x134 - 0x118);
     for (int32_t i = 0; i < 10; i++) {
         if (base->queue_items[i] < -0x21) base->queue_items[i] -= 0x1F;  // facility ids moved up
@@ -234,8 +242,7 @@ static int32_t save_io_stringlist(uint8_t* list, int32_t write, CrtFile* file) {
             if (!crt_fread(&id, 4, 1, file)) return 1;
             if (!crt_fread(&len, 4, 1, file)) return 1;
             // BUG(original): fread of an empty text returns 0 and fails the load.
-            COMPAT_ORIGINAL(empty_text_fails_load);
-            if (!crt_fread(StrBuffer, (uint32_t)len, 1, file)) return 1;
+            if ((len || g_compat.empty_text_fails_load) && !crt_fread(StrBuffer, (uint32_t)len, 1, file)) return 1;
             StrBuffer[len] = 0;
             ui_stringlist_add(list, id, StrBuffer);
         }
@@ -262,16 +269,22 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
     // stack buffer (BUG(original): the file gets 0x31C bytes of stack contents, and a version
     // field below 11 there would even be copied into the preferences when saving). The
     // reconstruction writes zeros with SaveFileVersion = 12, which the original reads as a
-    // current savegame.
-    COMPAT_ORIGINAL(legacy_prefs_uninit);
+    // current savegame, in both settings (compat legacy_prefs_uninit), plus smacx's mark (save.h).
     LegacyGamePrefs legacy;
     std::memset(&legacy, 0, sizeof(legacy));
     legacy.SaveFileVersion = kSaveFileVersion;
+    // smacx's mark and setting (save.h), in bytes the original never reads in a current savegame.
+    uint32_t mark[2] = {kSmacxSaveMark, g_original_bugs ? 1u : 0u};
+    if (write) std::memcpy(&legacy, mark, sizeof(mark));
     SaveFileWrite = write;
     SaveFileEncrypt = 0;
     SaveFileStatus = 0;
     if (!(write ? crt_fwrite(&legacy, sizeof(legacy), 1, file) : crt_fread(&legacy, sizeof(legacy), 1, file))) {
         return 1;
+    }
+    if (!write) {
+        std::memcpy(mark, &legacy, sizeof(mark));
+        g_save_original_bugs = legacy.SaveFileVersion >= 0xB && mark[0] == kSmacxSaveMark ? (int32_t)(mark[1] & 1) : -1;
     }
     if (legacy.SaveFileVersion < 0xB) {
         std::memcpy(&cs, &legacy, sizeof(legacy));
@@ -408,7 +421,8 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
         for (int32_t i = 0; i < game().veh_count; i++)
             game().vehs[i].unit_id = (int16_t)convert_unit_id_v2(game().vehs[i].unit_id);
         for (int32_t i = 0; i < game().base_count; i++) {
-            // BUG(original): items 0..queue_size (one more than the queue holds) are converted.
+            // BUG(original)? items 0..queue_size are converted, which is the whole queue (compat
+            // queue_scan_one_past, not a bug: not fixed).
             COMPAT_ORIGINAL(queue_scan_one_past);
             int32_t* queue = &game().bases[i].queue_size;
             for (int32_t k = 0; k <= queue[0]; k++) {
@@ -496,11 +510,41 @@ int32_t GAMEAPI map_data(CrtFile* file, int32_t write, int32_t is_save) {
     // BUG(original): for savegames the blocks are read with the layout of an old format that had
     // no leading legacy preferences block, so a current savegame's map is read from the wrong
     // offset. When writing (never done with is_save) the buffers would be uninitialised.
-    COMPAT_ORIGINAL(map_data_save_layout);
     static uint8_t prefs[0x398], factions[0x10660], mfactions[0x2CE0], rankings[0x20];
     SaveFileWrite = write;
     SaveFileEncrypt = 0;
-    if (is_save) {
+    if (is_save && !write && !g_compat.map_data_save_layout) {
+        // Fixed: the blocks before the map skipped as game_data lays them out.
+        LegacyGamePrefs legacy;
+        if (!crt_fread(&legacy, sizeof(legacy), 1, file)) return 1;
+        const int32_t version = legacy.SaveFileVersion;
+        const uint8_t* cs_block = reinterpret_cast<const uint8_t*>(&legacy);
+        if (version >= 0xB) {
+            if (!crt_fread(prefs, sizeof(prefs), 1, file)) return 1;
+            cs_block = prefs;
+        }
+        uint32_t state;
+        std::memcpy(&state, cs_block + offsetof(GamePrefs, GameState), 4);
+        SaveFileEncrypt = version >= 4 ? state & 0x10000000 : 0;
+        if (SaveFileEncrypt) {
+            static uint8_t skip[0xCE0];
+            if (!save_io(prefs, 0x398, file) || !save_io(skip, 0xCE0, file) || !save_io(skip, 4, file) ||
+                !save_io(skip, 0xC0, file))
+                return 1;
+        }
+        int32_t player;
+        if (!save_io(&player, 4, file)) return 1;
+        uint32_t faction_bytes = version < 3    ? (uint32_t)sizeof(LegacyFactionV2) * 8
+                                 : version < 0xB ? (uint32_t)sizeof(LegacyFactionV10) * 8
+                                                 : 0x10660u;
+        if (faction_bytes > sizeof(factions)) return 1;
+        if (!save_io(factions, faction_bytes, file)) return 1;
+        if (!save_io(mfactions, sizeof(mfactions), file)) return 1;
+        if (!save_io(rankings, sizeof(rankings), file)) return 1;
+        SaveFileEncrypt = 0;
+        return map_read(file) != 0;
+    }
+    if (is_save) {  // (compat map_data_save_layout: the original's layout)
         if (!(write ? crt_fwrite(prefs, sizeof(prefs), 1, file) : crt_fread(prefs, sizeof(prefs), 1, file))) return 1;
         if (!save_io(&write, 4, file)) return 1;  // the player faction, read over the argument
         int32_t version = reinterpret_cast<GamePrefs*>(prefs)->SaveFileVersion;
@@ -644,6 +688,14 @@ int32_t GAMEAPI load_daemon(const char* filename, int32_t relinearize) {
                 } else {
                     PbemActive = 0;
                 }
+                // smacx: a hotseat, PBEM or online game plays with the setting it was saved with
+                // (save.h), unless the setting was forced (--original-bugs, the hybrid build).
+                if ((PbemActive || MultiplayerActive) && g_save_original_bugs >= 0 && !g_original_bugs_forced &&
+                    (g_save_original_bugs != 0) != g_original_bugs) {
+                    compat_set_original_bugs(g_save_original_bugs != 0);
+                    std::fprintf(stderr, "smacx: this game plays with %s (the save's setting)\n",
+                                 g_original_bugs ? "the original bugs" : "the fixes");
+                }
                 GameDrawState |= 4;
             } else if (SaveFileStatus) {
                 crt_fclose(file);
@@ -674,8 +726,8 @@ int32_t GAMEAPI save_map_daemon(const char* filename) {
             if (!map_data(file, 1, 0)) result = 0;
         }
     }
-    COMPAT_ORIGINAL(fclose_null_file);
-    crt_fclose(file);  // BUG(original): also called when the file could not be created
+    // BUG(original): also called when the file could not be created.
+    if (file || g_compat.fclose_null_file) crt_fclose(file);
     if (result) crt_remove(path);
     return result;
 }
@@ -773,17 +825,22 @@ void GAMEAPI auto_save() {
 }
 
 // The undo files are named without extension, while save_daemon appends ".SAV": loading,
-// deleting and rotating them only works on files of that exact name (BUG(original)).
+// deleting and rotating them only works on files of that exact name (BUG(original), compat
+// undo_name_extension).
 static const char kUndoName[] = "saves\\auto\\Scenario Editor Undo ";
+// Fixed (compat undo_name_extension): the names the undo files really have.
+static void undo_extension(char* name) {
+    if (!g_compat.undo_name_extension) crt_strcat(name, ".SAV");
+}
 
 void GAMEAPI load_undo(int32_t direction) {
-    COMPAT_ORIGINAL(undo_name_extension);
     char digits[80];
     if (direction < 0 && UndoIndex > 1) UndoIndex--;
     StrBuffer[0] = 0;
     crt_strcat(StrBuffer, kUndoName);
     crt_itoa(UndoIndex, digits, 10);
     crt_strcat(StrBuffer, digits);
+    undo_extension(StrBuffer);
     if (direction > 0 && UndoIndex < 9) UndoIndex++;
     load_daemon(StrBuffer, 0);
 }
@@ -795,6 +852,7 @@ void GAMEAPI wipe_undo() {
         crt_strcat(StrBuffer, kUndoName);
         crt_itoa(i, digits, 10);
         crt_strcat(StrBuffer, digits);
+        undo_extension(StrBuffer);
         crt_remove(StrBuffer);
     }
 }
@@ -809,13 +867,14 @@ void GAMEAPI auto_undo() {
         crt_strcat(name, kUndoName);
         crt_itoa(i, digits, 10);
         crt_strcat(name, digits);
+        undo_extension(name);
         if (!crt_strlen(prev)) {
             crt_remove(name);
         } else {
             // BUG(original): renames the previous (higher, already moved) slot onto this one, so
-            // the slots do not rotate.
-            COMPAT_ORIGINAL(undo_rotation);
-            crt_rename(prev, name);
+            // the slots do not rotate. Fixed: this slot moves up to the previous one.
+            if (g_compat.undo_rotation) crt_rename(prev, name);
+            else crt_rename(name, prev);
         }
         crt_strcpy(prev, name);
     }

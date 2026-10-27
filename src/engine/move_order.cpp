@@ -778,8 +778,9 @@ Step OrderVeh::attack() {
     fought = 1;
     goody = 0;
     // BUG(original): the post-move code reads visible ([ebp-0x24]), which still holds the target's
-    // stack offset here (stack residue #5).
-    COMPAT_ORIGINAL(residue.order_veh_visible);
+    // stack offset here (stack residue #5). Fixed (compat residue.order_veh_visible): whether the
+    // viewer sees the unit, as for a move.
+    if (!g_compat.residue.order_veh_visible) move_shown(CurrentPlayerFaction);
     return Step::after_move;
 }
 
@@ -1549,8 +1550,7 @@ Step OrderVeh::no_direction() {
             for (int32_t v = veh_id < 0 ? -1 : top_of(veh_id); v >= 0 && !carried;
                  v = game().vehs[v].next_veh_id_stack) {
                 // BUG(original): tests the moving unit's abilities, not those of the stack member.
-                COMPAT_ORIGINAL(carried_ability_mover);
-                if (has_abil(game().vehs[veh_id].unit_id, 0x80)) carried = true;
+                if (has_abil(game().vehs[g_compat.carried_ability_mover ? veh_id : v].unit_id, 0x80)) carried = true;
                 else if (veh_unit(v).plan == 10 && veh_chassis_triad(v) == 2) carried = true;
             }
             if (!carried && moves_left(veh_id) > 0 &&
@@ -1568,8 +1568,9 @@ Step OrderVeh::no_direction() {
     veh_skip(veh_id);
     game().vehs[veh_id].state &= ~0x40u;
     // BUG(original): the post-move code reads visible ([ebp-0x24]), never set on this path (0 here,
-    // the original's slot is unset), and scroll, which holds delayed (stack residue #5).
-    COMPAT_ORIGINAL(residue.order_veh_visible);
+    // the original's slot is unset), and scroll, which holds delayed (stack residue #5). Fixed
+    // (compat residue.order_veh_visible): whether the viewer sees the unit, as for a move.
+    if (!g_compat.residue.order_veh_visible) move_shown(CurrentPlayerFaction);
     return Step::after_move;
 }
 

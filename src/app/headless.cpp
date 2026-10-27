@@ -3,8 +3,11 @@
 // Executes the same command scripts as the oracle (harness/oracle/oracle.cpp) and writes snapshots
 // in the same format, so harness/compare.py can diff the two. Usage:
 //
-//   smacx_headless <script.cmd> [--outdir DIR] [--gamedir DIR] [--image FILE]
+//   smacx_headless <script.cmd> [--outdir DIR] [--gamedir DIR] [--image FILE] [--original-bugs]
 //
+// --original-bugs plays with the original's bugs (engine/compat.h), as the comparisons with the
+// original need (harness/verify.sh and the gate pass it); without it the game plays with the
+// fixes (the gate's fixes step).
 // --gamedir is the original game's data directory (default: game); the runner chdirs into it.
 // The game runs as in the original: control_game (0x52AA30) boots and calls the script in place of
 // the main menu (top_menu).
@@ -28,6 +31,7 @@
 #include "engine/tech.h"
 #include "engine/veh.h"
 #include "engine/clock.h"
+#include "engine/compat.h"
 #include "engine/game.h"
 #include "engine/map.h"
 #include "engine/memmap.h"
@@ -439,19 +443,24 @@ static int32_t harness_turn_upkeep() {
 int main(int argc, char** argv) {
     std::string script, gamedir = "game", image = "src/data/data_image.bin";
     std::string ini = "harness/oracle/runtime/Alpha Centauri.Ini";
+    bool original_bugs = false;
     for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
         if (a == "--outdir" && i + 1 < argc) g_outdir = argv[++i];
         else if (a == "--gamedir" && i + 1 < argc) gamedir = argv[++i];
         else if (a == "--image" && i + 1 < argc) image = argv[++i];
         else if (a == "--ini" && i + 1 < argc) ini = argv[++i];
+        else if (a == "--original-bugs") original_bugs = true;
         else script = a;
     }
     if (script.empty()) {
         std::fprintf(stderr,
-                     "usage: smacx_headless <script.cmd> [--outdir DIR] [--gamedir DIR] [--image FILE] [--ini FILE]\n");
+                     "usage: smacx_headless <script.cmd> [--outdir DIR] [--gamedir DIR] [--image FILE] [--ini FILE]\n"
+                     "                      [--original-bugs]\n");
         return 2;
     }
+    compat_set_original_bugs(original_bugs);
+    g_original_bugs_forced = original_bugs;
     g_outdir = fs::absolute(g_outdir).string();
     script = fs::absolute(script).string();
     if (!mem::init(fs::absolute(image).string().c_str())) {

@@ -26,6 +26,20 @@ void GAMEAPI mem_free(void* ptr) { std::free(ptr); }
 #include "engine/strings.h"
 #include "platform/win32.h"
 
+#include <unordered_map>
+
+// The fixed heap (compat heap_realloc_moves): a growable heap is allocated with room to grow in
+// place (kHeapReserve more bytes than asked), so the blocks it handed out stay valid. The original's
+// sizes are kept (base_size, free_size): Strings_get's range test sees the same heap. Capacities of
+// such heaps, by heap.
+namespace {
+constexpr int32_t kHeapReserve = 0x100000;
+std::unordered_map<const Heap*, int32_t>& heap_capacity() {
+    static std::unordered_map<const Heap*, int32_t> capacity;
+    return capacity;
+}
+}  // namespace
+
 Heap* THISCALL Heap_ctor(Heap* self) {
     self->flags = 0;
     self->next = nullptr;
@@ -36,6 +50,7 @@ Heap* THISCALL Heap_ctor(Heap* self) {
 }
 
 void THISCALL Heap_free(Heap* self) {
+    heap_capacity().erase(self);
     if (self->base) {
         mem_free(self->base);
         self->base = nullptr;
@@ -50,6 +65,13 @@ void THISCALL Heap_free(Heap* self) {
 void THISCALL Heap_shutdown(Heap* self) { Heap_free(self); }
 
 void THISCALL Heap_squeeze(Heap* self, int32_t unused) {
+    // BUG(original): the shrunk buffer may move, as Heap_get's (compat heap_realloc_moves). Fixed:
+    // the buffer stays where it is; only the sizes shrink.
+    if (!g_compat.heap_realloc_moves && heap_capacity().count(self)) {
+        self->base_size -= self->free_size;
+        self->free_size = 0;
+        return;
+    }
     uint8_t* p = (uint8_t*)crt_realloc(self->base, (uint32_t)(self->base_size - self->free_size));
     if (p) {
         self->base = p;
@@ -68,7 +90,13 @@ int32_t THISCALL Heap_init(Heap* self, int32_t size) {
         self->free_size = 0;
         self->base_size = 0;
     }
-    self->base = (uint8_t*)mem_get((uint32_t)size);
+    heap_capacity().erase(self);
+    if (!g_compat.heap_realloc_moves && !(self->flags & 1)) {
+        self->base = (uint8_t*)mem_get((uint32_t)(size + kHeapReserve));
+        if (self->base) heap_capacity()[self] = size + kHeapReserve;
+    } else {
+        self->base = (uint8_t*)mem_get((uint32_t)size);
+    }
     if (!self->base) return 1;
     self->free_size = size;
     self->base_size = size;
@@ -81,8 +109,14 @@ void* THISCALL Heap_get(Heap* self, int32_t size) {
         if (self->flags & 1) return nullptr;
         // BUG(original): blocks handed out earlier keep pointing into the old buffer if realloc
         // moves it.
-        COMPAT_ORIGINAL(heap_realloc_moves);
+        auto cap = heap_capacity().find(self);
+        if (!g_compat.heap_realloc_moves && cap != heap_capacity().end() && self->base_size + 0x400 <= cap->second) {
+            self->base_size += 0x400;  // fixed: grown in place, within the reserved room
+            self->free_size += 0x400;
+            continue;
+        }
         uint8_t* p = (uint8_t*)crt_realloc(self->base, (uint32_t)(self->base_size + 0x400));
+        if (cap != heap_capacity().end()) heap_capacity().erase(cap);  // (past the reserve: as the original)
         if (!p) {
             char num[80];
             StrBuffer[0] = 0;

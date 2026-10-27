@@ -829,8 +829,10 @@ int32_t GAMEAPI proposal_menu(int32_t f, int32_t fw) {
         if (DiploProposalFaction < 0) goto none;
         // BUG(original): the loop's counter (8) is used as the faction: diplo_status[8] of
         // faction_id_with is its diplo_agenda[0].
-        COMPAT_ORIGINAL(diplo_agenda_loop_counter);
-        if (Factions[fw].diplo_agenda[0] & 0x10) {
+        // Fixed: whether faction_id_with is already at war with the faction to attack.
+        if ((g_compat.diplo_agenda_loop_counter ? Factions[fw].diplo_agenda[0]
+                                                : Factions[fw].diplo_status[DiploProposalFaction & 7]) &
+            0x10) {
             int32_t p = DiploProposalFaction;
             PluralDefault = 0;
             GenderDefault = MFactions[p].is_leader_female;

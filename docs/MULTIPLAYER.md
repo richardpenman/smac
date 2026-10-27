@@ -4,7 +4,11 @@ Plan for multiplayer in smacx: hotseat, then play-by-email (PBEM), then online p
 copies over TCP. Single-player behaviour does not change: every path below is taken only with
 `PbemActive` or `MultiplayerActive` set, and the differential harness (`harness/verify.sh`) and
 the scripted suites keep passing at each step. User decisions: smacx to smacx only (no DirectPlay
-compatibility with the original); the original's bugs are replicated (COMPAT flags on).
+compatibility with the original). The original's bugs: every player must play with the same
+setting (engine/compat.h, docs/COMPAT.md). A hotseat or PBEM save carries it (smacx's mark in the
+save's legacy preferences block, engine/save.h) and a loaded hotseat/PBEM game plays with the
+save's setting; in an online game the host sends its setting before the rules and the game
+(message 0x0F10, `net_send_original_bugs`), and every client plays with it.
 
 ## How the original is structured
 

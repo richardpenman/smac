@@ -116,8 +116,8 @@ char* GAMEAPI tech_name_2(int32_t tech_id, int32_t with_category) {
 int32_t GAMEAPI has_tech(int32_t tech_id, int32_t faction_id) {
     if (faction_id <= 0) return 0;
     if (tech_id == -1) return 1;
-    COMPAT_ORIGINAL(last_tech_never_counts);
-    if (tech_id < 0 || tech_id >= 88) return 0;  // BUG(original): the last tech (88) never counts
+    // BUG(original): the last tech (88) never counts.
+    if (tech_id < 0 || tech_id >= (g_compat.last_tech_never_counts ? 88 : 89)) return 0;
     if (Tech[tech_id].preq_tech1 < -1) return 0;
     if (Tech[tech_id].preq_tech2 < -1 && Tech[tech_id].preq_tech1 != -1) return 0;
     return (TechOwners[tech_id] & (uint8_t)(1u << (faction_id & 31))) != 0;

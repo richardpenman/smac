@@ -26,7 +26,7 @@ run() {  # run CASE ARGS... : runs smacx, log in OUT/CASE.log
     local name="$1"; shift
     mkdir -p "$OUT/$name"
     rm -f "$OUT/$name"/*.bmp
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy SMACX_POPUP_SHOTS="$OUT/$name" timeout 600 "$SMACX" --hidden \
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy SMACX_POPUP_SHOTS="$OUT/$name" timeout 600 "$SMACX" --original-bugs --hidden \
         --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
 }
 

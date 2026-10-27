@@ -354,8 +354,7 @@ int32_t GAMEAPI action_terraform(int32_t veh_id, int32_t terraform_id, int32_t i
             NetMsg_pop(&NetMsg, faction_id == CurrentPlayerFaction ? "TERRAMINE" : "TERRAYOURS", 5000, 0, nullptr);
         }
         // BUG(original): tests the viewer's entry but names the base of faction_id's entry.
-        COMPAT_ORIGINAL(drown_base_entry);
-        if (MapBaseIdClosestSubmergedVeh[CurrentPlayerFaction] >= 0) {
+        if (MapBaseIdClosestSubmergedVeh[g_compat.drown_base_entry ? CurrentPlayerFaction : faction_id] >= 0) {
             parse_says(0, game().bases[MapBaseIdClosestSubmergedVeh[faction_id]].name, -1, -1);
             parse_says(1, game().mfactions[faction_id].adj_name_faction, -1, -1);
             NetMsg_pop(&NetMsg, faction_id == CurrentPlayerFaction ? "DROWNMINE" : "DROWNYOURS", 5000, 0, nullptr);
@@ -1200,9 +1199,9 @@ int32_t GAMEAPI valid_patrol(int32_t veh_id, int32_t x, int32_t y) {
     if (triad != 2) return 1;
     if (!Chassis[Units[v.unit_id].chassis_id].range) return 1;
     // BUG(original): compares base_at() with 0 (base id 0 counts as no base, no base as a base).
-    COMPAT_ORIGINAL(base_at_zero_test);
-    bool from_base = base_at(v.x, v.y) != 0 || (map_tile(v.x, v.y)->items & BIT_AIRBASE);
-    bool to_base = base_at(x, y) != 0 || (map_tile(x, y)->items & BIT_AIRBASE);
+    auto is_base = [](int32_t base_id) { return g_compat.base_at_zero_test ? base_id != 0 : base_id >= 0; };
+    bool from_base = is_base(base_at(v.x, v.y)) || (map_tile(v.x, v.y)->items & BIT_AIRBASE);
+    bool to_base = is_base(base_at(x, y)) || (map_tile(x, y)->items & BIT_AIRBASE);
     int32_t left = moves_left(veh_id);
     int32_t reach = (speed(veh_id, 0) * ((Chassis[Units[v.unit_id].chassis_id].range - v.movement_turns) - 1) + left) /
                     Rules.move_rate_roads;
@@ -1412,15 +1411,15 @@ void GAMEAPI action_tectonic(int32_t veh_id, int32_t x, int32_t y) {
     world_climate();
     draw_map(1);
     // BUG(original): Vehs[veh_id] was removed by kill(); these read the next vehicle's faction.
-    COMPAT_ORIGINAL(read_after_kill);
+    const int32_t owner_after = g_compat.read_after_kill ? (int32_t)game().vehs[veh_id].faction_id : faction_id;
     if (focused) {
         parse_says(0, game().bases[base_id].name, -1, -1);
-        set_leader_title(1, game().vehs[veh_id].faction_id);
-        set_leader_name(2, game().vehs[veh_id].faction_id);
-        set_faction_noun(3, game().vehs[veh_id].faction_id);
+        set_leader_title(1, owner_after);
+        set_leader_name(2, owner_after);
+        set_faction_noun(3, owner_after);
         popp(ScriptFileName, "TECMOFIED", 0, "tectonic_sm.pcx", 0);
     }
-    TectonicDetonationCount[game().vehs[veh_id].faction_id]++;
+    TectonicDetonationCount[owner_after]++;
     GameDrawState |= 4;
 }
 
@@ -1444,6 +1443,7 @@ void GAMEAPI action_fungal(int32_t veh_id, int32_t x, int32_t y) {
     int32_t base_id = base_find(x, y);
     int32_t radius = TableRange[1];
     FX_play_loc(&Sounds, 0x54, game().vehs[veh_id].x, game().vehs[veh_id].y);
+    const int32_t own_reactor = Units[game().vehs[veh_id].unit_id].reactor_id;  // (read before the kill)
     kill(veh_id);
     if (faction_id != CurrentPlayerFaction && base_id >= 0) {
         set_leader_title(0, faction_id);
@@ -1470,8 +1470,7 @@ void GAMEAPI action_fungal(int32_t veh_id, int32_t x, int32_t y) {
     if (shot) return;
     // BUG(original): Vehs[veh_id] was removed by kill(); the reactor and faction read below are the
     // next vehicle's.
-    COMPAT_ORIGINAL(read_after_kill);
-    int32_t count = Units[game().vehs[veh_id].unit_id].reactor_id * 2;
+    int32_t count = (g_compat.read_after_kill ? Units[game().vehs[veh_id].unit_id].reactor_id : own_reactor) * 2;
     for (int32_t i = 0; i < count; i++) {
         int32_t k = 0;
         if (i != 0) k = game_rand() % 8 + 1;
@@ -1481,7 +1480,7 @@ void GAMEAPI action_fungal(int32_t veh_id, int32_t x, int32_t y) {
         if (game_rand() % 2 != 0 && tile_veh_owner(map_tile(tx, ty)) == -1) veh_init(BSC_MIND_WORMS, 0, tx, ty);
         MAP* sq = map_tile(tx, ty);
         if ((sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40) continue;
-        int32_t f = game().vehs[veh_id].faction_id;
+        int32_t f = g_compat.read_after_kill ? (int32_t)game().vehs[veh_id].faction_id : faction_id;
         if (f != CurrentPlayerFaction &&
             ((game().factions[CurrentPlayerFaction].player_flags & PFLAG_MAP_REVEALED) ||
              (sq->visibility & (uint8_t)(1 << (CurrentPlayerFaction & 31)))) &&

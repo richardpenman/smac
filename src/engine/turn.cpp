@@ -246,7 +246,6 @@ void base_event(int32_t base_id, uint32_t flag, const char* label, const char* p
 // Kelp farms / tidal platforms of a sea base destroyed (random events 20 and 21).
 // BUG(original): requires an ocean tile that is also land, so it never happens.
 void sea_wipe(int32_t base_id, uint32_t item, const char* label) {
-    COMPAT_ORIGINAL(sea_wipe_never);
     const BASE& base = game().bases[base_id];
     int32_t faction_id = (uint8_t)base.faction_id;
     bool shown = false;
@@ -256,7 +255,8 @@ void sea_wipe(int32_t base_id, uint32_t item, const char* label) {
         if (!map_in_bounds(x, y)) continue;
         MAP* sq = map_tile(x, y);
         if ((sq->climate & 0xE0) >= 0x60 || !(sq->items & item) || !tile_known(faction_id, sq)) continue;
-        if (!tile_claimable(faction_id, x, y) || (sq->climate & 0xE0) < 0x60) continue;
+        // (compat sea_wipe_never: fixed, an ocean tile is enough.)
+        if (!tile_claimable(faction_id, x, y) || (g_compat.sea_wipe_never && (sq->climate & 0xE0) < 0x60)) continue;
         if (event_base_seen(faction_id, base)) {
             if (!shown) {
                 Console_focus(&MainConsole, base.x, base.y, CurrentPlayerFaction);
@@ -335,10 +335,9 @@ void RandomEvent::plague() {
     parse_num(1, radius);
     // shown: 1 + the last affected base the viewer sees (BUG(original): 1, i.e. base 0, when
     // only the event base's visibility counts).
-    COMPAT_ORIGINAL(event_shown_base_0);
     int32_t shown = 0;
     if (base.faction_id == CurrentPlayerFaction || (base.visibility & (uint8_t)(1 << (CurrentPlayerFaction & 31)))) {
-        shown = 1;
+        shown = g_compat.event_shown_base_0 ? 1 : base_id + 1;
         Console_focus(&MainConsole, base.x, base.y, CurrentPlayerFaction);
     }
     for (int32_t i = 0; i < game().base_count; i++) {
@@ -640,9 +639,8 @@ void RandomEvent::blight() {
             synch_bit(x, y, faction_id);
             // BUG(original): clears the viewer's memory seven times instead of every
             // faction's (with viewer 0 the landmark bits).
-            COMPAT_ORIGINAL(landmark_memory_viewer);
             for (int32_t i = 7; i; i--) {
-                uint32_t& seen = tile_seen_items(sq, CurrentPlayerFaction);
+                uint32_t& seen = tile_seen_items(sq, g_compat.landmark_memory_viewer ? CurrentPlayerFaction : i);
                 if (seen & 0x288000) seen &= 0xFFD77FFF;
             }
             draw_tile(x, y, 2);
@@ -880,8 +878,8 @@ void GAMEAPI alien_fauna() {
     // Forests and kelp spread to a neighbouring tile.
     // BUG(original): the visibility of the spreading tile, not the new one, decides who learns of
     // it; and the worm spawn below redraws a stale tile (draw_x/draw_y, display only).
-    COMPAT_ORIGINAL(spread_visibility_source);
     int32_t draw_x = 0, draw_y = 0;
+    const bool from_source = g_compat.spread_visibility_source;
     for (int32_t i = 0; i < game().map.tile_count / (CurrentTurn / 4 + 32); i++) {
         int32_t x = map_rand_mod(game().map.x);
         int32_t y = map_rand_mod(game().map.y);
@@ -916,19 +914,23 @@ void GAMEAPI alien_fauna() {
         MAP* sq2 = map_tile(best_x, best_y);
         if (sq2->items & growth) continue;
         sq2->items = (sq2->items | growth) & ~BIT_FUNGUS;
+        // Fixed (compat spread_visibility_source): who sees the new tile learns of it, which is
+        // the tile drawn.
+        const MAP* seen_sq = from_source ? sq : sq2;
+        const int32_t sx = from_source ? x : best_x, sy = from_source ? y : best_y;
         for (int32_t f = 1; f < 8; f++) {
-            if (!(game().factions[f].player_flags & PFLAG_MAP_REVEALED) && !(sq->visibility & (uint8_t)(1 << f)))
+            if (!(game().factions[f].player_flags & PFLAG_MAP_REVEALED) && !(seen_sq->visibility & (uint8_t)(1 << f)))
                 continue;
-            if (!(sq->visible_items[f - 1] & growth)) continue;
+            if (from_source && !(sq->visible_items[f - 1] & growth)) continue;
             sq2->visible_items[f - 1] = (sq2->visible_items[f - 1] | growth) & ~BIT_FUNGUS;
             if (f != CurrentPlayerFaction) continue;
-            int32_t base_id = base_find_filtered(x, y, -1, -1, -1, CurrentPlayerFaction);
+            int32_t base_id = base_find_filtered(sx, sy, -1, -1, -1, CurrentPlayerFaction);
             if (base_id < 0 || game().bases[base_id].faction_id != CurrentPlayerFaction ||
-                (BaseFindDist > 3 && whose_territory(CurrentPlayerFaction, x, y, nullptr, 0) != CurrentPlayerFaction)) {
-                draw_tiles(x, y, 2);
+                (BaseFindDist > 3 && whose_territory(CurrentPlayerFaction, sx, sy, nullptr, 0) != CurrentPlayerFaction)) {
+                draw_tiles(sx, sy, 2);
                 continue;
             }
-            if (!MapWin_focus(MapWins[0], x, y)) draw_tiles(x, y, 2);
+            if (!MapWin_focus(MapWins[0], sx, sy)) draw_tiles(sx, sy, 2);
             parse_says(0, game().bases[base_id].name, -1, -1);
             if (ocean) POP2("KELPGROWS", "kelp_sm.pcx", -1);
             else POP2("FORESTGROWS", "forgr_sm.pcx", -1);
@@ -1020,11 +1022,12 @@ void GAMEAPI alien_fauna() {
         if (BaseFindDist > 1 && BaseFindDist < 6 && (sq->items & BIT_FUNGUS) && (sq->climate & 0xE0) >= 0x40 &&
             !goody_at(x, y)) {
             int32_t veh_id = veh_init(native_spawn_unit(), 0, x, y);
-            if (veh_id >= 0 && veh_visible_to_viewer(veh_id)) draw_tile(draw_x, draw_y, 2);
+            if (veh_id >= 0 && veh_visible_to_viewer(veh_id)) draw_tile(from_source ? draw_x : x, from_source ? draw_y : y, 2);
         }
     }
     // BUG(original): the code after this loop (worms attacking the area of a base, with the
-    // XMINDWORMS message) is unreachable: the loop never exits early.
+    // XMINDWORMS message) is unreachable: the loop never exits early (compat
+    // fungal_worms_unreachable, not fixed).
     COMPAT_ORIGINAL(fungal_worms_unreachable);
 }
 
@@ -1071,8 +1074,8 @@ void GAMEAPI turn_upkeep() {
         if (veh.movement_turns < chassis.range - 1) {
             // BUG(original): returns from turn_upkeep, skipping the rest of the turn's upkeep (the
             // turn counter included) while an aircraft in flight still has moves.
-            COMPAT_ORIGINAL(turn_upkeep_air_return);
             veh.movement_turns++;
+            if (!g_compat.turn_upkeep_air_return) continue;  // fixed: the next unit
             return;
         }
         veh.state |= VSTATE_HAS_MOVED;
@@ -1405,8 +1408,7 @@ void GAMEAPI allocate_energy(int32_t faction_id) {
     for (int32_t i = 0; i < game().base_count; i++) {
         if (game().bases[i].faction_id != faction_id) continue;
         // BUG(original): tests the current base (CurrentBase), not base i.
-        COMPAT_ORIGINAL(drone_riot_current_base);
-        const BASE& cb = cur_base();
+        const BASE& cb = g_compat.drone_riot_current_base ? cur_base() : game().bases[i];
         if (cb.state_flags & BSTATE_DRONE_RIOTS_ACTIVE) {
             raise = true;
             break;
@@ -1970,12 +1972,21 @@ int32_t GAMEAPI wants_prop(int32_t faction_id, int32_t proposal, int32_t candida
                             // BUG(original): mixes ranks and faction ids: the highest rank whose
                             // faction is not human and toward whose *rank number* faction_id has
                             // no war flags; the candidate gains if its id equals that rank.
-                            COMPAT_ORIGINAL(council_rank_faction_mix);
                             int32_t rank = 7;
-                            for (; rank >= 0; rank--) {
-                                if (!is_human(cs.FactionRankings[rank]) && !(f.diplo_status[rank] & 0x70)) break;
+                            if (g_compat.council_rank_faction_mix) {
+                                for (; rank >= 0; rank--) {
+                                    if (!is_human(cs.FactionRankings[rank]) && !(f.diplo_status[rank] & 0x70)) break;
+                                }
+                                if (candidate == rank) value++;
+                            } else {
+                                // Fixed: the highest-ranked AI faction it is not at odds with.
+                                int32_t favourite = -1;
+                                for (; rank >= 0 && favourite < 0; rank--) {
+                                    int32_t r = cs.FactionRankings[rank];
+                                    if (!is_human(r) && !(f.diplo_status[r & 7] & 0x70)) favourite = r;
+                                }
+                                if (candidate == favourite) value++;
                             }
-                            if (candidate == rank) value++;
                         }
                     }
                     if (GovernorFaction >= 0 && candidate != GovernorFaction && faction_id != GovernorFaction) {
@@ -2303,10 +2314,10 @@ int32_t GAMEAPI can_call_council(int32_t faction_id, int32_t show_reason) {
 // considered. BUG(original): otherwise it holds what the prologue's _chkstk (0x645550, `push ecx`)
 // stored there: the caller's ECX. faction_upkeep calls with ECX = the human players' mask
 // (FactionStatus[0], loaded by its is_human test), so AI factions propose anything only in games
-// without human players (observer games); with a human, only governor elections.
+// without human players (observer games); with a human, only governor elections
+// (compat residue.council_aliens_ecx).
 namespace {
 void call_council_body(int32_t faction_id, int32_t aliens_residue) {
-    COMPAT_ORIGINAL(residue.council_aliens_ecx);
     if (ExpansionEnabled && (game().mfactions[faction_id].rule_flags & RFLAG_ALIEN)) return;
     if (!faction_id) return;
     bool human = is_human(faction_id);
@@ -2322,6 +2333,11 @@ void call_council_body(int32_t faction_id, int32_t aliens_residue) {
     for (int32_t i = 1; i < 8; i++)
         if (!human && is_human(i) && (game().mfactions[i].rule_flags & RFLAG_ALIEN)) return;
     int32_t aliens = aliens_residue;
+    if (!g_compat.residue.council_aliens_ecx) {  // fixed: computed for every proposal
+        aliens = 0;
+        for (int32_t i = 1; i < 8; i++)
+            if ((game().mfactions[i].rule_flags & RFLAG_ALIEN) && is_alive(i)) aliens = 1;
+    }
     int32_t best = 0;
     int32_t best_proposal = -1;
     int32_t best_candidate = faction_id;
@@ -2638,6 +2654,7 @@ void GAMEAPI control_turn() {
                 call_human_turn();
                 if (ControlTurnMove) {
                     // BUG(original): restarts the round at faction 1 (the loop increment follows).
+                    // (compat net_round_restart, not fixed: harmless, see compat.h.)
                     COMPAT_ORIGINAL(net_round_restart);
                     f = 0;
                     continue;

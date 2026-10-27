@@ -20,11 +20,15 @@ rm -rf "$OUT"
 mkdir -p "$OUT/a/saves" "$OUT/b/saves"
 cat "$ROOT/harness/oracle/runtime/Alpha Centauri.Ini" > "$OUT/pbem.ini"
 echo "Difficulty=2" >> "$OUT/pbem.ini"
+# Machine A sets the game up with the original's bugs (the ini's key, as a player sets it); every
+# later step's ini has the default (the fixes): the game keeps the setting its save carries.
+cp "$OUT/pbem.ini" "$OUT/pbem_ob.ini"
+echo "Original Bugs=1" >> "$OUT/pbem_ob.ini"
 FAIL=0
 
 run() {  # run STEP MACHINE ARGS... : the machine's outdir (a or b), log in OUT/STEP.log
     local name="$1" dir="$OUT/$2"; shift 2
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 900 "$SMACX" --hidden --ini "$OUT/pbem.ini" --outdir "$dir" \
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 900 "$SMACX" --hidden --ini "${INI:-$OUT/pbem.ini}" --outdir "$dir" \
         "$@" > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
@@ -57,7 +61,7 @@ LOAD="DOWN,DOWN,DOWN,DOWN,ENTER,ENTER,DOWN,DOWN,ENTER,p,b,ENTER"  # MULTIPLAYER,
 #    a new password (ab); the Pirates' handover: SAVE AND EXIT. Mailed to B.
 SETUP="DOWN,DOWN,DOWN,DOWN,ENTER,MENUSTATE,ENTER,MENUSTATE,ENTER,DOWN,ENTER,UP,UP,ENTER,ENTER,ENTER,ENTER,ENTER,DOWN,ENTER,\
 ENTER,ENTER,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER"
-run a1 a --seed 1001,2001 --keys "$SETUP,a,b,ENTER,a,b,ENTER,$END,$SAVEEXIT"
+INI="$OUT/pbem_ob.ini" run a1 a --seed 1001,2001 --keys "$SETUP,a,b,ENTER,a,b,ENTER,$END,$SAVEEXIT"
 check a1 "University's password set" "^hotseat: faction 1 password set"
 check a1 "Pirates' handover" "^hotseat: switching to faction 2 \\(no password\\)"
 check a1 "saved and exited" "^filebox: saves.pb.SAV"
@@ -69,6 +73,7 @@ mail a b
 #    (cd); their turn 1; University's handover (SWITCHING2): SAVE AND EXIT. Mailed to A.
 run b1 b --keys "$LOAD,ENTER,c,d,ENTER,c,d,ENTER,FACTIONSTATE,$END,$SAVEEXIT"
 check b1 "loaded" "^filebox: saves.pb.SAV"
+check b1 "the save's setting: the original bugs" "^smacx: this game plays with the original bugs \(the save's setting\)"
 check b1 "first load of this save: a new tamper record" "^pbem: tamper record new \(turn 1 faction 2 save 1 loads 1\)"
 nocheck b1 "no tampering told" "^popup HOTNOTAMPER shown"
 check b1 "Pirates' password set" "^hotseat: faction 2 password set"
@@ -106,6 +111,7 @@ mail b a
 # 6. Machine A: University's turn 3: told of the Pirates' extra load (HOTTAMPER2).
 run a3 a --keys "$LOAD,ENTER,a,b,ENTER,ENTER,FACTIONSTATE,QUIT"
 check a3 "University's turn 3" "^hotseat: faction 1 takes the turn \(turn 3\)"
+check a3 "still the save's setting" "^smacx: this game plays with the original bugs \(the save's setting\)"
 check a3 "the tampering told: HOTTAMPER2" "^popup HOTTAMPER2 shown"
 nocrash a3
 

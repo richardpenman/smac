@@ -58,7 +58,7 @@ for s in $SCEN; do
     PATCH_SPEC="$SPEC" ORACLE_DLL=hybrid "$ROOT/harness/run_oracle.sh" "$CMD" "$OUT" "${ORACLE_TIMEOUT:-1800}" >/dev/null
   else
     BIN="${NATIVE_BUILD:-$ROOT/build/native}/smacx_headless"
-    (cd "$ROOT" && "$BIN" "$CMD" --outdir "$OUT" > "$OUT/headless.log" 2>&1)
+    (cd "$ROOT" && "$BIN" "$CMD" --outdir "$OUT" --original-bugs > "$OUT/headless.log" 2>&1)
   fi
   echo "[$s]"
   if ! python3 "$ROOT/harness/compare.py" "$REF" "$OUT" | sed 's/^/  /'; then FAIL=1; fi

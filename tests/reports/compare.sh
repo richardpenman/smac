@@ -23,7 +23,7 @@ if [ ! -f "$ORIG/social.png" ]; then
     "$PY" "$ROOT/tests/popups/orig_drive.py" "$ROOT/tests/reports/orig_reports.steps" "$ORIG" \
         "$ROOT/tests/reports/orig_extra.ini"
 fi
-(cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 300 "$SMACX" --hidden --new size=0 --human 1 --seed 1,2 \
+(cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 300 "$SMACX" --original-bugs --hidden --new size=0 --human 1 --seed 1,2 \
     --outdir "$OUT/smacx" --keys "ENTER,SHOT:main.bmp,e,SHOT:social.bmp,ESC,F4,SHOT:ops.bmp,F7,SHOT:security.bmp,\
 F8,SHOT:score.bmp,F5,SHOT:projects.bmp,F2,SHOT:labs.bmp,F3,SHOT:energy.bmp,F6,SHOT:sat.bmp,ESC,F12,SHOT:commlink.bmp,F12,\
 F10,SHOT:fame.bmp,ESC" > "$OUT/smacx.log" 2>&1)

@@ -1,6 +1,7 @@
 #include "engine/veh.h"
 
 #include "engine/compat.h"
+#include "engine/compat_reads.h"
 #include "engine/game_state.h"
 #include "engine/hybrid_shadow.h"
 #include "engine/stack_residue.h"
@@ -146,10 +147,8 @@ namespace {
 // Raw view of the vehicle table: the original reads Vehs[-1] in a few places.
 uint8_t* veh_raw(int32_t veh_id) { return reinterpret_cast<uint8_t*>(&game().vehs[0]) + veh_id * (int32_t)sizeof(VEH); }
 // Vehs[-1] lies in the Reactor table (string pointers in the original): see rules_orig_byte.
-int16_t veh_unit_raw(int32_t veh_id) {
-    if ((uint32_t)veh_id < 2049) return game().vehs[veh_id].unit_id;
-    return rules_orig_i16(0x952828 + (uint32_t)veh_id * 0x34 + offsetof(VEH, unit_id));
-}
+// (Fixed with compat out_of_range_reads: no vehicle has no unit, -1.)
+int16_t veh_unit_raw(int32_t veh_id) { return (int16_t)compat_veh_unit(veh_id); }
 // Wrapped horizontal distance |x1 - x2| as the original computes it.
 int32_t wrap_dx(int32_t x1, int32_t x2) {
     int32_t dx = std::abs(x1 - x2);
@@ -183,8 +182,8 @@ int32_t GAMEAPI do_unity_crash(int32_t x, int32_t y, int32_t faction_id) {
             }
         }
         int32_t veh_id = veh_init(unit_id, faction_id, x, y);
-        COMPAT_ORIGINAL(out_of_range_reads);
-        veh_raw(veh_id)[offsetof(VEH, morale)] = 2;  // BUG(original): writes Vehs[-1] when the table is full
+        // BUG(original): writes Vehs[-1] when the table is full (fixed: no unit, no morale).
+        if (veh_id >= 0 || g_compat.out_of_range_reads) veh_raw(veh_id)[offsetof(VEH, morale)] = 2;
         return 1;
     }
     case 10: {
@@ -427,9 +426,9 @@ int32_t GAMEAPI veh_init(int32_t unit_id, int32_t faction_id, int32_t x, int32_t
     int32_t best = 0;
     for (int32_t i = 1; i < 8; i++) {
         // BUG(original): compares the faction's own base count in the region, not the enemy's
-        COMPAT_ORIGINAL(enemy_region_own_count);
-        if (i != faction_id && (f.diplo_status[i] & DIPLO_VENDETTA) && f.region_total_bases[region] > best) {
-            best = f.region_total_bases[region];
+        const Faction& counted = g_compat.enemy_region_own_count ? f : game().factions[i];
+        if (i != faction_id && (f.diplo_status[i] & DIPLO_VENDETTA) && counted.region_total_bases[region] > best) {
+            best = counted.region_total_bases[region];
             enemy_id = i;
         }
     }
@@ -737,8 +736,8 @@ int32_t GAMEAPI prototype_factor(int32_t unit_id) {
 int32_t GAMEAPI veh_cost(int32_t unit_id, int32_t base_id, int32_t* has_proto_cost) {
     int32_t cost = Units[unit_id].cost;
     // BUG(original): the Brood Pit check reads Bases[-1] without a base
-    COMPAT_ORIGINAL(out_of_range_reads);
-    if (unit_is_native(unit_id) && base_has_fac(base_id, 0x23)) cost = (cost * 3) >> 2;
+    if (unit_is_native(unit_id) && (base_id >= 0 || g_compat.out_of_range_reads) && base_has_fac(base_id, 0x23))
+        cost = (cost * 3) >> 2;  // (fixed: no base, no Brood Pit)
     if (Units[unit_id].plan == 8 && base_id >= 0) cost = cost < 1 ? 1 : cost > 999 ? 999 : cost;  // colony pod
     if (unit_id < 64 || (Units[unit_id].unit_flags & UNIT_PROTOTYPED)) {
         if (has_proto_cost) *has_proto_cost = 0;

@@ -13,8 +13,10 @@ int32_t GAMEAPI parse_string(const char* src, char* dst) {
     if (!src || !dst) return 3;
     char* const start = dst;
     char num[80];
-    COMPAT_ORIGINAL(residue.parse_gender);
-    int32_t gender = 0;  // BUG(original): uninitialized when "$<#n" sets only the plurality
+    // BUG(original), compat residue.parse_gender: uninitialized when "$<#n" sets only the
+    // plurality; 0 in the reconstruction, the value the original's stack held in every observed
+    // game and the fix's value too.
+    int32_t gender = 0;
     for (;;) {
         const char* mark = crt_strstr(src, "$");
         if (!mark) break;
@@ -63,8 +65,15 @@ int32_t GAMEAPI parse_string(const char* src, char* dst) {
         string_slot:
             digit = findnum(mark);
             // BUG(original): without any digit the same marker is found again forever.
-            COMPAT_ORIGINAL(parse_marker_no_digit);
-            if (!digit) continue;
+            if (!digit) {
+                if (g_compat.parse_marker_no_digit) continue;
+                // Fixed: the text up to and including the '$' is copied and the scan goes on.
+                crt_memcpy(dst, src, (uint32_t)(mark - src + 1));
+                dst += mark - src + 1;
+                *dst = 0;
+                src = mark + 1;
+                continue;
+            }
             n = (int8_t)*digit - '0';
             if (n > 9) return 14;
             crt_memcpy(dst, src, (uint32_t)(mark - src));

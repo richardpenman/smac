@@ -15,6 +15,9 @@
 #
 #   tests/online2/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/net-native/smacx)
 #
+# The games play with the original's bugs fixed (smacx's default; neither ini has "Original Bugs"):
+# the copies must agree in that mode too, and the client is told the host's setting.
+#
 # Runs two smacx processes at once: run it alone. Exit status 0 when every check passes.
 set -u
 if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
@@ -130,6 +133,7 @@ if want load; then
         "$CSETUP,$CLOAD,$CTURN,$CTURN,WAITFOR:turn 3 upkeep,WAIT:2000" save
     check load-host "the type of game: a saved game" "^net: type of game 2 \(net\)$"
     check load-client "the client told (NetSetupType 2)" "^net: session type 2 \(net\)$"
+    check load-client "the host's setting: the fixes" "^net: the host plays with the fixes"
     check load-host "the client's password not given yet" "^screentext Passwords Unsatisfied: 1$"
     check load-client "its faction's password asked (ENTERPASSWORDFACTION)" "^popup ENTERPASSWORDFACTION shown"
     check load-client "a wrong one refused (BADPASSWORD)" "^popup BADPASSWORD shown"

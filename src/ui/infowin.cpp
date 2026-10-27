@@ -612,9 +612,9 @@ void THISCALL InfoWin_draw_text(uint8_t*, int32_t pane) {
     if (!c->data) return;
     Buffer_set_font(c, font(), nullptr, nullptr, nullptr);
     int32_t first = pane == -1 ? 0 : pane, end = pane == -1 ? 2 : pane + 1;
-    COMPAT_ORIGINAL(infowin_counter_per_pane);
     int32_t i = 0;  // BUG(original): not reset per pane (draw_text(-1)).
     for (int32_t p = first; p < end; p++) {
+        if (!g_compat.infowin_counter_per_pane) i = 0;  // fixed: every pane from its first line
         UiRect pr = prect(p + 1);
         Buffer_set_clip(c, &pr);
         UiRect r{pr.left + 3, pr.top, pr.right - 3, pr.bottom};

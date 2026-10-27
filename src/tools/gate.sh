@@ -4,6 +4,9 @@
 #
 #   src/tools/gate.sh [--quick] [--only STEPS] [--skip STEPS]
 #
+# Every comparison with the original runs with the original's bugs (--original-bugs, verify.sh;
+# the hybrid DLL always has them); the fixes step plays with them fixed.
+#
 # Steps (in order; STEPS is a comma-separated list):
 #   static    src/tools/names.py check (no original address lost, names table current, fcompare
 #             entries name declared functions) and src/tools/compat.py check (every BUG(original)
@@ -15,6 +18,9 @@
 #             references: tiny20 small12 std8 late140
 #   asan      the ASan smacx_headless on $GATE_ASAN_SCENARIOS (default tiny20 small12 std8 late140
 #             council131; --quick: tiny20): no sanitizer report, snapshots match the references
+#   fixes     the ASan smacx_headless with the original's bugs fixed (the game's default) on
+#             $GATE_FIXES_SCENARIOS (default tiny20 late140 council131 end300; --quick: tiny20):
+#             no sanitizer report, the run ends normally (nothing is compared: the game differs)
 #   hybrid    harness/verify.sh hybrid "all" on $GATE_HYBRID_SCENARIOS (default tiny20 small12 std8
 #             late140; --quick: tiny20). Runs the original under Wine, one process at a time.
 #   fcompare  only when GATE_FCOMPARE is set (a patch spec, e.g. "none +vector_dist"): verify.sh
@@ -48,9 +54,11 @@ while [ $# -gt 0 ]; do
 done
 if [ $QUICK = 1 ]; then
     ASAN_SCEN="${GATE_ASAN_SCENARIOS:-tiny20}"
+    FIXES_SCEN="${GATE_FIXES_SCENARIOS:-tiny20}"
     HYBRID_SCEN="${GATE_HYBRID_SCENARIOS:-tiny20}"
 else
     ASAN_SCEN="${GATE_ASAN_SCENARIOS:-tiny20 small12 std8 late140 council131}"
+    FIXES_SCEN="${GATE_FIXES_SCENARIOS:-tiny20 late140 council131 end300}"
     HYBRID_SCEN="${GATE_HYBRID_SCENARIOS:-tiny20 small12 std8 late140}"
 fi
 FC_SCEN="${GATE_FCOMPARE_SCENARIOS:-tiny20 small12 std8}"
@@ -102,7 +110,7 @@ if want build; then
     ok=1; what=""
     build "$NATIVE" "$OUT/build.log" -DCMAKE_BUILD_TYPE=RelWithDebInfo || ok=0
     what="native"
-    if want asan || want unit || want ui; then
+    if want asan || want unit || want ui || want fixes; then
         build "$ASAN" "$OUT/build.log" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DSMACX_SANITIZE=ON -- \
             smacx_headless smacx_unit smacx || ok=0
         what="$what asan"
@@ -162,7 +170,7 @@ if want observer; then
         echo "[$s]" >> "$OUT/observer.log"
         # shellcheck disable=SC2046
         SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 1800 "$NATIVE/smacx" --hidden --nosound --human 0 \
-            --outdir "$d" --snapshots "$d/snap" $(smacx_args "$s") > "$d/smacx.log" 2>&1
+            --original-bugs --outdir "$d" --snapshots "$d/snap" $(smacx_args "$s") > "$d/smacx.log" 2>&1
         python3 harness/compare.py "work/ref/$s" "$d/snap" >> "$OUT/observer.log" 2>&1 || ok=0
     done
     grep -qE "DIFF|MISSING" "$OUT/observer.log" && ok=0
@@ -181,7 +189,7 @@ if want asan; then
         mkdir -p "$d"
         echo "[$s]" >> "$OUT/asan.log"
         ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0}" timeout 3600 "$ASAN/smacx_headless" \
-            "harness/scenarios/$s.cmd" --outdir "$d" > "$d/headless.log" 2>&1
+            "harness/scenarios/$s.cmd" --outdir "$d" --original-bugs > "$d/headless.log" 2>&1
         if grep -qE "AddressSanitizer|runtime error|LeakSanitizer" "$d/headless.log"; then
             grep -m 5 -E "AddressSanitizer|runtime error" "$d/headless.log" >> "$OUT/asan.log"; ok=0
         fi
@@ -190,6 +198,26 @@ if want asan; then
     grep -qE "DIFF|MISSING" "$OUT/asan.log" && ok=0
     if [ $ok = 1 ]; then report asan PASS "$ASAN_SCEN ($(grep -c ' OK$' "$OUT/asan.log") snapshots)"
     else report asan FAIL "see $OUT/asan.log"; fi
+fi
+
+# ---- fixes: the game with the original's bugs fixed, under ASan ----------------------------------
+if want fixes; then
+    ok=1; : > "$OUT/fixes.log"
+    for s in $FIXES_SCEN; do
+        d="$OUT/fixes/$s"
+        mkdir -p "$d"
+        ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0}" timeout 3600 "$ASAN/smacx_headless" \
+            "harness/scenarios/$s.cmd" --outdir "$d" > "$d/headless.log" 2>&1
+        st=$?
+        n=$(ls "$d"/turn_*.state 2>/dev/null | wc -l)
+        echo "[$s] exit $st, $n snapshots" >> "$OUT/fixes.log"
+        [ $st = 0 ] || ok=0
+        if grep -qE "AddressSanitizer|runtime error|LeakSanitizer|compat:" "$d/headless.log"; then
+            grep -m 5 -E "AddressSanitizer|runtime error|compat:" "$d/headless.log" >> "$OUT/fixes.log"; ok=0
+        fi
+    done
+    if [ $ok = 1 ]; then report fixes PASS "$FIXES_SCEN"
+    else report fixes FAIL "see $OUT/fixes.log"; fi
 fi
 
 # ---- hybrid / fcompare (Wine) ----------------------------------------------------------------

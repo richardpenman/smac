@@ -1491,6 +1491,7 @@ int32_t GAMEAPI multiplayer_init(int32_t lobby) {
             } else {
                 FactionStatus[0] = 0;
                 for (int32_t i = 1; i <= players(); i++) FactionStatus[0] |= (uint8_t)(1 << ((&NetState)[0x790 + i * 0x19C] & 31));
+                net_send_original_bugs();  // smacx: the players play with the host's setting
                 NetDaemon_send_rules(&NetState);
                 NetDaemon_send_game(&NetState);
             }

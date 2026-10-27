@@ -198,8 +198,11 @@ void GAMEAPI double_cross(int32_t faction_id, int32_t faction_id_with, int32_t a
     if (!(f.diplo_agenda[faction_id_with] & 0x20)) {
         // BUG(original): compares the two factions' human bits in place (different bit positions),
         // so this holds whenever either faction is human.
-        COMPAT_ORIGINAL(human_bits_in_place);
-        if ((FactionStatus[0] & (uint8_t)(1 << faction_id)) != (FactionStatus[0] & (uint8_t)(1 << faction_id_with))) {
+        bool human_a = (FactionStatus[0] & (uint8_t)(1 << faction_id)) != 0;
+        bool human_b = (FactionStatus[0] & (uint8_t)(1 << faction_id_with)) != 0;
+        if (g_compat.human_bits_in_place ? (FactionStatus[0] & (uint8_t)(1 << faction_id)) !=
+                                               (FactionStatus[0] & (uint8_t)(1 << faction_id_with))
+                                         : human_a != human_b) {
             set_treaty(faction_id, faction_id_with, 0x40, 1);
             f.diplo_spoke[faction_id_with] = CurrentTurn;
         }
@@ -278,8 +281,7 @@ void GAMEAPI capture_base(int32_t base_id, int32_t faction_id, int32_t is_probe)
                 int32_t other = game().bases[i].queue_items[0];
                 parse_says(0, game().mfactions[old].adj_name_faction, -1, -1);
                 // BUG(original): indexes Facility with the negative queue item.
-                COMPAT_ORIGINAL(facility_negative_item);
-                parse_say(1, facility_name_raw(other), -1, -1);
+                parse_say(1, g_compat.facility_negative_item ? facility_name_raw(other) : Facility[-other].name, -1, -1);
                 popp(ScriptFileName, "SURVIVEPROJECT", 0, "secproj_sm.pcx", 0);
             } else {
                 say_title(0, old);
@@ -291,7 +293,8 @@ void GAMEAPI capture_base(int32_t base_id, int32_t faction_id, int32_t is_probe)
                 item = game().bases[base_id].queue_items[0];
                 int32_t offset, mask;
                 bitmask((item < 0 ? -item : item) - 70, &offset, &mask);
-                // BUG(original): the byte offset of the bit indexes the dword array.
+                // BUG(original): the byte offset of the bit indexes the dword array (as every other
+                // use of secret_project_intel does; compat project_intel_byte_offset, not fixed).
                 COMPAT_ORIGINAL(project_intel_byte_offset);
                 game().factions[old].secret_project_intel[offset] &= ~(uint32_t)mask;
             }
@@ -335,8 +338,7 @@ void GAMEAPI capture_base(int32_t base_id, int32_t faction_id, int32_t is_probe)
             }
         }
         // BUG(original): base 0 never receives the headquarters (tests best > 0).
-        COMPAT_ORIGINAL(headquarters_base_0);
-        if (best > 0) {
+        if (g_compat.headquarters_base_0 ? best > 0 : best >= 0) {
             parse_says(0, name, -1, -1);
             parse_says(1, game().bases[best].name, -1, -1);
             if (MultiplayerActive || old != CurrentPlayerFaction || X_pop("ESCAPE", 0)) {
@@ -466,8 +468,7 @@ void GAMEAPI capture_base(int32_t base_id, int32_t faction_id, int32_t is_probe)
         }
         capture_free_facilities(faction_id, faction_id);
         // BUG(original): the old owner's free facilities too (with the new owner's techs).
-        COMPAT_ORIGINAL(capture_old_free_facilities);
-        capture_free_facilities(old, faction_id);
+        if (g_compat.capture_old_free_facilities) capture_free_facilities(old, faction_id);
         base_first(base_id);
     }
     owner_set(x, y, faction_id);
@@ -570,8 +571,10 @@ void GAMEAPI capture_base(int32_t base_id, int32_t faction_id, int32_t is_probe)
             steal_tech(faction_id, old, 1);
     }
     // BUG(original): passes the faction as the region and the region as the faction.
-    COMPAT_ORIGINAL(bases_reset_args);
-    if (!(old_bit & FactionStatus[0])) bases_reset(old, region, 0);
+    if (!(old_bit & FactionStatus[0])) {
+        if (g_compat.bases_reset_args) bases_reset(old, region, 0);
+        else bases_reset(region, old, 0);
+    }
     mon_conquer_base(faction_id, name);
     if (faction_id == CurrentPlayerFaction && base_id >= 0 &&
         (game().bases[base_id].state_flags & BSTATE_ASSISTANT_KILLER_HOME) &&

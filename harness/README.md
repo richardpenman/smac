@@ -11,7 +11,7 @@ on the same scripted scenario, and compares the game state turn by turn.
 | `../src/app/headless.cpp` → `smacx_headless` | Runs the same scripts on the pure reconstruction. |
 | `run_oracle.sh` | One isolated oracle/hybrid run (own run dir, pristine ini, own X display). |
 | `wine_env.sh` | The prefix and text setup every run of the original uses (fonts, FreeType; see below). |
-| `verify.sh` | Run scenarios in hybrid or native mode and compare with cached oracle references. |
+| `verify.sh` | Run scenarios in hybrid or native mode and compare with cached oracle references (`smacx_headless --original-bugs`: the reconstruction plays with the original's bugs, engine/compat.h; hybrid.dll always does). |
 | `compare.py` | Field-level diff of two snapshot directories. |
 | `state_regions.h` | The game-state memory regions that are compared. |
 | `scenarios/*.cmd` | Standard scenarios. |

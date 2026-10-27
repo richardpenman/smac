@@ -60,8 +60,7 @@ char* GAMEAPI text_string() {
     if (crt_feof(TextBuffer.file)) {
         *TextBuffer.buffer = 0;
         // BUG(original): stores a null string (Strings_put(nullptr) reads address 0).
-        COMPAT_ORIGINAL(text_null_string);
-        return Strings_put(&StringTable, nullptr);
+        return Strings_put(&StringTable, g_compat.text_null_string ? nullptr : TextBuffer.buffer);
     }
     if (!crt_fgets(TextBuffer.buffer, 0x1FF, TextBuffer.file)) {
         *TextBuffer.buffer = 0;
@@ -220,8 +219,8 @@ char* THISCALL Text_get(Text* self) {
 char* THISCALL Text_string(Text* self) {
     if (crt_feof(self->file)) {
         *self->buffer = 0;
-        COMPAT_ORIGINAL(text_null_string);
-        return Strings_put(&StringTable, nullptr);  // BUG(original): see text_string
+        // BUG(original): see text_string.
+        return Strings_put(&StringTable, g_compat.text_null_string ? nullptr : self->buffer);
     }
     if (!crt_fgets(self->buffer, 0x1FF, self->file)) {
         *self->buffer = 0;

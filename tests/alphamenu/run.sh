@@ -24,7 +24,7 @@ run() {  # run CASE ARGS... : log in OUT/CASE.log, screenshots in OUT/CASE/
     local name="$1"; shift
     rm -rf "$OUT/$name"
     mkdir -p "$OUT/$name"
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --exit-after-keys --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --original-bugs --exit-after-keys --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
 check() {  # check CASE DESCRIPTION REGEX: the log matches (grep -E)

@@ -3,7 +3,12 @@
 //   smacx [--new [k=v ...] | --save FILE.sav] [--human N] [--viewer N] [--seed CRT,GAME|clock]
 //         [--keys K1,K2,...] [--exit-after-keys] [--animate] [--turns N] [--shot FILE.bmp] [--snapshots DIR]
 //         [--rng FILE] [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR]
-//         [--gamedir DIR] [--image FILE] [--ini FILE] [--nosound]
+//         [--gamedir DIR] [--image FILE] [--ini FILE] [--nosound] [--original-bugs]
+//
+// The original's bugs (engine/compat.h, docs/COMPAT.md): smacx plays with them fixed unless the
+// ini says "Original Bugs=1" ([Alpha Centauri] section) or --original-bugs is given (the tests
+// whose references come from the original, the harness). --original-bugs also overrides the
+// setting a hotseat or PBEM save carries; in an online game the host's setting applies.
 //
 // Files. Played as a game (no --outdir): the settings (Alpha Centauri.Ini, seeded from the default
 // ini next to the executable), saves (the game's "saves" folder), the hall of fame, screenshots and
@@ -99,6 +104,7 @@
 
 #include "app/gamedata.h"
 #include "engine/clock.h"
+#include "engine/compat.h"
 #include "engine/game.h"
 #include "engine/globals.h"
 #include "engine/map.h"
@@ -142,6 +148,7 @@ struct Options {
     int human = -1, viewer = -1, zoom = 0x7FFF, cx = -1, cy = -1, width = 1024, height = 768, turns = 0;
     unsigned seed_crt = 0, seed_game = 0;
     bool seeded = false, seed_given = false, hidden = false, exit_after_keys = false, nosound = false, animate = false;
+    bool original_bugs = false;  // --original-bugs
     std::vector<ScriptedKey> keys;
 } g_opt;
 
@@ -705,7 +712,7 @@ int usage() {
         "             [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR] [--gamedir DIR]\n"
         "             [--image FILE] [--ini FILE] [--dump FILE.smxmap [--like REF.smxmap] [--scroll-from X,Y]\n"
         "             [--dump-options HEX] [--dump-radius X,Y,R]]\n"
-        "             [--nosound]\n");
+        "             [--nosound] [--original-bugs]\n");
     return 2;
 }
 
@@ -750,6 +757,7 @@ int main(int argc, char** argv) {
         else if (a == "--nosound") g_opt.nosound = true;
         else if (a == "--exit-after-keys") g_opt.exit_after_keys = true;
         else if (a == "--animate") g_opt.animate = true;
+        else if (a == "--original-bugs") g_opt.original_bugs = true;
         else if (a == "--keys") {
             std::string list = next() + ",";
             for (size_t p = 0, c; (c = list.find(',', p)) != std::string::npos; p = c + 1) {
@@ -830,6 +838,13 @@ int main(int argc, char** argv) {
     fs::current_path(g_opt.gamedir);
     platform::set_game_dir(".");
     engine_static_init(ini_copy.c_str());
+    // The original's bugs or their fixes (engine/compat.h): --original-bugs, else the ini's key.
+    {
+        char buf[16] = "";
+        win32::GetPrivateProfileStringA("Alpha Centauri", "Original Bugs", "0", buf, sizeof(buf), ini_copy.c_str());
+        compat_set_original_bugs(g_opt.original_bugs || std::atoi(buf) != 0);
+        g_original_bugs_forced = g_opt.original_bugs;
+    }
     // The harness's deterministic clock (engine/clock.h): the same keys give the same game.
     engine_set_deterministic(true);
     // WinMain: the screen size (GetSystemMetrics) the windows are laid out for; config_popups

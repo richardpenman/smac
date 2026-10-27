@@ -43,6 +43,9 @@ The whole single-player game works: game setup, the map, units, bases, research,
 workshop, diplomacy, the Planetary Council, reports, saving and loading, sound, music and movies.
 Multiplayer is not supported. Known gaps are listed in the [UI plan](docs/UI_PLAN.md) (section 13).
 
+smacx fixes the original game's bugs by default ([the list](docs/COMPAT.md)); start it with
+`--original-bugs` (or set `Original Bugs=1` in its ini) to play with every bug as the original does.
+
 | | |
 |---|---|
 | ![Developed land, late game](docs/screenshots/map.png) | ![Base window](docs/screenshots/base.png) |

@@ -10,12 +10,20 @@
 //   the world window, [PBEM: diplomacy/council state and message lists], canvas size, and the
 //   save_daemon time stamp. With GameState & 0x10000000 the blocks after GamePrefs (except the
 //   map, the message lists and the canvas size) are encrypted (encrypt_write).
+// smacx marks its saves in the legacy preferences block, which the original ignores in a current
+// savegame (it writes uninitialised stack bytes there): kSmacxSaveMark at offset 0, then a dword
+// of flags (bit 0: the game plays with the original bugs, engine/compat.h). A hotseat or PBEM game
+// loaded from such a save plays with the save's setting, so every player's copy agrees.
 #pragma once
 #include "engine/crt.h"
 #include "engine/globals.h"
 
 // Savegame version written by save_daemon (GamePrefs.SaveFileVersion).
 constexpr int32_t kSaveFileVersion = 12;
+// "SMXB" (little-endian): the legacy block's mark of a save written by smacx.
+constexpr uint32_t kSmacxSaveMark = 0x42584D53;
+// The original-bugs setting of the save game_data read last: 1 on, 0 off, -1 no smacx mark.
+inline int32_t g_save_original_bugs = -1;
 
 // ---- globals (save module and blocks only the save module names) ----
 GLOBAL(int32_t, NetPlayerListSeq, 0x93D4F8);  // multiplayer copy of NetDiploSeq

@@ -20,7 +20,7 @@ mkdir -p "$OUT/smacx"
 if [ ! -f "$ORIG/reallyover.png" ]; then
     "$PY" "$ROOT/tests/popups/orig_drive.py" "$ROOT/tests/popups/orig_quickstart.steps" "$ORIG"
 fi
-(cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 300 "$SMACX" --hidden --new size=0 --human 1 --seed 1,2 \
+(cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 300 "$SMACX" --original-bugs --hidden --new size=0 --human 1 --seed 1,2 \
     --outdir "$OUT/smacx" --keys "SHOT:firstbase.bmp,ENTER,C-ENTER,SHOT:reallyover.bmp,ESC,C-q,SHOT:reallyquit.bmp,DOWN,SHOT:reallyquit_down.bmp,UP,ENTER" \
     > "$OUT/smacx.log" 2>&1)
 # Region of each popup (the main interface's frame); the console panel below differs (MainInterface

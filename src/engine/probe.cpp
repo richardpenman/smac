@@ -317,8 +317,10 @@ int32_t GAMEAPI success_rates(int32_t n, int32_t morale, int32_t difficulty, int
         if (ProbeHasAlgoEnhancement && !ProbeTargetHasHSA) lose /= 2;
         int32_t survive = 100 - lose;
         // BUG(original): halves the success chance a second time instead of the survival chance.
-        COMPAT_ORIGINAL(probe_survival_halved);
-        if (ProbeTargetHasHSA) chance /= 2;
+        if (ProbeTargetHasHSA) {
+            if (g_compat.probe_survival_halved) chance /= 2;
+            else survive /= 2;
+        }
         if (survive != chance) {
             std::strcat(StrBuffer, ", ");
             crt_itoa(survive, buf, 10);
@@ -986,9 +988,9 @@ Step Probe::ai_choose() {
                     if (mon_field(t, 15 + k, 0x10) && !(st & 0x10)) {
                         any = true;
                         // BUG(original): compares with the status of faction freed + 1
-                        COMPAT_ORIGINAL(probe_freed_status_offset);
                         if (freed == -1 || (st & 1) ||
-                            ((st & 2) && !((uint8_t)(&game().factions[f].diplo_status[1])[freed] & 1)))
+                            ((st & 2) && !((uint8_t)(&game().factions[f].diplo_status[
+                                               g_compat.probe_freed_status_offset ? 1 : 0])[freed] & 1)))
                             freed = k + 1;
                     }
                 }

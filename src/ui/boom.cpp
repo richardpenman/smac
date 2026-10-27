@@ -24,6 +24,7 @@
 
 #include "engine/battle.h"
 #include "engine/compat.h"
+#include "engine/compat_reads.h"
 #include "engine/diplo_act.h"
 #include "engine/globals.h"
 #include "engine/map.h"
@@ -45,19 +46,15 @@ namespace {
 int32_t& mwi(uint8_t* win, uint32_t off) { return *reinterpret_cast<int32_t*>(win + off); }
 // The unit of a vehicle; the original also reads Vehs[-1] here (no unit on the target tile): it
 // lies in the Reactor table (rules_orig_byte), as in veh.cpp's veh_unit_raw.
-int32_t veh_unit(int32_t veh) {
-    if ((uint32_t)veh < 2049) return Vehs[veh].unit_id;
-    COMPAT_ORIGINAL(out_of_range_reads);
-    int32_t u = rules_orig_i16(0x952828 + (uint32_t)veh * 0x34 + offsetof(VEH, unit_id));
-    return u;
+// Fixed (compat out_of_range_reads): no vehicle has no unit (-1), read as an empty design.
+int32_t veh_unit(int32_t veh) { return compat_veh_unit(veh); }
+const UNIT& unit_of(int32_t veh) {
+    static const UNIT kNoUnit{};
+    int32_t u = veh_unit(veh);
+    return u < 0 && !g_compat.out_of_range_reads ? kNoUnit : Units[u];
 }
-const UNIT& unit_of(int32_t veh) { return Units[veh_unit(veh)]; }
 // Its x (i 0) or y (1), Vehs[-1]'s from the Reactor table as above.
-int32_t veh_pos(int32_t veh, int32_t i) {
-    if ((uint32_t)veh < 2049) return i ? Vehs[veh].y : Vehs[veh].x;
-    COMPAT_ORIGINAL(out_of_range_reads);
-    return rules_orig_i16(0x952828 + (uint32_t)veh * 0x34 + (i ? 2 : 0));
-}
+int32_t veh_pos(int32_t veh, int32_t i) { return compat_veh_pos(veh, i, 0); }
 const uint8_t* xtable(int32_t group) { return mem::host(0x6F1B7Cu + (uint32_t)group * 0x1000); }
 Sprite* shot_sprite(int32_t row, int32_t frame) { return ArtSprite(0x7A9B30u + (uint32_t)(row * 16 + frame) * 0x2C); }
 Sprite* boom_sprite(int32_t kind, int32_t frame) { return ArtSprite(0x7AB460u + (uint32_t)(kind * 16 + frame) * 0x2C); }
@@ -254,7 +251,7 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
                     if (!shot) {
                         int32_t kind = (flags & 0x100)  ? 3
                                        : (flags & 0x80) ? 2
-                                                        : (Units[veh_unit(second)].reactor_id > 1 ? 1 : 0);
+                                                        : (unit_of(second).reactor_id > 1 ? 1 : 0);
                         s = boom_sprite(kind, f);
                         table = kind == 3 ? 6 : 0;
                     } else {

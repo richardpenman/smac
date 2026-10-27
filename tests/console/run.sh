@@ -23,7 +23,7 @@ NEW="--new size=0 --human 1 --seed 1,2"
 run() {  # run CASE ARGS... : log in OUT/CASE.log
     local name="$1"; shift
     mkdir -p "$OUT/$name"
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --original-bugs --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
 # check CASE DESCRIPTION REGEX: the log matches (grep -E)

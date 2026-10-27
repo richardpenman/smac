@@ -102,17 +102,29 @@ The constraints: savegames stay byte-compatible, and the `.state` snapshots stay
 
 ## 4. `BUG(original)` behind named compatibility code
 
-* `engine/compat.h`: `struct Compat { bool arm_val_unit_ids = true; bool path_zoc_residue = true; ... };`
-  plus `extern Compat g_compat;`. Every flag defaults to the original behaviour.
-* Each of the 173 sites becomes `if (g_compat.flag) { original } else { fixed }`, or a named
-  helper (`compat_arm_val_index()`). The comment says what the bug is and what the fix would be.
-* In the cleanup phase the `else` branch is left empty or asserts. Fixes come later, as
-  deliberate changes. The gate proves only the on-path. Each fixed path gets its own unit test
-  and, when it matters, a scenario.
-* The stack-residue emulations (`g_stack_residue`, `EM` slots) are compat items too. Keep them
-  grouped in a `StackResidue` context, not scattered globals.
-* The catalogue is generated from the flags (`docs/COMPAT.md`). Later it can be exposed as ini
-  options.
+* `engine/compat.h`: `struct Compat { bool read_after_kill = false; ... }` plus `inline Compat
+  g_compat;`. A flag `true` plays the original's bug, `false` its fix.
+* User decision (after increment 9): smacx plays with every fix by default; one switch,
+  `--original-bugs` or `Original Bugs=1` in the ini (`compat_set_original_bugs`), turns every flag
+  on, i.e. the game exactly as terranx.exe plays it. There is no per-bug user option; the single
+  flags stay for the code and the tests. Everything compared with the original runs with the
+  original bugs: `harness/verify.sh` (`smacx_headless --original-bugs`), the gate's observer and
+  ASan steps, the hybrid DLL (forced on in `DllMain`: patched functions must behave as the
+  original's), the scripted suites (see docs/DEVELOPMENT.md). Multiplayer: a hotseat/PBEM save
+  carries the setting (a mark in the legacy preferences block, engine/save.h), an online host
+  sends it (0x0F10).
+* Each site is `if (g_compat.flag) { original } else { fixed }`, a named helper (e.g.
+  `engine/compat_reads.h` for the out-of-range reads, `ai_base_slots()`), or for a few flags
+  whose fix equals the reconstruction's emulation (stack residues read as 0) a comment naming the
+  flag. A flag whose fix is deliberately not written keeps `COMPAT_ORIGINAL(flag)` and its
+  comment says why ("Not fixed:"); five do (see docs/COMPAT.md).
+* The fixed paths have unit tests where they are reachable without game data
+  (tests/unit/test_compat_fixes.cpp, including the guarded readers); the gate's `fixes` step
+  plays scenarios with the fixes under ASan.
+* The stack-residue emulations (`g_stack_residue`, `EM` slots) are compat items too, grouped in
+  `Compat::StackResidue`.
+* The catalogue is generated from the flags (`docs/COMPAT.md`: what each bug does in play, the
+  fix, the files).
 
 ## 5. Naming conventions
 
@@ -316,6 +328,24 @@ Notes on the increments:
    before, else `compat flag` in the comment's text), every flag to be declared and used, and
    docs/COMPAT.md (`compat.py doc`, sites listed per file, no line numbers) to be current.
    tests/unit/test_compat.cpp checks that every flag defaults on.
+
+   Follow-up (user decision: fixes by default, one `--original-bugs` switch; section 4): every
+   fix is written except five, which keep `COMPAT_ORIGINAL` with a "Not fixed:" reason:
+   `queue_scan_one_past` and `project_intel_byte_offset` are not bugs (the queue holds
+   queue_size + 1 items; the project-news bits are addressed consistently everywhere),
+   `net_round_restart` is harmless and its suggested fix would be wrong, `prototyped_last_unit`
+   has no recoverable intent, `fungal_worms_unreachable` would add a feature. 123 flags default to
+   the fix (false); `compat_set_original_bugs(true)` turns all 128 on. Several stack-residue flags
+   (`parse_gender`, `revolt_shares`, `ai_score`, enemy_move's `s38`/`s48`/`edi`, also
+   `score_divide_zero` and `legacy_prefs_uninit`) were already emulated with the fix's value, so
+   both settings play alike there; their sites name the flag in a comment. The out-of-range reads
+   go through the guarded readers of `engine/compat_reads.h` where several sites share one.
+   `compat.py check` now also requires a "Fix:" for a flag defaulting to false, a "Not fixed:"
+   reason for one defaulting to true, and no `COMPAT_ORIGINAL` at a fixed flag's sites; the
+   catalogue's columns are Bug (what it does in play), Fix and Where. tests/unit/test_compat.cpp
+   checks the two settings; tests/unit/test_compat_fixes.cpp the fixed paths reachable without
+   game data. A game with the fixes differs from the original from the first turn on (tiny20:
+   turn 0, the factions' emphasised social effect; council131: its first played turn, 121).
 
 10. `base_production`, `base_yield` and `base_growth` (base.cpp) keep their `ADDR` and become short
     drivers over static helpers, each block moved unchanged in order. `base_production` shares its

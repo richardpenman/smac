@@ -497,8 +497,7 @@ void GAMEAPI read_faction(MFaction* faction, int32_t toggle) {
         crt_strcat(StrBuffer, text_item());
         for (int32_t i = 0; i < 11; i++) {
             if (!crt_stricmp(StrBuffer, SocialParam[i].set1)) {
-                COMPAT_ORIGINAL(social_effect_not_stored);
-                *effect = -1;  // BUG(original): the matching effect index is not stored
+                *effect = g_compat.social_effect_not_stored ? -1 : i;  // BUG(original): the index is not stored
                 break;
             }
         }

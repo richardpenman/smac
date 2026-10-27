@@ -19,12 +19,16 @@ mkdir -p "$OUT"
 # The menus' ini: the harness's with Difficulty=2 (as tests/menu).
 cat "$ROOT/harness/oracle/runtime/Alpha Centauri.Ini" > "$OUT/hotseat.ini"
 echo "Difficulty=2" >> "$OUT/hotseat.ini"
+# The first game is played with the original's bugs (the ini's key, as a player sets it): its save
+# carries the setting, and the reload (whose ini has the default, the fixes) plays with the save's.
+cp "$OUT/hotseat.ini" "$OUT/hotseat_ob.ini"
+echo "Original Bugs=1" >> "$OUT/hotseat_ob.ini"
 FAIL=0
 
 run() {  # run CASE ARGS... : log in OUT/CASE.log
     local name="$1"; shift
     mkdir -p "$OUT/$name"
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 900 "$SMACX" --hidden --ini "$OUT/hotseat.ini" --outdir "$OUT/$name" \
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 900 "$SMACX" --hidden --ini "${INI:-$OUT/hotseat.ini}" --outdir "$OUT/$name" \
         "$@" > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
@@ -58,7 +62,7 @@ T1="SHOT:switching.bmp,a,b,ENTER,a,b,ENTER,F12,CLICK:950x366,CLICK:790x467,CLICK
 SHOT:diplo1.bmp,SCREENSTATE,ESC,ESC,$END"
 T2="ENTER,SHOT:diplo2.bmp,CLICK:330x519,SCREENSTATE,ESC,DIPLOSTATE,FACTIONSTATE,$END"
 T3="z,z,ENTER,a,b,ENTER,ENTER,ENTER,FACTIONSTATE,$END,CLICK:344x478,h,s,ENTER"
-run game --seed 1001,2001 --keys "$SETUP,$T1,$T2,$T3"
+INI="$OUT/hotseat_ob.ini" run game --seed 1001,2001 --keys "$SETUP,$T1,$T2,$T3"
 check game "the service list" "^popup SELECTSERVICE answer: 9999"
 check game "the HOTSEAT menu" 'menustate caption="HOTSEAT/EMAIL GAME" selected=0 \[NEW MULTIPLAYER GAME\]'
 check game "another human player" "^hotseat players 02: add"
@@ -92,6 +96,7 @@ cp "$OUT/game/saves/hs.SAV" "$OUT/reload/saves/" 2>/dev/null
 run reload --keys "DOWN,DOWN,DOWN,DOWN,ENTER,ENTER,DOWN,DOWN,ENTER,h,s,ENTER,ENTER,ENTER,ENTER,DIPLOSTATE,$END,\
 a,b,ENTER,FACTIONSTATE,SHOT:reload.bmp,QUIT"
 check reload "loaded" "^filebox: saves.hs.SAV"
+check reload "the save's setting: the original bugs" "^smacx: this game plays with the original bugs \\(the save's setting\\)"
 check reload "Pirates' handover" "^hotseat: switching to faction 2 \\(no password\\)"
 check reload "the treaty kept" "^diplo 1 status 00000002"
 check reload "University's password asked" "^hotseat: switching to faction 1 \\(password\\)"

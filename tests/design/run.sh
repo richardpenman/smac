@@ -30,7 +30,7 @@ run() {  # run CASE ARGS... : runs smacx, log in OUT/CASE.log
     local name="$1"; shift
     mkdir -p "$OUT/$name"
     rm -f "$OUT/$name"/*.bmp
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --original-bugs --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
 line() {  # line CASE PREFIX N : the Nth log line starting with PREFIX

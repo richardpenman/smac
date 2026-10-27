@@ -23,7 +23,7 @@ if [ ! -f "$ORIG/design.png" ]; then
     "$PY" "$ROOT/tests/popups/orig_drive.py" "$ROOT/tests/design/orig_design.steps" "$ORIG" \
         "$ROOT/tests/reports/orig_extra.ini"
 fi
-(cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 300 "$SMACX" --hidden --new size=0 --human 1 --seed 1,2 \
+(cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 300 "$SMACX" --original-bugs --hidden --new size=0 --human 1 --seed 1,2 \
     --outdir "$OUT/smacx" --keys "ENTER,SHOT:main.bmp,u,SHOT:design.bmp,ESC,F1,SHOT:datalink.bmp,ESC,R,\
 SHOT:priorities.bmp,ESC" > "$OUT/smacx.log" 2>&1)
 # Regions: the design workshop with the main interface (its window above the interface); the

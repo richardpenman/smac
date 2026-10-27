@@ -135,7 +135,8 @@ static int32_t wants_to_attack_core(int32_t faction_id, int32_t faction_id_tgt, 
     if (f1.AI_fight < 0 && !ally_at_war && FactionRankings[7] != faction_id_tgt) return 0;
     // BUG(original): the per-faction maxima of region_total_bases start from uninitialised
     // stack slots (known uninitialised read #4).
-    COMPAT_ORIGINAL(residue.region_maxima);
+    int32_t fresh[8] = {};  // fixed: the maxima start from 0
+    if (!g_compat.residue.region_maxima) slots = fresh;
     for (int32_t r = 1; r < 64; r++) {
         for (int32_t k = 1; k < 8; k++) {
             int32_t v = game().factions[k].region_total_bases[r];
@@ -428,7 +429,7 @@ static bool tech_tradeable(int32_t owner, int32_t tech_id, uint32_t pact_status,
     if (!(diplo_status_raw(owner, src) & 2)) return true;
     // BUG(original): when faction_id gives a tech, the friction is read with faction_id_with's
     // source of the tech (friction_of is the receiver in both directions).
-    COMPAT_ORIGINAL(tech_friction_receiver);
+    if (!g_compat.tech_friction_receiver) friction_of = owner;  // fixed: the giver's friction and source
     int32_t src2 = game().factions[friction_of].tech_trade_source[tech_id];
     const int32_t* friction = reinterpret_cast<const int32_t*>(
         reinterpret_cast<const uint8_t*>(&game().factions[0].diplo_friction[0]) +
@@ -733,7 +734,7 @@ int32_t GAMEAPI territory(int32_t faction_id, int32_t faction_id_with, int32_t f
         if ((sq->climate & 0xE0) < 0x60 || tolerated[sq->region]) continue;
         // BUG(original): base_id keeps its previous value (initially status bit 0x20) when
         // whose_territory does not write it.
-        COMPAT_ORIGINAL(territory_base_id_stale);
+        if (!g_compat.territory_base_id_stale) base_id = -1;
         if (whose_territory(faction_id_with, veh.x, veh.y, &base_id, 1) != faction_id || base_id < 0) continue;
         if (base_id_out) *base_id_out = base_id;
         count++;
@@ -816,8 +817,8 @@ void GAMEAPI atrocity(int32_t faction_id, int32_t faction_id_vs, int32_t count_i
     }
     // BUG(original): the "victim is an AI" test uses the loop counter (8) instead of the victim:
     // always true.
-    COMPAT_ORIGINAL(atrocity_victim_loop_counter);
-    if (is_human(f) && !(FactionStatus[0] & (1u << i)) && !was_victim && atrocities >= 5)
+    const int32_t victim_id = g_compat.atrocity_victim_loop_counter ? i : faction_id_vs;
+    if (is_human(f) && !(FactionStatus[0] & (1u << victim_id)) && !was_victim && atrocities >= 5)
         game().factions[faction_id_vs].player_flags |= PFLAG_COMMIT_ATROCITIES_WANTONLY;
     say_leader(0, f);
     say_leader(2, faction_id_vs);
@@ -825,9 +826,8 @@ void GAMEAPI atrocity(int32_t faction_id, int32_t faction_id_vs, int32_t count_i
     StrBuffer[0] = 0;
     crt_strcat(StrBuffer, "ATROCITY");
     // BUG(original): "1" is meant for the victim being the viewer; the test is victim == f.
-    COMPAT_ORIGINAL(atrocity_label_victim);
     if (f == CurrentPlayerFaction) crt_strcat(StrBuffer, "2");
-    else if (faction_id_vs == f) crt_strcat(StrBuffer, "1");
+    else if (faction_id_vs == (g_compat.atrocity_label_victim ? f : CurrentPlayerFaction)) crt_strcat(StrBuffer, "1");
     if (!is_alien(f)) NetMsg_pop(&NetMsg, StrBuffer, 5000, 0, nullptr);
     fac.sanction_turns += atrocities * 10;
 }
@@ -1105,10 +1105,10 @@ int32_t GAMEAPI contiguous(int32_t faction_id, int32_t faction_id_with, int32_t 
             MAP* sq2 = map_tile(game().bases[j].x, game().bases[j].y);
             if (sq2->region != r || sq2->unk_1) continue;
             Path_territory(&Paths, game().bases[j].x, game().bases[j].y, r, faction_id_with);
-            // BUG(original)? faction_id is passed as the unit id.
-            COMPAT_ORIGINAL(path_unit_faction_id);
+            // BUG(original): faction_id is passed as the unit id (factions 3 and 4 path as ships).
+            const int32_t path_unit = g_compat.path_unit_faction_id ? faction_id : (int32_t)BSC_SCOUT_PATROL;
             if (Path_find(&Paths, game().bases[i].x, game().bases[i].y, game().bases[j].x, game().bases[j].y,
-                          faction_id, faction_id_with, (a4 ? 0xC00 : 0) | 0x201, -1) >= 0)
+                          path_unit, faction_id_with, (a4 ? 0xC00 : 0) | 0x201, -1) >= 0)
                 return 1;
         }
     }

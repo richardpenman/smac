@@ -117,7 +117,7 @@ void GAMEAPI load_vehicles() {
     // Chassis 0..8: the flag markers right of the model column (x 0x394..0x3F9). The vertical
     // position is stored in the variant slot of the last special row's count (BUG(original):
     // a stale loop counter; veh_draw reads slot 0, which stays 0).
-    COMPAT_ORIGINAL(flag_marker_stale_slot);
+    const int32_t marker_slot = g_compat.flag_marker_stale_slot ? last_count : 0;  // fixed: slot 0
     for (int32_t c = 0; c < 9; c++) {
         int32_t y0 = 2 + 0x4D * c;
         for (int32_t i = 0; i < 100; i++)
@@ -125,7 +125,7 @@ void GAMEAPI load_vehicles() {
                 if (Buffer_get_pixel(&g_canvas, 0x396 + i, r) == 5) VehSpriteOffsets[c][0][0] = (int8_t)i;
         for (int32_t i = 0; i < 0x4B; i++)
             for (int32_t x = 0x394; x <= 0x395; x++)
-                if (Buffer_get_pixel(&g_canvas, x, y0 + i + 1) == 5) VehSpriteOffsets[c][1][last_count] = (int8_t)i;
+                if (Buffer_get_pixel(&g_canvas, x, y0 + i + 1) == 5) VehSpriteOffsets[c][1][marker_slot] = (int8_t)i;
     }
     load_flags();
 }
@@ -790,13 +790,13 @@ void GAMEAPI vehdraw_construct_abil(uint32_t abil, VoxelScene* sc, int32_t f) {
         if (bits & 0x40000) add(sc, 0x78A5E0);
     };
     // BUG(original): the faction's free abilities (bonus FREEABIL) the unit has are drawn twice.
-    COMPAT_ORIGINAL(free_abilities_twice);
     const MFaction& m = MFactions[f];
     for (int32_t k = 0; k < m.faction_bonus_count; k++) {
         if (m.faction_bonus_id[k] != 0xF) continue;
         const int32_t ab = m.faction_bonus_val1[k];
         if (!has_tech(Ability[ab].preq_tech, f)) continue;
-        models((1u << (ab & 0x1F)) & abil);
+        // Fixed (compat free_abilities_twice): only the free abilities the unit does not have.
+        models((1u << (ab & 0x1F)) & (g_compat.free_abilities_twice ? abil : ~abil));
     }
     models(abil);
 }

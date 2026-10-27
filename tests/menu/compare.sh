@@ -26,7 +26,7 @@ if [ ! -f "$ORIG/topmenu.png" ]; then
         "$ROOT/tests/reports/orig_extra.ini"
 fi
 cat "$ROOT/harness/oracle/runtime/Alpha Centauri.Ini" "$ROOT/tests/reports/orig_extra.ini" > "$OUT/menu.ini"
-(cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 300 "$SMACX" --hidden --seed 1,2 --ini "$OUT/menu.ini" \
+(cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 300 "$SMACX" --original-bugs --hidden --seed 1,2 --ini "$OUT/menu.ini" \
     --outdir "$OUT/smacx" --keys "SHOT:topmenu.bmp,DOWN,SHOT:topmenu_down.bmp,DOWN,ENTER,SHOT:scenariomenu.bmp,\
 ESC,DOWN,ENTER,SHOT:loadgame.bmp,ESC,DOWN,ENTER,SHOT:multimenu.bmp,ESC,DOWN,ENTER,SHOT:credits.bmp,ESC,\
 UP,UP,UP,UP,UP,ENTER,SHOT:mapmenu.bmp,DOWN,ENTER,SHOT:worldsize.bmp,ENTER,SHOT:worldland.bmp,ENTER,\

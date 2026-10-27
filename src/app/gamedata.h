@@ -40,6 +40,7 @@ std::string data_image(const std::string& gamedir, const std::string& udir);
 // The default ini next to the executable (the release ships it), else the built-in copy, written
 // to path when path does not exist yet, with "Sliding windows" off (smacx's default for players).
 // An existing ini has them turned off once (recorded in udir's smacx.cfg).
+// The ini gets smacx's "Original Bugs=0" when it has no such key.
 void seed_ini(const std::string& path, const std::string& udir);
 
 // Shows an error to the player (message box, and stderr).

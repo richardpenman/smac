@@ -301,8 +301,9 @@ void Base::mark() {
         }
     }
     // BUG(original): the sites are deleted around the last radius tile instead of the base.
-    COMPAT_ORIGINAL(del_site_last_radius_tile);
-    for (int32_t f = 0; f < 8; f++) del_site(f, 8, tile_x, tile_y, 3);
+    const int32_t site_x = g_compat.del_site_last_radius_tile ? tile_x : x;
+    const int32_t site_y = g_compat.del_site_last_radius_tile ? tile_y : y;
+    for (int32_t f = 0; f < 8; f++) del_site(f, 8, site_x, site_y, 3);
 }
 
 int32_t GAMEAPI cost_factor(int32_t faction_id, int32_t is_mineral, int32_t base_id) {
@@ -1982,8 +1983,7 @@ BASE_ENERGY_DEF {
     }
     // BUG(original): the alien bonus below starts from a local that only the commerce loop writes
     // (residue of base_minerals otherwise).
-    COMPAT_ORIGINAL(residue.alien_bonus_energy);
-    int32_t value = ENERGY_RESIDUE_GET();
+    int32_t value = g_compat.residue.alien_bonus_energy ? ENERGY_RESIDUE_GET() : 0;
     for (int32_t i = 1; i < 8; i++) {
         BaseCommerceImport[i] = 0;
         BaseCommerceExport[i] = 0;
@@ -2162,7 +2162,7 @@ void GAMEAPI base_compute(int32_t force) {
 int32_t GAMEAPI base_rank(int32_t faction_id, int32_t position) {
     // One frame block as in the original (values below ids): a negative position reads values[]
     // (BUG(original); never passed by the game). Zeroed like the oracle's poisoned stack.
-    COMPAT_ORIGINAL(residue.base_list_frame);
+    if (position < 0 && !g_compat.residue.base_list_frame) return -1;  // fixed: no negative position
     int32_t block[1024] = {};
     int32_t* values = block;
     int32_t* ids = block + 512;
@@ -2249,9 +2249,9 @@ int32_t Base::queue_next() {
     for (;;) {
         if (queue_items[0] >= 0) game().factions[owner].units_queue[queue_items[0]]--;
         // BUG(original): with a full queue the shift reads the word after queue_items (worked_tiles).
-        COMPAT_ORIGINAL(queue_shift_past_end);
         int32_t* items = queue_items;
-        for (int32_t i = 0; i < queue_size; i++) items[i] = items[i + 1];
+        const int32_t shift = g_compat.queue_shift_past_end || queue_size < 10 ? queue_size : 9;  // fixed: within the queue
+        for (int32_t i = 0; i < shift; i++) items[i] = items[i + 1];
         queue_size--;
         int32_t item = queue_items[0];
         bool ok = item >= 0 ? veh_avail(item, owner, base_id) != 0 : facility_avail(-item, owner, base_id, 0) != 0;
@@ -2537,7 +2537,8 @@ void GAMEAPI do_upgrade(int32_t faction_id, int32_t new_unit_id, int32_t old_uni
     for (int32_t i = 0; i < game().base_count; i++) {
         BASE& base = game().bases[i];
         if ((uint8_t)base.faction_id != faction_id || base.queue_size < 0) continue;
-        // BUG(original): also checks the slot after the queue (queue_items[queue_size]).
+        // BUG(original)? also checks queue_items[queue_size], which is the queue's last item
+        // (compat queue_scan_one_past, not a bug: not fixed).
         COMPAT_ORIGINAL(queue_scan_one_past);
         int32_t* items = base.queue_items;
         for (int32_t j = 0; j <= base.queue_size; j++)
@@ -2935,8 +2936,8 @@ void GAMEAPI drone_riot() {
             if ((uint8_t)game().bases[i].faction_id == faction_id) continue;
             int32_t dist = base_dist(game().bases[i].x, game().bases[i].y, cur_base());
             // BUG(original): the diplomatic weighting uses the best faction found so far (-1 at first).
-            COMPAT_ORIGINAL(revolt_weight_best_so_far);
-            uint32_t status = diplo_status_raw(faction_id, target);
+            uint32_t status = diplo_status_raw(
+                faction_id, g_compat.revolt_weight_best_so_far ? target : (int32_t)(uint8_t)game().bases[i].faction_id);
             if (status & 1) dist *= 2;
             if (status & 2) dist = dist * 3 / 2;
             if (status & 4) dist /= 2;
@@ -2948,8 +2949,8 @@ void GAMEAPI drone_riot() {
     }
     // Factions with a REVOLT bonus attract the revolt.
     // BUG(original): the shares of factions without the bonus are never written (stack residue); the
-    // oracle's poisoned stack makes them 0, which this emulates.
-    COMPAT_ORIGINAL(residue.revolt_shares);
+    // oracle's poisoned stack makes them 0, which this emulates and which is also the fix
+    // (compat residue.revolt_shares).
     int32_t shares[8] = {};
     int32_t total = 0;
     for (int32_t i = 1; i < 8; i++) {
@@ -2992,8 +2993,10 @@ void GAMEAPI drone_riot() {
     cur_base().minerals_accumulated = 0;
     if (cur_base().queue_size >= 0) {
         int32_t* items = cur_base().queue_items;
+        // BUG(original)? one past the queue: queue_items[queue_size] is its last item (compat
+        // queue_scan_one_past, not a bug: not fixed).
         COMPAT_ORIGINAL(queue_scan_one_past);
-        for (int32_t j = 0; j <= cur_base().queue_size; j++)  // BUG(original): one past the queue
+        for (int32_t j = 0; j <= cur_base().queue_size; j++)
             if (items[j] >= 0) f.units_queue[items[j]]--;
     }
     cur_base().queue_size = 0;
@@ -3051,12 +3054,12 @@ void GAMEAPI drone_riot() {
             game().vehs[veh_id].home_base_id == CurrentBaseID)
             kill(veh_id);
     // BUG(original): both passes test the bonus techs of the old faction.
-    COMPAT_ORIGINAL(capture_bonus_old_faction);
     for (int32_t pass = 0; pass < 2; pass++) {
         MFaction& mb = game().mfactions[pass == 0 ? faction_id : target];
+        const int32_t tech_owner = g_compat.capture_bonus_old_faction || pass == 0 ? faction_id : target;
         for (int32_t k = 0; k < mb.faction_bonus_count; k++) {
             if (mb.faction_bonus_id[k] != 2 &&
-                !(mb.faction_bonus_id[k] == 12 && has_tech(Facility[mb.faction_bonus_val1[k]].preq_tech, faction_id)))
+                !(mb.faction_bonus_id[k] == 12 && has_tech(Facility[mb.faction_bonus_val1[k]].preq_tech, tech_owner)))
                 continue;
             int32_t fac = mb.faction_bonus_val1[k];
             if (fac < 1) fac = 1;
@@ -3127,8 +3130,7 @@ void GAMEAPI base_doctors() {
                 item == -FAC_RESEARCH_HOSPITAL || item == -FAC_NANOHOSPITAL)
                 return;
             // BUG(original): compares with unit 8 instead of the Network Node.
-            COMPAT_ORIGINAL(psych_request_unit_8);
-            if (item == 8 && has_sp(FAC_VIRTUAL_WORLD - 70, faction_id)) return;
+            if (item == (g_compat.psych_request_unit_8 ? 8 : -FAC_NETWORK_NODE) && has_sp(FAC_VIRTUAL_WORLD - 70, faction_id)) return;
             if (game().mfactions[faction_id].rule_flags & RFLAG_ALIEN) popb("PSYCHREQUEST", 0, -1, "Alopdir.pcx", 0);
             else popb("PSYCHREQUEST", 0, -1, "talent_sm.pcx", 0);
             return;
@@ -3910,8 +3912,9 @@ void GAMEAPI base_hurry() {
             if (i == faction_id || !(f.diplo_status[i] & (DIPLO_VENDETTA | DIPLO_WANT_REVENGE | DIPLO_ATROCITY_VICTIM)))
                 continue;
             // BUG(original): the byte tested is region_total_bases[i] of faction i.
-            COMPAT_ORIGINAL(hurry_region_bases_index);
-            if (game().factions[i].region_total_bases[i] || (FactionStatus[0] & (1u << i))) spend = credits / 10;
+            const int32_t region =
+                g_compat.hurry_region_bases_index ? i : (int32_t)map_tile(cur_base().x, cur_base().y)->region;
+            if (game().factions[i].region_total_bases[region] || (FactionStatus[0] & (1u << i))) spend = credits / 10;
         }
     } else if (fac >= 70) {
         spend = f.energy_credits / 50;
@@ -4043,9 +4046,13 @@ void GAMEAPI base_ecology() {
         if (tile_is_base(sq) || (sq->landmarks & 0x80000002) == 2) continue;
         if (improvement < 0) {
             // BUG(original): this search reuses the loop counter, which ends the spreading loop.
-            COMPAT_ORIGINAL(fungus_spread_loop_counter);
-            for (k = 0; k < 19; k++)
-                if (items & Terraform[k].bit & FungusClearItems) improvement = k;
+            if (g_compat.fungus_spread_loop_counter) {
+                for (k = 0; k < 19; k++)
+                    if (items & Terraform[k].bit & FungusClearItems) improvement = k;
+            } else {
+                for (int32_t j = 0; j < 19; j++)
+                    if (items & Terraform[j].bit & FungusClearItems) improvement = j;
+            }
         }
         bit_set(x, y, BIT_FUNGUS, 1);
         bit_set(x, y, FungusClearItems, 0);

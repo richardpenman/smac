@@ -432,10 +432,10 @@ void GAMEAPI say_loc(char* buffer, int32_t x, int32_t y, int32_t near_base, int3
         std::strcat(buffer, ")");
         if ((GameState & STATE_SCENARIO_EDITOR) && (GameState & STATE_DEBUG_MODE)) {
             // BUG(original): the region number goes to StrBuffer, not to buffer.
-            COMPAT_ORIGINAL(region_number_strbuffer);
-            std::strcat(StrBuffer, " ");
+            char* out = g_compat.region_number_strbuffer ? StrBuffer : buffer;
+            std::strcat(out, " ");
             crt_itoa(map_tile(x, y)->region, num, 10);
-            std::strcat(StrBuffer, num);
+            std::strcat(out, num);
         }
     }
 }
@@ -560,8 +560,14 @@ void GAMEAPI set_dirty() {
 
 // BUG(original): sets the redraw flag of every tile instead of clearing it.
 void GAMEAPI clear_dirty() {
-    COMPAT_ORIGINAL(clear_dirty_sets);
-    mark_all_dirty();
+    if (g_compat.clear_dirty_sets) {
+        mark_all_dirty();
+        return;
+    }
+    MAP* sq = game().map.tiles;
+    for (int32_t y = 0; y < game().map.y; y++) {
+        for (int32_t x = y & 1; x < game().map.x; x += 2, sq++) sq->landmarks &= ~0x400000u;
+    }
 }
 
 void GAMEAPI map_resize(int32_t width, int32_t height) {
@@ -572,8 +578,12 @@ void GAMEAPI map_resize(int32_t width, int32_t height) {
     game().map.tiles = nullptr;
     game().map.x = width;
     game().map.y = height;
-    COMPAT_ORIGINAL(map_resize_abstract_leak);
-    map_init();  // BUG(original): the previous MapAbstract array is not freed.
+    // BUG(original): the previous MapAbstract array is not freed.
+    if (!g_compat.map_resize_abstract_leak && MapAbstract) {
+        mem_free(MapAbstract);
+        MapAbstract = nullptr;
+    }
+    map_init();
     wipe_tiles();
     for (int32_t y = 0; y < game().map.y; y++) {
         for (int32_t x = y & 1; x < game().map.x; x += 2) {

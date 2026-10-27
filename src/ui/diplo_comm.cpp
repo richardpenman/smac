@@ -220,10 +220,11 @@ int32_t GAMEAPI communicate(int32_t f, int32_t fw, int32_t a3) {
             draw_map(1);
         }
         // BUG(original): base_id may be -1 here (the name is read before Bases).
-        COMPAT_ORIGINAL(territory_base_minus1);
-        says_n(0, (&Bases[0] + base_id)->name);
-        says_n(1, MFactions[fw].adj_name_faction);
-        pop("INOURTERRITORY2", fw);
+        if (base_id >= 0 || g_compat.territory_base_minus1) {  // fixed: no base, no message
+            says_n(0, (&Bases[0] + base_id)->name);
+            says_n(1, MFactions[fw].adj_name_faction);
+            pop("INOURTERRITORY2", fw);
+        }
     }
 L_550a82:
     if (!(flags & 3)) goto END;
@@ -483,8 +484,8 @@ L_551ecb:
                 says_n(3, get_phrase(DiploUnmetEnemy, 5));
                 says_n(4, get_pact_hood(f, fw));
                 // BUG(original): the alien text is chosen by DiploHelpFaction, not the faction met.
-                COMPAT_ORIGINAL(introduce_alien_text);
-                if (!pop(alien(DiploHelpFaction) ? "INTRODUCEENEMYALIEN" : "INTRODUCEENEMY", fw)) goto L_553464;
+                const int32_t met = g_compat.introduce_alien_text ? DiploHelpFaction : DiploUnmetEnemy;
+                if (!pop(alien(met) ? "INTRODUCEENEMYALIEN" : "INTRODUCEENEMY", fw)) goto L_553464;
                 lock();
                 net_set_treaty(f, DiploUnmetEnemy, 0x10000000, 1, 0);
                 pact_of_brotherhood(f, fw);
@@ -1833,8 +1834,9 @@ L_55778a:
         if (losing && !has_treaty(f, fw, 0x2000)) {
             for (int32_t g = 1; g < 128; g++) {
                 // BUG(original): the faction bit of DiploRegionFactions is not tested (1 << losing only).
-                COMPAT_ORIGINAL(region_factions_bit);
-                if (!bad_reg(g) && DiploRegionFactions[g] &&
+                const bool in_region = g_compat.region_factions_bit ? DiploRegionFactions[g] != 0
+                                                                    : (DiploRegionFactions[g] & (1u << (losing & 31))) != 0;
+                if (!bad_reg(g) && in_region &&
                     Factions[fw].region_force_rating[g] > Factions[losing].region_total_combat_units[g]) {
                     says_n(0, get_adjective(losing));
                     says_n(1, get_title(losing));

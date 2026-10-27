@@ -16,7 +16,7 @@ SMACX="$(realpath "${SMACX:-$ROOT/build/p10-native/smacx}")"
 mkdir -p "$OUT"
 printf 'seed 1001 2001\nnewgame size=0 diff=3\nlogsound 0\nturns 20\n' > "$OUT/sound20.cmd"
 "$ROOT/harness/run_oracle.sh" "$OUT/sound20.cmd" "$OUT/oracle" 900 > "$OUT/oracle_run.log" 2>&1
-(cd "$ROOT" && SDL_VIDEODRIVER=dummy SMACX_SOUNDLOG=1 timeout 900 "$SMACX" --hidden --nosound --outdir "$OUT/smacx" \
+(cd "$ROOT" && SDL_VIDEODRIVER=dummy SMACX_SOUNDLOG=1 timeout 900 "$SMACX" --original-bugs --hidden --nosound --outdir "$OUT/smacx" \
     --new size=0 diff=3 --seed 1001,2001 --human 0 --turns 20 --snapshots "$OUT/smacx/snap" > "$OUT/smacx.log" 2>&1)
 python3 "$ROOT/harness/compare.py" "$OUT/oracle" "$OUT/smacx/snap" | tail -1
 python3 "$ROOT/tests/sound/soundcmp.py" "$OUT/oracle/oracle.log" "$OUT/smacx.log" --one-window

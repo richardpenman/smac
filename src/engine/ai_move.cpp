@@ -21,6 +21,7 @@
 #include "engine/base_misc.h"
 #include "engine/battle.h"
 #include "engine/compat.h"
+#include "engine/compat_reads.h"
 #include "engine/diplomacy.h"
 #include "engine/diplo_act.h"
 #include "engine/game_state.h"
@@ -82,6 +83,14 @@ inline int32_t base_y_raw(int32_t base_id) {
     return v;
 }
 inline MAP* sq_at(int32_t x, int32_t y) { return map_tile(x, y); }
+// A base's position, or the fallback position for no base (-1) with the fix of compat
+// out_of_range_reads; with the original's bug Bases[-1] is read.
+inline int32_t base_x_opt(int32_t base_id, int32_t fallback) {
+    return base_id < 0 && !g_compat.out_of_range_reads ? fallback : base_x_raw(base_id);
+}
+inline int32_t base_y_opt(int32_t base_id, int32_t fallback) {
+    return base_id < 0 && !g_compat.out_of_range_reads ? fallback : base_y_raw(base_id);
+}
 inline bool sq_ocean(const MAP* sq) { return (sq->climate & 0xE0) < 0x60; }
 inline int32_t sq_ocean_i(const MAP* sq) { return sq_ocean(sq) ? 1 : 0; }
 inline int32_t tile_region(int32_t x, int32_t y) { return map_tile(x, y)->region; }
@@ -704,8 +713,8 @@ Flow em_auto_former(EM& m, uint32_t state) {
                         m.s70 = -1;
                     } else {
                         m.s70 = owner;
-                        // BUG(original): reads [ebp-0x38], not written on this path in this call.
-                        COMPAT_ORIGINAL(residue.enemy_move_s38);
+                        // BUG(original): reads [ebp-0x38], not written on this path in this call
+                        // (compat residue.enemy_move_s38: 0 here, the fix's value too, see enemy_move).
                         if (owner != m.fac || m.s38 != 0) continue;
                     }
                 }
@@ -1327,7 +1336,7 @@ Flow em_drop_pod(EM& m) {
     // L_56e9aa: no target in range: drop next to any enemy base.
     // BUG(original): `best` is not reset (still 99999 from the search above), so no tile ever
     // scores higher and this search never drops.
-    COMPAT_ORIGINAL(drop_best_not_reset);
+    if (!g_compat.drop_best_not_reset) m.best = 0;  // fixed: a site must score above 0
     v.order = ORDER_NONE;
     if (m.f().units_active[m.unit] <= 1) return F_56e62d;
     m.s58 = -1;
@@ -1714,10 +1723,11 @@ Flow em_colony(EM& m) {
         m.val = m.base_id < 6 ? 1 : 2;
         if (m.dist_any >= 0) {
             // BUG(original): base_any may be -1 here (Bases[-1], see base_raw).
-            COMPAT_ORIGINAL(out_of_range_reads);
-            m.s38 = hdist(m.tx, m.ty, base_x_raw(m.base_any), base_y_raw(m.base_any));
-            if (m.s38 <= 4) m.val = 1;
-            if (m.s38 >= 6 && m.s38 < 12 && m.base_id >= 10) m.val = 3;
+            if (m.base_any >= 0 || g_compat.out_of_range_reads) {  // fixed: no base, no distance rule
+                m.s38 = hdist(m.tx, m.ty, base_x_raw(m.base_any), base_y_raw(m.base_any));
+                if (m.s38 <= 4) m.val = 1;
+                if (m.s38 >= 6 && m.s38 < 12 && m.base_id >= 10) m.val = 3;
+            }
         }
         del_site(m.fac, 8, m.x, m.y, 2);
         add_site(m.fac, 8, m.val, m.tx, m.ty);
@@ -2149,11 +2159,10 @@ Flow em_defend(EM& m) {
             m.stay = 1;
             m.defend = (n <= 1) + 1;
             if (m.s6c) return RET1;
-            COMPAT_ORIGINAL(region_faction_0_units);
+            const Faction& counted = g_compat.region_faction_0_units ? game().factions[0] : m.f();
             if (m.plan == PLAN_DEFENSE && m.region_plan > 2 && n >= m.s48 &&
                 !(game().bases[m.base_own].state_flags & 0x4000000) &&
-                (n > 1 ||
-                 (game().factions[0].region_total_combat_units[m.region] == 0 && !(m.f().player_flags & 0x10000))))
+                (n > 1 || (counted.region_total_combat_units[m.region] == 0 && !(m.f().player_flags & 0x10000))))
                 return F_571982;  // BUG(original), compat region_faction_0_units: faction 0's region count
             return F_57707f;
         }
@@ -2238,8 +2247,8 @@ Flow em_cover(EM& m) {
         for (m.base_id = 0; m.base_id < game().base_count; m.base_id++) {
             const BASE& base = game().bases[m.base_id];
             if (base_faction(m.base_id) != m.fac) continue;
-            COMPAT_ORIGINAL(psi_gate_own_base);
-            if (!has_fac(FAC_PSI_GATE, bo, 0)) continue;  // BUG(original): tests the own base again
+            // BUG(original): tests the own base again.
+            if (!has_fac(FAC_PSI_GATE, g_compat.psi_gate_own_base ? bo : m.base_id, 0)) continue;
             if (base.state_flags & BSTATE_PSI_GATE_USED) continue;
             int32_t r = tile_region(base.x, base.y);
             if (r == m.region) continue;
@@ -2323,8 +2332,7 @@ Flow em_siege(EM& m) {
             if (!attacker(m.other)) continue;
             const VEH& o = game().vehs[m.other];
             // BUG(original): the upper bound is tested on this unit's status, not the other's.
-            COMPAT_ORIGINAL(status_icon_wrong_unit);
-            if (o.status_icon >= 0x33 && v.status_icon <= 0x35) {
+            if (o.status_icon >= 0x33 && (g_compat.status_icon_wrong_unit ? v : o).status_icon <= 0x35) {
                 m.s44++;
             } else if ((base_who(m.tx, m.ty) < 0 || (o.state & 0x10000)) && o.waypoint_x[0] == v.waypoint_x[0] &&
                        o.waypoint_y[0] == v.waypoint_y[0]) {
@@ -2737,23 +2745,23 @@ L_572d66:
     // L_5739aa: a tile near a base to improve.
     if (v.order == ORDER_MOVE_TO || m.s84) return F_5741cf;
     // BUG(original): the base may be -1 (no home base, no own base): Bases[-1] (see base_raw).
-    COMPAT_ORIGINAL(out_of_range_reads);
+    // Fixed (compat out_of_range_reads): without a base the unit works around its own tile.
     if (m.s30) {
         m.base_id = v.home_base_id;
-        m.sa4 = base_x_raw(m.base_id);
-        m.s58 = base_y_raw(m.base_id);
+        m.sa4 = base_x_opt(m.base_id, m.x);
+        m.s58 = base_y_opt(m.base_id, m.y);
     } else {
         m.base_id = m.base_own;
         if (v.state & VSTATE_ON_ALERT) {
-            m.sa4 = base_x_raw(m.base_id);
-            m.s58 = base_y_raw(m.base_id);
+            m.sa4 = base_x_opt(m.base_id, m.x);
+            m.s58 = base_y_opt(m.base_id, m.y);
         } else {
             m.sa4 = m.x;
             m.s58 = m.y;
         }
         m.val = 0;
         m.s60 = m.base_id * 0x134;
-        const int32_t bx = base_x_raw(m.base_id), by = base_y_raw(m.base_id);
+        const int32_t bx = base_x_opt(m.base_id, m.x), by = base_y_opt(m.base_id, m.y);
         for (int32_t i = 1; i < 21; i++) {
             m.tx = map_wrap_x(TableOffsetX[i] + bx);
             m.ty = TableOffsetY[i] + by;
@@ -2965,10 +2973,10 @@ Flow em_explore(EM& m) {
             else score = goody_at(m.tx, m.ty) ? 0x200 : 0;
             // BUG(original): the nine "neighbours" are all the same tile (the ring offset is
             // added again instead of the neighbour offset).
-            COMPAT_ORIGINAL(ring_offset_twice);
             for (m.s30 = 0; m.s30 < 9; m.s30++) {
-                int32_t ax = map_wrap_x(m.tx + TableOffsetX[m.s2c]);
-                int32_t ay = TableOffsetY[m.s2c] + m.ty;
+                const int32_t k = g_compat.ring_offset_twice ? m.s2c : m.s30;
+                int32_t ax = map_wrap_x(m.tx + TableOffsetX[k]);
+                int32_t ay = TableOffsetY[k] + m.ty;
                 if (!on_map(ax, ay)) continue;
                 if (is_known(ax, ay, m.fac)) {
                     m.s70 = veh_who(ax, ay);
@@ -3067,8 +3075,8 @@ Flow em_transport(EM& m) {
                     }
                     if (keep) {
                         // BUG(original): m.s48 ([ebp-0x48]) is not written on most paths that
-                        // reach here (uninitialised read #2).
-                        COMPAT_ORIGINAL(residue.enemy_move_s48);
+                        // reach here (uninitialised read #2; compat residue.enemy_move_s48: 0 then,
+                        // the fix's value too, see enemy_move).
                         if (++m.s44 <= m.s48) goto next;
                         if (m.region_plan <= 2 && m.s58 != 0) goto next;
                         m.s58++;
@@ -3091,8 +3099,8 @@ Flow em_transport(EM& m) {
                 } else {
                 L_574c42:
                     if (unit_plan(o) == PLAN_TERRAFORM) goto next;
-                    COMPAT_ORIGINAL(residue.enemy_move_s48);
-                    if (unit_plan(o) == PLAN_DEFENSE && m.s44 < m.s48) {  // BUG(original): see above
+                    // BUG(original): see above (compat residue.enemy_move_s48).
+                    if (unit_plan(o) == PLAN_DEFENSE && m.s44 < m.s48) {
                         if (m.dist_own == 0) {
                             m.s44++;
                             p.order = 2;
@@ -3574,8 +3582,7 @@ Flow em_transport_routes(EM& m) {
             if ((rr & 0x3F) == 0x3F || (rr & 0x3F) == 0) continue;
             if (m.f().region_total_bases[rr] != 0) continue;
             // BUG(original): the plan bit is taken from the transport's own region.
-            COMPAT_ORIGINAL(plan_bit_own_region);
-            if (!(m.s2c & (1 << (m.f().region_base_plan[m.region] & 31)))) continue;
+            if (!(m.s2c & (1 << (m.f().region_base_plan[g_compat.plan_bit_own_region ? m.region : rr] & 31)))) continue;
             if (m.dist_own == 0 ? port_to_coast(m.base_own, rr) : sea_coast(rr, m.region)) {
                 set_course(m.veh, 0x4A, m.tx, m.ty);
                 break;
@@ -3613,8 +3620,8 @@ Flow em_sea(EM& m) {
             }
             if (v.order == ORDER_MOVE_TO) {
                 // BUG(original): EDI holds [ebp-0x38] here; on the paths where no transport was
-                // examined in this call that slot was never written (uninitialised read #3).
-                COMPAT_ORIGINAL(residue.enemy_move_edi);
+                // examined in this call that slot was never written (uninitialised read #3;
+                // compat residue.enemy_move_edi: 0 then, the fix's value too, see enemy_move).
                 return m.s38 ? F_577071 : F_578b34;
             }
         } else if (v.order == ORDER_MOVE_TO && v.status_icon != 0x36) {
@@ -3629,8 +3636,8 @@ Flow em_sea(EM& m) {
                 int32_t bf = base_faction(m.base_id);
                 if (bf == m.fac || !(dstat(m.fac, bf) & 0x10)) continue;
                 // BUG(original): checks the own base's sea access instead of the target's.
-                COMPAT_ORIGINAL(sea_access_own_base);
-                if (m.dist_own == 0 ? !port_to_port(m.base_own, m.base_id) : !base_on_sea(m.base_own, m.region))
+                if (m.dist_own == 0 ? !port_to_port(m.base_own, m.base_id)
+                                    : !base_on_sea(g_compat.sea_access_own_base ? m.base_own : m.base_id, m.region))
                     continue;
                 m.s4c = base.x;
                 m.val = base.pop_size * base.pop_size * 32 / (hdist(m.x, m.y, base.x, base.y) + 1);
@@ -3756,10 +3763,8 @@ Flow em_sea(EM& m) {
 // ---- tactical move (0x57707F-0x578B29) -----------------------------------------------------------
 
 // Faction of vehicle `veh_id` as the original reads it (also for -1: the bytes before Vehs).
-inline uint8_t veh_faction_raw(int32_t veh_id) {
-    if ((uint32_t)veh_id < 2049) return game().vehs[veh_id].faction_id;
-    return rules_orig_byte(0x952828 + (uint32_t)veh_id * 0x34 + offsetof(VEH, faction_id));
-}
+// (Fixed with compat out_of_range_reads: no vehicle is no faction's.)
+inline uint8_t veh_faction_raw(int32_t veh_id) { return (uint8_t)compat_veh_faction(veh_id, 0xFF); }
 
 // L_57707f / L_57708a: pioneering land units in a region without own bases ask for a transport
 // at the coast.
@@ -4154,13 +4159,14 @@ Flow em_move(EM& m) {
             if (m.base_id >= 0 && base_faction(m.base_id) != m.fac) {
                 // An enemy base (empty).
                 int32_t bf = base_faction(m.base_id);
-                COMPAT_ORIGINAL(dstat_territory_owner);
-                uint32_t d = dstat_raw(m.fac, m.s70);  // BUG(original): the territory owner, not bf
+                // BUG(original): the territory owner, not bf.
+                const int32_t status_of = g_compat.dstat_territory_owner ? m.s70 : bf;
+                uint32_t d = dstat_raw(m.fac, status_of);
                 if (!(d & 1)) {
                     if (m.plan == PLAN_PROBE && !(unit_of(m.veh).ability_flags & 0x10000000) &&
                         has_project(FAC_HUNTER_SEEKER_ALGORITHM - SP_ID_First, bf))
                         continue;
-                    d = dstat_raw(m.fac, m.s70);
+                    d = dstat_raw(m.fac, status_of);
                     if ((d & 7) && !(d & 0x800)) {
                         if (!(d & 0x20)) continue;
                         if (d & 2) {
@@ -4243,8 +4249,7 @@ Flow em_move(EM& m) {
                 if (m.f().region_total_bases[rr] != 0 && m.f().region_base_plan[rr] != 2 && m.triad == TRIAD_LAND)
                     continue;
                 // BUG(original): the improvements are looked up on the unit's own tile.
-                COMPAT_ORIGINAL(destroy_own_tile_items);
-                uint32_t items = sq_at(m.x, m.y)->items;
+                uint32_t items = (g_compat.destroy_own_tile_items ? sq_at(m.x, m.y) : sq_at(m.tx, m.ty))->items;
                 if (!(items & 0x1000) || !(items & 0x81208854)) continue;
                 if (m.mp_own) {
                     log_say_values("Auto sending DESTROY2 message", m.veh, m.tx, m.ty);

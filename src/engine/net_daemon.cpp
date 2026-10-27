@@ -36,6 +36,7 @@
 #include "engine/battle.h"
 #include "engine/clock.h"
 #include "engine/path.h"
+#include "engine/compat.h"
 #include "engine/crt.h"
 #include "engine/diplo_act.h"
 #include "engine/strings.h"
@@ -1688,6 +1689,16 @@ void GAMEAPI send_faction_data(int32_t idx) {
     *reinterpret_cast<int32_t*>(&m[4]) = -1;
     std::memcpy(&m[0x10], data, (size_t)size - 0x10);
     Net_send(net, m.data(), size, idx < 0 ? 0 : fld(net, 0x78C + idx * 0x19C), 1);
+}
+
+// smacx: the host's original-bugs setting (engine/compat.h) to every player (0x0F10, not a
+// message of the original's), sent before the rules and the game so that every copy plays alike.
+void net_send_original_bugs() {
+    uint8_t m[0x20] = {};
+    *reinterpret_cast<uint16_t*>(m) = 0xF10;
+    *reinterpret_cast<int32_t*>(m + 4) = -1;
+    *reinterpret_cast<int32_t*>(m + 0x10) = g_original_bugs ? 1 : 0;
+    Net_send(&NetState, m, sizeof(m), 0, 1);
 }
 
 void GAMEAPI send_all_player_packets(int32_t idx) {

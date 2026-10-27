@@ -120,7 +120,19 @@ CI (`.github/workflows/build.yml`) builds `smacx_headless` and runs `smacx_smoke
 
 ## The scripted UI suites
 
-`tests/*/run.sh` drive smacx with scripted keys (SDL dummy video and audio, fixed seeds). They run
+Everything compared with the original runs with the original's bugs (`--original-bugs`,
+engine/compat.h, docs/COMPAT.md): `harness/verify.sh` passes it to `smacx_headless`, the gate's
+observer and ASan steps to smacx and `smacx_headless`, and hybrid.dll always has them (patched
+functions inside terranx.exe must behave as the original's). The game itself plays with the bugs
+fixed; the gate's `fixes` step plays scenarios that way under ASan (no comparison).
+
+`tests/*/run.sh` drive smacx with scripted keys (SDL dummy video and audio, fixed seeds). Their
+expectations come from games played with the original's rules, so every suite passes
+`--original-bugs`, except the multiplayer ones, which check that the setting travels: tests/hotseat
+and tests/pbem set it up with `Original Bugs=1` in the first game's ini and check that the later
+runs (ini default) play with the save's setting; tests/online's host has it in its ini and the
+client takes the host's; tests/online2 plays with the fixes on both machines (the copies must
+agree in that mode too). `tests/long/session.sh` (manual) plays with the fixes. They run
 **animated** by default (`SMACX_ANIMATE=1`, i.e. `smacx --animate`): the window slides, the menu
 column's slide, unit moves, combat booms, battle reports and movies play with their real waits, as
 in an interactive game, and the run still quits when its keys end. `TEST_FAST=1` runs them

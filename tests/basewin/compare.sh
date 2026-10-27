@@ -36,7 +36,7 @@ for save in $(printf '%s\n' "${CASES[@]}" | cut -d: -f1 | sort -u); do
         tiles=$(grep -o "basedump b$b.smxbase base=$b viewer=[0-9]* tiles=[0-9a-f]*" "$OUT/$save/oracle.log" |
             sed 's/.*tiles=//')
         if [ -z "$tiles" ]; then echo "$save base $b: no oracle dump"; continue; fi
-        (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 300 "$SMACX" --hidden --save "work/saves_late/$save.sav" \
+        (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 300 "$SMACX" --original-bugs --hidden --save "work/saves_late/$save.sav" \
             --basedump "$b:$OUT/smacx_${save}_$b.smxbase:$tiles" > "$OUT/smacx_${save}_$b.log" 2>&1)
         echo "$save base $b:"
         "$PY" "$ROOT/tests/basewin/cmp.py" "$OUT/$save/b$b.smxbase" "$OUT/smacx_${save}_$b.smxbase" \

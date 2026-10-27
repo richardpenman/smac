@@ -20,7 +20,7 @@ mkdir -p "$OUT/smacx"
 if [ ! -f "$ORIG/rmenu.png" ]; then
     "$PY" "$ROOT/tests/popups/orig_drive.py" "$ROOT/tests/placeholders/orig_rmenu.steps" "$ORIG"
 fi
-(cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 300 "$SMACX" --hidden --new size=0 --human 1 --seed 1,2 \
+(cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 300 "$SMACX" --original-bugs --hidden --new size=0 --human 1 --seed 1,2 \
     --outdir "$OUT/smacx" --keys "ENTER,SHOT:start.bmp,S-RCLICK:512x300,SHOT:rmenu.bmp,ESC,DRAG:512x300:682x430:drag.bmp" > "$OUT/smacx.log" 2>&1)
 for p in "rmenu 513 301 745 700" "drag 400 180 900 510" "start 0 560 1024 768"; do
     set -- $p

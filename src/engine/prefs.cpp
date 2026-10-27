@@ -126,9 +126,9 @@ void GAMEAPI prefs_load(int32_t use_defaults) {
     DefaultPrefs.faction_id = load_number("Faction", 1);
 
     // BUG(original): prefs_get_int leaves "0" in StrBuffer, so the default reads "0" + digits.
-    COMPAT_ORIGINAL(laptop_prefs_strbuffer);
     StrBuffer[0] = 0;
     uint32_t prefs = laptop_prefs(prefs_get_int("Laptop", 0, 0));
+    if (!g_compat.laptop_prefs_strbuffer) StrBuffer[0] = 0;
     if (DefaultPrefs.difficulty < 2) prefs |= 0x20;  // tutorial messages for beginners
     str_binary(prefs, "1", "0");
     load_bits("Preferences", use_defaults);

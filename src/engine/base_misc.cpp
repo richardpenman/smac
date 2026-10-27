@@ -400,8 +400,8 @@ void BaseBuild::scan_bases() {
         if (item <= -70) project_builders[-item - 70] |= fbit;
         // BUG(original): for facilities (item < 0) the plan and triad are read from Units[item]
         // (memory before the unit table) and has_abil(item, ...) may be called; the values are only
-        // used for units, so they are computed for unit items only here.
-        COMPAT_ORIGINAL(out_of_range_reads);
+        // used for units, so they are computed for unit items only here (compat out_of_range_reads:
+        // both settings alike).
         int32_t plan = 0, triad = 0;
         if (item >= 0) {
             plan = Units[item].plan;
@@ -670,7 +670,22 @@ void BaseBuild::score_units() {
     }
     if (f.total_combat_units < 512) {
         tie = 999999;
-        for (int32_t u = 0; u < 512; u++) score_unit(u);
+        // Fixed (compat base_build_persisting_locals): adjustments a unit makes to these are undone
+        // before the next unit.
+        const int32_t keep_regions = regions_with_bases, keep_need = need, keep_unk1 = unk1_flag;
+        for (int32_t u = 0; u < 512; u++) {
+            if (!g_compat.base_build_persisting_locals) {
+                regions_with_bases = keep_regions;
+                need = keep_need;
+                unk1_flag = keep_unk1;
+            }
+            score_unit(u);
+        }
+        if (!g_compat.base_build_persisting_locals) {
+            regions_with_bases = keep_regions;
+            need = keep_need;
+            unk1_flag = keep_unk1;
+        }
     }
 }
 // One candidate unit: its weight w (by triad, plan, prototype, defense needs, the situation),
@@ -754,8 +769,9 @@ bool BaseBuild::triad_weight(int32_t u) {
         if (!is_human && (f.player_flags & PFLAG_EMPHASIZE_SEA_POWER)) w /= 2;
         if (!is_human && (m.rule_flags & 0x100)) {
             w /= 2;
-            COMPAT_ORIGINAL(base_build_persisting_locals);
-            regions_with_bases++;  // BUG(original): persists for the following units
+            // BUG(original): persists for the following units (compat base_build_persisting_locals:
+            // fixed in score_units).
+            regions_with_bases++;
         }
         int32_t s = range(8 - regions_with_bases, 4, 8) * w / 8;
         w = s;
@@ -1207,8 +1223,7 @@ bool BaseBuild::weigh_terraformer(int32_t u) {
     int32_t formers = veh_region[pt(triad, 9)];  // [ebp-0x44]
     bool low = false;
     if (!formers && !queued_region[u] && CurrentTurn < 25 && !gov_conquer && !gov_explore) {
-        COMPAT_ORIGINAL(base_build_persisting_locals);
-        need = 0;  // BUG(original): persists for the following units
+        need = 0;  // BUG(original): persists for the following units (compat base_build_persisting_locals)
         low = true;
     } else if (need < 3) {
         low = true;
@@ -1369,8 +1384,8 @@ bool BaseBuild::weigh_prototype(int32_t u) {
             if (!(fl & 1) || (id >= 64 && !(fl & 4))) continue;
             if (best_weap <= weap_val(id, faction_id)) best_weap = weap_val(id, faction_id);
             // BUG(original): arm_val takes an armor id but is passed the unit id.
-            COMPAT_ORIGINAL(arm_val_unit_ids);
-            if (best_arm <= arm_val(id, faction_id)) best_arm = arm_val(id, faction_id);
+            int32_t arm = g_compat.arm_val_unit_ids ? arm_val(id, faction_id) : armor_val(id, faction_id);
+            if (best_arm <= arm) best_arm = arm;
             abil_any |= Units[id].ability_flags;
             int32_t t = Chassis[Units[id].chassis_id].triad;
             int32_t sp = speed_best[t];
@@ -1378,8 +1393,8 @@ bool BaseBuild::weigh_prototype(int32_t u) {
         }
         (void)abil_any;
         int32_t wv = weap_val(u, faction_id);
-        COMPAT_ORIGINAL(arm_val_unit_ids);
-        int32_t av = arm_val(u, faction_id);  // BUG(original): unit id as armor id
+        // BUG(original): unit id as armor id.
+        int32_t av = g_compat.arm_val_unit_ids ? arm_val(u, faction_id) : armor_val(u, faction_id);
         int32_t sp = speed_proto(u);
         if (plan == 2) {
             if (Armor[unit.armor_id].defense_value != 1 && av > best_arm && (av > best_arm + 1 || plan_region == 7)) {
@@ -1605,8 +1620,11 @@ int32_t BaseBuild::unit_value(int32_t u) {
     int32_t r = range(bit_count(unit.ability_flags) + ws + as, 1, 999);
     // BUG(original): the speed of the unit on top of the base tile (Vehs[-1] when there is none)
     // instead of the candidate's.
-    COMPAT_ORIGINAL(out_of_range_reads);
-    int32_t spd = raw_chassis_speed(raw_unit_chassis(raw_veh_unit_id(stack))) / Rules.move_rate_roads + 1;
+    // Fixed (compat out_of_range_reads): the candidate's speed.
+    int32_t spd = (g_compat.out_of_range_reads ? raw_chassis_speed(raw_unit_chassis(raw_veh_unit_id(stack)))
+                                               : speed_proto(u)) /
+                      Rules.move_rate_roads +
+                  1;
     int32_t val = w / (r * spd);
     if (vendetta_plan7 && plan_region == 7 && (uint8_t)unit.plan <= 1 && !need) {
         if (ai_fight == 0) val = val * 2 / 3;
@@ -1629,8 +1647,8 @@ int32_t BaseBuild::unit_value(int32_t u) {
     }
     bool riot_adjust = false;
     if (unk1_flag == 1) {
-        COMPAT_ORIGINAL(base_build_persisting_locals);
-        if (plan_region != 7) unk1_flag = 0;  // BUG(original): persists for the following units
+        // BUG(original): persists for the following units (compat base_build_persisting_locals).
+        if (plan_region != 7) unk1_flag = 0;
         else riot_adjust = true;
     } else if (unk1_flag) {
         riot_adjust = true;
@@ -1686,8 +1704,7 @@ void BaseBuild::rank_unit(int32_t u, int32_t val) {
 void BaseBuild::score_facilities() {
     // BUG(original): a few cases read the population of Bases[BaseCount] (the base loop counter
     // left in the argument slot) instead of the current base.
-    COMPAT_ORIGINAL(base_build_stale_base);
-    stale_base = game().base_count > 0 ? game().base_count : 0;
+    stale_base = g_compat.base_build_stale_base ? (game().base_count > 0 ? game().base_count : 0) : CurrentBaseID;
     for (int32_t fac = 1; fac < 70; fac++) {
         if (!facility_avail(fac, faction_id, CurrentBaseID, 0)) continue;
         rate_facility(fac);
@@ -2046,11 +2063,13 @@ void BaseBuild::rate_facility(int32_t fac) {
     case FAC_GEOSYNC_SURVEY_POD:
         value = 7;
         // BUG(original): adjusts the stored base stack id instead of a score.
-        COMPAT_ORIGINAL(base_build_stack_adjust);
-        if (f.AI_growth) stack++;
-        if (f.AI_tech) stack--;
-        if (f.AI_wealth) stack -= 3;
-        if (f.AI_power) stack--;
+        {
+            int32_t& adjusted = g_compat.base_build_stack_adjust ? stack : value;
+            if (f.AI_growth) adjusted++;
+            if (f.AI_tech) adjusted--;
+            if (f.AI_wealth) adjusted -= 3;
+            if (f.AI_power) adjusted--;
+        }
         break;
     case FAC_SKY_HYDRO_LAB:
     case FAC_NESSUS_MINING_STATION:

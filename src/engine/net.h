@@ -171,6 +171,8 @@ void net_session_clear();
 // every player's settings (0x0F04), the session's settings (0x0F02 NetConfigValue, 0x0F03
 // NetSetupType's block) to a player index (< 0: everyone).
 ADDR(0x47B020) void GAMEAPI send_faction_data(int32_t idx);
+// smacx: the host's original-bugs setting to every player (0x0F10; net_process applies it).
+void net_send_original_bugs();
 ADDR(0x47B0F0) void GAMEAPI send_all_player_packets(int32_t idx);
 ADDR(0x47B260) void GAMEAPI send_session_packet(int32_t a1, int32_t idx);
 ADDR(0x47B2E0) void GAMEAPI send_session2_packet(int32_t a1, int32_t idx);

@@ -29,7 +29,7 @@ run() {  # run CASE ARGS... : smacx with a fresh outdir (its own ini copy), log 
     local name="$1"; shift
     rm -rf "$OUT/$name"
     mkdir -p "$OUT/$name"
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --hidden --ini "$OUT/menu.ini" \
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --original-bugs --hidden --ini "$OUT/menu.ini" \
         --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
 }
 check() {  # check NAME CONDITION-RESULT(0/1) DETAIL

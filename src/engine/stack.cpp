@@ -250,14 +250,15 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                             break;
                         }
                         // BUG(original): tests the base nearest to the unit, not to the sensor tile
-                        COMPAT_ORIGINAL(sensor_base_nearest_unit);
-                        int32_t base_id = base_find(x, y);
+                        const int32_t sx = g_compat.sensor_base_nearest_unit ? x : x3;
+                        const int32_t sy = g_compat.sensor_base_nearest_unit ? y : y3;
+                        int32_t base_id = base_find(sx, sy);
                         if (base_id != -1) {
                             BASE& base = game().bases[base_id];
-                            int32_t dx = std::abs(x - base.x);
+                            int32_t dx = std::abs(sx - base.x);
                             if (!(game().map.flat & 1) && dx > game().map.half_x) dx = game().map.x - dx;
-                            int32_t dy = y - base.y;
-                            if (dy < 0) dy = base.y - y;
+                            int32_t dy = sy - base.y;
+                            if (dy < 0) dy = base.y - sy;
                             if ((dx == 0 || dx == 2) && (dy == 0 || dy == 2) && base_has_fac(base_id, 0x29)) {
                                 seen = 1;
                                 break;
@@ -541,9 +542,9 @@ void GAMEAPI spot_all(int32_t veh_id, int32_t flag) {
                 MAP* osq = map_tile(other.x, other.y);
                 if (!(osq->items & BIT_FUNGUS) || (osq->climate & 0xE0) < 0x40 || other.unit_id == 19) {
                     // BUG(original): tests the visibility of the spotting unit, not of the spotted one
-                    COMPAT_ORIGINAL(spot_visibility_spotter);
+                    const VEH& seen = g_compat.spot_visibility_spotter ? veh : other;
                     if (faction_id == CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW) &&
-                        !(veh.visibility & fbit) && redraw < 3)
+                        !(seen.visibility & fbit) && redraw < 3)
                         redraw = 2;
                     int32_t tx = other.x, ty = other.y;
                     if (in_map(tx, ty) && on_map(tx, ty)) spot_tile_in_map(tx, ty, faction_id);
@@ -684,8 +685,8 @@ int32_t GAMEAPI stack_fix(int32_t veh_id) {
     int32_t y = game().vehs[veh_id].y;
     for (int32_t i = 0; i < game().veh_count; i++) {
         // BUG(original): tests the position of veh_id instead of vehicle i
-        COMPAT_ORIGINAL(promote_position_veh_id);
-        if (game().vehs[veh_id].x == x && game().vehs[veh_id].y == y) {
+        const int32_t at = g_compat.promote_position_veh_id ? veh_id : i;
+        if (game().vehs[at].x == x && game().vehs[at].y == y) {
             veh_promote(i);
             stack_sort(veh_id);
         }
@@ -707,9 +708,10 @@ int32_t GAMEAPI stack_veh(int32_t veh_id, int32_t mode) {
     } else {
         if (mode > 1) {
             // BUG(original): no map bounds check
-            COMPAT_ORIGINAL(stack_map_bounds);
-            MAP* sq = map_tile(veh.x, veh.y);
-            if ((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8) return veh_drop(veh_lift(veh_id), -2, -2);
+            if (g_compat.stack_map_bounds || in_map(veh.x, veh.y)) {
+                MAP* sq = map_tile(veh.x, veh.y);
+                if ((sq->items & BIT_BASE_IN_TILE) && (sq->val2 & 0xF) < 8) return veh_drop(veh_lift(veh_id), -2, -2);
+            }
         }
         stack_sort(veh_id);
     }
@@ -747,12 +749,15 @@ int32_t GAMEAPI stack_veh(int32_t veh_id, int32_t mode) {
                         bool allowed = true;
                         if (is_air) {
                             // BUG(original): no map bounds check
-                            COMPAT_ORIGINAL(stack_map_bounds);
-                            MAP* sq = map_tile(veh.x, veh.y);
-                            uint32_t owner = sq->val2 & 0xF;
-                            if (!((sq->items & BIT_BASE_IN_TILE) && owner < 8 && owner > 0) &&
-                                !(sq->items & BIT_AIRBASE))
+                            if (!g_compat.stack_map_bounds && !in_map(veh.x, veh.y)) {
                                 allowed = false;
+                            } else {
+                                MAP* sq = map_tile(veh.x, veh.y);
+                                uint32_t owner = sq->val2 & 0xF;
+                                if (!((sq->items & BIT_BASE_IN_TILE) && owner < 8 && owner > 0) &&
+                                    !(sq->items & BIT_AIRBASE))
+                                    allowed = false;
+                            }
                         }
                         if (allowed) {
                             uint32_t cargo_faction = cargo.faction_id;
@@ -764,9 +769,9 @@ int32_t GAMEAPI stack_veh(int32_t veh_id, int32_t mode) {
                             } else if (cargo.state & 0x40000) {
                                 if (cargo.state & 0x20000) {
                                     // BUG(original): no map bounds check
-                                    COMPAT_ORIGINAL(stack_map_bounds);
                                     const uint8_t* plans = game().factions[cargo_faction].region_base_plan;
-                                    load = plans[map_tile(cargo.x, cargo.y)->region] == 7;
+                                    load = (g_compat.stack_map_bounds || in_map(cargo.x, cargo.y)) &&
+                                           plans[map_tile(cargo.x, cargo.y)->region] == 7;
                                 }
                             } else {
                                 uint8_t plan = (uint8_t)Units[cargo.unit_id].plan;

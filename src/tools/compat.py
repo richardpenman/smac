@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""Compatibility flags (src/engine/compat.h) and the BUG(original) sites of the source.
+"""The original's bugs (src/engine/compat.h) and the BUG(original) sites of the source.
 
   compat.py check   exit 1 unless every BUG(original) comment under src/ names its flag (a
-                    COMPAT_ORIGINAL(flag) statement or a "compat flag" mention within the comment
-                    and the 12 lines after it, or the 4 lines before it), every named flag is declared in compat.h, every
-                    declared flag is used, and docs/COMPAT.md is current
+                    g_compat.flag test, a COMPAT_ORIGINAL(flag) statement or a "compat flag"
+                    mention within the comment and the 12 lines after it, or the 4 lines before
+                    it), every named flag is declared in compat.h, every declared flag is used,
+                    every flag's comment has its "Fix:" (a fixed flag, default false) or its "Not
+                    fixed:" reason (default true), no fixed flag has a COMPAT_ORIGINAL site (it
+                    would stop the game), and docs/COMPAT.md is current
   compat.py doc     regenerate docs/COMPAT.md from compat.h and the sites
 
-Flags inside compat.h's nested StackResidue struct are named residue.<flag>.
+Flags inside compat.h's nested StackResidue struct are named residue.<flag>. A flag's comment is
+"<what the bug does> Fix: <the fix>" or "<what the bug does> Not fixed: <why>".
 """
 import os
 import re
@@ -17,11 +21,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 HEADER = os.path.join(ROOT, "src", "engine", "compat.h")
 DOC = os.path.join(ROOT, "docs", "COMPAT.md")
 NAME = r"(?:residue\.)?[a-z_0-9]+"
-USE = re.compile(r"COMPAT_ORIGINAL\((%s)\)|\bcompat (%s)\b" % (NAME, NAME))
+USE = re.compile(r"COMPAT_ORIGINAL\((%s)\)|\bcompat (%s)\b|\bg_compat\.(%s)\b" % (NAME, NAME, NAME))
+ORIGINAL = re.compile(r"COMPAT_ORIGINAL\((%s)\)" % NAME)
 
 
 def read_flags():
-    """[(name, doc, section)] in declaration order."""
+    """[(name, doc, section, fixed)] in declaration order (fixed: the flag defaults to false)."""
     flags, doc, section, prefix = [], [], "", ""
     for line in open(HEADER, encoding="utf-8").read().split("\n"):
         s = line.strip()
@@ -32,8 +37,8 @@ def read_flags():
             prefix, section, doc = "residue.", "stack residues", []
         elif s.startswith("//"):
             doc.append(s[2:].strip())
-        elif re.match(r"bool \w+ = true;$", s):
-            flags.append((prefix + s.split()[1], " ".join(doc), section))
+        elif re.match(r"bool \w+ = (true|false);$", s):
+            flags.append((prefix + s.split()[1], " ".join(doc), section, s.endswith("false;")))
             doc = []
         else:
             doc = []
@@ -41,8 +46,9 @@ def read_flags():
 
 
 def scan_sites():
-    """[(path, line, flag or None)] of every BUG(original) comment, and {flag: [path:line]} of uses."""
-    sites, uses = [], {}
+    """[(path, line, flag or None)] of every BUG(original) comment, {flag: [path:line]} of uses and
+    {flag: [path:line]} of COMPAT_ORIGINAL statements."""
+    sites, uses, originals = [], {}, {}
     for root, _, files in os.walk(os.path.join(ROOT, "src")):
         for f in sorted(files):
             if not f.endswith((".h", ".cpp")) or f == "compat.h":
@@ -52,7 +58,9 @@ def scan_sites():
             lines = open(path, encoding="utf-8", errors="replace").read().split("\n")
             for i, line in enumerate(lines):
                 for m in USE.finditer(line):
-                    uses.setdefault(m.group(1) or m.group(2), []).append(f"{rel}:{i + 1}")
+                    uses.setdefault(m.group(1) or m.group(2) or m.group(3), []).append(f"{rel}:{i + 1}")
+                for m in ORIGINAL.finditer(line):
+                    originals.setdefault(m.group(1), []).append(f"{rel}:{i + 1}")
                 if "BUG(original)" not in line:
                     continue
                 flag = None
@@ -61,10 +69,19 @@ def scan_sites():
                 for j in list(range(i, min(len(lines), i + 13))) + list(range(i - 1, max(-1, i - 5), -1)):
                     m = USE.search(lines[j])
                     if m:
-                        flag = m.group(1) or m.group(2)
+                        flag = m.group(1) or m.group(2) or m.group(3)
                         break
                 sites.append((rel, i + 1, flag))
-    return sites, uses
+    return sites, uses, originals
+
+
+def split_doc(doc):
+    """(bug, fix) of a flag's comment; fix is "" when it has neither "Fix:" nor "Not fixed:"."""
+    for key, label in (("Not fixed:", "Not fixed: "), ("Fix:", "")):
+        k = doc.find(key)
+        if k >= 0:
+            return doc[:k].strip(), label + doc[k + len(key):].strip()
+    return doc.strip(), ""
 
 
 def make_doc(flags, sites):
@@ -72,21 +89,27 @@ def make_doc(flags, sites):
     for rel, n, flag in sites:
         by_flag.setdefault(flag, {}).setdefault(rel, 0)
         by_flag[flag][rel] += 1
-    out = ["# Compatibility flags", "",
+    fixed = sum(1 for f in flags if f[3])
+    out = ["# The original's bugs", "",
            "Generated by `src/tools/compat.py doc` from `src/engine/compat.h`; do not edit.", "",
-           "Every bug of the original that the reconstruction reproduces is behind one of these flags",
-           "(`g_compat`, all on: the original behaviour). No fixed path is written yet: switching a",
-           "flag off stops the game at its first site (`compat_unfixed`). Sites are the `BUG(original)`",
-           "comments; each names its flag with `COMPAT_ORIGINAL(flag)` next to it.", "",
-           f"{len(flags)} flags, {len(sites)} sites.", ""]
+           "The bugs of the original `terranx.exe` that the reconstruction knows of, and how smacx fixes them.",
+           "smacx plays with the fixes by default. `smacx --original-bugs`, or `Original Bugs=1` in the ini",
+           "(`[Alpha Centauri]` section), plays with every bug as the original does; the harness, the hybrid",
+           "build and the tests compared with the original use that setting. A hotseat or PBEM game keeps the",
+           "setting its save was made with, and in an online game the host's setting applies.", "",
+           "Bugs marked \"Not fixed\" keep the original's behaviour in both settings. In the code each bug",
+           "is a flag of `g_compat` (`true` plays the bug); Where lists the files with its `BUG(original)` sites.", "",
+           f"{len(flags)} bugs ({fixed} fixed), {len(sites)} sites.", ""]
     section = None
-    for name, doc, sec in flags:
+    for i, (name, doc, sec, fixed_flag) in enumerate(flags):
         if sec != section:
-            out += [f"## {sec}", "", "| Flag | Bug, and the fix | Sites |", "| --- | --- | --- |"]
+            out += [f"## {sec}", "", "| Bug | Fix | Where |", "| --- | --- | --- |"]
             section = sec
+        bug, fix = split_doc(doc)
+        fix = fix[:1].upper() + fix[1:]
         where = ", ".join(f"`{f}`" + (f" ({k})" if k > 1 else "") for f, k in by_flag.get(name, {}).items())
-        out.append(f"| `{name}` | {doc.replace('|', '/')} | {where} |")
-        if flags[-1][0] == name or flags[flags.index((name, doc, sec)) + 1][2] != sec:
+        out.append(f"| {bug.replace('|', '/')} | {fix.replace('|', '/')} | {where} |")
+        if i + 1 == len(flags) or flags[i + 1][2] != sec:
             out.append("")
     return "\n".join(out)
 
@@ -94,7 +117,7 @@ def make_doc(flags, sites):
 def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else "check"
     flags = read_flags()
-    sites, uses = scan_sites()
+    sites, uses, originals = scan_sites()
     if cmd == "doc":
         open(DOC, "w", encoding="utf-8", newline="\n").write(make_doc(flags, sites))
         print(f"compat.py: wrote docs/COMPAT.md ({len(flags)} flags, {len(sites)} sites)")
@@ -112,6 +135,13 @@ def main():
             errors.append(f"{where[0]}: compat flag {flag} is not declared in compat.h")
     for name in sorted(declared - set(uses)):
         errors.append(f"compat.h: {name} is not used by any site")
+    for name, doc, _, fixed in flags:
+        if fixed and name in originals:
+            errors.append(f"{originals[name][0]}: {name} defaults to the fix but keeps COMPAT_ORIGINAL")
+        if fixed and "Fix:" not in doc:
+            errors.append(f"compat.h: {name} defaults to the fix but its comment has no \"Fix:\"")
+        if not fixed and "Not fixed:" not in doc:
+            errors.append(f"compat.h: {name} defaults to the original (true) without a \"Not fixed:\" reason")
     if not os.path.exists(DOC) or open(DOC, encoding="utf-8").read() != make_doc(flags, sites):
         errors.append("docs/COMPAT.md is not current (src/tools/compat.py doc)")
     for e in errors:
@@ -119,7 +149,7 @@ def main():
     if errors:
         print("compat.py: FAIL")
         return 1
-    print(f"compat.py: OK ({len(flags)} flags, {len(sites)} sites)")
+    print(f"compat.py: OK ({len(flags)} flags, {sum(1 for f in flags if f[3])} fixed, {len(sites)} sites)")
     return 0
 
 

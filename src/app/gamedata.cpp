@@ -598,6 +598,14 @@ static void default_sliding_windows_off(const std::string& path) {
     win32::WritePrivateProfileStringA("Alpha Centauri", "Preferences", bits.c_str(), path.c_str());
 }
 
+// smacx's own key: "Original Bugs" (0: the original's bugs fixed, the default; 1: played as in the
+// original, engine/compat.h), written with its default when missing so that players find it.
+static void original_bugs_key(const std::string& path) {
+    char buf[16] = "";
+    win32::GetPrivateProfileStringA("Alpha Centauri", "Original Bugs", "", buf, sizeof(buf), path.c_str());
+    if (!buf[0]) win32::WritePrivateProfileStringA("Alpha Centauri", "Original Bugs", "0", path.c_str());
+}
+
 void seed_ini(const std::string& path, const std::string& udir) {
     std::error_code ec;
     // An ini from before this default loses "Sliding windows" once (smacx.cfg records it), so a
@@ -609,6 +617,7 @@ void seed_ini(const std::string& path, const std::string& udir) {
             config_set(udir, kMigrated, "1");
             std::fprintf(stderr, "smacx: \"Sliding windows\" turned off in %s (once)\n", path.c_str());
         }
+        original_bugs_key(path);
         return;
     }
     bool copied = false;
@@ -619,6 +628,7 @@ void seed_ini(const std::string& path, const std::string& udir) {
     }
     if (!copied) write_file(path, kDefaultIni, sizeof(kDefaultIni));
     default_sliding_windows_off(path);
+    original_bugs_key(path);
     config_set(udir, kMigrated, "1");
 }
 

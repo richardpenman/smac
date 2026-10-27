@@ -704,8 +704,7 @@ void vx_setup_view(VoxelScene* sc, int32_t frame) {
     sT[1] = (float)((((double)sc->v_offset[1] * sc->v_shadow_zoom[1]) + sc->v_shadow_shift[1]) + hh + sT[1]);
     s_lx = (float)crt_hypot(sM[0], sM[2]);
     // BUG(original): the y axis length uses the elements 4 and 5 (x: 0 and 2).
-    COMPAT_ORIGINAL(voxel_y_axis_elements);
-    const double ry = crt_hypot(sM[4], sM[5]);
+    const double ry = g_compat.voxel_y_axis_elements ? crt_hypot(sM[4], sM[5]) : crt_hypot(sM[3], sM[5]);
     s_ly = (float)ry;
     if (s_lx < 1e-06f) s_lx = 1e-06f;
     if (ry < (double)1e-06f) s_ly = 1e-06f;

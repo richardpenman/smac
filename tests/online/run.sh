@@ -66,6 +66,9 @@ game() {
     printf 'Difficulty=2\r\nNet Port=%s\r\nNet Address=127.0.0.1\r\nNet Name=Host\r\n' $port >> "$OUT/$name.ini"
     cp "$OUT/$name.ini" "$OUT/$name-client.ini"
     sed -i 's/^Net Name=Host/Net Name=Client/' "$OUT/$name-client.ini"
+    # The host plays with the original's bugs (the ini's key); the client, with the default (the
+    # fixes), takes the host's setting.
+    printf 'Original Bugs=1\r\n' >> "$OUT/$name.ini"
     (cd "$ROOT" && timeout 600 "$SMACX" --hidden --seed 1001,2001 --ini "$OUT/$name.ini" --outdir "$OUT/$name-host" \
         --snapshots "$OUT/$name-host/snap" --keys "$HOST" > "$OUT/$name-host.log" 2>&1; echo $? > "$OUT/$name-host.rc") &
     local hp=$!
@@ -112,6 +115,7 @@ check game-client "the NetMsg box (UPKEEP5)" "^netmsg UPKEEP5: Upkeep Phase"
 nocheck game-client "not a modal popup" "^popup UPKEEP5 shown"
 check game-host "the host" "^net: hosting on port"
 check game-client "the client" "^net: joined 127.0.0.1"
+check game-client "the host's setting: the original bugs" "^net: the host plays with the original bugs"
 compare game "host and client states equal each turn"
 
 # 2. A desync provoked at turn 2 on the client: the host resends the units.

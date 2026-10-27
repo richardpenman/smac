@@ -154,11 +154,10 @@ int32_t GAMEAPI most_objectives(int32_t* winner_id, int32_t* tied_count) {
 
 int32_t GAMEAPI transcending(int32_t faction_id) {
     if (SecretProjects[FAC_VOICE_OF_PLANET - 70] == -1) return 0;
-    COMPAT_ORIGINAL(ascent_queue_sign);
+    // BUG(original): tests +102 (a unit), not -102 (the Ascent to Transcendence).
+    const int32_t ascent = g_compat.ascent_queue_sign ? FAC_ASCENT_TO_TRANSCENDENCE : -FAC_ASCENT_TO_TRANSCENDENCE;
     for (int32_t i = 0; i < game().base_count; i++) {
-        if (game().bases[i].faction_id == faction_id &&
-            game().bases[i].queue_items[0] == FAC_ASCENT_TO_TRANSCENDENCE)  // BUG(original): +102 (a unit), not -102
-            return 1;
+        if (game().bases[i].faction_id == faction_id && game().bases[i].queue_items[0] == ascent) return 1;
     }
     return 0;
 }
@@ -194,13 +193,20 @@ void GAMEAPI rankings(int32_t full) {
             for (int32_t i = 0; i < 64; i++)
                 if (SecretProjects[i] >= 0 && game().bases[SecretProjects[i]].faction_id == fid) score += 10;
             score += num_objectives(fid, 0) * ObjectiveAchievePts;
+            // Fixed (compat unit_count_251): the faction's units counted, without a byte's limit.
+            int32_t counts[512] = {};
+            if (!g_compat.unit_count_251) {
+                for (int32_t v = 0; v < game().veh_count; v++) {
+                    const VEH& veh = game().vehs[v];
+                    if (veh.faction_id == fid && veh.unit_id >= 0 && veh.unit_id < 512) counts[veh.unit_id]++;
+                }
+            }
             for (int32_t unit_id = 0; unit_id < 512; unit_id++) {
                 const UNIT& u = Units[unit_id];
                 if (unit_id < 64 && !has_tech(u.preq_tech, fid)) continue;
                 // BUG(original): counts of 251 and more (the byte counter can also wrap) are ignored.
-                COMPAT_ORIGINAL(unit_count_251);
-                uint32_t count = f.units_active[unit_id];
-                if (count >= 251) continue;
+                uint32_t count = g_compat.unit_count_251 ? f.units_active[unit_id] : (uint32_t)counts[unit_id];
+                if (g_compat.unit_count_251 && count >= 251) continue;
                 uint32_t value = u.cost * count;
                 if (!value) continue;
                 int32_t offense = Weapon[u.weapon_id].offense_value;
@@ -212,8 +218,8 @@ void GAMEAPI rankings(int32_t full) {
                     // planet busters: full value
                 } else {
                     // BUG(original): integer quotient first, so weaker weapons count 0.
-                    COMPAT_ORIGINAL(weapon_ratio_integer);
-                    value = (uint32_t)(offense / best_weapon) * value;
+                    if (g_compat.weapon_ratio_integer) value = (uint32_t)(offense / best_weapon) * value;
+                    else value = (uint32_t)((int64_t)offense * value / best_weapon);
                 }
                 score += value;
             }
@@ -351,7 +357,7 @@ void GAMEAPI compute_score(int32_t faction_id, int32_t* score, int32_t* table, i
             if (ascender == i) continue;
             // BUG(original): with no ascender (-1) this reads the word before diplo_status
             // (last_base_turn).
-            COMPAT_ORIGINAL(out_of_range_reads);
+            if (!g_compat.out_of_range_reads && ascender < 0) continue;  // fixed: no ascender, no pact
             const uint32_t* status =
                 reinterpret_cast<const uint32_t*>(&game().factions[i]) + offsetof(Faction, diplo_status) / 4;
             if (!(status[ascender] & DIPLO_PACT)) continue;
@@ -360,8 +366,8 @@ void GAMEAPI compute_score(int32_t faction_id, int32_t* score, int32_t* table, i
             ScorePopTotal[i] = pop;
             if (i == faction_id) mine += pop;
         }
-        // BUG(original): divides by zero (crash) when no population counts.
-        COMPAT_ORIGINAL(score_divide_zero);
+        // BUG(original), compat score_divide_zero: divides by zero (crash) when no population
+        // counts; the reconstruction yields 0 in both settings.
         table[6] = total ? ScoreBonusPts * mine / total : 0;
         ScorePopTotal[0] = total;
     }
@@ -449,7 +455,7 @@ void GAMEAPI replay_base(int32_t event, int32_t x, int32_t y, int32_t faction_id
     e.x = (int16_t)x;
     e.y = (int16_t)y;
     // BUG(original): no bounds check; past 1024 events the record is written beyond ReplayEvents.
-    COMPAT_ORIGINAL(replay_events_overflow);
+    if (!g_compat.replay_events_overflow && ReplayEventSize + (int32_t)sizeof(e) > (int32_t)sizeof(ReplayEvents)) return;
     std::memcpy(reinterpret_cast<uint8_t*>(ReplayEvents) + ReplayEventSize, &e, sizeof(e));
     ReplayEventSize += 8;
 }

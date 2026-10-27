@@ -25,6 +25,7 @@
 
 #ifdef ORACLE_WITH_ENGINE
 #include "engine/clock.h"
+#include "engine/compat.h"
 #include "engine/hybrid_patch.h"
 #include "fcompare.h"
 /* Harness hooks of the reconstructed control_game/control_turn (engine/turn.h): they make those
@@ -1751,6 +1752,9 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
             patch_bytes(IAT_timeGetTime, (const uint8_t*)&hook, 4);
         }
 #ifdef ORACLE_WITH_ENGINE
+        /* Reconstructed functions inside the original behave as the original: every bug on. */
+        compat_set_original_bugs(true);
+        g_original_bugs_forced = true;
         g_harness_turn_upkeep = hook_turn_upkeep;
         g_harness_faction_upkeep = hook_faction_upkeep;
         g_harness_enemy_turn = hook_enemy_turn;

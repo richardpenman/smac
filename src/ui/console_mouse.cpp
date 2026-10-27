@@ -353,12 +353,16 @@ void THISCALL MapWin_on_mouse_move(uint8_t* win, int32_t px, int32_t py) {
     if (v < 0) {
         // A base's rally point. BUG(original): the leg's end is (y, stale) — the tile's y is stored
         // as the end's x and the end's y is not written.
-        COMPAT_ORIGINAL(rally_leg_end);
         mw(win, 0x1DE14) = 10;
         int32_t b = mw(win, kMwDragBase);
         seg_x(0) = Bases[b].x;
         seg_y(0) = Bases[b].y;
-        seg_x(1) = y;
+        if (g_compat.rally_leg_end) {
+            seg_x(1) = y;
+        } else {  // fixed: the tile
+            seg_x(1) = x;
+            seg_y(1) = y;
+        }
         mw(win, 0x1DE18) = 2;
         mw(win, 0x1DE1C) = 0;
         mw(win, 0x1DE20) = 1;
