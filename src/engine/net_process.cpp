@@ -154,6 +154,7 @@ void THISCALL NetDaemon_process_message(uint8_t* net, uint8_t* msg, int32_t size
             *reinterpret_cast<uint16_t*>(msg) = (uint16_t)((type & 0xDFFF) | 0x4000);
             NetDaemon_send_message(net, msg, size, 0);
         } else {
+            ui_net_note_text("net: session settings received");
             ui_netwin_redraw();
         }
         break;

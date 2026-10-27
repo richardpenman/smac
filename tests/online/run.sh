@@ -11,7 +11,9 @@
 # through the locks. A second game
 # provokes a desync (SMACX_NET_DESYNC=TURN: the client changes a unit's morale at that turn): the host finds
 # the vehicles' checksum different and resends the units; the next turn's units and bases agree.
-# A third game has the two humans make a deal in the DiploWin (a treaty and energy credits).
+# A third game has the two humans make a deal in the DiploWin (a treaty and energy credits), a
+# fourth sets time controls and lets turns run out, a fifth has the host's settings picked in the
+# setup window applied on the client, a sixth has the client drop out of the game.
 #
 #   tests/online/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/net-native/smacx)
 #
@@ -194,5 +196,48 @@ check timer-host "the custom values" "^time controls custom: base 0 unit 0 event
 # snapshot (GamePrefs.GameTimeControl[1], 0x9A64E4) is the old table's until the next turn.)
 compare timer "host and client states equal each turn" 'GamePrefs\.GameTimeControl\[1\]'
 
+
+# 5. The setup window (NetWin): the host picks the planet's size (Tiny), the time controls (Loose)
+# and a rule (Look First) in the session settings; each choice is sent (0x2F02 -> the session
+# packet to everyone) and the game the client starts with has them.
+HLOBBY="WAIT:500,CLICK:532x192,UP,UP,ENTER,WAITFOR:setting 4 chosen 1,CLICK:532x172,DOWN,DOWN,DOWN,DOWN,ENTER,\
+WAITFOR:setting 3 chosen 4,CLICK:532x392,WAITFOR:rule 6 toggled,SCREENSTATE,c,d,o,n,e,ENTER"
+HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:netmsg ADDED,ENTER,$HLOBBY,WAITFOR:player 2 ready 1,ENTER,\
+WAITFOR:game started,ENTER,$HTURN,WAITFOR:player turn faction 1,WAIT:1000"
+CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAITFOR:net: chat Host: done,WAITFOR:session settings,WAITFOR:session settings,WAITFOR:session settings,\
+SCREENSTATE,ENTER,WAITFOR:game started,ENTER,$CTURN,WAITFOR:player turn faction 1,WAIT:1000"
+game lobby
+check lobby-host "the planet's size picked" "^net: setting 4 chosen 1$"
+check lobby-host "the time controls picked" "^net: setting 3 chosen 4$"
+check lobby-host "a rule toggled" "^net: rule 6 toggled$"
+for side in host client; do
+    log="lobby-$side"
+    check $log "the planet's size in the window" "^screentext .*: Tiny planet"
+    check $log "the time controls in the window" "^screentext .*: Loose"
+    check $log "the rule in the window" "^screentext \\[X\\] Look First"
+    check $log "the game with the host's settings" "^net: game started: .*map 48x48, rules [0-9A-F]*[13579BDF][0-9A-F]{1}, time control 4"
+    nocheck $log "the checksums agree" "checksum [0-9]+ differs"
+    nocheck $log "no crash" "not reconstructed|abort|Assertion"
+done
+
+# 6. A player dropping: the client plays its first turn and quits. The host is told (DROPPED,
+# NetDaemon_on_player_deleted), the client's faction is no longer human (FactionStatus) and the
+# host plays on alone: two more turns, the computer playing the client's faction.
+HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:netmsg ADDED,ENTER,WAITFOR:player 2 ready 1,ENTER,\
+WAITFOR:game started,ENTER,$HTURN,WAITFOR:netmsg DROPPED,ENTER,WAITFOR:player turn faction 1,ENTER,$END,\
+WAITFOR:player turn faction 1,ENTER,$END,WAITFOR:player turn faction 1,WAIT:1000"
+CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAIT:500,ENTER,\
+WAITFOR:game started,ENTER,$CTURN"
+game drop
+check drop-host "the client dropped (DROPPED)" "^netmsg DROPPED: "
+check drop-host "the client's faction left to the computer" "^net: player 2 left$"
+count drop-host "the host's turns after the drop" "^net: player turn faction 1" 4
+count drop-host "the turns' upkeep goes on" "^net: turn [0-9]+ upkeep" 4
+nocheck drop-host "no crash" "not reconstructed|abort|Assertion"
+if sed -n '/^net: player 2 left/,$p' "$OUT/drop-host.log" | grep -aq "^net: player turn faction 2"; then
+    echo "FAIL drop-host: the dropped faction no longer has a player's turn"; FAIL=1
+else
+    echo "PASS drop-host: the dropped faction no longer has a player's turn"
+fi
 
 exit $FAIL

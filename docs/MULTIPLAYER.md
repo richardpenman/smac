@@ -168,10 +168,9 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   smacx's TCPHOST / TCPJOIN popups (smacxnet.txt) for the name, address and port, kept in the
   prefs Net Name / Net Address / Net Port), NetWin_config_players, NetWin_setup_faction_data,
   NetWin_fill_player, NetWin_on_button_clicked (ready / start, NOTALLREADY), NetWin_prepare_game
-  (Random_reseed(1000)); the setup packets (0x0F02/03/04/0D) in the engine. Approximated: the
-  MULTIPLAYER SETUP window is a plain list (F the faction, C a chat line, Enter ready / start, Esc
-  cancel); the host's map and rule settings stay the defaults (a random map, NetSetupType 0); no
-  scenario file transfer (NetDaemon_send_files, 0x0F05..0x0F0C).
+  (Random_reseed(1000)); the setup packets (0x0F02/03/04/0D) in the engine. The window's look
+  and the host's settings: see "The setup window" below (F the faction, C a chat line, Enter
+  ready / start, Esc cancel); no scenario file transfer (NetDaemon_send_files, 0x0F05..0x0F0C).
 * Group 3, turns, synch and locks (done): src/engine/net_daemon.cpp (routing, message_* /
   synch_*, NetDaemon_synch's blocks -- the rule tables travel in the original's 32-bit layout --,
   send_rules / send_game, the locks' requests, order_veh / action / await_*, the deletion list,
@@ -205,6 +204,23 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   custom table travels through the server (0x2101 -> 0x4101) while 0x4C02 goes to everyone at
   once, so a client applies 0x4C02 with the old table (its HECHANGEDTIME1 shows the old values
   and that turn's total time is the old one).
+* The setup window (in part, src/ui/netwin.cpp): the players (name, faction, difficulty, ready;
+  a click on one's own row picks the faction), the host's session settings as
+  NetWin_draw_session_info lists them (the type of game, the global difficulty, the time controls,
+  the planet's size, ocean, erosion, native life, clouds; a click: NetWin_pick_global_diff /
+  _time / _planet_size / _ocean / _erosion / _native / _clouds, here a popup list for the
+  original's PopMenu) and NetWin_draw_custom_rules' check boxes (SCRIPT's RULES lines and
+  Simultaneous Moves; a click: NetWin_on_left_click's toggles of NetConfigRules / NetConfigState /
+  NetConfigMRules); each change goes to the host as 0x2F02 and to everyone as the session packet
+  (the window redrawn: NetWin_on_redraw), and NetWin_exec builds the game from them as before.
+  Approximated: the window's art and exact layout (a plain box with the original's texts), the
+  number of players (NetWin_pick_num_players) and the type of game (NetWin_pick_map: a random map
+  only; scenarios, saved games and their file transfer, NetDaemon_send_files 0x0F05..0x0F0C, are
+  not reconstructed), the passwords (NetWin_pick_pass), the chat's EditBox (C: a popup).
+* A player dropping (done, as the original): NetDaemon_on_player_deleted's DROPPED (SERVERLOST /
+  SERVERLOSTINSETUP for the host), the player's faction no longer human (the computer plays it)
+  and the turns going on without them. Not reconstructed: a player joining a game under way, and
+  the save and load of a network game (the saved game's transfer to the players).
 * The commlink panel's network rows (done, src/ui/multiwin.cpp): MultiWin_draw's network path (the
   top art, the time row, the bonus pills' row "^", the chat button under the Council button),
   MultiWin_draw_player's chat flag (multi.pcx's three flags: none, refused (0x7FFF74), left out
@@ -242,4 +258,6 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   two humans trade in the DiploWin (the call answered, a chat line, a treaty and 5 credits
   offered, both agree, the deal done by the host) with the treaty and credits checked on both;
   a fourth game sets custom time controls (5 s a turn, doubled the first turns), lets the host's
-  and the client's turns run out and uses a bonus pill.
+  and the client's turns run out and uses a bonus pill; a fifth has the host pick the planet's
+  size, the time controls and a rule in the setup window, checked in both windows and in both
+  games; a sixth has the client quit after its first turn and the host play on alone.
