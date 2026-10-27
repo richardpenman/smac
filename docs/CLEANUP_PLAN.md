@@ -246,7 +246,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 16 | Scratch globals → contexts/locals | L | native part done; image globals after the freeze (see note 16) |
 | 17 | Golden-record fcompare mode + data-dependent unit tests | M | done (see note 17) |
 | 18 | `diffnative.sh` (native-vs-baseline on new seeds); tag `hybrid-final` | S | script done (see note 18); the tag is set by the user |
-| 19 | Split `enemy_move` and the AI (stack residues as explicit context) | XL | |
+| 19 | Split `enemy_move` and the AI (stack residues as explicit context) | XL | done (see note 19) |
 | 20 | Native state containers + explicit save/snapshot serialisation (phase B) | XL | |
 | 21 | UI windows: typed views, then classes | L | |
 
@@ -619,3 +619,47 @@ Notes on the increments:
     start the release workflow). Until the tag exists, `diffnative.sh --baseline <commit>` does
     the same.
 
+19. Three commits (ai.cpp, ai_move.cpp, the context) and a side fix. The AI functions keep their `ADDR` (hybrid and fcompare patch
+    them as before); helpers have none. Engine gotos: 81 -> 33.
+    * ai.cpp (no gotos left): `air_power` became an `AirPower` object (`explore`, `missile` ->
+      `tectonic` / `fungal` / `conventional`, `launch`, `stockpile`, `intercept`, `patrol`,
+      `base_attack`; the original's labels auto_patrol and base_attack are the driver's branches;
+      speed() is still called twice where the original does); `enemy_strategy` an `EnemyStrategy`
+      object (`reset_counters`, `scan_bases`, `scan_vehicles` -> `own_unit` (`disband_obsolete`,
+      `mark_garrison`, `plan_step`, `count_unit`, `rate_strength`) / `foreign_unit`,
+      `rate_transports`, `release_formers`, `review_target`); `can_terraform`'s mine choice,
+      `alien_move`'s and `assemble_passengers`' gotos. Pure parts in `engine/ai_rules.h`
+      (`land_mine_order`, `air_reach`, `bombing_score`, `attack_force_limit`, `garrison_short`),
+      tests/unit/test_ai_rules.cpp (expectations from the code).
+    * ai_move.cpp (`enemy_move`, no gotos left): the 32 gotos became flags, breaks and helpers
+      (`em_no_garrison`, `em_passenger` / `em_passenger_lands`, `em_move_units` returning
+      `MoveTile`); the largest steps were split, blocks moved unchanged: `em_move` (`em_move_enter`,
+      `_terrain`, `_role`, `_units`, `_explore`, `_tile`, `_end`), `em_former` (`_goals`, `_shelf`,
+      `_follow_pod`, `_here`, `_area`, `_tile`, `_end`), `em_transport` (`_ports`, `_landing`),
+      `em_transport_routes` (`em_route_colony`, `_defence`, `_settlers`, `_coast`), `em_plan`
+      (`em_plan_neighbours`, `em_artifact`, `em_supply`).
+    * The stack residues: `EM` is the explicit context of the steps instead of a zeroed copy of the
+      frame (no memset; every field starts at 0, the canonical value), grouped into the unit, the
+      values passed between steps on purpose, and the scratch slots. An instrumented build (scratch
+      only: every field a proxy recording reads of a value written in an earlier step of the call;
+      28 scenarios and 20 new games, both settings) gave the slots that carry values across steps.
+      Besides the intended ones it found the known residues #2 (s48) and #3 (s38) and two more
+      stale reads (s70 in em_move's ship-next-to-land test, base_id when a former already on its
+      way picks its base), documented at `EM` and in docs/RECONSTRUCTION.md (#3); they have no
+      compat flag (a fix would change the fixed game, which this increment must not). These four
+      slots stay shared fields that every role writes. tx, ty, other, val, best, best_idx, s54 and
+      s58 never carry a value between steps, so they could become locals of the steps; that, and
+      names for the multi-role slots, is left for after the hybrid freeze (it moves state that
+      fcompare compares).
+    * Side fix and finding: net_daemon.cpp's header() read the event sequence number as `NetSessionState[-1]`
+      (UB, flagged by UBSan); it is its own global `NetEventSequence` (0x93E8BC) now. The
+      fixed-mode hang of cov_actions on turn 300 (also in b55e6a9) is the scenario's: its setup
+      calls use vehicle ids past VehCount (`action_tectonic 278`, `action_gate 274`), which links a
+      stale vehicle into base 9's stack; with the fix of turn_upkeep_air_return the turn goes on and
+      an AI transport walks the broken stack (veh_top). diffnative --fixes leaves cov_actions out
+      until the scenario is corrected and its reference re-recorded.
+    Proof per commit: native verify (29 scenarios), hybrid all (tiny20, council131, small12, std8,
+    late140, cov_missiles), fcompare of the touched entry points (air_power, enemy_strategy,
+    can_terraform, alien_move, assemble_passengers, enemy_move; 0 mismatches), diffnative against
+    b55e6a9 in both settings (6 + 20 new games, the scenarios), the ASan fixes step, the scripted
+    UI suites.

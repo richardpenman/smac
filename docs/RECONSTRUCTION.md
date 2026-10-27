@@ -146,17 +146,25 @@ The original reads stack memory it never wrote in these places. The oracle makes
    in the transport branch, read at 0x574DD7). Canonical value (poison 0 / 0xFFFFFFFF) behaves as
    "limit <= 0". Reconstruct with this variable initialised to 0 at function entry (shared across
    the roles the compiler merged into the slot), marked `BUG(original)`.
-   Implemented (src/engine/ai_move.cpp): every local is a field of `EM`, one per frame slot
-   (`EM::s48` here), zeroed at entry; the slot is also written on many paths of the call (garrison
-   want, loop indexes, a base pointer), which the reconstruction reproduces, so only the paths
-   that reach 0x574C5E/0x574DD7 without such a write see the canonical 0.
+   Implemented (src/engine/ai_move.cpp): every local is a field of the context `EM`, one per
+   frame slot (`EM::s48` here), each starting at 0; the slot is also written on many paths of the
+   call (garrison want, loop indexes, a base pointer), which the reconstruction reproduces, so only
+   the paths that reach 0x574C5E/0x574DD7 without such a write see the canonical 0. In the
+   harness scenarios and 20 new games the read sees 0 or em_defend's garrison count.
 3. **`enemy_move`, local `[ebp-0x38]`** (distance temp, `EM::s38`): confirmed. 0x574A8B loads it into
    EDI; for sea units that are not transports (plan != 7) the value survives (reloaded from the
    slot) to 0x576828, where a naval escort (group 0x15) with a waypoint order keeps the order
    (non-zero) or drops it (0). It is unwritten in this call only when no earlier code (naval hunt,
    escort loop, ...) stored a distance there: canonical 0 (drop the order). The same slot is read
    uninitialised at 0x56C1C7 (automated former fungus search, human units only: own-base tiles are
-   considered only if it is 0). Both use the zeroed `EM`, marked `BUG(original)`.
+   considered only if it is 0). Both use `EM::s38`, which starts at 0, marked `BUG(original)`.
+   Two more slots of this frame are read before the call writes them for the reading role (found
+   in cleanup increment 19 by an instrumented build that recorded every read of a slot written in
+   an earlier step of the call; documented at `EM`, no compat flag): `[ebp-0x70]` (`EM::s70`) at
+   em_move's test for a ship next to land, which sees the owner the previous direction looked at
+   or, for the first direction, what an earlier step left; and `[ebp-0x24]` (`EM::base_id`) when a
+   former already on its way picks the base whose area it works, which sees the colony pod scan's
+   last base or 0. The reconstruction reproduces both by keeping the shared slots.
 4. **`wants_to_attack` (0x55BC80), array `[ebp-0x130]`** (7 dwords, Ghidra `auStack_138[1..7]`): the
    loop at 0x55BF6E stores `max(slot, region_total_bases)` per faction without ever initialising the
    slots, then reduces them by a quarter. Its result reaches `enemy_strategy` (region_flags bit 4

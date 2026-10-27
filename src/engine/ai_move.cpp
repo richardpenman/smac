@@ -8,9 +8,9 @@
 // enemy_move runs the helpers as a small state machine. Labels L_<address> inside a helper are the
 // original's local join points.
 //
-// All locals live in `EM`, one field per stack slot of the original frame: the compiler reused
-// slots for different roles, and some paths read a slot that another role (or no code at all in
-// this call) wrote. See docs/RECONSTRUCTION.md, "Known uninitialised reads" #2 and #3.
+// The locals live in `EM`, the context every step works on (one field per stack slot of the
+// original frame: the compiler reused slots for different roles, and a few reads see a slot that
+// another role, or no code at all in this call, wrote; the stack residues are listed there).
 #include "engine/ai.h"
 
 #include <cstdlib>
@@ -184,56 +184,86 @@ enum Flow {
     F_56e693,
 };
 
+// enemy_move's context: the original's locals, one field per slot of its stack frame ([ebp-x] and
+// Ghidra's local_ name in the comments). Three kinds of fields:
+// * the unit: set by em_setup and read by every step (plan, st4 and dmg are later changed by
+//   em_defend, em_orders / em_move and em_plan);
+// * values the steps pass to each other on purpose: the step to take (best_dir), hold or defend
+//   (stay, defend), the coast goal, the kept waypoint, hint mode (s6c), the faction bit (s68,
+//   em_orders and em_defend to em_naval and em_cover), the transport's passenger plans and
+//   combat flag (s2c, s30, em_transport to em_transport_routes);
+// * scratch slots: the original's compiler reused them for unrelated variables of different
+//   roles (loop indexes, temps). Within a step each role writes them before it reads them, except
+//   the stack residues below, where a role reads a slot that this call has not written for it:
+//   it then sees what another role left there, or 0 (the oracle's poisoned stack) when nothing
+//   wrote it. These reads are what tie the slots together, so every role keeps writing the
+//   shared field rather than a local of its own:
+//   - s48 [ebp-0x48]: em_passenger / em_passenger_lands (0x574C5E, 0x574DD7), the number of
+//     passengers to keep sentried; the values seen are 0 and em_defend's garrison count
+//     (docs/RECONSTRUCTION.md, uninitialised read #2; compat residue.enemy_move_s48);
+//   - s38 [ebp-0x38]: em_auto_former's fungus test (0x56C1C7) and the escort's choice in em_sea
+//     (EDI, 0x576828; em_naval's distance seen) (#3; residue.enemy_move_s38, residue.enemy_move_edi);
+//   - s70 [ebp-0x70]: em_move_enter, a ship next to land, reads the territory or unit owner of
+//     the previous direction, and for the first direction what the step before em_move left
+//     (em_gift, em_transport, em_follow, em_defend, em_sea, ...);
+//   - base_id [ebp-0x24]: em_former_goals, a former already on its way, takes the base left by the
+//     colony pod scan (em_colony) or 0.
+//   Slots tx, ty, other, val, best, best_idx, s54 and s58 never carry a value from one step to the
+//   next (an instrumented build that recorded every read of a value written in an earlier step,
+//   on the 28 harness scenarios and 20 new games in both settings, found none).
 struct EM {
-    int32_t retval;
-    int32_t veh;  // [ebp+8]
-    int32_t tx, ty;  // [-4], [-8] (local_8, local_c): candidate tile
-    int32_t fac;  // [-0xc]
-    int32_t x, y;  // [-0x18], [-0x14]
-    int32_t other;  // [-0x1c] local_20: unit on a tile / loop vehicle
-    int32_t val;  // [-0x20] local_24: candidate score
-    int32_t base_id;  // [-0x24] local_28
-    int32_t best;  // [-0x28] local_2c: best score
-    int32_t s2c;  // [-0x2c] local_30: loop index, counter, direction
-    int32_t s30;  // [-0x30] local_34
-    int32_t region;  // [-0x34] local_38
-    int32_t s38;  // [-0x38] local_3c: distance temp (uninitialised read #3)
-    int32_t triad;  // [-0x40] local_44
-    int32_t s44;  // [-0x44] local_48: recon empath flag, later loop index
-    int32_t s48;  // [-0x48] local_4c (uninitialised read #2)
-    int32_t s4c;  // [-0x4c] local_50: in own territory, later temp
-    int32_t plan;  // [-0x50] local_54
-    int32_t s54;  // [-0x54] local_58
-    int32_t s58;  // [-0x58] local_5c
-    int32_t base_own;  // [-0x5c] local_60: nearest own base
-    int32_t s60;  // [-0x60] local_64: territory owner of the tile, later temp
-    int32_t dist_own;  // [-0x64] local_68
-    int32_t s68;  // [-0x68] local_6c: faction bit, later a region
-    int32_t s6c;  // [-0x6c] local_70: hint mode (negative argument), later loop index
-    int32_t s70;  // [-0x70] local_74: faction temp
-    int32_t at_sea;  // [-0x74] local_78: the unit's tile is ocean
-    int32_t best_idx;  // [-0x78] local_7c
-    int32_t dist_any;  // [-0x7c] local_80
-    int32_t best_dir;  // [-0x80] local_84
-    int32_t s84;  // [-0x84] local_88: next to a hostile base, later tile is ocean
-    int32_t region_plan;  // [-0x88] local_8c
-    int32_t stay;  // [-0x8c] local_90
-    int32_t dmg;  // [-0x90] local_94: damage level 0-4
-    int32_t zocv;  // [-0x94] local_98: zoc_veh (faction + 1)
-    int32_t st4;  // [-0x98] local_9c: state & 0x60000 == 0x40000
-    int32_t base_any;  // [-0x9c] local_a0: nearest base
-    int32_t mp_own;  // [-0xa0] local_a4: multiplayer, own unit
-    int32_t sa4;  // [-0xa4] local_a8: altitude, later temp
-    int32_t st6;  // [-0xa8] local_ac: state & 0x60000 == 0x60000
-    int32_t unit;  // [-0xac] local_b0
-    int32_t st4000;  // [-0xb0] local_b4: state & 0x4000
-    int32_t defend;  // [-0xb4] local_b8
-    int32_t sb8;  // [-0xb8] local_bc: out of moves, later a plan
-    int32_t zocm;  // [-0xbc] local_c0: zoc_move
-    int32_t coast_goal;  // [-0xc0] local_c4
-    int32_t keep_wp;  // [-0xc4] local_c8
-    int32_t ys[64];  // [-0x1c4] local_1c8
-    int32_t xs[64];  // [-0x2c4] local_2c8
+    int32_t retval = 0;
+    // The unit (em_setup).
+    int32_t veh = 0;  // [ebp+8]
+    int32_t fac = 0;  // [-0xc]
+    int32_t x = 0, y = 0;  // [-0x18], [-0x14]
+    int32_t unit = 0;  // [-0xac] local_b0
+    int32_t plan = 0;  // [-0x50] local_54 (em_defend may make it PLAN_DEFENSE)
+    int32_t triad = 0;  // [-0x40] local_44
+    int32_t region = 0;  // [-0x34] local_38
+    int32_t region_plan = 0;  // [-0x88] local_8c
+    int32_t at_sea = 0;  // [-0x74] local_78: the unit's tile is ocean
+    int32_t dmg = 0;  // [-0x90] local_94: damage level 0-4
+    int32_t zocv = 0;  // [-0x94] local_98: zoc_veh (faction + 1)
+    int32_t zocm = 0;  // [-0xbc] local_c0: zoc_move
+    int32_t base_any = 0;  // [-0x9c] local_a0: nearest base
+    int32_t dist_any = 0;  // [-0x7c] local_80
+    int32_t base_own = 0;  // [-0x5c] local_60: nearest own base
+    int32_t dist_own = 0;  // [-0x64] local_68
+    int32_t st4 = 0;  // [-0x98] local_9c: state & 0x60000 == 0x40000 (em_move: whether to explore)
+    int32_t st6 = 0;  // [-0xa8] local_ac: state & 0x60000 == 0x60000
+    int32_t st4000 = 0;  // [-0xb0] local_b4: state & 0x4000
+    int32_t mp_own = 0;  // [-0xa0] local_a4: multiplayer, own unit
+    // Passed between steps.
+    int32_t best_dir = 0;  // [-0x80] local_84
+    int32_t stay = 0;  // [-0x8c] local_90
+    int32_t defend = 0;  // [-0xb4] local_b8
+    int32_t coast_goal = 0;  // [-0xc0] local_c4
+    int32_t keep_wp = 0;  // [-0xc4] local_c8
+    // Scratch slots (the first use of several also passes a value between steps: see above).
+    int32_t tx = 0, ty = 0;  // [-4], [-8] (local_8, local_c): candidate tile
+    int32_t other = 0;  // [-0x1c] local_20: unit on a tile / loop vehicle
+    int32_t val = 0;  // [-0x20] local_24: candidate score
+    int32_t base_id = 0;  // [-0x24] local_28 (stack residue, see above)
+    int32_t best = 0;  // [-0x28] local_2c: best score
+    int32_t best_idx = 0;  // [-0x78] local_7c
+    int32_t s2c = 0;  // [-0x2c] local_30: loop index, counter, direction; passenger plans
+    int32_t s30 = 0;  // [-0x30] local_34; transport: combat passengers
+    int32_t s38 = 0;  // [-0x38] local_3c: distance temp (stack residue #3)
+    int32_t s44 = 0;  // [-0x44] local_48: recon empath flag (em_setup), later loop index
+    int32_t s48 = 0;  // [-0x48] local_4c (stack residue #2)
+    int32_t s4c = 0;  // [-0x4c] local_50: in own territory (em_setup), later temp
+    int32_t s54 = 0;  // [-0x54] local_58
+    int32_t s58 = 0;  // [-0x58] local_5c
+    int32_t s60 = 0;  // [-0x60] local_64: territory owner of the tile (em_setup), later temp
+    int32_t s68 = 0;  // [-0x68] local_6c: faction bit, later a region
+    int32_t s6c = 0;  // [-0x6c] local_70: hint mode (negative argument), later loop index
+    int32_t s70 = 0;  // [-0x70] local_74: faction temp (stack residue, see above)
+    int32_t s84 = 0;  // [-0x84] local_88: next to a hostile base, later tile is ocean
+    int32_t sa4 = 0;  // [-0xa4] local_a8: altitude (em_setup), later temp
+    int32_t sb8 = 0;  // [-0xb8] local_bc: out of moves, later a plan
+    int32_t ys[64] = {};  // [-0x1c4] local_1c8
+    int32_t xs[64] = {};  // [-0x2c4] local_2c8
     VEH& v() const { return game().vehs[veh]; }
     Faction& f() const { return game().factions[fac]; }
     bool human() const { return is_human(fac); }
@@ -2483,7 +2513,7 @@ std::optional<Flow> em_former_goals(EM& m) {
     m.s4c = 0;
     int32_t b;  // edi: the base whose area is worked
     if (v.order == ORDER_MOVE_TO) {
-        b = m.base_id;
+        b = m.base_id;  // stack residue (see EM): the colony pod scan's base, or 0
     } else {
         bool check_home;
         if (m.s30 == 0 && m.base_own >= 0) {
@@ -4041,7 +4071,8 @@ bool em_move_enter(EM& m) {
     m.base_id = base_at(m.tx, m.ty);
     m.s68 = tile_region(m.tx, m.ty);
     if (m.triad == TRIAD_SEA && m.s84 == 0) {
-        // A ship next to land: only to attack from the sea.
+        // A ship next to land: only to attack from the sea. Stack residue (see EM): s70 still holds
+        // the owner the previous direction looked at, or for the first one the last step's value.
         if (m.other < 0 || m.s70 == m.fac || !m.at_sea) return false;
     } else if (!(m.at_sea || m.s84 || !m.zocm || m.triad != TRIAD_LAND || m.other >= 0 ||
                  (unit_of(m.veh).ability_flags & ABL_CLOAKED) || unit_plan(m.veh) == PLAN_PROBE)) {
@@ -4422,10 +4453,10 @@ Flow em_move(EM& m) {
 }  // namespace
 
 int32_t GAMEAPI enemy_move(int32_t veh_id) {
+    // Every slot starts at 0, the canonical value of the oracle's stack poisoning, which the stack
+    // residues read when nothing in this call wrote them (EM; docs/RECONSTRUCTION.md, "Known
+    // uninitialised reads" #2 and #3).
     EM m;
-    // The original's frame: slots it reads before writing hold the canonical value of the oracle's
-    // stack poisoning (0). See docs/RECONSTRUCTION.md, "Known uninitialised reads" #2 and #3.
-    std::memset(&m, 0, sizeof(m));
     Flow f = em_setup(m, veh_id);
     for (;;) {
         switch (f) {
