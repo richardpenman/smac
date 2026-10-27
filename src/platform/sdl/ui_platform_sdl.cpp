@@ -199,6 +199,31 @@ int64_t ft_mulfix(int64_t a, int64_t b) {
     return p >= 0 ? (p + 0x8000) >> 16 : -((-p + 0x8000) >> 16);
 }
 std::map<int32_t, FontEntry> g_fonts;
+// The open TrueType instances by file, size and style, shared by every handle of that font. Each
+// TTF_Font keeps its file open, and the game creates fonts freely (GDI fonts are cheap): many of
+// the reconstructed windows' Font objects are locals whose handles are never closed (the original's
+// Font destructors), and a battle report alone made three a frame. Opening a file per handle ran
+// out of file descriptors on macOS (256 by default) after a few battles, and every later
+// text_open failed: blank 100-pixel popups. The instances stay open until video_shutdown.
+std::map<std::string, std::pair<TTF_Font*, TTF_Font*>> g_ttf_cache;
+// The font files' bytes: the instances read them from memory, holding no file open.
+std::map<std::string, std::vector<uint8_t>> g_ttf_files;
+TTF_Font* open_ttf(const std::string& path, int32_t pixels) {
+    auto it = g_ttf_files.find(path);
+    if (it == g_ttf_files.end()) {
+        std::vector<uint8_t> bytes;
+        if (FILE* fp = std::fopen(path.c_str(), "rb")) {
+            uint8_t buf[65536];
+            size_t n;
+            while ((n = std::fread(buf, 1, sizeof(buf), fp)) > 0) bytes.insert(bytes.end(), buf, buf + n);
+            std::fclose(fp);
+        }
+        it = g_ttf_files.emplace(path, std::move(bytes)).first;
+    }
+    if (it->second.empty()) return nullptr;
+    SDL_RWops* rw = SDL_RWFromConstMem(it->second.data(), (int)it->second.size());
+    return rw ? TTF_OpenFontRW(rw, 1, pixels) : nullptr;
+}
 int32_t g_next_font = 1;
 
 bool file_ok(const std::string& path) {
@@ -284,8 +309,11 @@ bool video_init(const char* title, int32_t width, int32_t height, bool hidden) {
 }
 
 void video_shutdown() {
-    for (auto& f : g_fonts)
-        if (f.second.font) TTF_CloseFont(f.second.font);
+    for (auto& f : g_ttf_cache) {
+        if (f.second.first) TTF_CloseFont(f.second.first);
+        if (f.second.second) TTF_CloseFont(f.second.second);
+    }
+    g_ttf_cache.clear();
     g_fonts.clear();
     if (g_texture) SDL_DestroyTexture(g_texture);
     if (g_renderer) SDL_DestroyRenderer(g_renderer);
@@ -392,18 +420,6 @@ void delay_ms(uint32_t ms) { SDL_Delay(ms); }
 int32_t font_open(const char* face, int32_t pixels, bool bold, bool italic, bool underline) {
     std::string path = find_font_file(face, bold, italic);
     if (path.empty() || pixels <= 0) return 0;
-    TTF_Font* f = TTF_OpenFont(path.c_str(), pixels);
-    if (!f) return 0;
-    // Under Wine, TextOut's glyphs (shapes and advances) match FreeType's mono hinting, while
-    // GetTextExtentPoint32 sums the advances of the normal hinting target: a second instance
-    // measures.
-    TTF_SetFontHinting(f, TTF_HINTING_MONO);
-    TTF_Font* measure = TTF_OpenFont(path.c_str(), pixels);
-    if (measure) {
-        TTF_SetFontHinting(measure, TTF_HINTING_NORMAL);
-        TTF_SetFontKerning(measure, 0);
-    }
-    TTF_SetFontKerning(f, 0);  // GDI TextOut does not kern
     int style = TTF_STYLE_NORMAL;
     // Bold/italic come from the file when a matching one exists; synthesise them otherwise.
     if (bold && path.find("old") == std::string::npos && path.find("bd") == std::string::npos &&
@@ -412,8 +428,29 @@ int32_t font_open(const char* face, int32_t pixels, bool bold, bool italic, bool
     if (italic && path.find("talic") == std::string::npos && path.find("i.ttf") == std::string::npos)
         style |= TTF_STYLE_ITALIC;
     if (underline) style |= TTF_STYLE_UNDERLINE;
-    TTF_SetFontStyle(f, style);
-    if (measure) TTF_SetFontStyle(measure, style);
+    std::string key = path + "|" + std::to_string(pixels) + "|" + std::to_string(style);
+    TTF_Font *f = nullptr, *measure = nullptr;
+    auto cached = g_ttf_cache.find(key);
+    if (cached != g_ttf_cache.end()) {
+        f = cached->second.first;
+        measure = cached->second.second;
+    } else {
+        f = open_ttf(path, pixels);
+        if (!f) return 0;
+        // Under Wine, TextOut's glyphs (shapes and advances) match FreeType's mono hinting, while
+        // GetTextExtentPoint32 sums the advances of the normal hinting target: a second instance
+        // measures.
+        TTF_SetFontHinting(f, TTF_HINTING_MONO);
+        measure = open_ttf(path, pixels);
+        if (measure) {
+            TTF_SetFontHinting(measure, TTF_HINTING_NORMAL);
+            TTF_SetFontKerning(measure, 0);
+        }
+        TTF_SetFontKerning(f, 0);  // GDI TextOut does not kern
+        TTF_SetFontStyle(f, style);
+        if (measure) TTF_SetFontStyle(measure, style);
+        g_ttf_cache[key] = {f, measure};
+    }
     int32_t h = g_next_font++;
     g_fonts[h].font = f;
     g_fonts[h].pixels = pixels;
@@ -441,9 +478,7 @@ int32_t font_open(const char* face, int32_t pixels, bool bold, bool italic, bool
 void font_close(int32_t handle) {
     auto it = g_fonts.find(handle);
     if (it == g_fonts.end()) return;
-    if (it->second.font) TTF_CloseFont(it->second.font);
-    if (it->second.measure) TTF_CloseFont(it->second.measure);
-    g_fonts.erase(it);
+    g_fonts.erase(it);  // the TTF instances stay shared (g_ttf_cache)
 }
 
 bool font_metrics(int32_t handle, FontMetrics* out) {

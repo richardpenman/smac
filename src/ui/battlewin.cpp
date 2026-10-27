@@ -363,6 +363,9 @@ void THISCALL BattleWin_battle_report(uint8_t*, int32_t atk, int32_t def, int32_
     g_deadline = g_ui_unattended ? 0 : platform::ticks_ms() + 5000;  // Time_pulse
     std::fprintf(stderr, "battle report: %d (%s) vs %d (%s) strength %d / %d\n", atk, ua.name, def, ud.name, off, dstr);
     if (const char* shot = std::getenv("SMACX_BATTLE_SHOT")) ui_screenshot(g_ui_outdir + "/" + shot);  // test aid
+    Font_dtor(&fn);  // the locals' destructors
+    Font_dtor(&fi);
+    Font_dtor(&fb);
 }
 
 // ---- the headless "move" area (src/headless/ui_headless_move.cpp) ----

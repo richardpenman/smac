@@ -66,6 +66,8 @@ struct Font {
 };
 static_assert(sizeof(Font) == 0x2C, "Font layout");
 ADDR_NATIVE(0x618EA0) void THISCALL Font_ctor(Font* self);
+// Font_dtor (0x618EE0): the font object deleted (DeleteObject) when it is not a resource font.
+void Font_dtor(Font* self);
 // Creates the font: face, character height in pixels, style bits (1 bold, 2 italic, 4 underline).
 ADDR_NATIVE(0x618F40) int32_t THISCALL Font_init(Font* self, const char* face, int32_t size, int32_t style);
 ADDR_NATIVE(0x619280) int32_t THISCALL Font_width(Font* self, const char* text);

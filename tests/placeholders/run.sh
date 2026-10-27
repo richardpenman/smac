@@ -352,7 +352,7 @@ fi
 run menucol $NEW --keys "ENTER,A-m,DOWN,DOWN,SHOT:menu.bmp,ESC,A-h,ESC"
 check menucol "the column, MAP its third button" "^menu column at 0,343 \\(139x168\\): Map at 0,385"
 check menucol "HQ the second" "^menu column at 0,343 \\(139x168\\): HQ at 0,367"
-check menucol "AlphaMenu_show when the column opens (the slide skipped unattended)" "^alphamenu show \\(sound [01], slide 0\\)"
+check menucol "AlphaMenu_show when the column opens (the slide skipped unattended)" "^alphamenu show \\(sound [01], slide $([ "$SMACX_ANIMATE" = 1 ] && echo 1 || echo 0)\\)"
 nocrash menucol
 
 # 21. The scenario editor (editor.cpp): ctrl+K (SCENEDITOR yes) switches it on; '1' paints the
@@ -438,5 +438,18 @@ nocrash newtech
 run gotoredraw $NEW --keys "ENTER,DRAG:530x200:700x330,v,KP2,KP1,WAIT:200,SHOT:goto.bmp,WAIT:200,UNITS"
 check gotoredraw "the go-to order kept" "unit 4 f1 Scout Patrol \(35,9\) order 24"
 nocrash gotoredraw
+
+# 25. File descriptors (blank 100-pixel popups and "cannot play fx\psi blow.wav" after battles on
+#     macOS, whose default limit is 256): every font handle opened its TTF file (twice), and the
+#     battle report's local fonts were never closed: a few battles used up the descriptors and
+#     every later text_open (popups, message texts) and sound failed. With 64 descriptors, a turn
+#     of the late save with its battle reports drawn, then a popup with its text.
+if [ -f "$ROOT/work/saves_late/turn_200.sav" ]; then
+    (ulimit -n 64; run fdlimit --save work/saves_late/turn_200.sav --human 1 --keys "C-ENTER,DOWN,ENTER,ENTER,ENTER,ENTER,ESC,ESC")
+    check fdlimit "battle reports drawn" "battle report: [0-9]+ "
+    check fdlimit "the popup after them has its text" "popup REALLYQUIT shown: 755x300 at 150,255 \\(2 items\\)"
+    nocheck fdlimit "every sound found" "cannot play"
+    nocrash fdlimit
+fi
 
 exit $FAIL

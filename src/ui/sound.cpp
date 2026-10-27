@@ -201,7 +201,17 @@ std::shared_ptr<const platform::Pcm> sound_load_file(const char* name) {
         if (!pcm) pcm = mp3_decode(data, size);
         win32::free_file(data);
     }
-    if (!pcm) std::fprintf(stderr, "sound: cannot play %s\n", name);
+    if (!pcm) {
+        // A file the game lacks plays nothing, silently (the original's Wave_init / FX_play check
+        // that it exists); a file that exists but could not be read (e.g. no file descriptor
+        // left) or decoded is reported, and tried again next time.
+        if (!win32::file_exists(name)) {
+            cache[path] = pcm;
+            return pcm;
+        }
+        std::fprintf(stderr, "sound: cannot play %s\n", name);
+        if (!data) return pcm;
+    }
     cache[path] = pcm;
     return pcm;
 }

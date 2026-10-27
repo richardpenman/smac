@@ -148,6 +148,11 @@ void THISCALL Font_ctor(Font* self) {
     self->field_0 = -1;
 }
 
+void Font_dtor(Font* self) {
+    if (self->handle) platform::font_close(self->handle);
+    self->handle = 0;
+}
+
 int32_t THISCALL Font_init(Font* self, const char* face, int32_t size, int32_t style) {
     if (!face) return 3;
     if (!(self->flags & 1)) self->field_0 = -1;
