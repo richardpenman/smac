@@ -1655,8 +1655,8 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         // message list (M) gives way to the info pane (I); nothing when it already shows.
         if (!Win_is_visible(&BaseWin)) mi_set_mode(0x3E9);
         AlphaMenu_hide_main();
-        if (MultiWinVisible) console_not_reconstructed("MultiWin_hide");
-        if (InterfaceMessageShown) console_not_reconstructed("MainInterface_clear_message");
+        if (MultiWinVisible) multiwin_hide();  // MultiWin_hide
+        // (InterfaceMessageShown: MainInterface_clear_message, an empty function in the original.)
         if (NetMsgShownA || NetMsgShownB) {
             NetMsg_close(&NetMsg);
             NetMsg_close(&NetMsg);

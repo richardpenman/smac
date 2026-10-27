@@ -465,7 +465,7 @@ void THISCALL MapWin_click(uint8_t* win, int32_t px, int32_t py, int32_t right) 
     if (base_cursor && drag_base >= 0 && (uint8_t)Bases[drag_base].faction_id == CurrentPlayerFaction) {
         // Dragging a base's rally point: asked for which triad.
         set_base(drag_base);
-        if (NetDaemon_lock_base(CurrentBaseID, 0, -1, -1)) return;
+        if (NetDaemon_lock_base(&NetState, CurrentBaseID, 0, -1, -1)) return;
         int32_t target = base_find_filtered(x, y, CurrentPlayerFaction, -1, -2, -1);
         parse_says(0, Bases[drag_base].name, -1, -1);
         parse_says(1, Bases[target].name, -1, -1);
@@ -501,7 +501,7 @@ void THISCALL MapWin_click(uint8_t* win, int32_t px, int32_t py, int32_t right) 
                 NetMsg_pop(&NetMsg, "DESTNO", 5000, 0, nullptr);
             }
         }
-        NetDaemon_unlock_base(CurrentBaseID);
+        NetDaemon_unlock_base(&NetState, CurrentBaseID);
         return;
     }
     if (goto_cursor) {

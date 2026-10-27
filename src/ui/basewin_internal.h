@@ -15,11 +15,11 @@
 inline int32_t bw_lock_base(int32_t base_id, int32_t a2 = 0) {
     log_say_values("LockBase", ControlUpkeepA, ControlTurnC, CurrentBaseID);
     if (!MultiplayerActive) return 0;
-    return NetDaemon_lock_base(base_id, a2, -1, -1);
+    return NetDaemon_lock_base(&NetState, base_id, a2, -1, -1);
 }
 inline void bw_unlock_base(int32_t base_id) {
     log_say_values("UnlockBase", NetSessionState[0x1F], base_id, 0);  // 0x93E93C
-    if (MultiplayerActive) NetDaemon_unlock_base(base_id);
+    if (MultiplayerActive) NetDaemon_unlock_base(&NetState, base_id);
 }
 
 // Spot list (0x0C bytes: entries, capacity, count; entries 0x18 bytes: rect, index, type).

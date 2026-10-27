@@ -1029,7 +1029,7 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
             return;
         }
         if (mode == -1) {
-            NetDaemon_unlock_base(CurrentBaseID);
+            NetDaemon_unlock_base(&NetState, CurrentBaseID);
             restore_view();
             return;
         }
@@ -1043,7 +1043,7 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
         x = b.x;
         y = b.y;
         set_base(base_id);
-        if (NetDaemon_lock_base(base_id, 0, -1, -1)) return;
+        if (NetDaemon_lock_base(&NetState, base_id, 0, -1, -1)) return;
         base_locked = true;
         if (!(saved_options & 0x40000)) {
             // The rally points of every base are shown while choosing.
@@ -1064,7 +1064,7 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
         }
         triad = BasePop_exec_3(pop.p, 0, 0);
         if (triad < 0) {
-            NetDaemon_unlock_base(CurrentBaseID);
+            NetDaemon_unlock_base(&NetState, CurrentBaseID);
             restore_view();
             return;
         }
@@ -1354,7 +1354,7 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
             if (chosen == 9999) chosen = -1;
             (&Bases[base_id].autoforward_land_base_id)[triad] = (int16_t)chosen;
             draw_map(1);
-            NetDaemon_unlock_base(CurrentBaseID);
+            NetDaemon_unlock_base(&NetState, CurrentBaseID);
             restore_view();
             return;
         }

@@ -331,7 +331,7 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
     case 0x111: hall_of_fame(0); break;
     case 0x113:
         if (!MultiWinVisible) MultiWin_show(nullptr);
-        else console_not_reconstructed("MultiWin_hide");
+        else multiwin_hide();  // MultiWin_hide
         break;
     case 0x114: Console_corner_the_market(self); break;
     case 0x115: Console_show_scen_objectives(self); break;

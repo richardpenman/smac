@@ -12,8 +12,8 @@ ADDR(0x532B70) void GAMEAPI rebuild_base_bits();
 // Ends the network session (NetDaemon object NetState).
 ADDR(0x52E050) void THISCALL NetDaemon_hang_up(uint8_t* net);
 // Multiplayer: locks a base for editing (0 on success) / releases it.
-ADDR(0x530D50) int32_t GAMEAPI NetDaemon_lock_base(int32_t base_id, int32_t a2, int32_t a3, int32_t a4);
-ADDR(0x530E50) void GAMEAPI NetDaemon_unlock_base(int32_t base_id);
+ADDR(0x530D50) int32_t THISCALL NetDaemon_lock_base(uint8_t* net, int32_t base_id, int32_t a2, int32_t a3, int32_t a4);
+ADDR(0x530E50) void THISCALL NetDaemon_unlock_base(uint8_t* net, int32_t base_id);
 // Multiplayer session state cleared when an iron man game is saved (0x93E8C0-0x93E96C).
 GLOBAL(int32_t[44], NetSessionState, 0x93E8C0);
 GLOBAL(uint8_t, NetLock, 0x93E230);  // Lock object (multiplayer)
@@ -33,6 +33,8 @@ ADDR(0x593310) void GAMEAPI synch_ai(int32_t faction_id);
 ADDR(0x5933F0) void GAMEAPI synch_proto(int32_t unit_id);
 // Multiplayer: sends faction_id's research goal to the other players.
 ADDR(0x5932B0) void GAMEAPI synch_researching(int32_t faction_id);
+// Multiplayer: sends a faction's energy (NetDaemon_synch 0xB).
+ADDR(0x593280) void GAMEAPI synch_energy(int32_t faction_id);
 // Processes pending network messages (multiplayer wait loops).
 ADDR(0x530360) void GAMEAPI NetDaemon_net_tasks();
 // Multiplayer: asks the player of faction_id_with to open a diplomatic channel; 0 when opened.

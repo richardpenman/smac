@@ -807,7 +807,7 @@ void GAMEAPI prune_protos(int32_t faction_id, int32_t unit_id, int32_t net_synch
                         if (!MultiplayerActive && faction_id == CurrentPlayerFaction) {
                             if (!queued) continue;
                             if (replaced) {
-                                if (net_synch && NetDaemon_lock_base(b, 0, -1, -1) != 0) continue;
+                                if (net_synch && NetDaemon_lock_base(&NetState, b, 0, -1, -1) != 0) continue;
                                 if (MultiplayerActive) {
                                     ask = false;
                                 } else {
@@ -817,7 +817,7 @@ void GAMEAPI prune_protos(int32_t faction_id, int32_t unit_id, int32_t net_synch
                                 ask = true;
                             }
                         } else {
-                            if (!queued || (net_synch && NetDaemon_lock_base(b, 0, -1, -1) != 0)) continue;
+                            if (!queued || (net_synch && NetDaemon_lock_base(&NetState, b, 0, -1, -1) != 0)) continue;
                             ask = !MultiplayerActive;
                         }
                         if (ask && faction_id == CurrentPlayerFaction && !replaced) {
@@ -847,7 +847,7 @@ void GAMEAPI prune_protos(int32_t faction_id, int32_t unit_id, int32_t net_synch
                         BASE& base = game().bases[b];
                         for (int32_t q = 0; q <= base.queue_size; q++)
                             if (base.queue_items[q] == v_id) base.queue_items[q] = u_id;
-                        if (MultiplayerActive && net_synch) NetDaemon_unlock_base(b);
+                        if (MultiplayerActive && net_synch) NetDaemon_unlock_base(&NetState, b);
                     }
                     if (next_k) continue;
                     if (game().base_count > 0 && replaced && MultiplayerActive && faction_id == CurrentPlayerFaction) {

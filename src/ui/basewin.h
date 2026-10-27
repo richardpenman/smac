@@ -175,8 +175,7 @@ ADDR_NATIVE(0x5882F0) Font* GAMEAPI find_font(int32_t size, int32_t style);
 // A number entry popup (pop_ask_number_4 through the alien scripts); the number goes to
 // ParseNumTable[0]. Returns 0 when confirmed.
 ADDR_NATIVE(0x5BFD10) int32_t GAMEAPI X_pop_ask_number(const char* label, int32_t value, int32_t a3);
-// Multiplayer: sends a faction's energy (net module; not reconstructed).
-ADDR_NATIVE(0x593280) void GAMEAPI synch_energy(int32_t faction_id);
+// synch_energy (multiplayer: a faction's energy): engine/net.h.
 
 // ---- not original functions ----
 // The facility / secret project picture (facs\facNNN.pcx, projs\projNNN.pcx; fac >= 0x46: project).
