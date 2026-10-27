@@ -15,13 +15,21 @@
 //
 // ui_hotseat_show: the screen shown again, the message list cleared, WONLOST (the combat won and
 // lost since the player's last turn), Console_update_data, the timers.
+// read_tamper / set_tamper (0x51E000 / 0x51E090): the PBEM tamper records (TamperIndex, value
+// "MVM", 4 bytes; TamperRecords, value "MVB", 0x4B0 bytes) are kept per machine. The original keeps
+// them in the registry (HKLM\SOFTWARE\Microsoft\DirectPlay\Applications\Sid Meier's Alpha
+// Centauri); smacx keeps the two values in the file tamper.reg of its per-user directory (the
+// --outdir with tests): a missing file reads nothing, as a missing registry value.
 // Approximated: the players' own message lists (sub_51E530: each faction's messages kept between
 // its turns, the message mode then set) are not kept; the desktop's box sprites are not drawn.
 #include <cstddef>
 #include <cstdio>
+#include <cstring>
+#include <string>
 
 #include "engine/diplomacy.h"
 #include "engine/globals.h"
+#include "engine/net_misc.h"
 #include "engine/parse.h"
 #include "engine/rules.h"
 #include "engine/save.h"
@@ -71,11 +79,12 @@ int32_t ui_hotseat_switch(int32_t f, int32_t* tries) {
         }
         if (button) {  // SAVE AND EXIT
             GameMoreRules |= 0x40;
+            // (save_game returns 1 after a hotseat / PBEM save: ControlTurnA is set, the game ends.)
             if (save_game(0) == 0) {
-                std::fprintf(stderr, "hotseat: saved and exited\n");
                 leave_game();
                 return 1;
             }
+            if (ControlTurnA) std::fprintf(stderr, "pbem: saved and exited, save count %d\n", PbemSaveCount);
             GameMoreRules &= ~0x40;
             if (ControlTurnA) return 1;
             continue;
@@ -136,4 +145,37 @@ void ui_hotseat_show(int32_t f) {
     start_timers();
     ui_invalidate();
     std::fprintf(stderr, "hotseat: faction %d takes the turn (turn %d)\n", f, CurrentTurn);
+}
+
+// ---- the tamper records (the registry's MVM / MVB values) ----
+
+namespace {
+std::string tamper_path() { return g_ui_outdir + "/tamper.reg"; }
+}  // namespace
+
+void GAMEAPI read_tamper() {
+    FILE* f = std::fopen(tamper_path().c_str(), "rb");
+    if (!f) return;
+    int32_t index;
+    if (std::fread(&index, 4, 1, f) == 1) {
+        TamperIndex = index;
+        static int32_t records[50][6];
+        if (std::fread(records, sizeof(records), 1, f) == 1) std::memcpy(TamperRecords, records, sizeof(records));
+    }
+    std::fclose(f);
+}
+
+void GAMEAPI set_tamper() {
+    FILE* f = std::fopen(tamper_path().c_str(), "wb");
+    if (!f) return;
+    std::fwrite(&TamperIndex, 4, 1, f);
+    std::fwrite(TamperRecords, 0x4B0, 1, f);
+    std::fclose(f);
+    for (const auto& rec : TamperRecords) {
+        if (rec[0] == TamperKeyA && rec[1] == TamperKeyB && rec[2] == CurrentTurn && rec[3] == CurrentPlayerFaction &&
+            rec[5] == TamperKeyC) {
+            std::fprintf(stderr, "pbem: tamper record %s (turn %d faction %d save %d loads %d)\n",
+                         rec[4] ? "again" : "new", CurrentTurn, CurrentPlayerFaction, TamperKeyC, rec[4] + 1);
+        }
+    }
 }

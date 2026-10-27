@@ -132,3 +132,24 @@ types and payloads, same routing in `NetDaemon_send_message`, same `process_mess
 * Approximated: the players' own message lists between turns (sub_51E530), the desktop's box art
   behind SWITCHING, the DiploWin's StringBox / EditBox look.
 * Tested by tests/hotseat/run.sh (two humans; a third works the same way through HOTSEATADD1).
+
+**Phase 2 (PBEM): done.** The original has no separate e-mail mode: a PBEM game is the hotseat game
+saved at a handover (SWITCHING's SAVE AND EXIT, or any save: with `PbemActive` `save_game` ends the
+game) and loaded by the next player from the HOTSEAT menu's LOAD MULTIPLAYER GAME. There is no
+e-mail instructions popup and no special save name (HOTTAMPER, ENTERPASSWORD, NOHOTSEAT,
+HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by terranx.exe).
+* Already in the engine: `save_daemon` (PbemSaveCount, GameMoreRules 0x20, the tamper seeds and
+  per-faction reload notes saved), `load_daemon` (PbemActive set again for a game with 0x20 or two
+  humans, `check_tamper`: HOTNOTAMPER and the other players' notes), `load_game`'s refusal of a
+  passworded game outside multiplayer (PASSWORDEDLOADATTEMPT), `hotseat_take_turn`'s HOTTAMPER2.
+  The password asked on load is the handover's SWITCHING2 (phase 1).
+* src/ui/hotseat.cpp: `read_tamper` / `set_tamper` (0x51E000 / 0x51E090). The original keeps the
+  50 tamper records in the registry (HKLM ...\DirectPlay\Applications\Sid Meier's Alpha
+  Centauri, values MVM and MVB), i.e. per machine; smacx keeps the same two values in
+  `tamper.reg` in its per-user directory (the `--outdir` in tests). The stubs in src/ui/editor.cpp
+  were removed.
+* Tested by tests/pbem/run.sh: two "machines" (two outdirs, each with its saves and its
+  tamper.reg) pass `pb.SAV` back and forth over three turns: passwords set at the first handovers,
+  a wrong one on load, SAVE AND EXIT at each handover, a save loaded twice (HOTNOTAMPER; the
+  record's load count 2), the other player told at their next turn (HOTTAMPER2), and the save
+  refused as a single-player load (PASSWORDEDLOADATTEMPT).

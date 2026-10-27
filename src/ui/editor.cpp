@@ -570,9 +570,6 @@ int32_t THISCALL Console_editor_who(uint8_t*, int32_t faction_id, int32_t from) 
     PopupDialogState = 0;
     return r;
 }
-// (ui_headless_social.cpp's other functions, as the area is replaced: no registry.)
-void GAMEAPI read_tamper() {}
-void GAMEAPI set_tamper() {}
 
 void GAMEAPI Console_editor_energy() {
     auto_undo();
