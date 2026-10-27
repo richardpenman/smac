@@ -14,7 +14,8 @@ char* GAMEAPI filefind_cd_drive_letter() { return FilefindPaths.cd_path; }
 void GAMEAPI filefind_set_alternate(const char* path) {
     FilefindPaths.alt_path[0] = 0;
     if (path) {
-        if (!crt_strchr(path, ':') && *path != '\\') crt_strcat(FilefindPaths.alt_path, FilefindPaths.exe_dir);
+        // (smacx: a host path from the root, '/', is absolute too: a player's received scenario files)
+        if (!crt_strchr(path, ':') && *path != '\\' && *path != '/') crt_strcat(FilefindPaths.alt_path, FilefindPaths.exe_dir);
         crt_strcat(FilefindPaths.alt_path, path);
     }
 }

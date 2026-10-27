@@ -160,6 +160,11 @@ ADDR(0x5934B0) void GAMEAPI synch_template(int32_t faction_id);
 ADDR(0x5934E0) void GAMEAPI synch_radius(int32_t base_id);
 ADDR(0x51F0C0) void GAMEAPI help_spock();
 ADDR(0x51F2C0) void GAMEAPI wait_2();
+// NetDaemon_send_files (0x52ED40, engine/net_files.cpp): a scenario's files sent to the players
+// (multiplayer_init, NetSetupType 3); non-zero when cancelled (Esc).
+ADDR_NATIVE(0x52ED40) int32_t THISCALL NetDaemon_send_files(uint8_t* net);
+// process_message's file transfer messages (0x0F05..0x0F0C, 0x0F0F; engine/net_files.cpp).
+void net_files_message(uint8_t* net, uint8_t* msg, int32_t size, int32_t from);
 // The session state cleared when a network game ends (inlined after NetDaemon_hang_up).
 void net_session_clear();
 // The setup window's packets (UI module 0x47B020..0x47B360, protocol only): the faction data (0x0F0D),
@@ -191,6 +196,8 @@ void ui_diplo_closed(int32_t faction_id);                  // DIPLOCLOSE: the ch
 void ui_multiwin_draw();                                   // MultiWin_draw(0)
 const uint8_t* ui_netwin_faction_blob();                   // the NetWin's faction data (+0x772C)
 bool net_trace_enabled();
+const char* ui_user_dir();                                 // smacx: the per-user directory (received files)
+bool ui_escape_pressed();                                  // GetAsyncKeyState(VK_ESCAPE) high bit
 void ui_net_close_windows();                               // net_upkeep: GraphicWin_close
 void ui_console_set_ai(int32_t faction_id);                // Console_set_ai
 void ui_console_set_view();                                // Console_set_view(MainConsole, 0)

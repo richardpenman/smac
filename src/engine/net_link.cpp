@@ -187,6 +187,8 @@ void ui_diplo_closed(int32_t) {}
 void ui_multiwin_draw() {}
 const uint8_t* ui_netwin_faction_blob() { return nullptr; }
 bool net_trace_enabled() { return false; }
+const char* ui_user_dir() { return "."; }
+bool ui_escape_pressed() { return false; }
 void ui_net_close_windows() {}
 void ui_console_set_ai(int32_t) {}
 void ui_console_set_view() {}

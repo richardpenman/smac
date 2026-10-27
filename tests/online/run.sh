@@ -39,6 +39,8 @@ count() {  # count LOG DESCRIPTION REGEX N: at least N lines match
     if [ "$n" -ge "$4" ]; then echo "PASS $1: $2 ($n)"; else echo "FAIL $1: $2 ($n < $4)"; FAIL=1; fi
 }
 
+# The setup window's button (LAUNCH GAME for the host, MAKE READY for a player).
+READY="CLICK:547x306"
 # game NAME [ENV...]: the host and the client of one game (keys below), logs OUT/NAME-host.log, OUT/NAME-client.log
 END="C-ENTER,DOWN,ENTER"  # end of turn (REALLYOVER)
 # NetMsg_pop's modal messages (a3 0) wait for their OK (ENTER) and hold the network meanwhile: the
@@ -52,9 +54,9 @@ CTURN="$W,$CTURN0"
 HMOVE="WAITFOR:player turn faction 1,ENTER,WAIT:500,KP2,WAITFOR:move veh 0 dir 3,KP4,WAITFOR:move veh 0 dir 5,$END,$W"
 # Its second turn sends a chat line to everyone (ctrl+C: Console_chat, CHATASK, message_chat 0x4E00).
 HCHAT="WAITFOR:player turn faction 1,ENTER,WAIT:500,C-c,h,i,ENTER,WAITFOR:net: chat,$END,$W"
-HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:netmsg ADDED,ENTER,WAITFOR:player 2 ready 1,ENTER,WAITFOR:game started,ENTER,\
+HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:netmsg ADDED,ENTER,WAITFOR:player 2 ready 1,$READY,WAITFOR:game started,ENTER,\
 $HMOVE,$HCHAT,$HTURN,WAITFOR:player turn faction 1,WAIT:2000"
-CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAIT:500,ENTER,\
+CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAIT:500,$READY,\
 WAITFOR:game started,ENTER,$CTURN,$CTURN,$CTURN,WAITFOR:player turn faction 1,WAIT:1000"
 game() {
     local name="$1"; shift
@@ -135,12 +137,12 @@ fi
 # (0x150A / 0x150B), the host (the lower faction) executes the deal (net_treaty_on, net_energy)
 # and tells the client (0x150D). The treaty and the credits must agree on both machines.
 HDIPLO="WAITFOR:player turn faction 1,ENTER,WAIT:500,F12,WAIT:300,SCREENSTATE,SHOT:commlink.bmp,CLICK:950x348,WAITFOR:netmsg DIPLOCOMM,ENTER,WAITFOR:diplo 1 2,h,i,ENTER,\
-CLICK:790x467,CLICK:400x467,5,ENTER,CLICK:330x519,WAITFOR:diplo: deal done between 1 and 2,WAIT:300,DIPLOSTATE,ESC,ESC,$END,$W"
+CLICK:790x467,CLICK:400x467,5,ENTER,CLICK:330x519,WAITFOR:diplo: deal done between 1 and 2,WAIT:300,DIPLOSTATE,ESC,$END,$W"
 CDIPLO="$W,WAITFOR:COMMDIPLO from faction 1,ENTER,WAITFOR:diplo 2 1,WAITFOR:diplo chat: ,\
 WAITFOR:diplo: faction 1 state 1,CLICK:330x519,WAITFOR:diplo: deal done by faction 1,WAITFOR:diplo: closed by faction 1,WAITFOR:netmsg DIPLOCLOSE,ENTER,DIPLOSTATE"
-HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:netmsg ADDED,ENTER,WAITFOR:player 2 ready 1,ENTER,WAITFOR:game started,ENTER,\
+HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:netmsg ADDED,ENTER,WAITFOR:player 2 ready 1,$READY,WAITFOR:game started,ENTER,\
 $HDIPLO,$HTURN,$HTURN,WAITFOR:player turn faction 1,WAIT:2000"
-CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAIT:500,ENTER,\
+CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAIT:500,$READY,\
 WAITFOR:game started,ENTER,$CDIPLO,$CTURN0,$CTURN,$CTURN,WAITFOR:player turn faction 1,WAIT:1000"
 game diplo
 for side in host client; do
@@ -175,9 +177,9 @@ HTIMER="WAITFOR:player turn faction 1,ENTER,WAIT:500,T,DOWN,DOWN,DOWN,DOWN,DOWN,
 HBONUS="WAITFOR:player turn faction 1,ENTER,WAIT:500,S-6,WAITFOR:netmsg WEBONUSED,ENTER,WAIT:1500,$END,$W"
 CTIMER="$W,WAITFOR:netmsg HECHANGEDTIME,ENTER,WAITFOR:player turn faction 2,ENTER,WAITFOR:netmsg TIMEWARNING,ENTER,\
 WAITFOR:turn time out,$W,WAITFOR:netmsg HEBONUSED,ENTER"
-HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:netmsg ADDED,ENTER,WAITFOR:player 2 ready 1,ENTER,WAITFOR:game started,ENTER,\
+HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:netmsg ADDED,ENTER,WAITFOR:player 2 ready 1,$READY,WAITFOR:game started,ENTER,\
 $HTIMER,$HBONUS,$HTURN,WAITFOR:player turn faction 1,WAIT:2000"
-CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAIT:500,ENTER,\
+CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAIT:500,$READY,\
 WAITFOR:game started,ENTER,$CTIMER,$CTURN0,$CTURN,WAITFOR:player turn faction 1,WAIT:1000"
 game timer
 for side in host client; do
@@ -200,12 +202,12 @@ compare timer "host and client states equal each turn" 'GamePrefs\.GameTimeContr
 # 5. The setup window (NetWin): the host picks the planet's size (Tiny), the time controls (Loose)
 # and a rule (Look First) in the session settings; each choice is sent (0x2F02 -> the session
 # packet to everyone) and the game the client starts with has them.
-HLOBBY="WAIT:500,CLICK:532x192,UP,UP,ENTER,WAITFOR:setting 4 chosen 1,CLICK:532x172,DOWN,DOWN,DOWN,DOWN,ENTER,\
-WAITFOR:setting 3 chosen 4,CLICK:532x392,WAITFOR:rule 6 toggled,SCREENSTATE,c,d,o,n,e,ENTER"
-HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:netmsg ADDED,ENTER,$HLOBBY,WAITFOR:player 2 ready 1,ENTER,\
+HLOBBY="WAIT:500,CLICK:200x218,UP,UP,ENTER,WAITFOR:setting 4 chosen 1,CLICK:180x170,DOWN,DOWN,DOWN,DOWN,ENTER,\
+WAITFOR:setting 3 chosen 4,CLICK:200x648,WAITFOR:rule 6 toggled,SCREENSTATE,d,o,n,e,ENTER"
+HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:netmsg ADDED,ENTER,$HLOBBY,WAITFOR:player 2 ready 1,$READY,\
 WAITFOR:game started,ENTER,$HTURN,WAITFOR:player turn faction 1,WAIT:1000"
 CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAITFOR:net: chat Host: done,WAITFOR:session settings,WAITFOR:session settings,WAITFOR:session settings,\
-SCREENSTATE,ENTER,WAITFOR:game started,ENTER,$CTURN,WAITFOR:player turn faction 1,WAIT:1000"
+SCREENSTATE,$READY,WAITFOR:game started,ENTER,$CTURN,WAITFOR:player turn faction 1,WAIT:1000"
 game lobby
 check lobby-host "the planet's size picked" "^net: setting 4 chosen 1$"
 check lobby-host "the time controls picked" "^net: setting 3 chosen 4$"
@@ -223,10 +225,10 @@ done
 # 6. A player dropping: the client plays its first turn and quits. The host is told (DROPPED,
 # NetDaemon_on_player_deleted), the client's faction is no longer human (FactionStatus) and the
 # host plays on alone: two more turns, the computer playing the client's faction.
-HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:netmsg ADDED,ENTER,WAITFOR:player 2 ready 1,ENTER,\
+HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:netmsg ADDED,ENTER,WAITFOR:player 2 ready 1,$READY,\
 WAITFOR:game started,ENTER,$HTURN,WAITFOR:netmsg DROPPED,ENTER,WAITFOR:player turn faction 1,ENTER,$END,\
 WAITFOR:player turn faction 1,ENTER,$END,WAITFOR:player turn faction 1,WAIT:1000"
-CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAIT:500,ENTER,\
+CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAIT:500,$READY,\
 WAITFOR:game started,ENTER,$CTURN"
 game drop
 check drop-host "the client dropped (DROPPED)" "^netmsg DROPPED: "

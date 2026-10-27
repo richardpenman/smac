@@ -35,9 +35,10 @@
 //   arrows scroll   + / - zoom   Enter / space next turn   F12 / S screenshot   Esc quit
 //
 // --keys: scripted input, consumed before real input. Tokens: a character (b, B = shift+b, ., [ ...),
-// LEFT RIGHT UP DOWN HOME END PGUP PGDN ENTER SPACE TAB BACK ESC F1..F12, KP1..KP9 (keypad),
+// LEFT RIGHT UP DOWN HOME END PGUP PGDN ENTER SPACE TAB BACK ESC PAUSE F1..F12, KP1..KP9 (keypad),
 // C-x (ctrl), S-x (shift), CLICK:XxY (a left click in a popup), RCLICK:XxY (a right click; S-RCLICK /
-// C-RCLICK with shift / ctrl held: the map's right-click menu), POPUP:FILE/LABEL[/FLAGS[/PCX]]
+// C-RCLICK with shift / ctrl held: the map's right-click menu), NETMSG:LABEL (a network game's NetMsg box),
+// POPUP:FILE/LABEL[/FLAGS[/PCX]]
 // (shows a script popup, a test aid), PLAYSOUND:FILE (decodes and plays a WAV / MP3 file on the
 // voice object, logging its length), MUSICRENDER:FILE:SECONDS (the music's next seconds into a WAV
 // file in --outdir), MOVIE:NAME (plays movies\NAME.wve), BASEDUMP:FILE (the open base window's canvases in the
@@ -586,6 +587,10 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         out->command = "movie " + tok.substr(6);
         return true;
     }
+    if (tok.rfind("NETMSG:", 0) == 0) {  // NETMSG:LABEL, a network game's NetMsg box (test aid)
+        out->command = "netmsg " + tok.substr(7);
+        return true;
+    }
     if (tok.rfind("POPUP:", 0) == 0) {  // POPUP:FILE/LABEL[/FLAGS[/PCX]], a popup by label (test aid)
         out->command = "popup " + tok.substr(6);
         return true;
@@ -652,7 +657,7 @@ bool parse_key(std::string tok, ScriptedKey* out) {
                                    {"PGUP", VKEY_PRIOR},  {"PGDN", VKEY_NEXT},   {"ENTER", VKEY_RETURN},
                                    {"SPACE", VKEY_SPACE}, {"TAB", VKEY_TAB},     {"BACK", VKEY_BACK},
                                    {"ESC", VKEY_ESCAPE},  {"PLUS", VKEY_ADD},    {"MINUS", VKEY_SUBTRACT},
-                                   {"COMMA", 0xBC},       {"ALT", VKEY_MENU}};
+                                   {"COMMA", 0xBC},       {"ALT", VKEY_MENU},    {"PAUSE", 0x13}};
     for (const Named& n : kNamed) {
         if (tok == n.name) {
             out->vk = n.vk | mods;

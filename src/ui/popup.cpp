@@ -112,6 +112,7 @@ bool intersect(UiRect* out, const UiRect& a, const UiRect& b) {
 
 BoxDef* box_def(int32_t index) { return (index >= 0 && index < 51) ? &g_boxes[index] : nullptr; }
 BoxDef* box_def_large() { return &g_box_large; }
+Sprite* popup_check_sprite(int32_t state) { return &g_checks[state < 0 ? 0 : state > 2 ? 2 : state]; }
 Sprite* newtech_button_sprite(int32_t button, int32_t state) {
     return (button >= 0 && button < 2 && state >= 0 && state < 3) ? &g_newtech_buttons[button][state] : nullptr;
 }
@@ -1670,6 +1671,28 @@ void BasePop_show(BasePop* p) {
     if (!p->shown) g_windows.push_back(p);
     p->shown = true;
     ui_invalidate();
+}
+
+void BasePop_change_flags(BasePop* p, uint32_t clear, uint32_t set) {
+    p->flags = (p->flags & ~clear) | set;
+}
+
+bool BasePop_button_center(BasePop* p, int32_t* x, int32_t* y) {
+    if (!p || p->btns.empty()) return false;
+    const UiRect& r = p->btns[0].r;
+    *x = p->win_x + (r.left + r.right) / 2;
+    *y = p->win_y + (r.top + r.bottom) / 2;
+    return true;
+}
+
+bool BasePop_hit_button(BasePop* p, int32_t x, int32_t y) {
+    if (!p || !p->shown) return false;
+    for (const BasePop::Button& b : p->btns) {
+        if (x >= p->win_x + b.r.left && x < p->win_x + b.r.right && y >= p->win_y + b.r.top &&
+            y < p->win_y + b.r.bottom)
+            return true;
+    }
+    return false;
 }
 
 void BasePop_hide(BasePop* p) {

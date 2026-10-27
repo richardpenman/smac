@@ -192,7 +192,7 @@ ADDR_NATIVE(0x4D95F0) void THISCALL Console_assemble(uint8_t* console);
 ADDR_NATIVE(0x515450) void THISCALL Console_survey(uint8_t* console);
 ADDR_NATIVE(0x515900) void THISCALL Console_time_controls(uint8_t* console);
 // time_controls_dialog (0x589330, console_placeholders.cpp): TIMECONTROLS's six items in `pop`.
-struct BasePop;
+class BasePop;
 void time_controls_dialog(BasePop* pop);
 ADDR_NATIVE(0x517060) void THISCALL Console_use_time_bonus(uint8_t* console);
 ADDR_NATIVE(0x515010) void THISCALL Console_set_tech(uint8_t* console, int32_t faction_id);

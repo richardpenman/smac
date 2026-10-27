@@ -154,7 +154,7 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   record's load count 2), the other player told at their next turn (HOTTAMPER2), and the save
   refused as a single-player load (PASSWORDEDLOADATTEMPT).
 
-**Phase 3 (online, TCP between smacx copies): in progress.**
+**Phase 3 (online, TCP between smacx copies): done** (the approximations are listed per part).
 * Group 1, the transport (done): src/platform/net_tcp.{h,cpp} (frames: a 16-byte header -- size,
   kind, from, to -- then the payload; the host relays; pids: the host 1, the clients 2, 3, ... in
   join order; join / leave events; non-blocking sockets, POSIX and Winsock), unit-tested by
@@ -169,8 +169,9 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   prefs Net Name / Net Address / Net Port), NetWin_config_players, NetWin_setup_faction_data,
   NetWin_fill_player, NetWin_on_button_clicked (ready / start, NOTALLREADY), NetWin_prepare_game
   (Random_reseed(1000)); the setup packets (0x0F02/03/04/0D) in the engine. The window's look
-  and the host's settings: see "The setup window" below (F the faction, C a chat line, Enter
-  ready / start, Esc cancel); no scenario file transfer (NetDaemon_send_files, 0x0F05..0x0F0C).
+  and the host's settings: see "The setup window" below (clicks on the rows, lines and
+  buttons, Enter sends the chat line, Esc cancels); the type of game and the scenario files:
+  see "Saved games and scenarios" below.
 * Group 3, turns, synch and locks (done): src/engine/net_daemon.cpp (routing, message_* /
   synch_*, NetDaemon_synch's blocks -- the rule tables travel in the original's 32-bit layout --,
   send_rules / send_game, the locks' requests, order_veh / action / await_*, the deletion list,
@@ -185,12 +186,12 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   DIPLOCLOSE, ADDED, the time controls' messages, ...); else the NetMsg box (top centre, 8 pixels
   down, PopupDialogState 6, its OK button label 0x36C) shown without waiting, hidden by the next
   one, NetMsg_close or its timer (NetMsg_timer_daemon after a positive delay). Each network
-  message is also a note ("netmsg LABEL: text") for the tests. Approximated: the box's OK button
-  cannot be clicked (it closes by its timer or NetMsg_close); single player keeps showing every
-  NetMsg_pop modal as before.
-* Group 4 (in part): the chat (Console_chat: CHATASK, message_chat 0x4E00 / 0x1E00, shown on the
+  message is also a note ("netmsg LABEL: text") for the tests. Its OK button closes it when
+  clicked on the main screen (NetMsg_close; the original box is a window of its own). Single
+  player keeps showing every NetMsg_pop modal as before.
+* Group 4 (done): the chat (Console_chat: CHATASK, message_chat 0x4E00 / 0x1E00, shown on the
   message line; the setup window's chat), the time-control and time-bonus messages (0x4C02,
-  0x4306), pause (0x4C00/01). Not done: the scenario file transfer.
+  0x4306), pause (0x4C00/01), the scenario file transfer (below).
 * Time controls (done): Console_time_controls (T, the panel's time row: HOSTTIME for a client;
   time_controls_dialog's TIMECONTROLS with the current one selected; CUSTOM asks CUSTOMTIME's seven
   values, 0..9999, and sends the table (NetDaemon_synch 0x85); 0x4C02 to everyone, its handler
@@ -204,8 +205,22 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   custom table travels through the server (0x2101 -> 0x4101) while 0x4C02 goes to everyone at
   once, so a client applies 0x4C02 with the old table (its HECHANGEDTIME1 shows the old values
   and that turn's total time is the old one).
-* The setup window (in part, src/ui/netwin.cpp): the players (name, faction, difficulty, ready;
-  a click on one's own row picks the faction), the host's session settings as
+* The setup window (done, src/ui/netwin.cpp): the original's 800x600 layout from NetWin_exec's
+  rectangles and NetWin_on_redraw's art (box 9 behind, the title in boxes 3 / 6, each part framed
+  in box 3 with its header in box 6 or 0): the session's settings on the left
+  (NetWin_draw_session_info: "{label: } value", the host's pick lists marked with interface.pcx's
+  drop-down arrow; the passwords no player gave yet for a saved game), the seven player rows
+  (NetWin_draw_player_names / _factions / _diffs: the ready mark (boxes 48 / 50), the password's
+  lock (interface.pcx's open / closed locks), "Computer" or the player's name with the leader's,
+  the faction, the difficulty, in the player's colour (NetWin_get_player_color: the faction PCX's
+  text colour); the own row's and, for the host, the computer rows' pick lists), the LAUNCH GAME /
+  MAKE READY / MAKE NOT READY and CANCEL buttons, the chat (StringBox: the last lines in their
+  writer's colour; EditBox: Enter sends the line to everyone, message_chat 0x1E00, as
+  NetWin_on_key_down; Esc cancels), the custom game options below (NetWin_draw_custom_rules:
+  check boxes in two columns). A click on the own row's faction / difficulty / lock:
+  NetWin_pick_faction / NetWin_pick_diff / NetWin_pick_pass (a new game: ENTERPASSWORDNEW,
+  VERIFYPASSWORD, DIFFERENTPASSWORDS; a random faction gets no password, as the original), on
+  the host's lines and boxes: the settings (below). The host's session settings as
   NetWin_draw_session_info lists them (the type of game, the global difficulty, the time controls,
   the planet's size, ocean, erosion, native life, clouds; a click: NetWin_pick_global_diff /
   _time / _planet_size / _ocean / _erosion / _native / _clouds, here a popup list for the
@@ -213,22 +228,59 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   Simultaneous Moves; a click: NetWin_on_left_click's toggles of NetConfigRules / NetConfigState /
   NetConfigMRules); each change goes to the host as 0x2F02 and to everyone as the session packet
   (the window redrawn: NetWin_on_redraw), and NetWin_exec builds the game from them as before.
-  Approximated: the window's art and exact layout (a plain box with the original's texts), the
-  number of players (NetWin_pick_num_players) and the type of game (NetWin_pick_map: a random map
-  only; scenarios, saved games and their file transfer, NetDaemon_send_files 0x0F05..0x0F0C, are
-  not reconstructed), the passwords (NetWin_pick_pass), the chat's EditBox (C: a popup).
+  Approximated: the PopMenu lists are popup lists; the window is not compared with the original's
+  pixels (not attempted under Wine: the original opens it only after a DirectPlay session is set up;
+  the layout follows the asm's rectangles and art); the number of players
+  (NetWin_pick_num_players: the original's session settings never show its line) and the own
+  row's names (NetWin_pick_player's CUSTOMNAMES) are not reconstructed; the session's title is
+  empty (DirectPlay's session name).
 * A player dropping (done, as the original): NetDaemon_on_player_deleted's DROPPED (SERVERLOST /
   SERVERLOSTINSETUP for the host), the player's faction no longer human (the computer plays it)
-  and the turns going on without them. Not reconstructed: a player joining a game under way, and
-  the save and load of a network game (the saved game's transfer to the players).
+  and the turns going on without them. Joining a game under way: the original has none
+  (NetDaemon_on_player_added refuses a player once the setup window closed, NetSessionState[4]
+  >= 2: 0x1F01, the player's NOJOIN and its setup window cancelled); a player who left cannot
+  come back into that game (the host saves it and the players load it again, below).
+* Saved games and scenarios (done). Saving: any player may save a network game (the original
+  has no restriction: ctrl+S / the menu's SAVE GAME on every machine; save_daemon marks it,
+  GameState 0x10000000, and keeps the players' list); each machine writes its own copy, the same
+  game when the checksums agree. Loading: there is no "load" in a network game (the menu's LOAD
+  is hidden); the host picks the type of game in the setup window (NetWin_pick_map, the session
+  settings' first line: NEW GAME W/ RANDOM MAP, LOAD MAP (load_map: a new game on that map,
+  NetGameFileKind 1), LOAD SCENARIO (load_game(1): 3), LOAD GAME (load_game(0): 2); a scenario
+  for fewer players than are there: TOOMANYFORSCENARIO). The file loaded, the session takes its
+  difficulty, rules, alive factions and map size (the window shows the file's name and kind:
+  "(SAVE)", "(SCENARIO)", "(Map)"; the planet's settings MAP DEFINED); for a saved game or a
+  scenario the faction data become the game's factions (the alive ones, each with its leader's
+  names, colour and password) and the players are seated again: each picks one of them
+  (NetWin_pick_faction lists the factions no other player took; the host checks a faction's
+  password, process_message 0x2F04, and asks each player's, 0x0F0E -> NetWin_pick_pass(1)).
+  NetWin_prepare_game then gives each player its chosen faction (a random choice: one not taken),
+  the players' copies take the factions' files and art; multiplayer_init builds no world and runs
+  no setup_game for them (NetSetupType 2 / 3): the host's loaded game goes to the players with
+  send_rules / send_game, the passwords to the factions, the humans in FactionStatus; the game
+  goes on at the saved turn. A scenario (NetSetupType 3, GameState 0x10): NetDaemon_send_files
+  (src/engine/net_files.cpp) sends its directory (0x0F05; each player's 0x0F0F), the headers of
+  the directory's files (0x0F06: checksum_file, size; 0x0F07), each player asks for the files it
+  lacks or whose checksum differs (0x0F08) and answers 0x0F0A / 0x0F0C, the host sends the asked
+  files in 2048-byte blocks (0x0F0B, MPSENDFILE; the player MPRECEIVEFILE, the file written at its
+  last block, 0x0F0C after its last file), then 0x0F07 (3); Esc cancels; the host runs
+  scenario_setup, every machine reloads its texts and art (game_reload: the scenario's alternate
+  directory) and shows the scenario's INTRO. smacx: a player's received files go below its
+  per-user directory at the scenario's relative path (the game folder is read-only), which
+  becomes its alternate directory; the MPSENDFILE / MPRECEIVEFILE boxes are the NetMsg box.
+  Kept as the original: a player answers the host's file messages through NetDaemon_send_message
+  with the host's pid taken as a faction (the player of faction 1, or everyone when no player has
+  it); a file whose size is a multiple of 2048 counts a block the host never sends.
 * The commlink panel's network rows (done, src/ui/multiwin.cpp): MultiWin_draw's network path (the
   top art, the time row, the bonus pills' row "^", the chat button under the Council button),
   MultiWin_draw_player's chat flag (multi.pcx's three flags: none, refused (0x7FFF74), left out
   of the chat (0x93E960); a click cycles them as MultiWin_on_left_click) and the players' states
   (PAUSED, (*), (+), (-), the upkeep's count, (?) / (@) the server's locks, the treaty's short
-  name), the time and pills spots (Console_time_controls, Console_use_time_bonus). Approximated:
-  the original's panel is modeless beside the map; closed, it keeps its time and pills rows on
-  the screen: here that closed panel is drawn over the screen but not clickable (T and ^).
+  name), the time and pills spots (Console_time_controls, Console_use_time_bonus). As the
+  original in a network game, the panel is modeless beside the map (F12 / the console's button
+  toggle it, MultiWin_hide; the main loop and the network go on; the main screen's mouse over it
+  goes to the panel), and closed it keeps its time and pills rows on the screen, clickable. (Single
+  player keeps smacx's modal panel.)
 * The DiploWin between online players (done): commlink_attempt's network path (another human:
   0x1501 and DIPLOCOMM; a computer faction: NetDaemon_open_channel / NOCHANNEL, communicate, the
   commlink treaty through 0x2441), commlink_attempter's ALREADYDONE / DIPLOALREADY / input-lock
@@ -261,3 +313,14 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   and the client's turns run out and uses a bonus pill; a fifth has the host pick the planet's
   size, the time controls and a rule in the setup window, checked in both windows and in both
   games; a sixth has the client quit after its first turn and the host play on alone.
+* tests/online2/run.sh (run it alone: two processes): a network game saved by the host
+  (saves/net.SAV; the client's faction given a password in the setup window), loaded in a new
+  session through the setup window's LOAD GAME with both players seated again (the host on its
+  faction, the client on its own after a wrong password, BADPASSWORD, and the right one), the
+  game going on at the saved turn with equal states and checksums; a two-player scenario of the game (Dogpile)
+  loaded through LOAD SCENARIO, its three files sent to the client (received intact) and a
+  (simultaneous) turn played with equal states; a host's game under way refusing a late player
+  (NOJOIN); the commlink panel shown and hidden modeless (F12), the closed panel's time row and
+  the NetMsg box's Close button clicked. tests/online/run.sh's setup windows are driven by
+  clicks (the ready / launch button, the settings' lines, the rules' boxes) and the EditBox (the
+  lobby's chat line typed and sent with Enter).

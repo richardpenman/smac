@@ -15,15 +15,17 @@
 // menu (MultiWin_on_right_click: Contact, Faction Profile (report_intel), Renounce Pact / Demand
 // Withdrawal when there is a treaty, Summon Planetary Council (call_council)); the buttons call
 // MultiWin_on_button_clicked (0 chat, 1 Council).
-// Approximated: the original panel stays on the screen beside the map while the game goes on
-// (toggled by F12); here it is a modal panel closed by F12, Esc or Enter.
+// Single player: a modal panel closed by F12, Esc or Enter (the original's stays on the screen
+// beside the map); a network game: modeless beside the map as the original's (F12 / the console's
+// button toggle it, Enter hides it; the main loop and the network go on).
 // In a network game (MultiWin_draw's network path): the top art, the time row (MultiWin_draw_time:
 // the turn's time left, the upkeep's count, the moving player's name, PAUSED, "No Time Control"; a
 // click: Console_time_controls), the bonus pills' row ("^" each; a click: Console_use_time_bonus),
 // each player's chat flag (a click cycles refused / left out of the chat / none) and state
 // (MultiWin_draw_player: PAUSED, (*), (+), (-), the upkeep, (?) / (@) the locks, the treaty's short
 // name), the chat button (MultiWin_init: id 0, Console_chat) under the Council button. Closed, the
-// panel keeps its time and pills rows on the screen (multiwin_net_tick: turn_timer's countdown).
+// panel keeps its time and pills rows on the screen (multiwin_net_tick: turn_timer's countdown),
+// clickable (multiwin_collapsed_click).
 #include <algorithm>
 #include <cstdio>
 #include <string>
@@ -73,6 +75,7 @@ struct MultiWinState : ScreenWin {
 
 MultiWinState g_mp;
 bool g_collapsed = false;  // the closed panel of a network game shown (multiwin_net_tick)
+bool g_modeless = false;   // a network game's open panel, modeless beside the map
 constexpr int32_t kW = 0x8A, kRowH = 0x11;  // MultiWin_draw: 0x8A wide, seven rows
 
 bool listed(int32_t f) {
@@ -475,6 +478,10 @@ void MultiWinState::log_state() {
 // MultiWin_show (0x479970) with the modal run of smacx (see above).
 void THISCALL MultiWin_show(uint8_t*) {
     MultiWinState* s = &g_mp;
+    if (g_modeless) {  // (MainInterface_on_iface_button_clicked 0x3EC: shown, F12 hides it)
+        multiwin_hide();
+        return;
+    }
     if (s->open) return;
     s->name = "commlink";
     s->menu_faction = -1;
@@ -531,10 +538,17 @@ void THISCALL MultiWin_show(uint8_t*) {
                 o->r.bottom -= art_h(g_art.bottom, 0x18);
             }
     }
-    // (In a network game the original panel stays beside the map while the main loop runs
-    // wait_loop: here the modal panel runs it while it waits.)
-    s->modal_cb = 0x51F200;  // wait_loop
     s->time_line = time_text(false, &s->time_color);
+    if (MultiplayerActive) {
+        // A network game: the panel stays beside the map, modeless, while the main loop runs
+        // (multiwin_modeless_mouse takes the mouse over it; F12 / Enter / MultiWin_hide close it).
+        s->open = true;
+        g_modeless = true;
+        MultiWinVisible = 1;
+        sw_show(s);
+        std::fprintf(stderr, "multiwin shown (modeless)\n");
+        return;
+    }
     sw_run(s);
     sw_clear_buttons(s);
     s->full = false;
@@ -545,7 +559,7 @@ void THISCALL MultiWin_show(uint8_t*) {
 // turn_timer (0x50EF10): every 500 ms of a network game MultiWin_draw(1): the time counted down
 // (MultiWin_draw_time). The original's panel stays on the screen in a network game, closed to its
 // time and bonus rows (MultiWin_init's Win_show(0)); here that closed panel is shown over the
-// screen (not clickable: T and ^ give the time controls and the bonus) while the game runs.
+// screen while the game runs, its rows clickable from the main screen (multiwin_collapsed_click).
 void multiwin_net_tick() {
     MultiWinState* s = &g_mp;
     netmsg_tick();
@@ -591,12 +605,68 @@ void multiwin_net_tick() {
         sw_show(s);
         g_collapsed = true;
         tick = true;
+        for (const Spot& sp : s->spots[0].list)
+            if (sp.type == 2)
+                std::fprintf(stderr, "multiwin closed panel row %d at %d,%d %dx%d\n", sp.index, s->x + sp.r.left,
+                             s->y + sp.r.top, sp.r.right - sp.r.left, sp.r.bottom - sp.r.top);
     }
     if (tick) {
         s->texts.clear();
         s->redraw();
         ui_invalidate();
     }
+}
+
+// The open panel of a network game (modeless): the main screen's mouse over it goes to the panel
+// (its buttons, its spots, the row under the mouse). True when taken.
+bool multiwin_modeless_mouse(int32_t type, int32_t x, int32_t y) {
+    MultiWinState* s = &g_mp;
+    if (!g_modeless || !s->open) return false;
+    int32_t lx = x - s->x, ly = y - s->y;
+    bool inside = lx >= 0 && ly >= 0 && lx < s->canvas.width && ly < s->canvas.height;
+    if (type == UiInput::MOVE) {
+        s->on_move(lx, ly);
+        return inside;
+    }
+    if (!inside) return false;
+    if (type == UiInput::LDOWN) {
+        for (BaseButton* b : s->buttons) {
+            if (b->shown && lx >= b->r.left && lx < b->r.right && ly >= b->r.top && ly < b->r.bottom) {
+                s->on_button(b->id);
+                return true;
+            }
+        }
+    }
+    if (type == UiInput::LDOWN || type == UiInput::RDOWN) {
+        int32_t index = -1, kind = -1;
+        spot_check(&s->spots[0], lx, ly, &index, &kind);
+        s->on_click(0, index, kind, lx, ly, type == UiInput::RDOWN, false);
+        if (g_modeless && s->open) {
+            s->texts.clear();
+            s->redraw();
+            ui_invalidate();
+        }
+    }
+    return true;
+}
+
+// The closed panel's rows clicked (MultiWin_on_left_click on the panel the original keeps on the
+// screen): the time row, Console_time_controls; the bonus pills' row, Console_use_time_bonus.
+bool multiwin_collapsed_click(int32_t x, int32_t y) {
+    MultiWinState* s = &g_mp;
+    if (!g_collapsed || s->open) return false;
+    int32_t index = -1, type = -1;
+    if (spot_check(&s->spots[0], x - s->x, y - s->y, &index, &type) < 0 || type != 2) return false;
+    if (index == 0) {
+        std::fprintf(stderr, "multiwin time row clicked\n");
+        Console_time_controls(&MainConsole);
+    } else if (index == 3) {
+        std::fprintf(stderr, "multiwin bonus row clicked\n");
+        Console_use_time_bonus(&MainConsole);
+    } else {
+        return false;
+    }
+    return true;
 }
 
 // MultiWin_on_button_clicked (0x477F00): 0 the chat (Console_chat(0)), 1 the Council
@@ -614,6 +684,20 @@ void THISCALL MultiWin_on_button_clicked(uint8_t*, int32_t id) {
 // MultiWin_hide (0x479C00) as MainInterface_on_status(0) calls it when another interface mode
 // starts (the diplomacy dialog): the commlink window closes.
 void multiwin_hide() {
+    if (g_modeless) {
+        MultiWinState* s = &g_mp;
+        g_modeless = false;
+        MultiWinVisible = 0;
+        s->open = false;
+        s->menu_faction = -1;
+        sw_clear_buttons(s);
+        sw_hide(s);
+        s->full = false;
+        g_collapsed = false;
+        std::fprintf(stderr, "multiwin hidden\n");
+        multiwin_net_tick();  // (the time rows shown again)
+        return;
+    }
     if (g_mp.open) {
         sw_close(&g_mp);
         sw_hide(&g_mp);

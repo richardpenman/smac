@@ -39,6 +39,12 @@ int32_t ui_set_modal_callback(int32_t addr);
 const bool* ui_set_modal_open(const bool* open);
 // NetMsg_timer_daemon: a network game's NetMsg box hidden once its time is up (win_popup.cpp).
 void netmsg_tick();
+// The main screen's left click on the NetMsg box's OK button (closes it) / on the closed commlink
+// panel's time or bonus row (multiwin.cpp): true when taken.
+bool netmsg_click(int32_t x, int32_t y);
+bool multiwin_collapsed_click(int32_t x, int32_t y);
+// A network game's open (modeless) commlink panel: the main screen's mouse over it (multiwin.cpp).
+bool multiwin_modeless_mouse(int32_t type, int32_t x, int32_t y);
 // The help bubble (Win_set_bubble_text): `text` (lines split at '^') above the screen point
 // (x, y); cleared by the next mouse move over the window (Win_clear_bubble_text).
 void ui_bubble_set(const char* text, int32_t x, int32_t y);

@@ -313,6 +313,10 @@ bool run_command(const std::string& cmd) {
         amovie_project_name(arg.c_str());
         return true;
     }
+    if (cmd.rfind("netmsg", 0) == 0) {  // test aid: NetMsg_pop(label, no timer, the box) (win_popup.cpp)
+        NetMsg_pop(&NetMsg, arg.c_str(), 0, 1, nullptr);
+        return true;
+    }
     if (cmd.rfind("popup", 0) == 0) {  // test aid: a popup by label (win_popup.cpp)
         ui_popup_command(arg);
         return true;

@@ -39,6 +39,8 @@ struct BoxDef {
 };
 BoxDef* box_def(int32_t index);  // 0x78D528 + index * 0x28
 BoxDef* box_def_large();  // 0x6846B0: the larger frame (interface windows)
+// interface.pcx's check box marks (0x7794D8): 0 off, 1 under the mouse, 2 checked.
+Sprite* popup_check_sprite(int32_t state);
 // NewTechWin's picture buttons (0x822610 [2][3], load_box_sprites): button 0 the quote, 1 the long
 // description; states normal, highlighted, pressed.
 Sprite* newtech_button_sprite(int32_t button, int32_t state);
@@ -109,6 +111,12 @@ void BasePop_edit(BasePop* self, const char* label, const char* text, int32_t ma
 // A popup shown without running it (BasePop_exec_3 of a modeless popup: the PickWin's faction
 // text, thumb_routine) at its #x / #y position, until BasePop_hide (or popup_delete).
 void BasePop_show(BasePop* self);
+// A shown popup's button at screen point (x, y) (a modeless popup's button clicked).
+bool BasePop_hit_button(BasePop* self, int32_t x, int32_t y);
+// The popup's flags changed after Popup_start (bits cleared, then set).
+void BasePop_change_flags(BasePop* self, uint32_t clear, uint32_t set);
+// The screen point at the centre of a popup's first button (a test aid's log).
+bool BasePop_button_center(BasePop* self, int32_t* x, int32_t* y);
 void BasePop_hide(BasePop* self);
 // A check box mark of interface.pcx (state 0 clear, 1 under the mouse, 2 checked) at (x, y).
 void popup_draw_check(Buffer* b, int32_t x, int32_t y, int32_t state);

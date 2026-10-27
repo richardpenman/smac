@@ -298,9 +298,13 @@ int32_t THISCALL NetMsg_pop(uint8_t*, const char* label, int32_t delay, int32_t 
     if (!popup_start(g_netmsg, ScriptFileName, label, -1, nullptr, 0x100)) {
         BasePop_set_loc(g_netmsg, 0x1000, 8);
         BasePop_button(g_netmsg, label_get(0x36C / 4));
+        // (Popup_start's 0x100 here: no default OK, the box's own button, label 0x36C, shown.)
+        BasePop_change_flags(g_netmsg, 0x100, 0x10000);
         ui_net_note(std::string("netmsg ") + label + ": " + BasePop_text(g_netmsg));
         g_netmsg_shown = true;
         BasePop_show(g_netmsg);
+        int32_t bx, by;
+        if (BasePop_button_center(g_netmsg, &bx, &by)) std::fprintf(stderr, "netmsg box %s: OK at %d,%d\n", label, bx, by);
         if (delay > 0) g_netmsg_until = platform::ticks_ms() + (uint32_t)delay;
     }
     PopupDialogState = 0;
@@ -313,6 +317,15 @@ void THISCALL NetMsg_close(uint8_t*) {
         g_netmsg_until = 0;
         BasePop_hide(g_netmsg);
     }
+}
+
+// The NetMsg box's OK button clicked on the main screen (the original box is a window of its own:
+// its button closes it, NetMsg_close).
+bool netmsg_click(int32_t x, int32_t y) {
+    if (!g_netmsg_shown || !BasePop_hit_button(g_netmsg, x, y)) return false;
+    ui_net_note("netmsg OK clicked");
+    NetMsg_close(nullptr);
+    return true;
 }
 
 // NetMsg_timer_daemon: the box's time is up.

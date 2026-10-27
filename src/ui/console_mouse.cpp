@@ -652,6 +652,9 @@ void console_ui_mouse(int32_t type, int32_t x, int32_t y) {
     if (g_cursor >= 0) ui_invalidate();
     // The menu bar and its pull-downs take the mouse first, then the interface frame.
     if (console_menu_mouse(type, x, y)) return;
+    // A network game's windows over the map: the NetMsg box's OK, the closed commlink panel's rows.
+    if (type == UiInput::LDOWN && MultiplayerActive && (netmsg_click(x, y) || multiwin_collapsed_click(x, y))) return;
+    if (MultiplayerActive && multiwin_modeless_mouse(type, x, y)) return;
     uint8_t* view = main_view();
     bool over_frame = console_frame_hit(x, y);
     switch (type) {

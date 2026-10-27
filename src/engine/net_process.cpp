@@ -166,6 +166,10 @@ void THISCALL NetDaemon_process_message(uint8_t* net, uint8_t* msg, int32_t size
             *reinterpret_cast<uint16_t*>(msg) = (uint16_t)((type & 0xDFFF) | 0x4000);
             NetDaemon_send_message(net, msg, size, 0);
         } else {
+            char note[96];
+            std::snprintf(note, sizeof(note), "net: session type %d (%s)", NetSetupType,
+                          reinterpret_cast<const char*>(mem::host(0x90E79C)));
+            ui_net_note_text(note);
             ui_netwin_redraw();
         }
         break;
@@ -177,7 +181,15 @@ void THISCALL NetDaemon_process_message(uint8_t* net, uint8_t* msg, int32_t size
         int32_t idx = who;
         if (!(type & 0x2000)) {
             if (idx == -1) std::memcpy(mem::host(0x90DD14), msg + 0x10, 0xA64);
-            else std::memcpy(mem::host(0x90DB98 + idx * 0x17C), msg + 0x10, 0x17C);
+            else {
+                std::memcpy(mem::host(0x90DB98 + idx * 0x17C), msg + 0x10, 0x17C);
+                // A saved game or a scenario: the host asks that player's password (0x0F0E).
+                if (fld(net, 0x1B30) && (NetSetupType == 2 || NetSetupType == 3)) {
+                    uint8_t ask[0x20] = {};
+                    *reinterpret_cast<uint16_t*>(ask) = 0xF0E;
+                    Net_send(net, ask, 0x20, fld(net, 0x78C + idx * 0x19C), 1);
+                }
+            }
             for (int32_t i = 1; i <= fld(net, 0x768); i++) {
                 const uint8_t* c = mem::host(0x90DB98 + i * 0x17C);
                 char note[96];
@@ -211,8 +223,14 @@ void THISCALL NetDaemon_process_message(uint8_t* net, uint8_t* msg, int32_t size
         NetDaemon_send_message(net, msg, size, 0);
         break;
     }
-    case 0x0F0A: net[0x794 + who * 0x19C] = 1; break;
-    case 0x0F0C: net[0x794 + who * 0x19C] = 2; break;
+    case 0x0F05:
+    case 0x0F06:
+    case 0x0F07:
+    case 0x0F08:
+    case 0x0F0A:
+    case 0x0F0B:
+    case 0x0F0C:
+    case 0x0F0F: net_files_message(net, msg, size, from_pid); break;
     case 0x0F0D: ui_netwin_faction_data(msg); break;
     case 0x0F0E:
         if (ui_netwin_visible()) ui_netwin_pick_pass(1);

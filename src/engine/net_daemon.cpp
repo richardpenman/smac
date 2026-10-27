@@ -301,6 +301,9 @@ void THISCALL NetDaemon_on_player_added(uint8_t* net, const char* name, int32_t 
         uint8_t msg[0x20] = {};
         *reinterpret_cast<uint16_t*>(msg) = 0x1F01;  // the session is full / under way
         Net_send(net, msg, 0x20, pid, 1);
+        char note[120];
+        std::snprintf(note, sizeof(note), "net: player refused (%s): the session is full or under way", name ? name : "");
+        ui_net_note_text(note);
     }
 }
 

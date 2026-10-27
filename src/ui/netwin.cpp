@@ -19,13 +19,15 @@
 // client's 0x2F04, the host's start when every player is ready, NOTALLREADY otherwise) and
 // NetWin_prepare_game (the random factions, Random_reseed(1000), the factions read from their
 // files, the leaders' names).
-// The window lists the players (faction, difficulty, ready), the host's session settings
-// (NetWin_draw_session_info's lines; a click: the NetWin_pick_* lists, sent as 0x2F02) and the
-// rules' check boxes (NetWin_draw_custom_rules; a click toggles them), the chat lines; F (or a
-// click on one's row) chooses the own faction, C types a chat line, Enter is READY / START, Esc
-// cancels. Approximated: the original's 800x600 art and exact layout (a plain box here), the
-// PopMenu lists (popup lists), the number of players, the type of game (a random map only: no
-// scenario or saved game, NetSetupType 0), the passwords and the chat EditBox.
+// The window (NetWin_on_redraw and its draw_* parts) has the original's 800x600 layout from
+// NetWin_exec's rectangles and art: the session's settings (the host's pick lists: NetWin_pick_*),
+// seven player rows (ready mark, password lock, name, faction, difficulty in the player's colour;
+// a click on the own row: NetWin_pick_faction / _diff / _pass), LAUNCH GAME / MAKE READY and
+// CANCEL, the chat (StringBox and EditBox: Enter sends the line), the custom game options' check
+// boxes (the host's clicks toggle them). The type of game (NetWin_pick_map: a random map, a map, a
+// scenario, a saved game) and the players seated again in a loaded game (NetWin_pick_faction,
+// NetWin_pick_pass). Approximated: the PopMenu lists (popup lists); NetWin_pick_player
+// (CUSTOMNAMES) is not reconstructed; NetWin_pick_num_players has no spot (as the original).
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -44,6 +46,11 @@
 #include "engine/prefs.h"
 #include "engine/random.h"
 #include "engine/rules.h"
+#include "engine/save.h"
+#include "engine/game.h"
+#include "engine/score.h"
+#include "engine/diplo_act.h"
+#include "engine/diplomacy.h"
 #include "engine/setup.h"
 #include "engine/strings.h"
 #include "engine/tech.h"
@@ -75,8 +82,10 @@ int32_t host_pid() { return fld(0x764); }
 // The faction data (NetWin +0x772C): [0] 7, [1] the number of factions, then 400 bytes per faction
 // from +0x10 (+4 a password, +8 the colour, +9 available, +10 the file name, +0x22.. the names).
 std::vector<uint8_t> g_blob;
+std::vector<uint8_t> g_blob_backup;  // NetWin +0x7730: the host's own faction data (a new game's)
 int32_t g_start = 0;  // NetWin +0x7614: > 0 start, -1 cancelled
 std::vector<std::string> g_chat;
+std::vector<int32_t> g_chat_idx;  // each line's player (its colour)
 bool g_visible = false;
 bool g_trace = std::getenv("SMACX_NETTRACE") != nullptr;
 
@@ -86,7 +95,6 @@ const char* kTexts =
     "#TCPJOIN\r\n#xs 440\r\n#caption Join Internet Game (TCP/IP)\r\n#editbox\r\n#itemlist\r\n"
     "Your name:\r\nHost address:\r\nPort:\r\n\r\n"
     "#TCPFAILED\r\n#xs 440\r\n#caption Internet (TCP/IP)\r\n^^Could not connect:\r\n^^$TEXT0\r\n\r\n"
-    "#NETCHAT\r\n#xs 440\r\n#caption Chat\r\n#editbox\r\n#itemlist\r\nMessage:\r\n\r\n"
     "#NETPICK\r\n#xs 300\r\n\r\n#END\r\n";
 
 void write_texts() {
@@ -105,6 +113,8 @@ void write_texts() {
 // ---- the engine's hooks ----
 
 bool net_trace_enabled() { return g_trace; }
+const char* ui_user_dir() { return g_ui_outdir.c_str(); }
+bool ui_escape_pressed() { return platform::key_down(0x1B); }
 
 void ui_net_turn(const char* stage) {
     char line[160];
@@ -120,8 +130,9 @@ const uint8_t* ui_netwin_faction_blob() { return g_blob.empty() ? nullptr : g_bl
 void ui_netwin_chat(int32_t idx, const char* text) {
     const char* name = reinterpret_cast<const char*>(&NetState + 0x76C + idx * 0x19C);
     g_chat.push_back(std::string(name) + ": " + text);
+    g_chat_idx.push_back(idx);
     ui_net_note(std::string("net: chat ") + g_chat.back());
-    ui_invalidate();
+    ui_netwin_redraw();
 }
 
 void ui_main_chat(const char* text, int32_t faction_id) {
@@ -186,6 +197,15 @@ void GAMEAPI NetWin_config_players() {
     }
 }
 
+// The faction's text colour: the pixel (4, 0x2F3) of its PCX (faction.pcx when missing).
+static int32_t faction_pcx_colour(const char* filename) {
+    Buffer b;
+    Buffer_ctor(&b);
+    std::string file = std::string(filename) + ".pcx";
+    if (Buffer_load_pcx(&b, file.c_str(), nullptr, 10, 0xEC)) Buffer_load_pcx(&b, "faction.pcx", nullptr, 10, 0xEC);
+    return Buffer_get_pixel(&b, 4, 0x2F3);
+}
+
 // NetWin_setup_faction_data (0x481FD0): the host (msg null) reads the factions' files; a player
 // receives the host's (0x0F0D).
 void ui_netwin_faction_data(const uint8_t* msg) {
@@ -232,8 +252,10 @@ void ui_netwin_faction_data(const uint8_t* msg) {
         crt_strcpy(reinterpret_cast<char*>(e + 0xFA), mf.title_leader);
         crt_strcpy(reinterpret_cast<char*>(e + 0x112), mf.adj_leader);
         e[0x192] = (uint8_t)mf.is_leader_female;
+        e[8] = (uint8_t)faction_pcx_colour(files[i].c_str());
     }
     text_close();
+    g_blob_backup = g_blob;
 }
 
 // NetWin_fill_player (0x481DA0): a player's names from the faction chosen (-1: random).
@@ -253,7 +275,77 @@ void ui_netwin_fill_player(uint8_t* p, int32_t faction) {
     p[0x175] = e[0x192];
 }
 
-void ui_netwin_pick_pass(int32_t) { X_pop("PASSWORDSNOTVALIDATED", 0); }
+namespace {
+int32_t& cfg_pass(int32_t idx) { return *reinterpret_cast<int32_t*>(cfg(idx) + 0x178); }
+int32_t blob_pass(int32_t faction) { return *reinterpret_cast<int32_t*>(&g_blob[(size_t)faction * 400 + 4]); }
+bool loaded_game() { return NetSetupType == 2 || NetSetupType == 3; }
+
+// A player's settings to the host (0x2F04): the own index's 0x17C bytes.
+void send_settings(const uint8_t* p, int32_t idx) {
+    std::vector<uint8_t> m(0x18C, 0);
+    *reinterpret_cast<uint16_t*>(&m[0]) = 0x2F04;
+    *reinterpret_cast<int32_t*>(&m[4]) = idx;
+    std::memcpy(&m[0x10], p, 0x17C);
+    Net_send(&NetState, m.data(), 0x18C, host_pid(), 1);
+}
+}  // namespace
+
+// NetWin_pick_pass (0x47C970). A new game (NetSetupType 0 / 1, a click on the own row's password
+// spot, a1 0): ENTERPASSWORDNEW and VERIFYPASSWORD (DIFFERENTPASSWORDS until they agree; blank:
+// none), the checksum (checksum_password) sent to the host in the player's settings. A saved game
+// or a scenario (a faction chosen, or the host's 0x0F0E, a1 1): a faction with a password asks
+// ENTERPASSWORDFACTION; a wrong one: BADPASSWORD (0); else the checksum kept in the player's
+// settings for the host's check (process_message 0x2F04). Without a password: PASSWORDOK (a1 0).
+// 0: cancelled / refused.
+int32_t NetWin_pick_pass(int32_t a1) {
+    int32_t idx = AlphaNet_pid_2_idx(&NetState, own_pid());
+    bool loaded = loaded_game();
+    if (!loaded && a1) return 1;
+    int32_t faction = (int8_t)cfg(idx)[3];
+    if (faction == -1) {
+        cfg_pass(idx) = 0;
+        return 1;
+    }
+    if (loaded && !g_blob.empty() && (blob_pass(faction) == 0 || blob_pass(faction) == cfg_pass(idx))) {
+        if (!a1) X_pop_2("SCRIPT", "PASSWORDOK", 0);
+        return 1;
+    }
+    for (;;) {
+        int32_t sum = 0;
+        if (loaded) parse_says(0, reinterpret_cast<const char*>(&g_blob[(size_t)faction * 400 + 0x62]), -1, -1);
+        if (X_pop_ask(loaded ? "ENTERPASSWORDFACTION" : "ENTERPASSWORDNEW", 0x50, "", 0, 0x800040) == -1) return 0;
+        if (ParseStrBuffer[0][0]) {
+            sum = checksum_password(ParseStrBuffer[0]);
+            if (!loaded) {
+                X_pop_ask("VERIFYPASSWORD", 0x50, "", 0, 0x800000);
+                int32_t again = ParseStrBuffer[0][0] ? checksum_password(ParseStrBuffer[0]) : 0;
+                if (sum != again) {
+                    X_pop("DIFFERENTPASSWORDS", 0);
+                    continue;
+                }
+            }
+        }
+        if (loaded) {
+            if (blob_pass(faction) != sum) {
+                ui_net_note("net: bad password");
+                X_pop("BADPASSWORD", 0);
+                return 0;
+            }
+            cfg_pass(idx) = sum;
+            return 1;
+        }
+        cfg_pass(idx) = sum;
+        uint8_t p[0x17C];
+        std::memcpy(p, cfg(idx), 0x17C);
+        send_settings(p, idx);
+        char note[64];
+        std::snprintf(note, sizeof(note), "net: password set (%s)", sum ? "on" : "none");
+        ui_net_note(note);
+        return 1;
+    }
+}
+
+void ui_netwin_pick_pass(int32_t a1) { NetWin_pick_pass(a1); }
 
 namespace {
 // The Random object of NetWin_prepare_game (0x625730..0x6257A4).
@@ -301,58 +393,78 @@ static void NetWin_prepare_game() {
         f = (uint8_t)pick;
         taken |= 1u << (pick & 31);
     }
-    // The AlphaNet slots take the players' settings; player i plays faction i (NetSetupType 0 / 1).
-    for (int32_t i = 0; i < 8; i++) {
-        uint8_t* slot = &NetState + 0x790 + i * 0x19C;
-        std::memcpy(slot, cfg(i), 0x176);
-        slot[0] = (uint8_t)i;
-    }
-    // The same leader name twice: numbered.
-    for (int32_t i = 2; i < 8; i++) {
-        char* name = reinterpret_cast<char*>(cfg(i) + 0x1D);
-        int32_t same = 0;
-        for (int32_t k = 1; k < i; k++) {
-            if (!crt_strcmp(name, reinterpret_cast<char*>(cfg(k) + 0x1D))) same++;
+    // The AlphaNet slots take the players' settings: a new game (NetSetupType 0 / 1), player i plays
+    // faction i; a saved game or a scenario, the faction chosen (random: 0).
+    if (!loaded_game()) {
+        for (int32_t i = 0; i < 8; i++) {
+            uint8_t* slot = &NetState + 0x790 + i * 0x19C;
+            std::memcpy(slot, cfg(i), 0x176);
+            slot[0] = (uint8_t)i;
         }
-        if (same) {
-            char num[16];
-            std::snprintf(num, sizeof(num), "%d", same);
-            crt_strcat(name, num);
+    } else {
+        for (int32_t i = 0; i < 8; i++) {
+            uint8_t* slot = &NetState + 0x790 + i * 0x19C;
+            std::memcpy(slot, cfg(i), 0x176);
+            slot[0] = cfg(i)[3] == 0xFF ? 0 : cfg(i)[3];
         }
     }
-    for (int32_t f = 1; f < 8; f++) {
-        const char* file = reinterpret_cast<const char*>(&g_blob[(size_t)cfg(f)[3] * 400 + 10]);
-        crt_strcpy(MFactions[f].filename, file);
-        crt_strcpy(MFactions[f].search_key, file);
-        read_faction2(f);
-        compute_faction_modifiers(f);
-    }
-    for (int32_t i = 1; i < 8; i++) {
-        uint8_t* slot = &NetState + 0x76C + i * 0x19C;
-        int32_t f = (int8_t)slot[0x24];
-        *reinterpret_cast<int32_t*>(mem::host(0x96C9E8 + (uint32_t)f * 0x20CC)) = (int8_t)slot[0x26];  // difficulty
-        if (randomized & (1u << i)) continue;
-        uint8_t* p = cfg(i);
-        MFaction& m = MFactions[f];
-        crt_strcpy(m.name_leader, reinterpret_cast<char*>(p + 5));
-        crt_strcpy(m.formal_name_faction, reinterpret_cast<char*>(p + 0x1D));
-        crt_strcpy(m.noun_faction, reinterpret_cast<char*>(p + 0x45));
-        crt_strcpy(m.adj_name_faction, reinterpret_cast<char*>(p + 0x5D));
-        crt_strcpy(m.title_leader, reinterpret_cast<char*>(p + 0xDD));
-        crt_strcpy(m.adj_leader, reinterpret_cast<char*>(p + 0xF5));
-        m.is_leader_female = p[0x175];
+    if (!loaded_game()) {
+        // The same leader name twice: numbered.
+        for (int32_t i = 2; i < 8; i++) {
+            char* name = reinterpret_cast<char*>(cfg(i) + 0x1D);
+            int32_t same = 0;
+            for (int32_t k = 1; k < i; k++) {
+                if (!crt_strcmp(name, reinterpret_cast<char*>(cfg(k) + 0x1D))) same++;
+            }
+            if (same) {
+                char num[16];
+                std::snprintf(num, sizeof(num), "%d", same);
+                crt_strcat(name, num);
+            }
+        }
+        for (int32_t f = 1; f < 8; f++) {
+            const char* file = reinterpret_cast<const char*>(&g_blob[(size_t)cfg(f)[3] * 400 + 10]);
+            crt_strcpy(MFactions[f].filename, file);
+            crt_strcpy(MFactions[f].search_key, file);
+            read_faction2(f);
+            compute_faction_modifiers(f);
+        }
+        for (int32_t i = 1; i < 8; i++) {
+            uint8_t* slot = &NetState + 0x76C + i * 0x19C;
+            int32_t f = (int8_t)slot[0x24];
+            *reinterpret_cast<int32_t*>(mem::host(0x96C9E8 + (uint32_t)f * 0x20CC)) = (int8_t)slot[0x26];  // difficulty
+            if (randomized & (1u << i)) continue;
+            uint8_t* p = cfg(i);
+            MFaction& m = MFactions[f];
+            crt_strcpy(m.name_leader, reinterpret_cast<char*>(p + 5));
+            crt_strcpy(m.formal_name_faction, reinterpret_cast<char*>(p + 0x1D));
+            crt_strcpy(m.noun_faction, reinterpret_cast<char*>(p + 0x45));
+            crt_strcpy(m.adj_name_faction, reinterpret_cast<char*>(p + 0x5D));
+            crt_strcpy(m.title_leader, reinterpret_cast<char*>(p + 0xDD));
+            crt_strcpy(m.adj_leader, reinterpret_cast<char*>(p + 0xF5));
+            m.is_leader_female = p[0x175];
+        }
+    } else if (own_pid() != host_pid()) {
+        // A player's copy: the factions' files from the host's faction data, their art.
+        for (int32_t f = 1; f < 8; f++) {
+            crt_strcpy(MFactions[f].filename, reinterpret_cast<const char*>(&g_blob[(size_t)f * 400 + 10]));
+            load_faction_art(f);
+        }
     }
     load_flags();
 }
 
 namespace {
 struct NetWinState : ScreenWin {
-    Font font;
-    Font* small = nullptr;
+    Font* big = nullptr;    // find_font(14, bold)
+    Font* small = nullptr;  // find_font(12, bold): the rules
+    std::string edit;       // the chat's EditBox (+0x10BD)
+    BaseButton* ready = nullptr;
     void redraw() override;
     void on_key(int32_t key) override;
     void on_button(int32_t id) override;
     void on_click(int32_t parent, int32_t index, int32_t type, int32_t x, int32_t y, bool right, bool dbl) override;
+    void log_state() override;
 };
 
 std::string faction_name(int32_t f) {
@@ -401,78 +513,342 @@ std::string size_name(int8_t v) {
 }
 std::string value_name(int8_t v, uint32_t base) { return v == -1 ? lab(0xFE4) : lab((uint32_t)(v + (int32_t)base) * 4); }
 
+// The type of game (NetWin_draw_session_info): the file's name (none: a random map) and its kind.
+std::string game_type_text() {
+    const char* name = reinterpret_cast<const char*>(mem::host(0x90E79C));
+    std::string t = name[0] ? std::string(name) : lab(0x107C);
+    if (NetSetupType >= 1 && NetSetupType <= 3) {
+        static const uint32_t kKind[4] = {0, 0x10, 0x1018, 0x1014};
+        t += " (" + lab(kKind[NetSetupType]) + ")";
+    }
+    return t;
+}
+
 std::vector<std::pair<int32_t, std::string>> session_lines() {
     const uint8_t* v = config_value();
     std::vector<std::pair<int32_t, std::string>> l;
-    l.push_back({0, lab(0x1078) + ": " + lab(0x107C)});  // the map: a random map (NetSetupType 0)
+    l.push_back({0, lab(0x1078) + ": " + game_type_text()});
     int32_t d = std::max(0, std::min(5, (int32_t)(int8_t)v[2]));
     l.push_back({2, lab(0xFA4) + ": " + std::string((Difficulty[d] ? Difficulty[d] : ""))});
     l.push_back({3, lab(0x100C) + ": " + std::string(TimeControl[v[3] % 6].name ? TimeControl[v[3] % 6].name : "")});
-    l.push_back({4, lab(0xFAC) + ": " + size_name((int8_t)v[6])});
-    l.push_back({5, lab(0xFB0) + ": " + value_name((int8_t)v[7], 0x3D8)});
-    l.push_back({6, lab(0xFB4) + ": " + value_name((int8_t)v[8], 0x3DB)});
-    l.push_back({7, lab(0xFB8) + ": " + value_name((int8_t)v[9], 0x3E4)});
-    l.push_back({8, lab(0xFBC) + ": " + value_name((int8_t)v[10], 0x3E1)});
+    // A file's map: its size, the rest MAP DEFINED (and no pick lists).
+    const bool file = mem::host(0x90E79C)[0] != 0;
+    std::string defined = lab(0x1000);
+    l.push_back({file ? -1 : 4, lab(0xFAC) + ": " +
+                                    (file ? std::to_string(v[4]) + " x " + std::to_string(v[5]) : size_name((int8_t)v[6]))});
+    l.push_back({file ? -1 : 5, lab(0xFB0) + ": " + (file ? defined : value_name((int8_t)v[7], 0x3D8))});
+    l.push_back({file ? -1 : 6, lab(0xFB4) + ": " + (file ? defined : value_name((int8_t)v[8], 0x3DB))});
+    l.push_back({file ? -1 : 7, lab(0xFB8) + ": " + (file ? defined : value_name((int8_t)v[9], 0x3E4))});
+    l.push_back({file ? -1 : 8, lab(0xFBC) + ": " + (file ? defined : value_name((int8_t)v[10], 0x3E1))});
     return l;
 }
 
-// The MULTIPLAYER SETUP window: the players (name, faction, difficulty, ready), the host's session
-// settings (spots of type 0: the host's pick lists) and the rules (spots of type 1: check boxes),
-// the chat lines, the keys' help.
+// ---- the window's layout (NetWin_exec's rectangles, window coordinates) ----
+struct R {
+    int32_t l, t, r, b;
+    UiRect u() const { return UiRect{l, t, r, b}; }
+};
+const R kTitle{3, 3, 797, 0x1D};                     // +0xA14
+const R kInfo{7, 0x3A, 0x134, 0x180};                // +0xA24: the session's settings
+const R kInfoHead{7, 0x24, 0x134, 0x38};             // +0xA34
+const R kInfoFrame{4, 0x21, 0x137, 0x183};           // +0xA44 (the union, 3 pixels out)
+const R kPlayersHead{0x13D, 0x24, 0x319, 0x38};      // +0xA54
+const R kPlayersFrame{0x13A, 0x21, 0x31C, 0xEB};     // +0xA64
+const int32_t kRowTop = 0x3A, kRowStep = 0x16, kRowH = 0x14;
+const int32_t kNameL = 0x161, kNameR = 0x213;        // +0xA74: the players' names
+const int32_t kFacL = 0x215, kFacR = 0x2A1;          // +0xAE4: their factions
+const int32_t kDiffL = 0x2A3, kDiffR = 0x319;        // +0xB54: their difficulties
+const int32_t kLockL = 0x14F, kLockR = 0x15F;        // +0xBC4: the password's lock
+const int32_t kReadyL = 0x13D, kReadyR = 0x14D;      // +0xC54: the ready mark
+const R kReadyButton{0x13D, 0xD4, 0x229, 0xE8};      // +0xC34 (button 10)
+const R kCancelButton{0x22C, 0xD4, 0x318, 0xE8};     // +0xC44 (button -2)
+const R kChat{0x13D, 0xF1, 0x319, 0x162};            // +0xCC4: the StringBox
+const R kEdit{0x13D, 0x164, 0x319, 0x180};           // +0xCD4: the EditBox
+const R kChatFrame{0x13A, 0xEE, 0x31C, 0x183};       // +0xCE4
+const R kRulesHead{7, 0x189, 0x319, 0x19D};          // +0xCF4
+const R kRulesFrame{4, 0x186, 0x31C, 0x254};         // +0xD04
+const R kRules1{0x1B, 0x19F, 399, 0x251};            // +0xD14
+const R kRules2{0x1A5, 0x19F, 0x319, 0x251};         // +0xD24
+R row(int32_t i, int32_t l, int32_t r) { return R{l, kRowTop + i * kRowStep, r, kRowTop + i * kRowStep + kRowH}; }
+
+// interface.pcx's small sprites (load_sprites): the drop-down arrow (0x788038, 7x13 at 534, 537),
+// the open and closed locks (0x7AC040 / 0x7AC06C, 15x19 at 247 / 263, 71).
+Sprite g_arrow, g_unlocked, g_locked;
+void load_art() {
+    static bool done = false;
+    if (done) return;
+    done = true;
+    Buffer b;
+    Buffer_ctor(&b);
+    if (Buffer_load_pcx(&b, "interface.pcx", nullptr, 10, 0xEC)) return;
+    Buffer_change_color(&b, 0x107, 0x109);
+    Buffer_change_color(&b, 0x106, 0x109);
+    pfncSpriteFromCanvasRectTrans(&g_arrow, &b, 0x109, 0x216, 0x219, 7, 0xD, 0);
+    pfncSpriteFromCanvasRectTrans(&g_unlocked, &b, 0x109, 0xF7, 0x47, 0xF, 0x13, 0);
+    pfncSpriteFromCanvasRectTrans(&g_locked, &b, 0x109, 0x107, 0x47, 0xF, 0x13, 0);
+}
+void sprite(Buffer* c, Sprite* s, int32_t x, int32_t y) {
+    if (s && s->width) pfncSpriteStretchCopyToCanvas(s, c, s->key, x, y);
+}
+// The drop-down arrow at a pick list's right end, centred in the row.
+void arrow(Buffer* c, const R& r) { sprite(c, &g_arrow, r.r - 10, ((r.b - g_arrow.full_height) - r.t) / 2 + r.t); }
+// Buffer_write_l_4: left-aligned in the row, centred vertically.
+void text_left(NetWinState* w, Buffer* c, const std::string& t, const R& r);
+void box(Buffer* c, const R& r, int32_t n) {
+    UiRect u = r.u();
+    Buffer_box_sprite(c, &u, box_def(n));
+}
+// A header: box 6 with its label upper-cased, centred (find_font(14, bold), colour 0xE1).
+void header(NetWinState* w, const R& r, const std::string& text) {
+    box(&w->canvas, r, 6);
+    sw_font(&w->canvas, w->big, 0xE1);
+    sw_text_cent(w, &w->canvas, sw_upper(text), r.u());
+}
+
+void text_left(NetWinState* w, Buffer* c, const std::string& t, const R& r) {
+    w->texts.push_back(t);
+    if (t.empty() || !c->fonts[0]) return;
+    int32_t y = ((r.b - c->fonts[0]->ascent_above) - r.t) / 2 + r.t;
+    Buffer_write_multi_font_raw_l(c, t.c_str(), r.l, y, (int32_t)t.size());
+}
+
+// NetWin_get_player_color (0x47B380): the colour of the player's faction (a faction another row
+// took first: the first faction no row took); random: 0xFF.
+int32_t player_color(int32_t idx) {
+    if (g_blob.empty()) return 0;
+    int32_t f = (int8_t)cfg(idx)[3];
+    if (f == -1) return 0xFF;
+    int32_t i = 1;
+    while (i < idx && (int8_t)cfg(i)[3] != f) i++;
+    if (i != idx) {
+        f = 0;
+        for (; f < g_blob[1]; f++) {
+            int32_t k = 1;
+            while (k < players() + 1 && (int8_t)cfg(k)[3] != f) k++;
+            if (k == players() + 1) break;
+        }
+    }
+    return g_blob[(size_t)f * 400 + 8];
+}
+
+// NetWin_draw_session_info (0x480900): the session's settings ("{label: } value", the host's pick
+// lists marked with the arrow, spots of type 0), the passwords no player gave yet (a saved game).
+void draw_session_info(NetWinState* w) {
+    Buffer* c = &w->canvas;
+    spot_kill_type(&w->spots[0], 0);
+    box(c, kInfoFrame, 3);
+    const char* session = *reinterpret_cast<const char* const*>(&NetState + 0x704);
+    header(w, kInfoHead, session ? session : "");
+    box(c, kInfo, 0);
+    sw_font(c, w->big, 0xDF);
+    Buffer_set_text_color2(c, 0xE2, -1, 1, 1);
+    const bool host = NetSessionState[0] != 0;
+    const int32_t x = kInfo.l + 4, wide = kInfo.r - kInfo.l - 8;
+    int32_t y = kInfo.t + 4;
+    const int32_t h = c->fonts[0] ? Buffer_text_line_height(c) : 16;
+    auto line = [&](int32_t spot, const std::string& label, const std::string& value, bool pick, int32_t gap) {
+        std::string t = "{" + label + ": } " + value;
+        w->texts.push_back(label + ": " + value);
+        int32_t right = Buffer_write_multi_font_raw_l(c, t.c_str(), x, y, (int32_t)t.size());
+        if (pick && host) {
+            sprite(c, &g_arrow, right + 3, y);
+            spot_add(&w->spots[0], spot, 0, x, y, std::min(right - x + 0x1E, wide), h);
+        }
+        y += h * gap;
+    };
+    const uint8_t* v = config_value();
+    int32_t d = std::max(0, std::min(5, (int32_t)(int8_t)v[2]));
+    line(2, lab(0xFA4), Difficulty[d] ? Difficulty[d] : "", true, 1);
+    line(3, lab(0x100C), TimeControl[v[3] % 6].name ? TimeControl[v[3] % 6].name : "", true, 2);
+    line(0, lab(0x1078), game_type_text(), true, 1);
+    const bool file = mem::host(0x90E79C)[0] != 0;
+    std::string defined = lab(0x1000);
+    line(4, lab(0xFAC), file ? std::to_string(v[4]) + " X " + std::to_string(v[5]) : size_name((int8_t)v[6]), !file, 1);
+    line(5, lab(0xFB0), file ? defined : value_name((int8_t)v[7], 0x3D8), !file, 1);
+    line(6, lab(0xFB4), file ? defined : value_name((int8_t)v[8], 0x3DB), !file, 1);
+    line(7, lab(0xFB8), file ? defined : value_name((int8_t)v[9], 0x3E4), !file, 1);
+    line(8, lab(0xFBC), file ? defined : value_name((int8_t)v[10], 0x3E1), !file, 2);
+    if (loaded_game() && !g_blob.empty()) {
+        int32_t missing = 0;
+        for (int32_t f = 0; f < 8; f++) {
+            int32_t pass = blob_pass(f);
+            if (!pass) continue;
+            int32_t i = 1;
+            while (i <= players() && cfg_pass(i) != pass) i++;
+            if (i > players()) missing++;
+        }
+        line(-1, lab(0x113C), std::to_string(missing), false, 1);
+    }
+}
+
+// NetWin_draw_player_names / _factions / _diffs (0x480370, 0x47FED0, 0x480180): seven rows, the
+// session's players then the computer's (a scenario: as many as its factions); the ready mark (box
+// 48 / 50), the password's lock (the own row's spot: NetWin_pick_pass), the name ("Computer"; with
+// the leader's), the faction (with the row's own noun when it differs), the difficulty, in the
+// player's colour; the own row's (and for the host the computer's rows') pick lists marked.
+void draw_players(NetWinState* w) {
+    Buffer* c = &w->canvas;
+    spot_kill_type(&w->spots[0], 2);
+    spot_kill_type(&w->spots[0], 3);
+    spot_kill_type(&w->spots[0], 4);
+    spot_kill_type(&w->spots[0], 5);
+    const int32_t own = AlphaNet_pid_2_idx(&NetState, own_pid());
+    const bool host = own_pid() == host_pid();
+    box(c, kPlayersFrame, 3);
+    header(w, kPlayersHead, lab(0x414));
+    for (int32_t i = 0; i < 7; i++) {
+        const int32_t idx = i + 1;
+        const uint8_t* p = cfg(idx);
+        if (NetSetupType == 3 && !g_blob.empty() && i >= g_blob[0]) break;
+        R name = row(i, kNameL, kNameR), lock = row(i, kLockL, kLockR), mark = row(i, kReadyL, kReadyR);
+        R fac = row(i, kFacL, kFacR), diff = row(i, kDiffL, kDiffR);
+        box(c, name, 0);
+        box(c, lock, 0);
+        box(c, mark, p[1] ? 50 : 48);
+        box(c, fac, 0);
+        box(c, diff, 0);
+        const bool computer = p[0] == 0xFF;
+        if (NetSetupType == 3 && computer) continue;
+        const int32_t f = (int8_t)p[3];
+        bool locked;
+        if (loaded_game()) locked = f != -1 && !g_blob.empty() && blob_pass(f) && blob_pass(f) != cfg_pass(idx);
+        else locked = cfg_pass(idx) != 0;
+        sprite(c, locked ? &g_locked : &g_unlocked, lock.l + 1, lock.t);
+        if (!loaded_game() && idx == own) arrow(c, name);
+        sw_font(c, w->big, player_color(idx));
+        std::string t = computer ? std::string("Computer") : std::string(reinterpret_cast<const char*>(&NetState + 0x76C + idx * 0x19C));
+        if (f != -1) {
+            t += ":  ";
+            t += reinterpret_cast<const char*>(p + 5);
+            int32_t same = 0;
+            for (int32_t k = 1; k < idx; k++) {
+                if (!crt_strcmp(reinterpret_cast<const char*>(cfg(k) + 5), reinterpret_cast<const char*>(p + 5))) same++;
+            }
+            if (same) t += std::to_string(same);
+        }
+        UiRect clip{name.l + 4, name.t, name.r - 4, name.b};
+        Buffer_set_clip(c, &clip);
+        text_left(w, c, t, R{name.l + 4, name.t, name.r - 4, name.b});
+        Buffer_set_clip(c, nullptr);
+        spot_add(&w->spots[0], i, 2, mark.l, mark.t, mark.r - mark.l, mark.b - mark.t);
+        if (!loaded_game()) spot_add(&w->spots[0], i, 2, name.l, name.t, name.r - name.l, name.b - name.t);
+        spot_add(&w->spots[0], i, 5, lock.l, lock.t, lock.r - lock.l, lock.b - lock.t);
+        // The faction.
+        const bool mine = idx == own || (host && computer);
+        if (mine) arrow(c, fac);
+        sw_font(c, w->big, player_color(idx));
+        std::string ft = faction_name(p[3]);
+        const char* noun = reinterpret_cast<const char*>(p + 0x45);
+        if (crt_strcmp(ft.c_str(), noun)) ft += std::string(":  ") + noun;
+        UiRect fclip{fac.l + 4, fac.t, fac.r - 11, fac.b};
+        Buffer_set_clip(c, &fclip);
+        text_left(w, c, ft, R{fac.l + 4, fac.t, fac.r - 11, fac.b});
+        Buffer_set_clip(c, nullptr);
+        spot_add(&w->spots[0], i, 3, fac.l, fac.t, fac.r - fac.l, fac.b - fac.t);
+        // The difficulty.
+        if (mine) arrow(c, diff);
+        int32_t dl = std::max(0, std::min(5, (int32_t)(int8_t)p[2]));
+        UiRect dclip{diff.l + 4, diff.t, diff.r - 4, diff.b};
+        Buffer_set_clip(c, &dclip);
+        text_left(w, c, Difficulty[dl] ? Difficulty[dl] : "", R{diff.l + 4, diff.t, diff.r - 4, diff.b});
+        Buffer_set_clip(c, nullptr);
+        spot_add(&w->spots[0], i, 4, diff.l, diff.t, diff.r - diff.l, diff.b - diff.t);
+    }
+    // A player's button: MAKE READY / MAKE NOT READY.
+    if (!NetSessionState[0] && w->ready && own > 0) w->ready->name = lab(cfg(own)[1] ? 0x1054 : 0x1050);
+}
+
+// NetWin_draw_custom_rules (0x47F960): the check boxes (interface.pcx's marks; the host's spots of
+// type 1), Simultaneous Moves first, the RULES lines in two columns (eight, then the rest; Iron Man,
+// line 15, not offered); a rule on in colour 0xDE, off 0xE4.
+void draw_rules(NetWinState* w) {
+    Buffer* c = &w->canvas;
+    spot_kill_type(&w->spots[0], 1);
+    box(c, kRulesFrame, 3);
+    box(c, kRulesHead, 0);
+    sw_font(c, w->big, 0xE1);
+    sw_text_cent(w, c, sw_upper(lab(0xF9C)), kRulesHead.u());
+    box(c, kRules1, 0);
+    box(c, kRules2, 0);
+    const bool host = NetSessionState[0] != 0;
+    int32_t x = kRules1.l - 0x14, y = kRules1.t, right = (kRules1.r - kRules1.l) - 6 + x;
+    auto item = [&](int32_t spot, bool on, const std::string& text) {
+        sprite(c, popup_check_sprite(on ? 2 : 0), x, y);
+        if (host) spot_add(&w->spots[0], spot, 1, x, y, right - x, 0x12);
+        sw_font(c, w->small, on ? 0xDE : 0xE4);
+        w->texts.push_back(std::string(on ? "[X] " : "[ ] ") + text);
+        Buffer_write_multi_font_raw_l(c, text.c_str(), x + 0x19, y, (int32_t)text.size());
+    };
+    item(100, !(config_mrules() & 0x10), lab(0x10A4) + ".");
+    y += 0x14;
+    load_rule_lines();
+    for (int32_t i = 0; i < (int32_t)g_rule_lines.size() && i < 18; i++) {
+        if (i == 15) continue;
+        item(i, rule_on(i), g_rule_lines[(size_t)i]);
+        if (i == 7) {
+            x += 0x18A;
+            right += 0x18A;
+            y -= 0xA0;
+        } else {
+            y += 0x14;
+        }
+    }
+}
+
+// The chat: the StringBox's last lines (each in its writer's colour: NetWin_string_callback) and
+// the EditBox's line.
+void draw_chat(NetWinState* w) {
+    Buffer* c = &w->canvas;
+    box(c, kChatFrame, 3);
+    box(c, kEdit, 0);
+    box(c, kChat, 0);
+    if (!c->fonts[0]) return;
+    sw_font(c, w->big, 0xDF);
+    const int32_t h = Buffer_text_line_height(c);
+    const int32_t rows = std::max(1, (kChat.b - kChat.t - 6) / std::max(1, h));
+    size_t from = g_chat.size() > (size_t)rows ? g_chat.size() - (size_t)rows : 0;
+    int32_t y = kChat.t + 3;
+    UiRect clip{kChat.l + 3, kChat.t + 3, kChat.r - 3, kChat.b - 3};
+    Buffer_set_clip(c, &clip);
+    for (size_t i = from; i < g_chat.size(); i++, y += h) {
+        sw_font(c, w->big, player_color(g_chat_idx[i]));
+        sw_text(w, c, g_chat[i], kChat.l + 3, y);
+    }
+    UiRect eclip{kEdit.l + 3, kEdit.t, kEdit.r - 3, kEdit.b};
+    Buffer_set_clip(c, &eclip);
+    sw_font(c, w->big, 0x41);
+    std::string e = w->edit + "_";
+    Buffer_write_multi_font_raw_l(c, e.c_str(), kEdit.l + 4, (kEdit.b - h - kEdit.t) / 2 + kEdit.t, (int32_t)e.size());
+    Buffer_set_clip(c, nullptr);
+}
+
+// NetWin_on_redraw (0x481AD0): the background (box 9), the title, the rules, the chat's frames,
+// the players, the session's settings.
 void NetWinState::redraw() {
+    load_art();
+    if (!big) big = find_font(0xE, 1);
+    if (!small) small = find_font(0xC, 1);
     UiRect all{0, 0, canvas.width, canvas.height};
     Buffer_fill_3(&canvas, &all, 0);
     Buffer_box_sprite(&canvas, &all, box_def(9));
     texts.clear();
-    spot_kill_type(&spots[0], 0);
-    spot_kill_type(&spots[0], 1);
-    spot_kill_type(&spots[0], 3);
-    const bool host = own_pid() == host_pid();
-    sw_font(&canvas, &font, 0xFF);
-    sw_text(this, &canvas, "MULTIPLAYER SETUP", 20, 12);
-    sw_text(this, &canvas, host ? "(host)" : "(player)", 300, 12);
-    for (int32_t i = 1; i <= players(); i++) {
-        uint8_t* p = cfg(i);
-        const char* name = reinterpret_cast<const char*>(&NetState + 0x76C + i * 0x19C);
-        int32_t d = std::max(0, std::min(5, (int32_t)(int8_t)p[2]));
-        char line[256];
-        std::snprintf(line, sizeof(line), "%d. %s - %s - %s%s", i, name, faction_name(p[3]).c_str(),
-                      (Difficulty[d] ? Difficulty[d] : ""), p[1] ? " - READY" : "");
-        sw_text(this, &canvas, line, 20, 40 + i * 22);
-        spot_add(&spots[0], i - 1, 3, 20, 40 + i * 22, 360, 20);
-    }
-    sw_font(&canvas, small ? small : &font, 0xFF);
-    int32_t y = 40;
-    for (auto& l : session_lines()) {
-        sw_text(this, &canvas, l.second, 420, y);
-        if (NetSessionState[0]) spot_add(&spots[0], l.first, 0, 420, y, 360, 18);
-        y += 20;
-    }
-    y += 6;
-    load_rule_lines();
-    for (int32_t i = 0; i < (int32_t)g_rule_lines.size(); i++, y += 16) {
-        std::string t = std::string(rule_on(i) ? "[X] " : "[ ] ") + g_rule_lines[(size_t)i];
-        sw_text(this, &canvas, t, 420, y);
-        if (NetSessionState[0] && i != 15) spot_add(&spots[0], i, 1, 420, y, 360, 16);
-    }
-    std::string sim = std::string((config_mrules() & 0x10) ? "[ ] " : "[X] ") + lab(0x10A4);
-    sw_text(this, &canvas, sim, 420, y);
-    if (NetSessionState[0]) spot_add(&spots[0], 100, 1, 420, y, 360, 16);
-    sw_font(&canvas, &font, 0xFF);
-    y = 240;
-    size_t from = g_chat.size() > 8 ? g_chat.size() - 8 : 0;
-    for (size_t i = from; i < g_chat.size(); i++, y += 20) sw_text(this, &canvas, g_chat[i], 20, y);
-    sw_text(this, &canvas, host ? "Enter: START   F: faction   C: chat   Esc: cancel"
-                                : "Enter: READY   F: faction   C: chat   Esc: cancel",
-            20, canvas.height - 30);
+    box(&canvas, kTitle, 3);
+    R inner{kTitle.l + 3, kTitle.t + 3, kTitle.r - 3, kTitle.b - 3};
+    box(&canvas, inner, 6);
+    sw_font(&canvas, big, 0xE1);
+    sw_text_cent(this, &canvas, sw_upper(lab(0x3F0)), kTitle.u());
+    draw_rules(this);
+    draw_chat(this);
+    draw_players(this);
+    draw_session_info(this);
 }
 
-void send_own_settings(uint8_t* p, int32_t idx) {
-    std::vector<uint8_t> m(0x18C, 0);
-    *reinterpret_cast<uint16_t*>(&m[0]) = 0x2F04;
-    *reinterpret_cast<int32_t*>(&m[4]) = idx;
-    std::memcpy(&m[0x10], p, 0x17C);
-    Net_send(&NetState, m.data(), 0x18C, host_pid(), 1);
+// SCREENSTATE: the spots' rectangles (the tests click them).
+void NetWinState::log_state() {
+    std::fprintf(stderr, "screenstate netwin at %d,%d\n", x, y);
+    for (const Spot& sp : spots[0].list)
+        std::fprintf(stderr, "screenstate netwin spot %d %d at %d,%d %dx%d\n", sp.type, sp.index, x + sp.r.left,
+                     y + sp.r.top, sp.r.right - sp.r.left, sp.r.bottom - sp.r.top);
 }
 
 // NetWin_on_button_clicked (0x47B450): 10 ready (a player) / start (the host), -2 cancel.
@@ -487,7 +863,7 @@ void NetWin_on_button_clicked(int32_t id) {
         uint8_t p[0x17C];
         std::memcpy(p, cfg(idx), 0x17C);
         p[1] = p[1] == 0;
-        if (idx > 0) send_own_settings(p, idx);
+        if (idx > 0) send_settings(p, idx);
         return;
     }
     int32_t n = players() + 1;
@@ -500,24 +876,36 @@ void NetWin_on_button_clicked(int32_t id) {
     send_all_player_packets(-1);
 }
 
-// NetWin_pick_faction (0x47C530): a popup of the factions; the choice sent to the host.
-void NetWin_pick_faction() {
-    if (g_blob.empty()) return;
-    int32_t idx = AlphaNet_pid_2_idx(&NetState, own_pid());
-    if (idx <= 0) return;
+// NetWin_pick_faction (0x47C530): the PopMenu of the factions (here a popup list: Random, then each
+// faction available; a saved game's or a scenario's without those other players took); the choice
+// (its password asked first: NetWin_pick_pass(1)) sent to the host.
+void NetWin_pick_faction(int32_t idx) {
+    if (g_blob.empty() || idx <= 0) return;
     BasePop* pop = popup_new();
     if (!Popup_start(pop, ScriptFileName, "FACTION", -1, nullptr, 0)) {
-        BasePop_item(pop, label_get(0xFE4 / 4), 0xFF);
+        BasePop_item(pop, label_get(0xFE4 / 4), 0);
         for (int32_t f = 0; f < g_blob[1]; f++) {
-            if (g_blob[(size_t)f * 400 + 9]) BasePop_item(pop, faction_name(f).c_str(), f);
+            if (!g_blob[(size_t)f * 400 + 9]) continue;
+            if (loaded_game()) {
+                int32_t i = 1;
+                while (i <= players() && (int8_t)cfg(i)[3] != f) i++;
+                if (i <= players()) continue;
+            }
+            BasePop_item(pop, faction_name(f).c_str(), f + 1);
         }
-        int32_t r = BasePop_exec_3(pop, 0, 0);
+        int32_t r = BasePop_exec_3(pop, 0, 0x483240);
         if (r >= 0) {
-            uint8_t p[0x17C];
-            std::memcpy(p, cfg(idx), 0x17C);
-            p[3] = (uint8_t)r;
-            ui_netwin_fill_player(p, r == 0xFF ? -1 : r);
-            send_own_settings(p, idx);
+            uint8_t& f = cfg(idx)[3];
+            uint8_t old = f;
+            f = (uint8_t)(r - 1);
+            int32_t ok = NetWin_pick_pass(1);
+            f = old;
+            if (ok) {
+                uint8_t p[0x17C];
+                std::memcpy(p, cfg(idx), 0x17C);
+                p[3] = (uint8_t)(r - 1);
+                send_settings(p, idx);
+            }
         }
     }
     popup_delete(pop);
@@ -531,6 +919,137 @@ void send_session() {
     *reinterpret_cast<int32_t*>(m + 4) = AlphaNet_pid_2_idx(&NetState, own_pid());
     std::memcpy(m + 0x10, config_value(), 0x18);
     Net_send(&NetState, m, 0x28, host_pid(), 1);
+}
+
+// NetWin_pick_map (0x47D300): the type of game (the host). The PopMenu (here a popup list): a new
+// game with a random map, LOAD MAP (load_map: a new game on that map, NetGameFileKind 1), LOAD
+// SCENARIO and LOAD GAME (load_game: 3 / 2; a scenario for fewer players than there are:
+// TOOMANYFORSCENARIO). A file loaded: the factions' passwords and the map's size kept for the
+// window, the game's name; the session's difficulty, rules, alive factions (NetConfigValue[0])
+// from the game; sent (0x2F02). A saved game or a scenario: the faction data become the game's
+// factions (8 entries, the alive ones available with their names, colour and password; the
+// players' rows given their names, the faction random), sent to everyone (send_faction_data);
+// back to a new game: the host's own faction data again. Then the players' settings (0x4F04),
+// NetSetupType's block (0x2F03) and, after load_game, 0x2F0E.
+void NetWin_pick_map() {
+    int32_t old_kind = NetGameFileKind;
+    bool loaded = false;
+    BasePop* pop = popup_new();
+    int32_t r = -1;
+    if (!Popup_start(pop, "smacxnet", "NETPICK", -1, nullptr, 0)) {
+        BasePop_item(pop, lab(0x107C).c_str(), 0);
+        BasePop_item(pop, lab(0xFD8).c_str(), 1);
+        BasePop_item(pop, lab(0xFDC).c_str(), 2);
+        BasePop_item(pop, lab(0xFE0).c_str(), 3);
+        r = BasePop_exec_3(pop, 0, 0x483240);
+    }
+    popup_delete(pop);
+    char note[96];
+    std::snprintf(note, sizeof(note), "net: type of game chosen %d", r);
+    ui_net_note(note);
+    if (r < 0) return;
+    uint8_t* v = config_value();
+    if (r == 0) {
+        g_blob = g_blob_backup;
+        NetGameFileKind = 0;
+        v[2] = mem::host(0x94B350)[0];
+        mem::host(0x90E79C)[0] = 0;
+        v[0] = 0xFF;
+        config_rules() = *reinterpret_cast<int32_t*>(mem::host(0x94B470));
+    } else {
+        SaveFileMenu = 1;
+        if (r == 1) {
+            if (load_map()) return;  // (SaveFileMenu stays set, as in the original)
+        } else {
+            if (load_game(r == 2, 0)) return;  // (SaveFileMenu stays set, as in the original)
+            int32_t alive = bit_count(FactionStatus[1] & 0xFFFE);
+            if (r == 2 && alive < players()) {
+                parse_num(0, alive);
+                X_pop("TOOMANYFORSCENARIO", 0);
+                return;
+            }
+            loaded = true;
+        }
+        SaveFileMenu = 0;
+        if (NetGameFileKind) {
+            for (int32_t f = 0; f < 8 && !g_blob.empty(); f++)
+                *reinterpret_cast<int32_t*>(&g_blob[(size_t)f * 400 + 4]) = Factions[f].unk_102;
+            v[4] = (uint8_t)(MapAreaX / 2);
+            v[5] = (uint8_t)MapAreaY;
+            char* name = reinterpret_cast<char*>(mem::host(0x90E79C));
+            const char* slash = crt_strrchr(NetGameFileName, '\\');
+            name[0] = 0;
+            crt_strcat(name, slash ? slash + 1 : NetGameFileName);
+        }
+        if (GameMoreRules & 0x10) config_mrules() |= 0x10;
+        else config_mrules() &= ~0x10;
+        v[2] = (uint8_t)DiffLevel;
+        v[0] = FactionStatus[1];
+        config_rules() = GameRules;
+    }
+    send_session();
+    if (NetGameFileKind == 0 || NetGameFileKind == 1) {
+        if (old_kind != 0 && old_kind != 1) {
+            g_blob = g_blob_backup;
+            send_faction_data(-1);
+        }
+        for (int32_t i = 1; i < 8; i++) {
+            cfg(i)[3] = 0xFF;
+            crt_strcpy(reinterpret_cast<char*>(cfg(i) + 5), lab(0xFE4).c_str());
+            crt_strcpy(reinterpret_cast<char*>(cfg(i) + 0x45), lab(0xFE4).c_str());
+        }
+    } else {
+        int32_t size = 8 * 399 + 0x194;
+        if ((int32_t)g_blob.size() < size) g_blob.resize((size_t)size, 0);
+        g_blob[1] = 8;
+        g_blob[0] = (uint8_t)bit_count(FactionStatus[1] & 0xFFFE);
+        g_blob[9] = 0;
+        int32_t row = 1;
+        for (int32_t f = 1; f < 8; f++) {
+            uint8_t* e = &g_blob[(size_t)f * 400];
+            if (!(v[0] & (1 << f))) {
+                e[9] = 0;
+                continue;
+            }
+            const MFaction& m = MFactions[f];
+            e[9] = 1;
+            *reinterpret_cast<int32_t*>(e + 4) = Factions[f].unk_102;
+            crt_strcpy(reinterpret_cast<char*>(e + 10), m.filename);
+            crt_strcpy(reinterpret_cast<char*>(e + 0x22), m.name_leader);
+            crt_strcpy(reinterpret_cast<char*>(e + 0x22), m.name_leader);
+            crt_strcpy(reinterpret_cast<char*>(e + 0x3A), m.formal_name_faction);
+            crt_strcpy(reinterpret_cast<char*>(e + 0x62), m.noun_faction);
+            crt_strcpy(reinterpret_cast<char*>(e + 0x7A), m.adj_name_faction);
+            crt_strcpy(reinterpret_cast<char*>(e + 0xFA), m.title_leader);
+            crt_strcpy(reinterpret_cast<char*>(e + 0x112), m.adj_leader);
+            e[0x192] = (uint8_t)m.is_leader_female;
+            e[8] = (uint8_t)faction_pcx_colour(m.filename);
+            // The row-th player's row takes the row-th alive faction's names (seven at most).
+            uint8_t* p = cfg(row++);
+            *reinterpret_cast<int32_t*>(p + 0x178) = 0;
+            p[3] = 0xFF;
+            crt_strcpy(reinterpret_cast<char*>(p + 5), m.name_leader);
+            crt_strcpy(reinterpret_cast<char*>(p + 0x1D), m.formal_name_faction);
+            crt_strcpy(reinterpret_cast<char*>(p + 0x45), lab(0xFE4).c_str());
+            crt_strcpy(reinterpret_cast<char*>(p + 0x5D), m.adj_name_faction);
+            crt_strcpy(reinterpret_cast<char*>(p + 0xDD), m.title_leader);
+            crt_strcpy(reinterpret_cast<char*>(p + 0xF5), m.adj_leader);
+            p[0x175] = (uint8_t)m.is_leader_female;
+        }
+        send_faction_data(-1);
+    }
+    // (The original first fills a copy of the table with empty rows, then copies the real one over it.)
+    send_all_player_packets(-1);
+    NetSetupType = NetGameFileKind;
+    send_session2_packet(0, 0);
+    if (loaded) {
+        uint8_t m[0x20] = {};
+        *reinterpret_cast<uint16_t*>(m) = 0x2F0E;
+        Net_send(&NetState, m, 0x20, host_pid(), 1);
+    }
+    std::snprintf(note, sizeof(note), "net: type of game %d (%s)", NetSetupType,
+                  reinterpret_cast<const char*>(mem::host(0x90E79C)));
+    ui_net_note(note);
 }
 
 // NetWin_pick_num_players / _global_diff / _time / _planet_size / _ocean / _erosion / _native /
@@ -583,15 +1102,38 @@ void NetWin_pick(int32_t index) {
     send_session();
 }
 
-void NetWinState::on_click(int32_t, int32_t index, int32_t type, int32_t, int32_t, bool right, bool) {
-    if (right || index < 0 || !NetSessionState[0]) {
-        if (!right && type == 3 && index + 1 == AlphaNet_pid_2_idx(&NetState, own_pid())) NetWin_pick_faction();
-        return;
+// NetWin_pick_diff (0x47CF40): the PopMenu of the difficulties (here a popup list); the row's
+// settings with it sent to the host (0x2F04; even when cancelled, as the original).
+void NetWin_pick_diff(int32_t idx) {
+    BasePop* pop = popup_new();
+    int32_t r = -1;
+    if (!Popup_start(pop, "smacxnet", "NETPICK", -1, nullptr, 0)) {
+        for (int32_t d = 0; d < 6; d++) BasePop_item(pop, Difficulty[d] ? Difficulty[d] : "", d);
+        BasePop_set_active(pop, cfg(idx)[2]);
+        r = BasePop_exec_3(pop, 0, 0x483240);
     }
-    if (type == 0) {
-        if (index >= 1 && index <= 8) NetWin_pick(index);  // (0: the map: a random map only)
-    } else if (type == 1) {
-        // NetWin_on_left_click: a rule toggled, the session packet sent.
+    popup_delete(pop);
+    uint8_t p[0x17C];
+    std::memcpy(p, cfg(idx), 0x17C);
+    if (r >= 0) p[2] = (uint8_t)r;
+    if (idx > 0) send_settings(p, idx);
+}
+
+// NetWin_on_left_click (0x47B760): the host's settings (type 0: the pick lists; 1: the rules,
+// sent as 0x2F02), a row's faction (3) and difficulty (4): the own row, or for the host a
+// computer's row; the own row's password (5, a new game). (Type 2, the own row's names:
+// NetWin_pick_player's CUSTOMNAMES, is not reconstructed.)
+void NetWinState::on_click(int32_t, int32_t index, int32_t type, int32_t, int32_t, bool right, bool) {
+    if (right || index < 0) return;
+    const bool host = NetSessionState[0] != 0;
+    const int32_t own = AlphaNet_pid_2_idx(&NetState, own_pid());
+    const int32_t idx = index + 1;
+    const bool row_mine = (type >= 2 && type <= 5) &&
+                          (idx == own || (cfg(idx)[0] == 0xFF && own_pid() == host_pid()));
+    if (type == 0 && host) {
+        if (index == 0) NetWin_pick_map();
+        else if (index >= 1 && index <= 8) NetWin_pick(index);
+    } else if (type == 1 && host) {
         if (index == 100) config_mrules() ^= 0x10;
         else if (index >= 16 && index < 18) config_state() ^= (int32_t)kRuleBit[index];
         else if (index >= 0 && index < 15) config_rules() ^= (int32_t)kRuleBit[index];
@@ -599,36 +1141,45 @@ void NetWinState::on_click(int32_t, int32_t index, int32_t type, int32_t, int32_
         std::snprintf(note, sizeof(note), "net: rule %d toggled", index);
         ui_net_note(note);
         send_session();
-    } else if (type == 3 && index + 1 == AlphaNet_pid_2_idx(&NetState, own_pid())) {
-        NetWin_pick_faction();
+    } else if (type == 2 && idx == own) {
+        ui_net_note("net: custom names (not reconstructed)");
+    } else if (type == 3 && row_mine) {
+        NetWin_pick_faction(idx);
+    } else if (type == 4 && row_mine) {
+        NetWin_pick_diff(idx);
+    } else if (type == 5 && !loaded_game() && idx == own) {
+        NetWin_pick_pass(0);
     }
     texts.clear();
     redraw();
     ui_invalidate();
 }
 
-void NetWin_chat() {
-    write_texts();
-    BasePop* pop = popup_new();
-    ParseStrBuffer[0][0] = 0;
-    if (!Popup_start(pop, "smacxnet", "NETCHAT", -1, nullptr, 0) && BasePop_exec_3(pop, 0, 0) >= 0 &&
-        ParseStrBuffer[0][0]) {
-        // The setup window's chat (NetWin_on_key_down): to each other player.
-        for (int32_t i = 1; i <= players(); i++) {
-            int32_t pid = fld(0x78C + i * 0x19C);
-            if (pid != own_pid()) message_chat(0x1E00, pid, ParseStrBuffer[0]);
-        }
-        ui_netwin_chat(AlphaNet_pid_2_idx(&NetState, own_pid()), ParseStrBuffer[0]);
-    }
-    popup_delete(pop);
-}
-
+// NetWin_on_key_down (0x483310): Enter sends the EditBox's line to everyone (message_chat 0x1E00:
+// the sender's own copy shows it), Esc cancels the window, the other keys edit the line.
 void NetWinState::on_key(int32_t key) {
-    int32_t k = key & 0xFFFF;
-    if (k == 0x1B) NetWin_on_button_clicked(-2);
-    else if (k == 0x0D) NetWin_on_button_clicked(10);
-    else if (k == 'F' || k == 'f') NetWin_pick_faction();
-    else if (k == 'C' || k == 'c') NetWin_chat();
+    int32_t vk = key & 0xFFFF;
+    if (vk == 0x1B) {
+        NetWin_on_button_clicked(-2);
+        return;
+    }
+    if (vk == 0x0D) {
+        message_chat(0x1E00, 0, edit.c_str());
+        edit.clear();
+    } else if (vk == 8) {
+        if (!edit.empty()) edit.pop_back();
+    } else {
+        bool shift = key & 0x10000;
+        char ch = 0;
+        if (vk >= 'A' && vk <= 'Z') ch = (char)(shift ? vk : vk - 'A' + 'a');
+        else if (vk >= '0' && vk <= '9') ch = (char)vk;
+        else if (vk == 0x20) ch = ' ';
+        if (!ch || edit.size() >= 0xFF) return;
+        edit += ch;
+    }
+    texts.clear();
+    redraw();
+    ui_invalidate();
 }
 
 void NetWinState::on_button(int32_t id) { NetWin_on_button_clicked(id); }
@@ -674,6 +1225,7 @@ static int32_t NetWin_exec() {
     NetSessionState[4] = 1;  // the phase: setup
     g_start = 0;
     g_chat.clear();
+    g_chat_idx.clear();
     if (NetSessionState[0]) {
         config_rules() = *reinterpret_cast<int32_t*>(mem::host(0x94B470));
         config_value()[2] = mem::host(0x94B350)[0];
@@ -684,9 +1236,16 @@ static int32_t NetWin_exec() {
     }
     NetWinState w;
     w.name = "netwin";
-    Font_ctor(&w.font);
-    Font_init(&w.font, "Arial", 0xE, 1);
     sw_init(&w, (ScreenWidth - 800) / 2, (ScreenHeight - 600) / 2, 800, 600, false);
+    // The buttons: LAUNCH GAME (the host) / MAKE READY (a player), CANCEL (font 14 bold, colour 0x41).
+    w.big = find_font(0xE, 1);
+    w.small = find_font(0xC, 1);
+    w.ready = sw_button(&w, lab(NetSessionState[0] ? 0x1058 : 0x1050).c_str(), 10, kReadyButton.l, kReadyButton.t,
+                        kReadyButton.r - kReadyButton.l, kReadyButton.b - kReadyButton.t, 0, w.big);
+    BaseButton* cancel = sw_button(&w, sw_upper(lab(0x198)).c_str(), -2, kCancelButton.l, kCancelButton.t,
+                                   kCancelButton.r - kCancelButton.l, kCancelButton.b - kCancelButton.t, 0, w.big);
+    for (BaseButton* b : {w.ready, cancel})
+        for (int32_t& c : b->text_color) c = 0x41;
     g_win = &w;
     g_visible = true;
     ui_set_idle_hook(netwin_tick);
@@ -907,7 +1466,21 @@ int32_t GAMEAPI multiplayer_init(int32_t lobby) {
             else GameMoreRules &= ~0x10;
             GameTimeControl = v[3];
             CurrentPlayerFaction = AlphaNet_pid_2_who(&NetState, own_pid());
-            GameState &= ~0x10;  // (NetSetupType 3: the scenario files, not reconstructed)
+            if (NetSetupType == 3) {
+                // A scenario: its files sent to the players (NetDaemon_send_files), its setup.
+                GameState |= 0x10;
+                if (NetDaemon_send_files(&NetState)) {
+                    ui_net_note("net: scenario cancelled");
+                    NetMsg_close(&NetMsg);  // (pop_close)
+                    log_set_state(0);
+                    net_session_clear();
+                    MultiplayerActive = 0;
+                    return 1;
+                }
+                if (NetSessionState[0]) scenario_setup();
+            } else {
+                GameState &= ~0x10;
+            }
             log_reset();
             if (!NetSessionState[0]) {
                 std::memcpy(AltNatural, AltNaturalLinear, sizeof(AltNatural));
@@ -921,6 +1494,7 @@ int32_t GAMEAPI multiplayer_init(int32_t lobby) {
                 NetDaemon_send_rules(&NetState);
                 NetDaemon_send_game(&NetState);
             }
+            if (NetSetupType == 3) game_reload(1, 0);  // (inline in the original: the windows, texts and art again)
             Lock_clear(&NetState + 0x14A0);
             char line[160];
             std::snprintf(line, sizeof(line),
@@ -929,6 +1503,28 @@ int32_t GAMEAPI multiplayer_init(int32_t lobby) {
                           DiffLevel);
             ui_net_note(line);
             if (!ControlTurnMove) planetfall(CurrentPlayerFaction);
+            if (NetSetupType == 3) {
+                const MFaction& m = MFactions[CurrentPlayerFaction];
+                PluralDefault = 0;
+                GenderDefault = m.is_leader_female;
+                parse_says(1, m.title_leader, -1, -1);
+                PluralDefault = 0;
+                GenderDefault = m.is_leader_female;
+                parse_says(2, m.name_leader, -1, -1);
+                GenderDefault = m.noun_gender;
+                PluralDefault = m.is_noun_plural;
+                parse_says(3, m.noun_faction, -1, -1);
+                StrBuffer[0] = 0;
+                crt_strcat(StrBuffer, label_get(0));
+                crt_strcat(StrBuffer, " ");
+                say_year(StrBuffer);
+                parse_says(4, StrBuffer, -1, -1);
+                parse_num(0, ObjectiveReqVictory);
+                parse_num(1, ObjectivesSuddenDeathVictory);
+                parse_num(2, num_objectives(CurrentPlayerFaction, GameRules & 0x1000));
+                parse_num(3, EndingMissionYear);
+                X_pop_2("SCENARIO", "INTRO", 0);
+            }
             result = ControlTurnA;
             if (!ControlTurnA) return 0;
         } else {
