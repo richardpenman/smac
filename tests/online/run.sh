@@ -39,14 +39,18 @@ count() {  # count LOG DESCRIPTION REGEX N: at least N lines match
 
 # game NAME [ENV...]: the host and the client of one game (keys below), logs OUT/NAME-host.log, OUT/NAME-client.log
 END="C-ENTER,DOWN,ENTER"  # end of turn (REALLYOVER)
-HTURN="WAITFOR:player turn faction 1,ENTER,$END"
-CTURN="WAITFOR:player turn faction 2,ENTER,$END"
+# NetMsg_pop's modal messages (a3 0) wait for their OK (ENTER) and hold the network meanwhile: the
+# other player's turn (SIMULWHOSE) after each turn of ours.
+W="WAITFOR:netmsg SIMULWHOSE,ENTER"
+HTURN="WAITFOR:player turn faction 1,ENTER,$END,$W"
+CTURN0="WAITFOR:player turn faction 2,ENTER,$END"  # (the host's turn's SIMULWHOSE already answered)
+CTURN="$W,$CTURN0"
 # The host's first turn moves a unit twice (KP2, KP4: NetDaemon_order_veh's lock, MOVE_VEH 0x2401
 # relayed as 0x4401 and executed by both).
-HMOVE="WAITFOR:player turn faction 1,ENTER,WAIT:500,KP2,WAITFOR:move veh 0 dir 3,KP4,WAITFOR:move veh 0 dir 5,$END"
+HMOVE="WAITFOR:player turn faction 1,ENTER,WAIT:500,KP2,WAITFOR:move veh 0 dir 3,KP4,WAITFOR:move veh 0 dir 5,$END,$W"
 # Its second turn sends a chat line to everyone (ctrl+C: Console_chat, CHATASK, message_chat 0x4E00).
-HCHAT="WAITFOR:player turn faction 1,ENTER,WAIT:500,C-c,h,i,ENTER,WAITFOR:net: chat,$END"
-HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:player 2 ready 1,ENTER,WAITFOR:game started,ENTER,\
+HCHAT="WAITFOR:player turn faction 1,ENTER,WAIT:500,C-c,h,i,ENTER,WAITFOR:net: chat,$END,$W"
+HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:netmsg ADDED,ENTER,WAITFOR:player 2 ready 1,ENTER,WAITFOR:game started,ENTER,\
 $HMOVE,$HCHAT,$HTURN,WAITFOR:player turn faction 1,WAIT:2000"
 CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAIT:500,ENTER,\
 WAITFOR:game started,ENTER,$CTURN,$CTURN,$CTURN,WAITFOR:player turn faction 1,WAIT:1000"
@@ -97,6 +101,11 @@ for side in host client; do
     nocheck $log "the checksums agree" "checksum [0-9]+ differs"
     nocheck $log "no crash" "not reconstructed|abort|Assertion"
 done
+# NetMsg_pop: the modal messages (a3 0: the other player's turn, SIMULWHOSE) and the NetMsg box
+# shown without waiting (the upkeep's phases), hidden by NetMsg_close or its timer.
+check game-client "a modal NetMsg_pop (SIMULWHOSE)" "^popup SIMULWHOSE shown"
+check game-client "the NetMsg box (UPKEEP5)" "^netmsg UPKEEP5: Upkeep Phase"
+nocheck game-client "not a modal popup" "^popup UPKEEP5 shown"
 check game-host "the host" "^net: hosting on port"
 check game-client "the client" "^net: joined 127.0.0.1"
 compare game "host and client states equal each turn"
@@ -123,14 +132,14 @@ fi
 # (0x1506) and agrees (0x1509), the client sees the offers and agrees: MAYBE / YES DEAL
 # (0x150A / 0x150B), the host (the lower faction) executes the deal (net_treaty_on, net_energy)
 # and tells the client (0x150D). The treaty and the credits must agree on both machines.
-HDIPLO="WAITFOR:player turn faction 1,ENTER,WAIT:500,F12,WAIT:300,SCREENSTATE,SHOT:commlink.bmp,CLICK:950x348,WAITFOR:diplo 1 2,h,i,ENTER,\
-CLICK:790x467,CLICK:400x467,5,ENTER,CLICK:330x519,WAITFOR:diplo: deal done between 1 and 2,WAIT:300,DIPLOSTATE,ESC,ESC,$END"
-CDIPLO="WAITFOR:COMMDIPLO from faction 1,ENTER,WAITFOR:diplo 2 1,WAITFOR:diplo chat: ,\
-WAITFOR:diplo: faction 1 state 1,CLICK:330x519,WAITFOR:diplo: deal done by faction 1,WAITFOR:diplo: closed by faction 1,DIPLOSTATE"
-HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:player 2 ready 1,ENTER,WAITFOR:game started,ENTER,\
+HDIPLO="WAITFOR:player turn faction 1,ENTER,WAIT:500,F12,WAIT:300,SCREENSTATE,SHOT:commlink.bmp,CLICK:950x348,WAITFOR:netmsg DIPLOCOMM,ENTER,WAITFOR:diplo 1 2,h,i,ENTER,\
+CLICK:790x467,CLICK:400x467,5,ENTER,CLICK:330x519,WAITFOR:diplo: deal done between 1 and 2,WAIT:300,DIPLOSTATE,ESC,ESC,$END,$W"
+CDIPLO="$W,WAITFOR:COMMDIPLO from faction 1,ENTER,WAITFOR:diplo 2 1,WAITFOR:diplo chat: ,\
+WAITFOR:diplo: faction 1 state 1,CLICK:330x519,WAITFOR:diplo: deal done by faction 1,WAITFOR:diplo: closed by faction 1,WAITFOR:netmsg DIPLOCLOSE,ENTER,DIPLOSTATE"
+HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:netmsg ADDED,ENTER,WAITFOR:player 2 ready 1,ENTER,WAITFOR:game started,ENTER,\
 $HDIPLO,$HTURN,$HTURN,WAITFOR:player turn faction 1,WAIT:2000"
 CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAIT:500,ENTER,\
-WAITFOR:game started,ENTER,$CDIPLO,$CTURN,$CTURN,$CTURN,WAITFOR:player turn faction 1,WAIT:1000"
+WAITFOR:game started,ENTER,$CDIPLO,$CTURN0,$CTURN,$CTURN,WAITFOR:player turn faction 1,WAIT:1000"
 game diplo
 for side in host client; do
     log="diplo-$side"
@@ -160,13 +169,14 @@ compare diplo "host and client states equal each turn"
 # turns count double: 10 seconds. The host's turn and then the client's run out (turn_timer:
 # GameState 0x800 ends the turn); at its second turn the host uses a bonus pill (S-6, ^: 0x2306 / 0x4306).
 HTIMER="WAITFOR:player turn faction 1,ENTER,WAIT:500,T,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,\
-0,DOWN,0,DOWN,0,DOWN,5,DOWN,1,0,DOWN,1,DOWN,2,ENTER,WAITFOR:turn time out"
-HBONUS="WAITFOR:player turn faction 1,ENTER,WAIT:500,S-6,WAIT:1500,$END"
-CTIMER="WAITFOR:player turn faction 2,ENTER,WAITFOR:turn time out"
-HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:player 2 ready 1,ENTER,WAITFOR:game started,ENTER,\
+0,DOWN,0,DOWN,0,DOWN,5,DOWN,1,0,DOWN,1,DOWN,2,ENTER,WAITFOR:netmsg WECHANGEDTIME,ENTER,WAITFOR:turn time out,$W"
+HBONUS="WAITFOR:player turn faction 1,ENTER,WAIT:500,S-6,WAITFOR:netmsg WEBONUSED,ENTER,WAIT:1500,$END,$W"
+CTIMER="$W,WAITFOR:netmsg HECHANGEDTIME,ENTER,WAITFOR:player turn faction 2,ENTER,WAITFOR:netmsg TIMEWARNING,ENTER,\
+WAITFOR:turn time out,$W,WAITFOR:netmsg HEBONUSED,ENTER"
+HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:netmsg ADDED,ENTER,WAITFOR:player 2 ready 1,ENTER,WAITFOR:game started,ENTER,\
 $HTIMER,$HBONUS,$HTURN,WAITFOR:player turn faction 1,WAIT:2000"
 CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAIT:500,ENTER,\
-WAITFOR:game started,ENTER,$CTIMER,$CTURN,$CTURN,WAITFOR:player turn faction 1,WAIT:1000"
+WAITFOR:game started,ENTER,$CTIMER,$CTURN0,$CTURN,WAITFOR:player turn faction 1,WAIT:1000"
 game timer
 for side in host client; do
     log="timer-$side"

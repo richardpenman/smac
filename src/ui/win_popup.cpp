@@ -262,25 +262,64 @@ int32_t GAMEAPI POP3(const char* label, int32_t, int32_t, int32_t, int32_t) {
     return 0;
 }
 
-// NetMsg_pop (0x47A890): in single player (a3 0, or no interface window open) a modal popup with
-// an OK button. In a network game the original shows the message box without waiting (a timer of
-// `delay` ms or NetMsg_close hides it); approximated: the text goes to the message line (and a
-// "netmsg LABEL: text" line to stderr) and the game goes on at once.
+// NetMsg_pop (0x47A890) / NetMsg_close (0x47A7D0) / NetMsg_timer_daemon (0x47A800). With a3 0
+// (or a3 > 1 and no interface window open) a modal popup with an OK button (no picture in a
+// network game; no wait callback: a network game's messages wait for the OK). Else, in a network
+// game, the NetMsg box (0x805338: top centre, 8 pixels down; PopupDialogState 6, its OK button
+// label 0x36C) shown without waiting: the previous one hidden first, hidden again after `delay`
+// ms (a positive delay: the timer) or by NetMsg_close. Each network message is also a note
+// ("netmsg LABEL: text") for the tests' WAITFOR.
+// Kept as smacx had it in single player (the modeless box is a network game's: single player
+// shows every NetMsg_pop modal).
+namespace {
+BasePop* g_netmsg = nullptr;
+bool g_netmsg_shown = false;  // +0x5384
+uint32_t g_netmsg_until = 0;  // the timer's end (0: none)
+}  // namespace
+
 int32_t THISCALL NetMsg_pop(uint8_t*, const char* label, int32_t delay, int32_t a3, const char* pcx) {
-    PopupHolder h;
-    popup_start(h.pop, ScriptFileName, label, -1, nullptr, 0);
-    if (MultiplayerActive) {
-        std::string text = BasePop_text(h.pop);
-        std::fprintf(stderr, "netmsg %s: %s\n", label, text.c_str());
-        ui_set_message(text);
+    const bool modal = a3 == 0 || (a3 > 1 && InfcList[InfcUsed] == 0);
+    if (!MultiplayerActive || modal) {
+        PopupHolder h;
+        popup_start(h.pop, ScriptFileName, label, -1, nullptr, 0);
+        if (MultiplayerActive) ui_net_note(std::string("netmsg ") + label + ": " + BasePop_text(h.pop));
+        if (pcx && !MultiplayerActive && delay < 0) BasePop_set_picture(h.pop, pcx);
+        BasePop_exec_3(h.pop, 0, 0);
         return 0;
     }
-    if (pcx && !MultiplayerActive && delay < 0) BasePop_set_picture(h.pop, pcx);
-    (void)a3;
-    BasePop_exec_3(h.pop, 0, 0);
+    if (!g_netmsg) g_netmsg = popup_new();
+    if (g_netmsg_shown) {
+        g_netmsg_shown = false;
+        g_netmsg_until = 0;
+        BasePop_hide(g_netmsg);
+    }
+    PopupDialogState = 6;
+    BasePop_set_loc(g_netmsg, 0x1000, 8);
+    if (!popup_start(g_netmsg, ScriptFileName, label, -1, nullptr, 0x100)) {
+        BasePop_set_loc(g_netmsg, 0x1000, 8);
+        BasePop_button(g_netmsg, label_get(0x36C / 4));
+        ui_net_note(std::string("netmsg ") + label + ": " + BasePop_text(g_netmsg));
+        g_netmsg_shown = true;
+        BasePop_show(g_netmsg);
+        if (delay > 0) g_netmsg_until = platform::ticks_ms() + (uint32_t)delay;
+    }
+    PopupDialogState = 0;
     return 0;
 }
-void THISCALL NetMsg_close(uint8_t*) {}
+
+void THISCALL NetMsg_close(uint8_t*) {
+    if (g_netmsg_shown) {
+        g_netmsg_shown = false;
+        g_netmsg_until = 0;
+        BasePop_hide(g_netmsg);
+    }
+}
+
+// NetMsg_timer_daemon: the box's time is up.
+void netmsg_tick() {
+    if (g_netmsg_shown && g_netmsg_until && (int32_t)(platform::ticks_ms() - g_netmsg_until) >= 0)
+        NetMsg_close(nullptr);
+}
 
 // The crash landing's FIRSTBASE question (a Popup of crash_landing with an edit field and OK only).
 void ui_first_base_name(const char* default_name) {

@@ -548,6 +548,7 @@ void THISCALL MultiWin_show(uint8_t*) {
 // screen (not clickable: T and ^ give the time controls and the bonus) while the game runs.
 void multiwin_net_tick() {
     MultiWinState* s = &g_mp;
+    netmsg_tick();
     bool in_game = MultiplayerActive && *reinterpret_cast<int32_t*>(&NetState + 0x1B40) == 2;
     if (!in_game) {
         if (g_collapsed) {

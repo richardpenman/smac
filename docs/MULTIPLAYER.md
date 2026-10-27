@@ -181,7 +181,14 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   server, MOVE_VEH (0x2401) relayed as 0x4401 and executed by every machine with the server's
   stamp as seed. smacx stamps relayed events with a counter of its own under its deterministic
   clock (net_stamp; the original: timeGetTime), so the same keys give the same online game.
-  Approximated: NetMsg_pop in a network game writes to the message line instead of its timed box.
+  NetMsg_pop (done, src/ui/win_popup.cpp): with a3 0 (or a3 > 1 and no interface window) a
+  modal popup that holds the network until its OK (as the original: SIMULWHOSE, DIPLOCOMM,
+  DIPLOCLOSE, ADDED, the time controls' messages, ...); else the NetMsg box (top centre, 8 pixels
+  down, PopupDialogState 6, its OK button label 0x36C) shown without waiting, hidden by the next
+  one, NetMsg_close or its timer (NetMsg_timer_daemon after a positive delay). Each network
+  message is also a note ("netmsg LABEL: text") for the tests. Approximated: the box's OK button
+  cannot be clicked (it closes by its timer or NetMsg_close); single player keeps showing every
+  NetMsg_pop modal as before.
 * Group 4 (in part): the chat (Console_chat: CHATASK, message_chat 0x4E00 / 0x1E00, shown on the
   message line; the setup window's chat), the time-control and time-bonus messages (0x4C02,
   0x4306), pause (0x4C00/01). Not done: the scenario file transfer.
