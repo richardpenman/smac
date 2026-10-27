@@ -981,7 +981,7 @@ int32_t basewin_console_key(uint8_t* console, int32_t ch, int32_t vk, int32_t ke
         Console_zoom_to_upkeep_base(console);
         return 1;
     }
-    console_not_reconstructed_quiet("Console_on_key_click: function keys with the base window open");
+    console_function_keys(console, vk, true);  // the movement keys after it are skipped
     return 1;
 }
 

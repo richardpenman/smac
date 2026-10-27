@@ -465,4 +465,21 @@ if [ "$(uname)" = Linux ]; then
     nocrash firstrun
 fi
 
+# 27. Enter / space with the message list shown (M): Console_on_key_click's
+#     ButtonGroup_button_click(0x3E9) on the main interface's mode buttons: the info pane again.
+run msgdismiss $NEW --keys "ENTER,CLICK:745x596,INFOSTATE,SPACE,INFOSTATE"
+check msgdismiss "M: the message list" "infostate mode 1000 "
+check msgdismiss "space: the info pane (I) again" "infostate mode 1001 "
+nocheck msgdismiss "no placeholder" "not reconstructed: ButtonGroup_button_click"
+nocrash msgdismiss
+
+# 28. Function keys with the base window open (Console_on_key_click after the base window's keys,
+#     its flag set): F2 opens the research report over it; ctrl+B (the go-to base list) does
+#     nothing there.
+run basefkeys $NEW --keys "ENTER,BASE:0,C-b,F2,SCREENSTATE,ESC,ESC"
+check basefkeys "F2: the labs report" "^reportstate kind 2 "
+nocheck basefkeys "ctrl+B: no go-to list" "popup .*GOTO.* shown|planwin open"
+nocheck basefkeys "no placeholder" "not reconstructed: Console_on_key_click"
+nocrash basefkeys
+
 exit $FAIL

@@ -607,6 +607,14 @@ void sound_menu_up() { Wave_play_2(WaveMenuUp()); }
 void sound_menu_down() { Wave_play_2(WaveMenuDown()); }
 void sound_alpha_menu() { Wave_play_2(WaveAlphaMenu()); }
 
+void sound_turn_complete() {
+    uint8_t* wave = fx(&Sounds, 57);
+    if (playing(wave)) return;
+    sound_log("turn complete voice");
+    Wave_load_2(wave);
+    Wave_play_2(wave);
+}
+
 // ---------------------------------------------------------------------------------------------
 // Ambience
 

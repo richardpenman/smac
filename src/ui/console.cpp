@@ -7,6 +7,7 @@
 #include "ui/statuswin.h"
 #include "ui/console.h"
 #include "ui/infowin.h"
+#include "ui/sound.h"
 #include "ui/mapwin.h"
 #include "ui/help.h"
 #include "ui/techwin.h"
@@ -588,7 +589,7 @@ int32_t THISCALL Console_human_turn(uint8_t* self) {
         Console_turn_hints(self);
         if (mw(self, kConVeh) < 0) {
             GameState &= ~4;
-            console_not_reconstructed_quiet("end of turn music check (sound object 0x74B504)");
+            sound_turn_complete();  // the "turn complete" voice (FX slot 57) unless it is playing
             ambience(0xCB);
             mw(self, kConWaiting) = 1;
             int32_t count = VehCount;
@@ -1522,6 +1523,106 @@ bool confirm_quit() {
 }
 }  // namespace
 
+// Console_on_key_click's function keys and menu commands (from 0x51A53E). With the base window open
+// (its flag [ebp-0x28]) the same switch runs after the base window's keys, except Backspace,
+// shift+Backspace, shift+N, ctrl+shift+N, ctrl+B and the zoom keys ctrl+X / ctrl+Z (each checks the
+// flag and returns); the movement keys after it are then skipped (0x51B078).
+void console_function_keys(uint8_t* self, int32_t vk, bool in_base) {
+    switch (vk) {
+    case 0x20043: console_not_reconstructed("Console_chat"); break;
+    case 0x77: report_score(0); break;  // F8
+    case 8: {  // Backspace: back in the cursor history
+        if (in_base) break;
+        hide_cursor(self);
+        if (MapWinInVehMode) Console_set_view(self, 1);  // inlined
+        if (--mw(self, kConCursorIdx) < 0) mw(self, kConCursorIdx) = 0x1F;
+        StatusWin_set_loc(&InfoWin, MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
+        MapWin_focus(main_view(), MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
+        break;
+    }
+    case 0xD:
+    case 0x1000D: {  // Enter: end of turn, or the base at the cursor
+        if (!(GameState & 2) || Console_edit_lock(self)) {
+            int32_t base_id = base_at(MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
+            if (base_id >= 0) {
+                int32_t owner = Bases[base_id].faction_id;
+                bool known = owner == CurrentPlayerFaction ||
+                             (Bases[base_id].visibility & (1 << (CurrentPlayerFaction & 31))) ||
+                             (GameState & STATE_OMNISCIENT_VIEW);
+                if (known && ((GameState & STATE_OMNISCIENT_VIEW) || owner == CurrentPlayerFaction || spying(owner)))
+                    BaseWin_zoom(&BaseWin, base_id, 0);
+            }
+        } else {
+            mw(self, kConWaiting) = 0;
+            mw(self, kConTurnActive) = 0;
+        }
+        break;
+    }
+    case 0x13:  // Pause
+        if (MultiplayerActive) console_not_reconstructed("Console_on_key_click: multiplayer pause");
+        break;
+    case 0x1B:  // Esc
+        if (InfcList[InfcUsed] != 5) confirm_quit();
+        else console_not_reconstructed("ReportIf_done");
+        break;
+    case 0x70: Datalink_exec(&DatalinkWin, 0xE, 0); break;  // F1
+    case 0x71: report_labs(); break;  // F2
+    case 0x72: report_energy(); break;  // F3
+    case 0x73: report_ops(); break;  // F4
+    case 0x74: report_projects(); break;  // F5
+    case 0x75: report_sat(); break;  // F6
+    case 0x76: report_security(); break;  // F7
+    case 0x78: monument(0); break;  // F9
+    case 0x79: hall_of_fame(0); break;  // F10
+    case 0x7A:  // F11: menu detail
+        GameMorePreferences ^= MPREF_ADV_DETAIL_MAIN_MENUS;
+        pfncMainMenuUpdateVisible(main_menu(self), mw(self, kConVeh));
+        X_pop((GameMorePreferences & MPREF_ADV_DETAIL_MAIN_MENUS) ? "MENUDETAIL" : "MENUSIMPLE", 0);
+        break;
+    case 0x7B: MultiWin_show(nullptr); break;  // F12: MainInterface_on_iface_button_clicked(0x3EC)
+    case 0x10008: if (!in_base) Console_next_cursor(self); break;  // shift+Backspace
+    case 0x1004E: if (!in_base) Console_name_landmark(self, -1, -1); break;  // shift+N
+    case 0x3004E: if (!in_base) Console_erase_landmark(self, -1, -1); break;  // ctrl+shift+N
+    case 0x10051: Console_retire_game(self); break;  // shift+Q: Resign
+    case 0x20042: if (!in_base) Console_go_to(self, -1, -2, 0); break;  // ctrl+B
+    case 0x20051: confirm_quit(); break;  // ctrl+Q
+    case 0x30051:  // ctrl+shift+Q: quit to the main menu
+        if (confirm_quit() && ControlTurnA) ControlTurnB = 1;
+        break;
+    case 0x20053: save_game(0); break;  // ctrl+S
+    case 0x2004C:  // ctrl+L
+        if (!MultiplayerActive || (GameState & STATE_DEBUG_MODE)) Console_load_proc(self, 0, 0);
+        break;
+    case 0x20058: if (!in_base) pfncProcZoomKey(self, 0x208, 0); break;  // ctrl+X
+    case 0x2005A: if (!in_base) pfncProcZoomKey(self, 0x207, 0); break;  // ctrl+Z
+    case 0x20050: prefwin_display(0); break;  // ctrl+P: Console_set_preferences
+    case 0x2004F: prefwin_display(1); break;  // ctrl+O: Console_set_adv_preferences
+    case 0x20057: prefwin_display(2); break;  // ctrl+W: Console_set_base_preferences
+    case 0x20041: prefwin_display(3); break;  // ctrl+A: Console_set_auto_preferences
+    case 0x20049: prefwin_display(4); break;  // ctrl+I: Console_set_audiovisual
+    case 0x2004D: prefwin_display(5); break;  // ctrl+M: Console_set_map_display
+    case 0x20047: console_toggle_pref(0x20A); break;  // ctrl+G
+    case 0x30047: console_toggle_pref(0x20B); break;  // ctrl+shift+G
+    case 0x2004E: console_toggle_pref(0x210); break;  // ctrl+N: base names
+    case 0x30041: console_toggle_pref(0x20C); break;  // ctrl+shift+A: rally points
+    case 0x30058: console_toggle_pref(0x209); break;  // ctrl+shift+X: flat terrain
+    case 0x30057:  // ctrl+shift+W
+        GameMorePreferences ^= MPREF_MAP_SHOW_FOG_WAR;
+        draw_map(1);
+        prefs_save(0);
+        break;
+    case 0x2004B: Console_editor_on(self); break;  // ctrl+K: scenario editor
+    case 0x3004C: Console_load_proc(self, 0, 0); break;  // ctrl+shift+L
+    case 0x20073:  // ctrl+F4: version
+        parse_says(0, "RELEASE 2.0", -1, -1);
+        parse_says(1, "20-Dec-1999", -1, -1);
+        popp(ScriptFileName, "VERSIONCONTROLX", 0, "ac_logo_sm.pcx", 0);
+        break;
+    case 0x30073: show_credits(); break;  // ctrl+shift+F4
+    default: break;
+    }
+}
+
 int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     if (ControlTurnA || (vk & 0xFFFCFFFF) == 0x12) return 1;  // Alt (menus)
     switch (vk) {
@@ -1550,7 +1651,9 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     }
     if (!dismiss && vk == 0xD && (Win_is_visible(&AlphaMenu) || MultiWinVisible)) dismiss = true;
     if (dismiss) {
-        if (!Win_is_visible(&BaseWin)) console_not_reconstructed_quiet("ButtonGroup_button_click");
+        // ButtonGroup_button_click(0x3E9) on the main interface's mode buttons (+0x1E878): the
+        // message list (M) gives way to the info pane (I); nothing when it already shows.
+        if (!Win_is_visible(&BaseWin)) mi_set_mode(0x3E9);
         AlphaMenu_hide_main();
         if (MultiWinVisible) console_not_reconstructed("MultiWin_hide");
         if (InterfaceMessageShown) console_not_reconstructed("MainInterface_clear_message");
@@ -1653,7 +1756,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         // The base window's keys (production, next/previous base, ...): ui/basewin.cpp.
         return basewin_console_key(self, ch, vk, key, net_busy);
     }
-    if (InterfaceButtonState == 1000) console_not_reconstructed_quiet("ButtonGroup_button_click");
+    if (InterfaceButtonState == 1000) mi_set_mode(0x3E9);  // ButtonGroup_button_click(0x3E9), as above
     if (vk == 0x2000D) {  // ctrl+Enter
         Console_end_my_turn(self);
         return 1;
@@ -1773,99 +1876,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
             NetMsg_pop(&NetMsg, "PROTECTED", 5000, 0, nullptr);
         }
     }
-    // Function keys and menu commands; every case goes on with the movement keys (LAB_0051b081).
-    switch (vk) {
-    case 0x20043: console_not_reconstructed("Console_chat"); break;
-    case 0x77: report_score(0); break;  // F8
-    case 8: {  // Backspace: back in the cursor history
-        hide_cursor(self);
-        if (MapWinInVehMode) Console_set_view(self, 1);  // inlined
-        if (--mw(self, kConCursorIdx) < 0) mw(self, kConCursorIdx) = 0x1F;
-        StatusWin_set_loc(&InfoWin, MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
-        MapWin_focus(main_view(), MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
-        break;
-    }
-    case 0xD:
-    case 0x1000D: {  // Enter: end of turn, or the base at the cursor
-        if (!(GameState & 2) || Console_edit_lock(self)) {
-            int32_t base_id = base_at(MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
-            if (base_id >= 0) {
-                int32_t owner = Bases[base_id].faction_id;
-                bool known = owner == CurrentPlayerFaction ||
-                             (Bases[base_id].visibility & (1 << (CurrentPlayerFaction & 31))) ||
-                             (GameState & STATE_OMNISCIENT_VIEW);
-                if (known && ((GameState & STATE_OMNISCIENT_VIEW) || owner == CurrentPlayerFaction || spying(owner)))
-                    BaseWin_zoom(&BaseWin, base_id, 0);
-            }
-        } else {
-            mw(self, kConWaiting) = 0;
-            mw(self, kConTurnActive) = 0;
-        }
-        break;
-    }
-    case 0x13:  // Pause
-        if (MultiplayerActive) console_not_reconstructed("Console_on_key_click: multiplayer pause");
-        break;
-    case 0x1B:  // Esc
-        if (InfcList[InfcUsed] != 5) confirm_quit();
-        else console_not_reconstructed("ReportIf_done");
-        break;
-    case 0x70: Datalink_exec(&DatalinkWin, 0xE, 0); break;  // F1
-    case 0x71: report_labs(); break;  // F2
-    case 0x72: report_energy(); break;  // F3
-    case 0x73: report_ops(); break;  // F4
-    case 0x74: report_projects(); break;  // F5
-    case 0x75: report_sat(); break;  // F6
-    case 0x76: report_security(); break;  // F7
-    case 0x78: monument(0); break;  // F9
-    case 0x79: hall_of_fame(0); break;  // F10
-    case 0x7A:  // F11: menu detail
-        GameMorePreferences ^= MPREF_ADV_DETAIL_MAIN_MENUS;
-        pfncMainMenuUpdateVisible(main_menu(self), mw(self, kConVeh));
-        X_pop((GameMorePreferences & MPREF_ADV_DETAIL_MAIN_MENUS) ? "MENUDETAIL" : "MENUSIMPLE", 0);
-        break;
-    case 0x7B: MultiWin_show(nullptr); break;  // F12: MainInterface_on_iface_button_clicked(0x3EC)
-    case 0x10008: Console_next_cursor(self); break;  // shift+Backspace
-    case 0x1004E: Console_name_landmark(self, -1, -1); break;  // shift+N
-    case 0x3004E: Console_erase_landmark(self, -1, -1); break;  // ctrl+shift+N
-    case 0x10051: Console_retire_game(self); break;  // shift+Q: Resign
-    case 0x20042: Console_go_to(self, -1, -2, 0); break;  // ctrl+B
-    case 0x20051: confirm_quit(); break;  // ctrl+Q
-    case 0x30051:  // ctrl+shift+Q: quit to the main menu
-        if (confirm_quit() && ControlTurnA) ControlTurnB = 1;
-        break;
-    case 0x20053: save_game(0); break;  // ctrl+S
-    case 0x2004C:  // ctrl+L
-        if (!MultiplayerActive || (GameState & STATE_DEBUG_MODE)) Console_load_proc(self, 0, 0);
-        break;
-    case 0x20058: pfncProcZoomKey(self, 0x208, 0); break;  // ctrl+X
-    case 0x2005A: pfncProcZoomKey(self, 0x207, 0); break;  // ctrl+Z
-    case 0x20050: prefwin_display(0); break;  // ctrl+P: Console_set_preferences
-    case 0x2004F: prefwin_display(1); break;  // ctrl+O: Console_set_adv_preferences
-    case 0x20057: prefwin_display(2); break;  // ctrl+W: Console_set_base_preferences
-    case 0x20041: prefwin_display(3); break;  // ctrl+A: Console_set_auto_preferences
-    case 0x20049: prefwin_display(4); break;  // ctrl+I: Console_set_audiovisual
-    case 0x2004D: prefwin_display(5); break;  // ctrl+M: Console_set_map_display
-    case 0x20047: console_toggle_pref(0x20A); break;  // ctrl+G
-    case 0x30047: console_toggle_pref(0x20B); break;  // ctrl+shift+G
-    case 0x2004E: console_toggle_pref(0x210); break;  // ctrl+N: base names
-    case 0x30041: console_toggle_pref(0x20C); break;  // ctrl+shift+A: rally points
-    case 0x30058: console_toggle_pref(0x209); break;  // ctrl+shift+X: flat terrain
-    case 0x30057:  // ctrl+shift+W
-        GameMorePreferences ^= MPREF_MAP_SHOW_FOG_WAR;
-        draw_map(1);
-        prefs_save(0);
-        break;
-    case 0x2004B: Console_editor_on(self); break;  // ctrl+K: scenario editor
-    case 0x3004C: Console_load_proc(self, 0, 0); break;  // ctrl+shift+L
-    case 0x20073:  // ctrl+F4: version
-        parse_says(0, "RELEASE 2.0", -1, -1);
-        parse_says(1, "20-Dec-1999", -1, -1);
-        popp(ScriptFileName, "VERSIONCONTROLX", 0, "ac_logo_sm.pcx", 0);
-        break;
-    case 0x30073: show_credits(); break;  // ctrl+shift+F4
-    default: break;
-    }
+    console_function_keys(self, vk, false);
     // Movement: keypad, arrows, Home/End/PgUp/PgDn (ctrl: a move order; shift: scroll the view).
     int32_t ctrl = vk & 0x20000;
     uint32_t k = ctrl ? (vk & 0xFFFCFFFF) : vk;

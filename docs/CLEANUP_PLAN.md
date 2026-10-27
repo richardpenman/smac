@@ -28,7 +28,7 @@ Every commit passes `src/tools/gate.sh`. The script exits non-zero on any failur
 | `asan` | No memory or UB errors, same game | ASan `smacx_headless` + `compare.py`: tiny20 small12 std8 late140 council131 |
 | `hybrid` | Each reconstructed function still drops into the original | `harness/verify.sh hybrid all` tiny20 small12 std8 late140 |
 | `fcompare` | Function by function against the original. Run when a commit touches the functions listed in `GATE_FCOMPARE`. | `harness/verify.sh fcompare "$GATE_FCOMPARE"` |
-| `ui` | The scripted UI behaviour is unchanged | `tests/*/run.sh` with the native smacx |
+| `ui` | The scripted UI behaviour is unchanged, with no memory or UB errors | `tests/*/run.sh` (animated: `smacx --animate`, every slide, move, boom and movie played) with the native smacx, then with the ASan smacx (no sanitizer report in any case's log) |
 
 When to run what:
 

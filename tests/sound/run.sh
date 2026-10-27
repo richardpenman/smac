@@ -88,6 +88,8 @@ inorder human "the selected units' sounds (infantry 0x40, sea 0x45)" "ambience_v
     "Wave_play_2 infantry.wav" "ambience_veh 5" "FX_play 69" "Wave_play_2 military ship.wav"
 inorder human "base window: open and close sounds" "FX_play 15" "Wave_play_2 menu2.wav" "ambience 205" \
     "ambience 206" "Wave_play_2 menu down.wav"
+inorder human "no unit left to move: the turn complete voice (FX slot 57), then ambience 0xCB" \
+    "turn complete voice" "Wave_play_2 cpu turn complete.wav" "ambience 203"
 nocrash human
 
 # 3. The main menu.

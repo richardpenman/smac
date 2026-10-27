@@ -19,7 +19,8 @@
 #             late140; --quick: tiny20). Runs the original under Wine, one process at a time.
 #   fcompare  only when GATE_FCOMPARE is set (a patch spec, e.g. "none +vector_dist"): verify.sh
 #             fcompare on $GATE_FCOMPARE_SCENARIOS (default tiny20 small12 std8)
-#   ui        tests/*/run.sh (scripted smacx checks), each against the native smacx
+#   ui        tests/*/run.sh (scripted smacx checks, animated: slides, moves, booms, movies), each
+#             against the native smacx, then again against the ASan smacx (no sanitizer report)
 #
 # Env: GATE_PREFIX build directory prefix (default build/gate: build/gate-native, -asan, -hybrid);
 #      GATE_OUT output directory (default work/gate); GATE_JOBS (default 2).
@@ -101,9 +102,9 @@ if want build; then
     ok=1; what=""
     build "$NATIVE" "$OUT/build.log" -DCMAKE_BUILD_TYPE=RelWithDebInfo || ok=0
     what="native"
-    if want asan || want unit; then
+    if want asan || want unit || want ui; then
         build "$ASAN" "$OUT/build.log" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DSMACX_SANITIZE=ON -- \
-            smacx_headless smacx_unit || ok=0
+            smacx_headless smacx_unit smacx || ok=0
         what="$what asan"
     fi
     if want hybrid || want fcompare; then
@@ -220,10 +221,24 @@ if want ui; then
             ok=0; failed="$failed $name"
         fi
     done
+    # The suites again (animated, their default) against the ASan smacx: every check and no
+    # sanitizer report in any case's log.
+    asan_bad=""
+    for t in tests/*/run.sh; do
+        name="$(basename "$(dirname "$t")")"
+        if ! ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0}" SMACX="$ASAN/smacx" "$t" "$OUT/ui_asan/$name" \
+            > "$OUT/ui_asan_$name.log" 2>&1; then
+            ok=0; failed="$failed asan:$name"
+        fi
+        if grep -lE "AddressSanitizer|runtime error" "$OUT/ui_asan/$name"/*.log >> "$OUT/ui_asan_reports.txt" \
+            2>/dev/null; then
+            ok=0; asan_bad="$asan_bad $name"
+        fi
+    done
     pass=$(cat "$OUT"/ui_*.log | grep -c "^PASS")
     fail=$(cat "$OUT"/ui_*.log | grep -c "^FAIL")
-    if [ $ok = 1 ]; then report ui PASS "tests/*/run.sh: $pass checks"
-    else report ui FAIL "$fail of $((pass + fail)) checks failed in:$failed (see $OUT/ui_*.log)"; fi
+    if [ $ok = 1 ]; then report ui PASS "tests/*/run.sh, native and ASan: $pass checks"
+    else report ui FAIL "$fail of $((pass + fail)) checks failed in:$failed${asan_bad:+; sanitizer reports in:$asan_bad (see $OUT/ui_asan_reports.txt)} (see $OUT/ui_*.log)"; fi
 fi
 
 echo "gate: $([ $FAILED = 0 ] && echo PASS || echo FAIL) (summary: $SUMMARY)"

@@ -78,6 +78,9 @@ ADDR_NATIVE(0x5171D0) void THISCALL Console_veh_key(uint8_t* console, int32_t ch
 ADDR_NATIVE(0x5166D0) void THISCALL Console_cursor_key(uint8_t* console, int32_t ch, int32_t key, int32_t vk);
 // A key pressed in the main view (character ch, key vk with modifier bits). Returns 1.
 ADDR_NATIVE(0x5178C0) int32_t THISCALL Console_on_key_click(uint8_t* console, int32_t ch, int32_t vk);
+// Console_on_key_click's function keys and menu commands (F1..F12, ctrl+S, the preferences, ...);
+// in_base: with the base window open (some keys do nothing).
+void console_function_keys(uint8_t* console, int32_t vk, bool in_base);
 // Build base (b): founds a base with a colony pod (asks for the name), or joins a base.
 ADDR_NATIVE(0x4CF7C0) void THISCALL Console_new_base(uint8_t* console, int32_t veh_id);
 // Terraforming orders (f, m, s, r, F, ...): checks the tile and starts terraform_id.

@@ -118,6 +118,17 @@ GCC also `-fno-aggressive-loop-optimizations`). Targets must be little-endian (x
 
 CI (`.github/workflows/build.yml`) builds `smacx_headless` and runs `smacx_smoke` on all of these.
 
+## The scripted UI suites
+
+`tests/*/run.sh` drive smacx with scripted keys (SDL dummy video and audio, fixed seeds). They run
+**animated** by default (`SMACX_ANIMATE=1`, i.e. `smacx --animate`): the window slides, the menu
+column's slide, unit moves, combat booms, battle reports and movies play with their real waits, as
+in an interactive game, and the run still quits when its keys end. `TEST_FAST=1` runs them
+unattended instead (those animations skipped or drawn without waiting). `WAIT:MS` in a script lets
+real time pass with no input (timers and animations run meanwhile). Timings (the eleven suites
+one after another): animated about 220 s, fast about 145 s; the slowest suite is placeholders.
+`src/tools/gate.sh`'s `ui` step runs them with the native smacx and again with the ASan build.
+
 ## Recreating what is not in the repository
 
 Not in the repository (copyrighted or regenerable): the game, the installers, tools, reference

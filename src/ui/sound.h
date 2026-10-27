@@ -71,6 +71,10 @@ void sound_popup_wave(int32_t wave, int32_t volume);
 void sound_menu_up();
 void sound_menu_down();
 void sound_alpha_menu();
+// Console_human_turn when no unit needs orders (0x514694): the FX object's slot 57 (fx\cpu turn
+// complete.wav, at 0x74B504), unless it is playing: reloaded (Wave_load_2), its reverb mix set to 0
+// (Wave_set_reverb_mix, no effect here: no DirectSound 3D) and played (Wave_play_2).
+void sound_turn_complete();
 
 // The Wave objects of the image used by the UI.
 inline uint8_t* WaveOk() { return mem::host(0x74D8F0); }
