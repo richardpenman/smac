@@ -990,6 +990,11 @@ int32_t calculate(BasePop* p) {
     } else {
         p->pic_w = p->pic_h = 0;
     }
+    // In an external window (DiploPop's) the item group is as wide as the window less the
+    // padding and the left and right margins (BasePop_calculate_dimensions, +0xA14 set: +0x21FC =
+    // window width - 2 * hpad - right - left; also after the picture widened it), so its rows end
+    // where the text box and the buttons do, inside the window's frame.
+    if (p->ext) p->dlg_width = p->ext_w - p->hpad * 2 - p->right - p->left;
     dialog_calculate(p);
     set_string_fonts(p);
     int32_t dw = p->total_w ? p->total_w : p->dlg_width;
@@ -1470,6 +1475,10 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
     ui_invalidate();
     std::fprintf(stderr, "popup %s shown: %dx%d at %d,%d (%d items)\n", p->label.c_str(), p->width, p->height, p->win_x,
                  p->win_y, (int32_t)p->items.size());
+    // The item rows' extent in the window (a test checks they stay in its frame).
+    if (!p->items.empty())
+        std::fprintf(stderr, "popup %s item rows %d..%d of %d\n", p->label.c_str(), p->item_x, p->item_x + p->total_w,
+                     p->width);
     // The #buttons' centres on the screen (a test can click them).
     for (const auto& b : p->btns)
         if (b.id > 0)

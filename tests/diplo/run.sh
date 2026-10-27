@@ -183,6 +183,14 @@ has techtrade147 "the exchange accepted" "^popup TRADETECH0 answer: 1 "
 has techtrade147 "the new technology's window" "^screentext WE HAVE ACQUIRED TECHNOLOGY!"
 has techtrade147 "drawn over DiploPop's window (its title)" "^pixel 512,150 index 72 "
 
+# DiploPop's popups (700 wide): their item rows end inside the window's frame (its right at
+# 700 - 0x37 = 645; BasePop_calculate_dimensions: the group is the window less 2 * hpad and the
+# margins). They ran to 688 before.
+bad=$(grep -ah "item rows [0-9]*\.\.[0-9]* of 700" "$OUT"/*.log | awk '{split($5,a,"\\.\\."); if (a[2] > 645) print}' | head -1)
+n=$(grep -ah "item rows [0-9]*\.\.[0-9]* of 700" "$OUT"/*.log | wc -l)
+if [ -z "$bad" ] && [ "$n" -gt 0 ]; then echo "PASS diplopop: $n menus' item rows inside the frame"
+else echo "FAIL diplopop: item rows past the frame ($bad; $n menus)"; FAIL=1; fi
+
 # No wrapped text drawn beyond its box (a text measured narrower than drawn overran popups, the
 # new technology window's description, ...).
 if grep -l "text beyond its box" "$OUT"/*.log > /dev/null 2>&1; then
