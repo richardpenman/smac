@@ -227,7 +227,10 @@ smacx draws the same with `smacx --save SAVE --hidden --basedump N:OUT.smxbase:A
 
 ## Snapshot files
 
-* `NAME.state` — records `{u32 addr, u32 size, bytes}` for every region in `state_regions.h`.
+* `NAME.state` — records `{u32 addr, u32 size, bytes}` for every region in `state_regions.h`. The
+  oracle copies the regions from the original's memory; smacx and `smacx_headless` serialise them
+  from the game's records (`src/engine/state_io.h`, the same field lists that write savegames), so
+  both hold the original's byte layout.
 * `NAME.rng` — `crt`, `game`, `clock`, `turn`.
 * `NAME.sav` — the game's own save (contains heap pointers and UI state; compared only with `--sav`).
 

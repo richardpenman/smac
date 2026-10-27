@@ -1,7 +1,10 @@
 // Saving and loading (original module save, 0x5A66E0-0x5ABFF0).
 #include "engine/save.h"
 
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <type_traits>
 #include <cstring>
 
 #include "engine/clock.h"
@@ -16,6 +19,7 @@
 #include "engine/path.h"
 #include "engine/random.h"
 #include "engine/setup.h"
+#include "engine/state_io.h"
 #include "engine/strings.h"
 #include "engine/tech.h"
 #include "engine/ui_bridge.h"
@@ -95,6 +99,53 @@ static uint32_t save_io(void* buf, uint32_t size, CrtFile* file) {
     return SaveFileWrite ? crt_fwrite(buf, size, 1, file) : crt_fread(buf, size, 1, file);
 }
 
+// A block of count records through save_io, in the original's byte layout (engine/state_io.h):
+// written from the records' serialisation; read into it and back into the records. The buffer
+// starts as the records' current bytes, so a block the file holds only partly leaves the rest of
+// the records as they were, as the original's fread into the records does.
+template <class T>
+static uint32_t save_records(T* first, size_t count, CrtFile* file, uint32_t size = UINT32_MAX) {
+    Writer w = write_records(first, count);
+    if (size < w.size()) w.bytes.resize(size);
+    uint32_t ok = save_io(w.bytes.data(), w.size(), file);
+    if (!SaveFileWrite) read_records(first, count, w.data(), w.size());
+    return ok;
+}
+// ReplayEventSize bytes from ReplayEvents on. With the original's bugs the table can overflow
+// (compat replay_events_overflow, score.cpp): the bytes past its end are the original's memory
+// that follows it (mem::read_bytes / write_bytes).
+static uint32_t save_replay_events(CrtFile* file) {
+    const uint32_t size = (uint32_t)ReplayEventSize;
+    Writer w = write_records(ReplayEvents, 1024);
+    w.bytes.resize(size);
+    if (size > sizeof(ReplayEvents))
+        mem::read_bytes(kReplayEventsEnd, &w.bytes[sizeof(ReplayEvents)], size - sizeof(ReplayEvents));
+    uint32_t ok = save_io(w.bytes.data(), size, file);
+    if (!SaveFileWrite) {
+        read_records(ReplayEvents, 1024, w.data(), std::min(size, (uint32_t)sizeof(ReplayEvents)));
+        if (size > sizeof(ReplayEvents))
+            mem::write_bytes(kReplayEventsEnd, &w.bytes[sizeof(ReplayEvents)], size - sizeof(ReplayEvents));
+    }
+    return ok;
+}
+
+template <class T, size_t N>
+static uint32_t save_record(T (&table)[N], CrtFile* file) {
+    return save_records(table, N, file);
+}
+template <class T, size_t N, size_t M>
+static uint32_t save_record(T (&table)[N][M], CrtFile* file) {
+    return save_records(&table[0][0], N * M, file);
+}
+template <class T, size_t N, size_t M, size_t K>
+static uint32_t save_record(T (&table)[N][M][K], CrtFile* file) {
+    return save_records(&table[0][0][0], N * M * K, file);
+}
+template <class T, std::enable_if_t<!std::is_array_v<T>, int> = 0>
+static uint32_t save_record(T& record, CrtFile* file) {
+    return save_records(&record, 1, file);
+}
+
 int32_t GAMEAPI game_io(uint8_t* win, CrtFile* file) {
     static const uint32_t kFields[6] = {0x1DD78, 0x1DD74, 0x1DD70, 0x1DD98, 0x1DD9C, 0x1DDA0};
     for (uint32_t offset : kFields) {
@@ -154,9 +205,11 @@ static void convert_faction_v2(LegacyFactionV10* dst, const LegacyFactionV2* src
     std::memcpy(&dst->total_combat_units, src->common_tail, sizeof(src->common_tail));
 }
 
-// Version 10 faction record (0x20BC bytes) to the current layout (0x20CC).
+// Version 10 faction record (0x20BC bytes) to the current layout (0x20CC), converted in the
+// record's byte layout (state_io.h).
 static void convert_faction_v10(Faction* faction, const uint8_t* src) {
-    uint8_t* dst = (uint8_t*)faction;
+    Writer w = write_records(faction, 1);
+    uint8_t* dst = w.bytes.data();
     std::memcpy(dst, src, 0x20BC);
     // BUG(original): of the 8 old facility_announced bytes only 5 are kept and bytes 5-8 cleared;
     // bytes 9-11 keep what the first copy put there (the old clean_minerals_modifier's high bytes).
@@ -167,10 +220,11 @@ static void convert_faction_v10(Faction* faction, const uint8_t* src) {
         std::memcpy(dst + 0x458, src + 0x458, 8);
         std::memset(dst + 0x460, 0, 4);
     }
-    std::memcpy(dst + offsetof(Faction, clean_minerals_modifier), src + 0x460, 0x205C - 0x464);
-    std::memcpy(faction->secret_project_intel, src + 0x2058, 5 * 4);
-    for (int32_t i = 5; i < 8; i++) faction->secret_project_intel[i] = 0;
-    std::memcpy(&faction->corner_market_turn, src + 0x206C, 0x20CC - 0x207C);
+    std::memcpy(dst + 0x464, src + 0x460, 0x205C - 0x464);  // clean_minerals_modifier ..
+    std::memcpy(dst + 0x205C, src + 0x2058, 5 * 4);  // secret_project_intel[0..4]
+    std::memset(dst + 0x205C + 5 * 4, 0, 3 * 4);  // secret_project_intel[5..7]
+    std::memcpy(dst + 0x207C, src + 0x206C, 0x20CC - 0x207C);  // corner_market_turn ..
+    read_records(faction, 1, w.data(), w.size());
 }
 
 // Version 2 vehicle record (0x30 bytes, byte unit ids) to the current layout.
@@ -206,9 +260,11 @@ static void convert_veh_v2(VEH* veh, const LegacyVehV2* src) {
     veh->prev_veh_id_stack = src->prev_veh_id_stack;
 }
 
-// Version 10 base record (0x130 bytes: 8 facility bytes) to the current layout (0x134).
+// Version 10 base record (0x130 bytes: 8 facility bytes) to the current layout (0x134), converted
+// in the record's byte layout (state_io.h).
 static void convert_base_v10(BASE* base, const uint8_t* src) {
-    uint8_t* dst = (uint8_t*)base;
+    Writer w = write_records(base, 1);
+    uint8_t* dst = w.bytes.data();
     std::memcpy(dst, src, 0x130);
     // BUG(original): as for factions, 5 of the 8 facility bytes are kept, bytes 5-8 cleared and
     // bytes 9-11 keep the old mineral_surplus_final's high bytes; pad_5 is not copied either and
@@ -223,6 +279,7 @@ static void convert_base_v10(BASE* base, const uint8_t* src) {
     std::memcpy(dst + 0x98, src + 0x94, 0x116 - 0x98);
     if (!g_compat.base_convert_facility_bytes) std::memset(dst + 0x116, 0, 2);  // fixed: pad_5 cleared
     std::memcpy(dst + 0x118, src + 0x114, 0x134 - 0x118);
+    read_records(base, 1, w.data(), w.size());
     for (int32_t i = 0; i < 10; i++) {
         if (base->queue_items[i] < -0x21) base->queue_items[i] -= 0x1F;  // facility ids moved up
     }
@@ -287,7 +344,9 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
         g_save_original_bugs = legacy.SaveFileVersion >= 0xB && mark[0] == kSmacxSaveMark ? (int32_t)(mark[1] & 1) : -1;
     }
     if (legacy.SaveFileVersion < 0xB) {
-        std::memcpy(&cs, &legacy, sizeof(legacy));
+        Writer prefs = write_records(&cs, 1);  // the legacy block over the first 0x31C bytes
+        std::memcpy(prefs.bytes.data(), &legacy, sizeof(legacy));
+        read_records(&cs, 1, prefs.data(), prefs.size());
         std::memcpy(SecretProjects, legacy.SecretProjects, sizeof(legacy.SecretProjects));
         for (int32_t i = 33; i < 64; i++) SecretProjects[i] = -1;
         GovernorFaction = legacy.GovernorFaction;
@@ -305,7 +364,7 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
         std::memcpy(ScorePopTotal, legacy.ScorePopTotal, sizeof(legacy.ScorePopTotal));
         // SunspotDuration .. ClimateLevel (includes SaveFileVersion)
         std::memcpy(&SunspotDuration, &legacy.SunspotDuration, 10 * 4);
-    } else if (!save_io(&cs, 0x398, file)) {
+    } else if (!save_record(cs, file)) {
         return 1;
     }
     if (SaveFileVersion < 4) {
@@ -313,13 +372,13 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
     } else {
         SaveFileEncrypt = GameState & 0x10000000;
         if (SaveFileEncrypt) {
-            if (!save_io(&cs, 0x398, file)) return 1;
-            if (!save_io(DiploPlrList, 0xCE0, file)) return 1;
-            if (!save_io(&NetDiploSeq, 4, file)) return 1;
+            if (!save_record(cs, file)) return 1;
+            if (!save_record(DiploPlrList, file)) return 1;
+            if (!save_record(NetDiploSeq, file)) return 1;
             if (!save_io_time_control(file, write)) return 1;
         }
     }
-    if (!save_io(&CurrentPlayerFaction, 4, file)) return 1;
+    if (!save_record(CurrentPlayerFaction, file)) return 1;
 
     uint8_t* factions10 = (uint8_t*)mem_get(sizeof(LegacyFactionV10) * 8);
     if (SaveFileVersion < 3) {
@@ -335,12 +394,12 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
         if (SaveFileVersion > 2 && !save_io(factions10, sizeof(LegacyFactionV10) * 8, file)) return 1;
         for (int32_t i = 0; i < 8; i++)
             convert_faction_v10(&game().factions[i], factions10 + i * sizeof(LegacyFactionV10));
-    } else if (!save_io(game().factions, 0x10660, file)) {
+    } else if (!save_record(game().factions, file)) {
         return 1;
     }
     if (factions10) mem_free(factions10);
-    if (!save_io(game().mfactions, 0x2CE0, file)) return 1;
-    if (!save_io(FactionRankingsUnk, 0x20, file)) return 1;
+    if (!save_record(game().mfactions, file)) return 1;
+    if (!save_record(FactionRankingsUnk, file)) return 1;
 
     int32_t map_result;
     if (!SaveFileWrite) {
@@ -363,26 +422,26 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
     }
     if (map_result) return 1;
 
-    if (!save_io(FactionTurnMightBlock, sizeof(FactionTurnMightBlock), file)) return 1;
-    if (!save_io(&ReplayEventSize, 4, file)) return 1;
-    if (ReplayEventSize && !save_io(ReplayEvents, (uint32_t)ReplayEventSize, file)) return 1;
-    if (!save_io(Continents, 0xE00, file)) return 1;
+    if (!save_record(FactionTurnMight, file)) return 1;
+    if (!save_record(ReplayEventSize, file)) return 1;
+    if (ReplayEventSize && !save_replay_events(file)) return 1;
+    if (!save_record(Continents, file)) return 1;
     if (SaveFileVersion < 3) {
         // 32 prototypes per faction: the second half of each faction's 64 slots is cleared.
         for (int32_t f = 0; f < 8; f++) {
-            if (!save_io(&Units[f * 64], 32 * sizeof(UNIT), file)) return 1;
+            if (!save_records(&Units[f * 64], 32, file)) return 1;
             for (int32_t i = f * 64 + 32; i < f * 64 + 64; i++) {
                 Units[i].name[0] = 0;
                 Units[i].unit_flags = 0;
                 Units[i].group_id = 0;
             }
         }
-    } else if (!save_io(Units, 0x6800, file)) {
+    } else if (!save_record(Units, file)) {
         return 1;
     }
     if (SaveFileVersion < 6) {
         for (int32_t i = 0; i < 8; i++) clear_bunglist(i);
-    } else if (!save_io(BungList, 0x1000, file)) {
+    } else if (!save_record(BungList, file)) {
         return 1;
     }
     int32_t version = SaveFileVersion;
@@ -398,7 +457,7 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
             if (!save_io(old, size, file)) return 1;
             for (int32_t i = 0; i < game().veh_count; i++) convert_veh_v2(&game().vehs[i], &old[i]);
             if (old) mem_free(old);
-        } else if (!save_io(game().vehs, (uint32_t)game().veh_count * sizeof(VEH), file)) {
+        } else if (!save_records(game().vehs, (size_t)(uint32_t)game().veh_count, file)) {
             return 1;
         }
     }
@@ -414,7 +473,7 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
             for (int32_t i = 0; i < game().base_count; i++) convert_base_v10(&game().bases[i], old + i * 0x130);
             if (old) mem_free(old);
         }
-    } else if (game().base_count && !save_io(game().bases, (uint32_t)game().base_count * sizeof(BASE), file)) {
+    } else if (game().base_count && !save_records(game().bases, (size_t)(uint32_t)game().base_count, file)) {
         return 1;
     }
     if (SaveFileVersion < 3) {
@@ -430,25 +489,25 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
             }
         }
     }
-    if ((GameState & STATE_IS_SCENARIO) && !save_io(ScenarioFileName, 0x100, file)) return 1;
+    if ((GameState & STATE_IS_SCENARIO) && !save_record(ScenarioFileName, file)) return 1;
     if (SaveFileVersion < 1) {
         crt_strcpy(GameAltPath, EmptyPathA);
-    } else if (!save_io(GameAltPath, 0x100, file)) {
+    } else if (!save_record(GameAltPath, file)) {
         return 1;
     }
     if (SaveFileVersion < 2) {
         clear_scenario();
-    } else if (!save_io(&ObjectiveReqVictory, 0x98, file)) {
+    } else if (!save_record(ScenarioRulesBlock, file)) {
         return 1;
     }
     if (SaveFileVersion < 7) {
         clear_monuments();
-    } else if (!save_io(Monuments, 0x27A0, file)) {
+    } else if (!save_record(Monuments, file)) {
         return 1;
     }
     if (SaveFileVersion < 0xC) {
         for (int32_t i = 0; i < 8; i++) TectonicDetonationCount[i] = 0;
-    } else if (!save_io(TectonicDetonationCount, 0x20, file)) {
+    } else if (!save_record(TectonicDetonationCount, file)) {
         return 1;
     }
     // Main view state.
@@ -464,10 +523,10 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
     if (game_io(&WorldMapWin, file)) return 1;
 
     if (GameMoreRules & 0x20) {  // PBEM
-        if (!save_io(DiploStateC, 0x2400, file)) return 1;
-        if (!save_io(DiploStateB, 0x100, file)) return 1;
-        if (!save_io(FactionCombatWin, 0x20, file)) return 1;
-        if (!save_io(FactionCombatLoss, 0x20, file)) return 1;
+        if (!save_record(DiploStateC, file)) return 1;
+        if (!save_record(DiploStateB, file)) return 1;
+        if (!save_record(FactionCombatWin, file)) return 1;
+        if (!save_record(FactionCombatLoss, file)) return 1;
         for (int32_t i = 1; i < 8; i++) {
             if (save_io_stringlist(DiploTextLists[i], write, file)) return 1;
         }
@@ -477,18 +536,19 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
             }
         }
         for (int32_t i = 0; i < 4; i++) {
-            if (!save_io(&CouncilWinState[i], 4, file)) return 1;
+            if (!save_record(CouncilWinState[i], file)) return 1;
         }
-        if (!save_io(CouncilWinVotesA, 0x20, file)) return 1;
-        if (!save_io(CouncilWinVotesB, 0x20, file)) return 1;
-        if (!save_io(&CouncilSessionPending, 4, file)) return 1;
-        if (!save_io(CouncilProposal, 0x20, file)) return 1;
-        if (!save_io(CouncilVoteState, 0x20, file)) return 1;
-        if (!save_io(&PbemGameID, 4, file)) return 1;
-        if (!save_io(&PbemGameDate, 4, file)) return 1;
-        if (!save_io(&PbemSaveCount, 4, file)) return 1;
-        if (!save_io(&PbemTamperFaction, 0x20, file)) return 1;
-        if (!save_io(&PbemTamperReloads, 0x20, file)) return 1;
+        if (!save_record(CouncilWinVotesA, file)) return 1;
+        if (!save_record(CouncilWinVotesB, file)) return 1;
+        if (!save_record(CouncilSessionPending, file)) return 1;
+        if (!save_record(CouncilProposal, file)) return 1;
+        if (!save_record(CouncilVoteState, file)) return 1;
+        PbemState& pbem = PbemStateBlock;  // five blocks (each encrypted on its own)
+        if (!save_record(pbem.game_id, file)) return 1;
+        if (!save_record(pbem.game_date, file)) return 1;
+        if (!save_record(pbem.save_count, file)) return 1;
+        if (!save_record(pbem.tamper_faction, file)) return 1;
+        if (!save_record(pbem.tamper_reloads, file)) return 1;
     }
     if (!write) {
         int32_t width, height;

@@ -1,10 +1,14 @@
 /* Hash of the compared game state: FNV-1a 64 over the regions of state_regions.h (the bytes a
  * .state snapshot holds), masked bytes (MASK: heap pointers) read as 0. Built into hybrid.dll
  * (fcompare's golden records) and smacx_headless (their replay, --golden), so both sides can tell
- * that a record is replayed on the state it was made on. Needs engine/globals.h (MapTiles,
- * MapAbstract) and engine/memmap.h (mem::host: identity in the hybrid build). */
+ * that a record is replayed on the state it was made on. The hybrid build reads the regions from
+ * the original's memory (needs engine/globals.h and engine/memmap.h); native builds hash the
+ * serialised records (engine/state_io.h), the bytes the snapshots hold. */
 #pragma once
 #include <cstdint>
+#ifndef SMACX_HYBRID
+#include "engine/state_io.h"
+#endif
 
 inline uint64_t state_hash() {
     struct Mask {
@@ -30,6 +34,7 @@ inline uint64_t state_hash() {
             h = (h ^ b) * 0x100000001B3ull;
         }
     };
+#ifdef SMACX_HYBRID  // the original's memory
 #define REGION(name, addr, size) mix(addr, mem::host(addr), size);
 #define REGION_VAR(name, addr, count_addr, elem)                                                     \
     {                                                                                                \
@@ -44,5 +49,8 @@ inline uint64_t state_hash() {
 #undef REGION
 #undef REGION_VAR
 #undef MASK
+#else  // the records serialised (engine/state_io.h), as the .state snapshots hold them
+    state_regions_write(mix);
+#endif
     return h;
 }

@@ -83,6 +83,59 @@ struct LegacyGamePrefs {
     int32_t ClimateLevel;
 };
 
+// The map header block (0x949870, 0xAA4 bytes): the map's dimensions and generation settings, the
+// landmarks and the abstract map's size. Savegames and map files hold it as one block before the
+// tiles (map_write), the snapshots as the region MapHeader. Its fields are also the globals
+// MapAreaX ... MapNativeLifeForms, Landmarks and MapFilePath of globals.h.
+struct MapHeader {
+    int32_t area_x;  // MapAreaX
+    int32_t area_y;  // MapAreaY
+    int32_t random_seed;  // MapRandomSeed
+    int32_t sea_level;  // MapSeaLevel
+    int32_t sea_level_council;  // MapSeaLevelCouncil
+    int32_t area_tiles;  // MapAreaTiles
+    int32_t area_sq_root;  // MapAreaSqRoot
+    int32_t toggle_flat;  // MapToggleFlat
+    int32_t landmark_count;  // MapLandmarkCount
+    Landmark landmarks[64];  // Landmarks
+    int32_t abstract_x;  // MapAbstractX
+    int32_t abstract_y;  // MapAbstractY
+    int32_t abstract_count;  // MapAbstractCount
+    int32_t size_planet;  // MapSizePlanet
+    int32_t ocean_coverage;  // MapOceanCoverage
+    int32_t land_coverage;  // MapLandCoverage
+    int32_t erosive_forces;  // MapErosiveForces
+    int32_t planetary_orbit;  // MapPlanetaryOrbit
+    int32_t cloud_cover;  // MapCloudCover
+    int32_t native_life_forms;  // MapNativeLifeForms
+    char file_path[0x50];  // MapFilePath (the global is declared 256 bytes; 80 lie in the block)
+    // The original's MapTiles and MapAbstract pointers (32-bit addresses in its process). Savegames
+    // carry them, nothing reads them back; native builds keep the real pointers elsewhere.
+    uint32_t tiles_slot;
+    uint32_t abstract_slot;
+};
+
+// The scenario's victory rules (0x94B4C0, 0x98 bytes; clear_scenario's values when not a
+// scenario), saved as one block.
+struct ScenarioRules {
+    int32_t req_victory;  // ObjectiveReqVictory
+    int32_t sudden_death_victory;  // ObjectivesSuddenDeathVictory
+    int32_t achieve_pts;  // ObjectiveAchievePts
+    int32_t victory_achieve_bonus_pts;  // VictoryAchieveBonusPts
+    int32_t starting_mission_year;  // StartingMissionYear
+    int32_t ending_mission_year;  // EndingMissionYear
+    uint8_t unk_18[0x80];  // the scenario editor's objectives (not reconstructed)
+};
+
+// PBEM tamper check (0x93A9AC, 0x4C bytes; saved in PBEM games).
+struct PbemState {
+    int32_t game_id;  // PbemGameID
+    int32_t game_date;  // PbemGameDate
+    int32_t save_count;  // PbemSaveCount
+    int32_t tamper_faction[8];  // PbemTamperFaction
+    int32_t tamper_reloads[8];  // PbemTamperReloads
+};
+
 struct LegacyFactionV10 {
     // same as the current Faction from here down to facility_announced
     int32_t player_flags;
@@ -406,6 +459,13 @@ struct LegacyBaseV2 {
 
 SMAC_LAYOUT(GamePrefs, 0x398);
 SMAC_LAYOUT(LegacyGamePrefs, 0x31C);
+SMAC_LAYOUT(MapHeader, 0xAA4);
+SMAC_LAYOUT(ScenarioRules, 0x98);
+SMAC_LAYOUT(PbemState, 0x4C);
+static_assert(offsetof(MapHeader, landmarks) == 0x24, "");
+static_assert(offsetof(MapHeader, abstract_x) == 0xA24, "");
+static_assert(offsetof(MapHeader, file_path) == 0xA4C, "");
+static_assert(offsetof(MapHeader, tiles_slot) == 0xA9C, "");
 static_assert(offsetof(GamePrefs, SaveFileVersion) == 0x380, "");
 
 static_assert(sizeof(LegacyFactionV10) == 0x20BC, "");

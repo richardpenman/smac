@@ -98,6 +98,7 @@ GLOBAL(int32_t, PbemSaveCount, 0x93A9B4);  // PBEM tamper check: saves so far (s
 GLOBAL(int32_t, PbemTamperFaction,
        0x93A9B8);  // [8] PBEM: faction that reloaded the turn, per faction (check_tamper; saved)
 GLOBAL(int32_t, PbemTamperReloads, 0x93A9D8);  // [8] PBEM: how often it reloaded, per faction (check_tamper; saved)
+GLOBAL(PbemState, PbemStateBlock, 0x93A9AC);  // PbemGameID .. PbemTamperReloads as one record
 GLOBAL(int32_t, VehAttackFlags, 0x93E904);
 GLOBAL(int32_t, ChatRecipientMask, 0x93E960);  // factions the chat goes to (MultiWin toggles); 0xFF everyone
 GLOBAL(int32_t[8][103], DiploPlrList, 0x93E978);  // [8][103]
@@ -222,6 +223,7 @@ GLOBAL(int32_t, MapPlanetaryOrbit, 0x94A2B0);  // affects temperature
 GLOBAL(int32_t, MapCloudCover, 0x94A2B4);  // affects rainfall, rivers
 GLOBAL(int32_t, MapNativeLifeForms, 0x94A2B8);
 GLOBAL(char[256], MapFilePath, 0x94A2BC);
+GLOBAL(MapHeader, MapHeaderBlock, 0x949870);  // MapAreaX .. the MapTiles/MapAbstract slots as one record
 GLOBAL_NATIVE(CEnergy[3], Energy, 0x94A318);  // [3]
 GLOBAL_NATIVE(CChassis[9], Chassis, 0x94A330);  // [9]
 GLOBAL_NATIVE(CNatural[16], Natural, 0x94ADE0);  // [16]
@@ -234,6 +236,7 @@ GLOBAL(int32_t, ObjectiveAchievePts, 0x94B4C8);
 GLOBAL(int32_t, VictoryAchieveBonusPts, 0x94B4CC);
 GLOBAL(int32_t, StartingMissionYear, 0x94B4D0);  // Normal starting year
 GLOBAL(int32_t, EndingMissionYear, 0x94B4D4);  // Normal ending year for the difficulty level
+GLOBAL(ScenarioRules, ScenarioRulesBlock, 0x94B4C0);  // ObjectiveReqVictory .. as one record
 GLOBAL_NATIVE(CMight[7], Might, 0x94C558);  // [7]
 GLOBAL(Monument[8], Monuments, 0x94CA08);  // [8]
 GLOBAL_NATIVE(CTimeControl[6], TimeControl, 0x94F1B8);  // [6]
@@ -241,6 +244,7 @@ GLOBAL_NATIVE(CArmor[14], Armor, 0x94F278);  // [14]
 GLOBAL_NATIVE(CTech[89], Tech, 0x94F358);  // [89]
 GLOBAL(CWorldbuilder, WorldBuilder, 0x9502A8);
 GLOBAL(ReplayEvent[1024], ReplayEvents, 0x950324);  // [1024]
+constexpr uint32_t kReplayEventsEnd = 0x950324 + 1024 * 8;  // the original's memory after ReplayEvents
 GLOBAL_NATIVE(CMorale[7], Morale, 0x952328);  // [7]
 GLOBAL_NATIVE(CReactor[4], Reactor, 0x9527F8);  // [4]
 GLOBAL(VEH[2049], VehsDef, 0x952828);  // [2049]

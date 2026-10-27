@@ -12,6 +12,7 @@
 #include "engine/log.h"
 #include "engine/map.h"
 #include "engine/random.h"
+#include "engine/state_io.h"
 #include "engine/tech.h"
 
 namespace {
@@ -456,6 +457,12 @@ void GAMEAPI replay_base(int32_t event, int32_t x, int32_t y, int32_t faction_id
     e.y = (int16_t)y;
     // BUG(original): no bounds check; past 1024 events the record is written beyond ReplayEvents.
     if (!g_compat.replay_events_overflow && ReplayEventSize + (int32_t)sizeof(e) > (int32_t)sizeof(ReplayEvents)) return;
-    std::memcpy(reinterpret_cast<uint8_t*>(ReplayEvents) + ReplayEventSize, &e, sizeof(e));
+    if (ReplayEventSize % 8 == 0 && ReplayEventSize + (int32_t)sizeof(e) <= (int32_t)sizeof(ReplayEvents)) {
+        ReplayEvents[ReplayEventSize / 8] = e;
+    } else {  // past the table: the original's memory after it (mem::write_bytes)
+        Writer w;
+        w(e);
+        mem::write_bytes(0x950324 + (uint32_t)ReplayEventSize, w.data(), w.size());
+    }
     ReplayEventSize += 8;
 }

@@ -11,6 +11,7 @@
 #include "engine/heap.h"
 #include "engine/parse.h"
 #include "engine/random.h"
+#include "engine/state_io.h"
 #include "engine/score.h"
 #include "engine/stack.h"
 #include "engine/strings.h"
@@ -93,12 +94,23 @@ static void wipe_tiles() {
 
 void GAMEAPI map_wipe() { wipe_tiles(); }
 
-// The header block starts at MapAreaX (0x949870) and runs 0xAA4 bytes (to MapFilePath's end);
-// it includes the MapTiles/MapAbstract pointer slots, written as they are in the image.
+// Reads or writes count records with fread/fwrite in the original's byte layout (state_io.h).
+// A read the file holds only partly leaves the rest of the records as they were, as fread does.
+template <class T>
+static uint32_t map_records(T* first, uint32_t count, bool write, CrtFile* file) {
+    Writer w = write_records(first, count);
+    if (write) return crt_fwrite(w.bytes.data(), w.size(), 1, file);
+    uint32_t ok = crt_fread(w.bytes.data(), w.size(), 1, file);
+    read_records(first, count, w.data(), w.size());
+    return ok;
+}
+
+// The header block (MapHeader: MapAreaX .. MapFilePath, then the original's MapTiles/MapAbstract
+// pointer slots, written as they are), the tiles, the abstract map.
 int32_t GAMEAPI map_write(CrtFile* file) {
-    if (crt_fwrite(&game().map.x, 0xAA4, 1, file) == 0) return 1;
-    if (crt_fwrite(game().map.tiles, (uint32_t)game().map.tile_count * sizeof(MAP), 1, file) == 0) return 1;
-    return crt_fwrite(MapAbstract, (uint32_t)MapAbstractCount, 1, file) == 0;
+    if (map_records(&MapHeaderBlock, 1, true, file) == 0) return 1;
+    if (map_records(game().map.tiles, (uint32_t)game().map.tile_count, true, file) == 0) return 1;
+    return map_records(MapAbstract, (uint32_t)MapAbstractCount, true, file) == 0;
 }
 
 int32_t GAMEAPI map_read(CrtFile* file) {
@@ -106,12 +118,12 @@ int32_t GAMEAPI map_read(CrtFile* file) {
     if (MapAbstract) mem_free(MapAbstract);
     game().map.tiles = nullptr;
     MapAbstract = nullptr;
-    if (crt_fread(&game().map.x, 0xAA4, 1, file) == 0) return 1;
+    if (map_records(&MapHeaderBlock, 1, false, file) == 0) return 1;
     game().map.tiles = nullptr;
     MapAbstract = nullptr;
     if (map_init() != 0) return 1;
-    if (crt_fread(game().map.tiles, (uint32_t)game().map.tile_count * sizeof(MAP), 1, file) == 0) return 1;
-    if (crt_fread(MapAbstract, (uint32_t)MapAbstractCount, 1, file) == 0) return 1;
+    if (map_records(game().map.tiles, (uint32_t)game().map.tile_count, false, file) == 0) return 1;
+    if (map_records(MapAbstract, (uint32_t)MapAbstractCount, false, file) == 0) return 1;
     fixup_landmarks();
     return 0;
 }

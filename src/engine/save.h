@@ -10,6 +10,8 @@
 //   the world window, [PBEM: diplomacy/council state and message lists], canvas size, and the
 //   save_daemon time stamp. With GameState & 0x10000000 the blocks after GamePrefs (except the
 //   map, the message lists and the canvas size) are encrypted (encrypt_write).
+// The game-state blocks are written and read through the records' serialisation
+// (engine/state_io.h): the original's byte layout, whatever the records' types in memory.
 // smacx marks its saves in the legacy preferences block, which the original ignores in a current
 // savegame (it writes uninitialised stack bytes there): kSmacxSaveMark at offset 0, then a dword
 // of flags (bit 0: the game plays with the original bugs, engine/compat.h). A hotseat or PBEM game

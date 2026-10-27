@@ -47,6 +47,7 @@
 #include "engine/save.h"
 #include "engine/strings.h"
 #include "engine/setup.h"
+#include "engine/state_io.h"
 #include "engine/turn.h"
 #include "engine/world.h"
 #include "golden.h"
@@ -88,26 +89,11 @@ static void apply_observer_prefs() {
 static void write_state(const std::string& path) {
     FILE* f = std::fopen(path.c_str(), "wb");
     if (!f) return;
-    auto put = [&](uint32_t addr, const void* data, uint32_t size) {
+    state_regions_write([&](uint32_t addr, const uint8_t* data, uint32_t size) {
         std::fwrite(&addr, 4, 1, f);
         std::fwrite(&size, 4, 1, f);
         if (size) std::fwrite(data, 1, size, f);
-    };
-    auto i32 = [](uint32_t addr) { return *reinterpret_cast<int32_t*>(mem::host(addr)); };
-#define REGION(name, addr, size) put(addr, mem::host(addr), size);
-#define REGION_VAR(name, addr, count_addr, elem)                                 \
-    {                                                                            \
-        uint32_t n = (uint32_t)i32(count_addr) * (elem);                         \
-        const void* src = (addr) == 0x10000000   ? (const void*)MapTiles         \
-                          : (addr) == 0x20000000 ? (const void*)MapAbstract      \
-                                                 : (const void*)mem::host(addr); \
-        put(addr, src, src ? n : 0);                                             \
-    }
-#define MASK(addr, size)
-#include "state_regions.h"
-#undef REGION
-#undef REGION_VAR
-#undef MASK
+    });
     std::fclose(f);
 }
 

@@ -36,4 +36,7 @@ bool init(const char* image_path) {
 bool init(const char*) { return true; }
 #endif
 
+void read_bytes(uint32_t addr, void* dst, uint32_t n) { std::memcpy(dst, host(addr), n); }
+void write_bytes(uint32_t addr, const void* src, uint32_t n) { std::memcpy(host(addr), src, n); }
+
 }  // namespace mem

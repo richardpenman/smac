@@ -28,6 +28,11 @@ inline uint8_t* host(uint32_t addr) { return g_image + (addr - kImageBase); }
 #endif
 // Load the initial data image (native builds). Returns false if the image is missing.
 bool init(const char* image_path);
+// Copy n bytes of the original's memory at addr: for the original's reads and writes past the end
+// of a table (compat out_of_range_reads, replay_events_overflow), which reach whatever the
+// original keeps after it.
+void read_bytes(uint32_t addr, void* dst, uint32_t n);
+void write_bytes(uint32_t addr, const void* src, uint32_t n);
 }  // namespace mem
 
 template <class T>
