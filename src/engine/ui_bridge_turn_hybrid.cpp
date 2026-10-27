@@ -25,7 +25,7 @@ bool ui_directplay_registered() {
 void ui_main_mapwin_set_options(uint32_t bits) { *reinterpret_cast<uint32_t*>(MapWins[0] + 0x1DD70) |= bits; }
 
 // Hotseat/PBEM screens and the human council menu are not shown in hybrid runs (observer games).
-int32_t ui_hotseat_switch(int32_t) { return 0; }
+int32_t ui_hotseat_switch(int32_t, int32_t*) { return 0; }
 void ui_hotseat_show(int32_t) {}
 void ui_council_menu_open(int32_t) {}
 void ui_council_menu_add(const char*, int32_t) {}

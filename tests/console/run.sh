@@ -79,14 +79,14 @@ nocrash menu
 
 # 5. Save (ctrl+S, the name typed) and load (ctrl+L, the newest save): the hold order of the
 #    scout given after the save is gone after the load.
-rm -f "$ROOT/game/saves/cstest.SAV"
+rm -f "$OUT/saveload/saves/cstest.SAV"
 run saveload $NEW --keys "ENTER,C-s,c,s,t,e,s,t,ENTER,h,UNITS,C-l,ENTER,UNITS,SHOT:loaded.bmp"
-if [ -f "$ROOT/game/saves/cstest.SAV" ]; then echo "PASS saveload: saves/cstest.SAV written"; else echo "FAIL saveload: no save"; FAIL=1; fi
+if [ -f "$OUT/saveload/saves/cstest.SAV" ]; then echo "PASS saveload: saves/cstest.SAV written (below the outdir)"; else echo "FAIL saveload: no save"; FAIL=1; fi
 check saveload "loaded: the scout has no orders again" "popup LOADGAME shown(.|\n)*" 
 if [ "$(grep -c 'unit 4 f1 Scout Patrol (35,7) order 0 ' "$OUT/saveload.log")" -ge 1 ] && \
    grep -q 'unit 4 f1 Scout Patrol (35,7) order 2 ' "$OUT/saveload.log"; then echo "PASS saveload: order 2 before, 0 after"
 else echo "FAIL saveload: orders"; FAIL=1; fi
-rm -f "$ROOT/game/saves/cstest.SAV"
+rm -f "$OUT/saveload/saves/cstest.SAV"
 nocrash saveload
 
 # 6. A late save as a human faction: go-to list, automation (shift+A), turns.

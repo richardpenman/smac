@@ -159,8 +159,11 @@ const char* resolve_path(const char* path, char* out, uint32_t out_size) {
     std::string p(path);
     for (char& c : p)
         if (c == '\\') c = '/';
-    if (!g_saves_dir.empty() && p.size() >= 5 && ieq(p.substr(0, 5), "saves") && (p.size() == 5 || p[5] == '/'))
+    if (!g_saves_dir.empty() && p.size() >= 5 && ieq(p.substr(0, 5), "saves") && (p.size() == 5 || p[5] == '/')) {
         p = g_saves_dir + p.substr(5);
+        std::error_code ec;
+        fs::create_directories(g_saves_dir, ec);  // made when first used
+    }
     std::string result;
     size_t pos = 0;
     if (!p.empty() && p[0] == '/') {

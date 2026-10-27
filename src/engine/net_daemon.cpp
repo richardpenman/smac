@@ -60,6 +60,12 @@ void GAMEAPI message_data(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t) 
     if (!MultiplayerActive) return;
     net_unimplemented("message_data", 0x592EE0);
 }
+// message_chat (0x593190): a chat line (type, the faction it goes to) through
+// NetDaemon_send_message, which sends nothing without a network game.
+void GAMEAPI message_chat(int32_t, int32_t, const char*) {
+    if (!MultiplayerActive) return;
+    net_unimplemented("message_chat", 0x593190);
+}
 
 // check_spock (0x51F1B0): with the session's lock state (0x93E8C0, 0x93F670) outside the upkeep and
 // the computer players' turns, help_spock when no lock is pending.

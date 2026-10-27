@@ -39,7 +39,6 @@ void GAMEAPI clear_council_notify(int32_t faction_id) {
     CouncilProposal[faction_id] = 0;
     CouncilVoteState[faction_id] = 0;
 }
-void GAMEAPI diplo(int32_t, int32_t) {}
 void GAMEAPI quayle(int32_t) {}
 // The end of the game for the harness (g_harness_game_end: final snapshot, exit), as the oracle
 // does at the original's show_replay.
@@ -52,6 +51,4 @@ void THISCALL GraphicWin_fill(uint8_t*, int32_t) {}
 void THISCALL Win_show(uint8_t*, int32_t) {}
 bool ui_directplay_registered() { return false; }
 void ui_main_mapwin_set_options(uint32_t) {}
-int32_t ui_hotseat_switch(int32_t) { return 0; }
-void ui_hotseat_show(int32_t) {}
 #endif

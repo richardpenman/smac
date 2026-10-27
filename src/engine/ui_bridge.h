@@ -405,10 +405,11 @@ bool ui_directplay_registered();
 // Main map window display options (field +0x1DD70) |= bits.
 void ui_main_mapwin_set_options(uint32_t bits);
 // Hotseat/PBEM: hides the previous player's view and asks the next human (faction_id) to take
-// over (SWITCHING popup, password check, optional save and quit). Returns 0 when the player takes
-// the turn, 1 when the game was left (ControlTurnA set). Hybrid builds and headless: not shown
-// (returns 0).
-int32_t ui_hotseat_switch(int32_t faction_id);
+// over (SWITCHING popup, password check, optional save and quit). password_tries is control_turn's
+// count of wrong passwords (kept for the whole control_turn, as the original's local). Returns 0
+// when the player takes the turn, 1 when the game was left (ControlTurnA set). Hybrid builds and
+// headless: not shown (returns 0).
+int32_t ui_hotseat_switch(int32_t faction_id, int32_t* password_tries);
 // Hotseat/PBEM: shows the new player's view (centred on a base or unit), the battle summary popup
 // and the message list. Hybrid builds and headless: not shown.
 void ui_hotseat_show(int32_t faction_id);

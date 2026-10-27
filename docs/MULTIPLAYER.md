@@ -115,3 +115,20 @@ types and payloads, same routing in `NetDaemon_send_message`, same `process_mess
   one after the other's start; the machine allows only one smacx at a time for the suites, so
   this test runs alone); the messages logged on both sides and the game states compared at each
   turn's end (`do_checksums` must agree). Unit tests for the frame codec and the message routing.
+
+## State
+
+**Phase 1 (hotseat): done.**
+* src/ui/topmenu.cpp: `multiplayer_init` (SELECTSERVICE with the hotseat/email item, the HOTSEAT
+  menu through `top_menu(1)`).
+* src/ui/gamesetup.cpp: `config_game`'s FACTIONTAKEN, HOTSEATADD0 / MULTISTRING / HOTSEATADD1, the
+  first human as the viewer, the tamper seeds (`PbemGameID`, `PbemGameDate`, `PbemSaveCount`).
+* src/ui/hotseat.cpp: the handover (`ui_hotseat_switch`: the screen cleared, SWITCHING /
+  SWITCHING2, passwords with VERIFYPASSWORD and three tries, SAVE AND EXIT, the view centred;
+  `ui_hotseat_show`: WONLOST, the timers). The engine's `control_turn` and `hotseat_take_turn`
+  were already reconstructed.
+* src/ui/diplo_hotseat.cpp: `diplo` and the DiploWin.
+* src/app/smacx.cpp, src/platform/win32.cpp: with `--outdir` the saves go to `DIR/saves`.
+* Approximated: the players' own message lists between turns (sub_51E530), the desktop's box art
+  behind SWITCHING, the DiploWin's StringBox / EditBox look.
+* Tested by tests/hotseat/run.sh (two humans; a third works the same way through HOTSEATADD1).

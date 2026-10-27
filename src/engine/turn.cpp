@@ -2584,8 +2584,7 @@ void hotseat_take_turn(int32_t viewer) {
 }  // namespace
 
 void GAMEAPI control_turn() {
-    int32_t password_tries = 0;
-    (void)password_tries;
+    int32_t password_tries = 0;  // the handovers' wrong passwords (ui_hotseat_switch)
     if (!CurrentTurn && !ControlTurnMove && is_human(CurrentPlayerFaction)) {
         if (!PbemActive) crash_landing(CurrentPlayerFaction);
     }
@@ -2621,7 +2620,7 @@ void GAMEAPI control_turn() {
                 parse_says(3, game().mfactions[f].noun_faction, -1, -1);
                 parse_num(0, CurrentMissionYear);
                 CurrentPlayerFaction = f;
-                if (ui_hotseat_switch(f) || ControlTurnA) return;
+                if (ui_hotseat_switch(f, &password_tries) || ControlTurnA) return;
                 ui_hotseat_show(f);
                 hotseat_take_turn(CurrentPlayerFaction);
             }

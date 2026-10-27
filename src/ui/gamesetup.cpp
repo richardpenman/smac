@@ -23,6 +23,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <string>
 #include <vector>
 
@@ -37,6 +38,7 @@
 #include "engine/rules.h"
 #include "engine/setup.h"
 #include "engine/strings.h"
+#include "engine/tech.h"
 #include "engine/text.h"
 #include "engine/ui_bridge.h"
 #include "engine/world.h"
@@ -575,6 +577,10 @@ L_58a551:  // the factions
         }
         if (!(mode & 2)) DefaultPrefs.faction_id = r;
         pick = r;
+        if (PbemActive && (players & (1u << pick))) {  // a human already plays it
+            X_pop("FACTIONTAKEN", 0);
+            goto L_58a551;
+        }
         if (BasePop_button_pressed(pop)) {  // OTHER: the other faction file (RELOADFAC)
             if (X_pop_ask("RELOADFAC", 0x50, MFactions[pick].filename, 0, 0) == 0) {
                 crt_strcpy(MFactions[pick].filename, ParseStrBuffer[0]);
@@ -609,6 +615,11 @@ L_58a551:  // the factions
             goto L_589da1;
         }
         DefaultPrefs.faction_id = pick;
+        if (PbemActive && (players & (1u << pick))) {  // a human already plays it
+            pick_close();
+            X_pop("FACTIONTAKEN", 0);
+            goto L_58a551;
+        }
         if (action == 0x105) {
             pick = game_rand() % 7 + 1;
             pick_close();
@@ -732,12 +743,48 @@ L_58b34a:  // the rivals
         load_flags();
         if (ExpansionEnabled && !MultiplayerActive && !PbemActive && (MFactions[pick].rule_flags & RFLAG_ALIEN))
             GameRules = (int32_t)(((uint32_t)GameRules & ~RULES_BLIND_RESEARCH) | 0x140);
-        if (!(mode & 1)) ui_invalidate();
+        if (!(mode & 1)) {
+            ui_invalidate();
+            if (PbemActive) {
+                // Hotseat / PBEM: HOTSEATADD0 lists the human factions so far (MULTISTRING per
+                // faction), HOTSEATADD1 asks for another human player: Yes picks the next faction,
+                // Esc drops this one and picks again.
+                uint32_t bit = 1u << pick;
+                players |= bit;
+                Popup_start(pop, ScriptFileName, "HOTSEATADD0", -1, nullptr, 0x40);
+                for (int32_t f = 1; f < 8; f++) {
+                    if (!(players & (1u << f))) continue;
+                    if (X_text_open(ScriptFileName, "MULTISTRING")) break;
+                    char* line = text_get();
+                    const MFaction& m = MFactions[f];
+                    GenderDefault = m.is_leader_female;
+                    PluralDefault = 0;
+                    parse_says(0, m.title_leader, -1, -1);
+                    GenderDefault = m.is_leader_female;
+                    PluralDefault = 0;
+                    parse_says(1, m.name_leader, -1, -1);
+                    GenderDefault = m.noun_gender;
+                    PluralDefault = m.is_noun_plural;
+                    parse_says(2, m.noun_faction, -1, -1);
+                    StrBuffer[0] = 0;
+                    parse_string(line, StrBuffer);
+                    BasePop_string(pop, StrBuffer);
+                }
+                Popup_start(pop, ScriptFileName, "HOTSEATADD1", -1, nullptr, 0x80);
+                int32_t r = BasePop_exec_3(pop, 0, 0);
+                std::fprintf(stderr, "hotseat players %02X: %s\n", players, r == 0 ? "proceed" : r > 0 ? "add" : "drop");
+                if (r != 0) {
+                    if (r < 0) players &= ~bit;
+                    goto L_58a551;
+                }
+            }
+        }
         if (PbemActive) {
-            // Hotseat / PBEM (HOTSEATADD0/1, not reconstructed): the picked faction plays.
-            players |= 1u << pick;
+            // The first human faction is the viewer.
             FactionStatus[0] = (uint8_t)players;
-            CurrentPlayerFaction = pick;
+            int32_t f = 1;
+            while (f < 8 && !(players & 0xFF & (1u << f))) f++;
+            CurrentPlayerFaction = f < 8 ? f : 1;
             goto L_58a580;
         }
     }
@@ -764,7 +811,13 @@ L_58a580:
             if (!(mode & 2)) planetfall(CurrentPlayerFaction);
         } else if (PbemActive) {
             clear_tamper();
-            // The PBEM tamper seeds (timeGetTime, GetSystemTime) of PbemState are not set here.
+            // The tamper checks' identity of the game: timeGetTime + MapRandomSeed, the date
+            // (GetSystemTime: (year * 16 + month) * 32 + day), no save yet.
+            PbemGameID = (int32_t)platform::ticks_ms() + MapRandomSeed;
+            std::time_t now = std::time(nullptr);
+            const std::tm* t = std::gmtime(&now);
+            PbemSaveCount = 0;
+            PbemGameDate = t ? ((t->tm_year + 1900) * 16 + t->tm_mon + 1) * 32 + t->tm_mday : 0;
         }
     }
     return quit(0);

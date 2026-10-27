@@ -26,7 +26,7 @@ Details for working on the reconstruction. The README covers playing and buildin
 
 With `--outdir DIR` (the tests and the harness) none of this happens: the defaults are the
 repository's (`game/`, `src/data/data_image.bin`, `harness/oracle/runtime/Alpha Centauri.Ini`),
-everything is written below `DIR`, and the ini is copied from `--ini` at every start, so a
+everything is written below `DIR` (saved games in `DIR/saves`), and the ini is copied from `--ini` at every start, so a
 stale ini from an earlier run cannot change a test run.
 
 ## Making a release
@@ -125,8 +125,8 @@ CI (`.github/workflows/build.yml`) builds `smacx_headless` and runs `smacx_smoke
 column's slide, unit moves, combat booms, battle reports and movies play with their real waits, as
 in an interactive game, and the run still quits when its keys end. `TEST_FAST=1` runs them
 unattended instead (those animations skipped or drawn without waiting). `WAIT:MS` in a script lets
-real time pass with no input (timers and animations run meanwhile). Timings (the eleven suites
-one after another): animated about 220 s, fast about 145 s; the slowest suite is placeholders.
+real time pass with no input (timers and animations run meanwhile). Timings (the twelve suites
+one after another, before tests/hotseat): animated about 220 s, fast about 145 s; the slowest suite is placeholders.
 `src/tools/gate.sh`'s `ui` step runs them with the native smacx and again with the ASan build.
 
 `tests/long/session.sh [OUTDIR] [SEED...]` is a manual test, not one of the suites (it is not a

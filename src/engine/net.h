@@ -48,6 +48,8 @@ void THISCALL
     NetDaemon_synch(uint8_t* net, int32_t type, int32_t a2, int32_t a3, int32_t a4, int32_t a5, int32_t a6, int32_t a7);
 // Multiplayer: sends a data message (type, a2..a5) to the other players.
 ADDR(0x592EE0) void GAMEAPI message_data(int32_t type, int32_t a2, int32_t a3, int32_t a4, int32_t a5, int32_t a6);
+// Multiplayer: sends a chat line (type 0x1E00 / 0x4E00, the faction it goes to, the text).
+ADDR(0x593190) void GAMEAPI message_chat(int32_t type, int32_t faction_id, const char* text);
 // Multiplayer: sends a base-building message (type, veh_id, base name, a4) to the other players.
 ADDR(0x592E70) void GAMEAPI message_base(int32_t type, int32_t veh_id, const char* name, int32_t a4);
 // Multiplayer: locks the tile (x, y) for a move; 0 if the lock was obtained (always 0 in single player).

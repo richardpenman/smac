@@ -50,9 +50,9 @@ compare() {  # compare NAME DIR_A DIR_B : turn_000 of both runs equal (harness/c
 }
 
 # 1. The main menu and its sub-menus: SCENARIO (and back), LOAD GAME's FileBox (cancelled),
-#    MULTIPLAYER (the placeholder), VIEW CREDITS, then EXIT GAME.
+#    MULTIPLAYER (the service list, cancelled), VIEW CREDITS, then EXIT GAME.
 run menus --seed $SEED --keys \
-"MENUSTATE,DOWN,DOWN,ENTER,MENUSTATE,ESC,MENUSTATE,DOWN,ENTER,SCREENSTATE,ESC,DOWN,ENTER,ENTER,\
+"MENUSTATE,DOWN,DOWN,ENTER,MENUSTATE,ESC,MENUSTATE,DOWN,ENTER,SCREENSTATE,ESC,DOWN,ENTER,ESC,\
 DOWN,ENTER,SCREENSTATE,ESC,MENUSTATE,DOWN,ENTER"
 c=0
 has menus 'menustate caption="" selected=0 [START GAME] [QUICK START] [SCENARIO] [LOAD GAME] [MULTIPLAYER] [VIEW CREDITS] [EXIT GAME]' || c=1
@@ -60,7 +60,7 @@ has menus 'menustate caption="SCENARIO" selected=0 [PLAY SCENARIO] [CREATE SCENA
 has menus 'menustate caption="" selected=2' || c=1
 has menus 'screenstate filebox kind=200 dir="saves"' || c=1
 has menus 'filebox: cancelled' || c=1
-has menus 'popup SMACXMULTI answer' || c=1
+has menus 'popup SELECTSERVICE answer: -1' || c=1
 has menus 'screenstate credits' || c=1
 has menus 'menustate caption="" selected=5' || c=1
 has menus 'menu  -> 6' || c=1
@@ -97,13 +97,13 @@ has rules 'popup RULES answer' || c=1
 compare "$OUT/rules/snap" "$OUT/rules_new/snap" || c=1
 check rules $c "see $OUT/rules.log, $OUT/compare_rules.txt"
 
-# 4. LOAD GAME: a save of a --new game (SAVE: in its outdir), found by typing its directory in the
-#    FileBox's name field, selected in the list and loaded.
+# 4. LOAD GAME: a save of a --new game (SAVE: in its outdir, beside the saves folder of that run),
+#    found by typing its directory in the FileBox's name field, selected in the list and loaded.
 run save --new size=0 --human 1 --seed 1,2 --keys "SAVE:menu1.SAV"
 DIRKEYS=$(typed "$OUT/save")
-run load --seed $SEED --keys "DOWN,DOWN,DOWN,ENTER,$DIRKEYS,ENTER,SCREENSTATE,DOWN,ENTER"
+run load --seed $SEED --keys "DOWN,DOWN,DOWN,ENTER,$DIRKEYS,ENTER,SCREENSTATE,DOWN,DOWN,ENTER"
 c=0
-has load "screenstate filebox kind=200 dir=\"$OUT/save\" selected=0 edit=\"\" entries [<..] [menu1.SAV]" || c=1
+has load "screenstate filebox kind=200 dir=\"$OUT/save\" selected=0 edit=\"\" entries [<..] [<saves] [menu1.SAV]" || c=1
 has load "filebox: $OUT/save\\menu1.SAV" || c=1
 has load 'game from the menu: turn 0, human faction 1 (Gaians)' || c=1
 check load $c "see $OUT/load.log"

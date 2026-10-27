@@ -773,6 +773,8 @@ int main(int argc, char** argv) {
         ini_copy = (fs::path(g_opt.outdir) / "Alpha Centauri.Ini").string();
         std::error_code ec;
         fs::copy_file(g_opt.ini, ini_copy, fs::copy_options::overwrite_existing, ec);
+        // Saved games too go below the outdir (the game folder is only read).
+        platform::set_saves_dir((fs::path(g_opt.outdir) / "saves").string().c_str());
     } else {
         // The game as players run it: the per-user directory and the installed game.
         std::string udir = gamedata::user_dir();
