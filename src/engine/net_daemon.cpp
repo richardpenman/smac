@@ -73,6 +73,19 @@ int32_t& SpockBusy() { return g32(0x93F674); }
 uint8_t* Lock() { return &NetState + 0x14A0; }
 
 uint32_t now_ms() { return engine_real_time(); }
+}  // namespace
+
+// The time stamp of a relayed event (timeGetTime in the original): the seed every machine executes
+// the event with. With smacx's deterministic clock (engine/clock.h) a counter of its own, so that
+// the same keys give the same online game (the logic clock is not read: its reads are game state).
+uint32_t net_stamp() {
+    static uint32_t counter = 0;
+    if (!engine_is_deterministic()) return engine_real_time();
+    counter += 7919;
+    return counter;
+}
+
+namespace {
 
 // The original's idle wait of a network request: the tasks, one message, the global lock, spock;
 // after `popup_ms` a NetMsg box (`label`) until the condition clears.
@@ -394,7 +407,7 @@ void THISCALL NetDaemon_send_message(uint8_t* net, void* msg, int32_t size, int3
     uint16_t type = *static_cast<uint16_t*>(msg);
     int32_t* m = static_cast<int32_t*>(msg);
     if (type & 0x4000) {
-        m[2] = (int32_t)now_ms();
+        m[2] = (int32_t)net_stamp();
         Net_send(net, msg, size, 0, 1);
         return;
     }
@@ -443,7 +456,7 @@ namespace {
 void header(int32_t* m, int32_t type) {
     m[0] = type & 0xFFFF;
     m[1] = CurrentPlayerFaction;
-    m[2] = (int32_t)now_ms();
+    m[2] = (int32_t)now_ms();  // (replaced by the server's stamp when it relays the event)
     m[3] = NetSessionState[-1];  // 0x93E8BC: the sequence number
 }
 void send(int32_t* m, int32_t size, int32_t to) {

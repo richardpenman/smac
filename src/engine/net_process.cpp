@@ -792,7 +792,7 @@ void THISCALL NetDaemon_process_message(uint8_t* net, uint8_t* msg, int32_t size
     default:
         // A request to the server without a handler: relayed to everyone as a timed event.
         if (type & 0xA000) {
-            m[2] = (int32_t)engine_real_time();
+            m[2] = (int32_t)net_stamp();
             if (!NetDaemon_fixup_message(net, msg)) {
                 *reinterpret_cast<uint16_t*>(msg) = (uint16_t)((type & 0x1FFF) | 0x4000);
                 m[3] = ++fld(net, 0x1B2C);

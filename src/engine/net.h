@@ -204,3 +204,5 @@ ADDR(0x529C00) void GAMEAPI mash_planes();
 ADDR(0x529F30) void GAMEAPI net_end_of_turn();
 // The pending tasks run once (UI: timers, the session's events, redraws; headless: nothing).
 ADDR_NATIVE(0x5FC8F0) void GAMEAPI do_all_tasks();
+// The time stamp the server gives a relayed event (its seed): timeGetTime, or smacx's deterministic counter.
+uint32_t net_stamp();

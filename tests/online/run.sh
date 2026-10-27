@@ -7,9 +7,10 @@
 # compared turn by turn (harness/compare.py) and must agree but for the data the original never
 # sends to the players (the monuments, the abstract map, the unused world-generation generator) and
 # each machine's own UI state (unit stacking order, a unit's focus bit). The original's desync check
-# runs each turn (NetDaemon_game_checksum, net_upkeep: no "checksum differs"). A second game
+# runs each turn (NetDaemon_game_checksum, net_upkeep: no "checksum differs"). The host moves a unit
+# through the locks. A second game
 # provokes a desync (SMACX_NET_DESYNC=TURN: the client changes a unit's morale at that turn): the host finds
-# the vehicles' checksum different and resends the units; the next turn's states agree again.
+# the vehicles' checksum different and resends the units; the next turn's units and bases agree.
 #
 #   tests/online/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/net-native/smacx)
 #
@@ -39,8 +40,13 @@ count() {  # count LOG DESCRIPTION REGEX N: at least N lines match
 END="C-ENTER,DOWN,ENTER"  # end of turn (REALLYOVER)
 HTURN="WAITFOR:player turn faction 1,ENTER,$END"
 CTURN="WAITFOR:player turn faction 2,ENTER,$END"
+# The host's first turn moves a unit twice (KP2, KP4: NetDaemon_order_veh's lock, MOVE_VEH 0x2401
+# relayed as 0x4401 and executed by both).
+HMOVE="WAITFOR:player turn faction 1,ENTER,WAIT:500,KP2,WAITFOR:move veh 0 dir 3,KP4,WAITFOR:move veh 0 dir 5,$END"
+# Its second turn sends a chat line to everyone (ctrl+C: Console_chat, CHATASK, message_chat 0x4E00).
+HCHAT="WAITFOR:player turn faction 1,ENTER,WAIT:500,C-c,h,i,ENTER,WAITFOR:net: chat,$END"
 HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:player 2 ready 1,ENTER,WAITFOR:game started,ENTER,\
-$HTURN,$HTURN,$HTURN,WAITFOR:player turn faction 1,WAIT:2000"
+$HMOVE,$HCHAT,$HTURN,WAITFOR:player turn faction 1,WAIT:2000"
 CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAIT:500,ENTER,\
 WAITFOR:game started,ENTER,$CTURN,$CTURN,$CTURN,WAITFOR:player turn faction 1,WAIT:1000"
 game() {
@@ -84,6 +90,9 @@ for side in host client; do
     count $log "the turns' upkeep in lockstep" "^net: turn [0-9]+ upkeep" 3
     count $log "the host's turns" "^net: player turn faction 1" 3
     count $log "the client's turns" "^net: player turn faction 2" 2
+    check $log "the host's unit moved (lock, MOVE_VEH)" "^net: move veh 0 dir 3 \\(faction 1\\)"
+    check $log "and moved again" "^net: move veh 0 dir 5 \\(faction 1\\)"
+    check $log "the chat line" "^net: chat .*: hi$"
     nocheck $log "the checksums agree" "checksum [0-9]+ differs"
     nocheck $log "no crash" "not reconstructed|abort|Assertion"
 done
@@ -95,13 +104,16 @@ compare game "host and client states equal each turn"
 game desync SMACX_NET_DESYNC=2
 check desync-client "the desync provoked" "^net: desync provoked"
 check desync-host "found by the checksums" "checksum 3 differs from faction 2's"
-# (The changed unit can make the client's computer factions see other tiles before the host resends
-# the units: the tiles' visibility, which the checksums do not cover, may stay different.)
-compare desync "the states equal again after the resynch" 'Vehs\[[0-9]+\]\.morale|MapTiles\[[0-9]+\]\.(visibility|visible_items)'
-if grep -q "^turn_003" "$OUT/desync-compare.txt" && \
-   sed -n '/^turn_003/,$p' "$OUT/desync-compare.txt" | grep -q "morale"; then
-    echo "FAIL desync: the changed unit still differs after the resynch"; FAIL=1
+# After the resynch the units and bases agree again. (The rest may keep a trace of the desync, as
+# in the original: the host resends only the blocks whose checksum failed, here the units; data the
+# checksums do not cover -- a faction's military strength, the tiles' visibility -- can stay
+# different.)
+python3 "$ROOT/harness/compare.py" "$OUT/desync-host/snap" "$OUT/desync-client/snap" --all --max 100000 \
+    > "$OUT/desync-compare.txt" 2>&1
+if grep -q "^turn_003" "$OUT/desync-compare.txt" && ! sed -n '/^turn_003/,$p' "$OUT/desync-compare.txt" |
+    grep -E '^ +(Vehs|Bases)\[' | grep -vqE 'next_veh_id_stack|prev_veh_id_stack|\.state\+3'; then
+    echo "PASS desync: the units and bases equal again after the resynch"
 else
-    echo "PASS desync: the changed unit resent"
+    echo "FAIL desync: the units and bases equal again after the resynch (see $OUT/desync-compare.txt)"; FAIL=1
 fi
 exit $FAIL

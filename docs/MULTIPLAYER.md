@@ -172,15 +172,27 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   MULTIPLAYER SETUP window is a plain list (F the faction, C a chat line, Enter ready / start, Esc
   cancel); the host's map and rule settings stay the defaults (a random map, NetSetupType 0); no
   scenario file transfer (NetDaemon_send_files, 0x0F05..0x0F0C).
-* Group 3, turns, synch and locks (working, being extended): src/engine/net_daemon.cpp (routing,
-  message_* / synch_*, NetDaemon_synch's blocks -- the rule tables travel in the original's 32-bit
-  layout --, send_rules / send_game, the locks' requests, order_veh / action / await_*, the
-  deletion list, game_checksum), net_process.cpp (process_message), net_lock.cpp (Lock,
-  PlayerLock, SquareLock), net_turn.cpp (net_control_turn, net_upkeep and its phases,
-  net_end_of_turn, net_not_my_turn, mash_planes, set_time_controls). Approximated: NetMsg_pop in
-  a network game writes to the message line instead of its timed box.
+* Group 3, turns, synch and locks (done): src/engine/net_daemon.cpp (routing, message_* /
+  synch_*, NetDaemon_synch's blocks -- the rule tables travel in the original's 32-bit layout --,
+  send_rules / send_game, the locks' requests, order_veh / action / await_*, the deletion list,
+  game_checksum, the channels), net_process.cpp (process_message), net_lock.cpp (Lock, PlayerLock,
+  SquareLock), net_turn.cpp (net_control_turn, net_upkeep and its phases, net_end_of_turn,
+  net_not_my_turn, mash_planes, set_time_controls). A unit's move: NetDaemon_lock (0x2210) at the
+  server, MOVE_VEH (0x2401) relayed as 0x4401 and executed by every machine with the server's
+  stamp as seed. smacx stamps relayed events with a counter of its own under its deterministic
+  clock (net_stamp; the original: timeGetTime), so the same keys give the same online game.
+  Approximated: NetMsg_pop in a network game writes to the message line instead of its timed box.
+* Group 4 (in part): the chat (Console_chat: CHATASK, message_chat 0x4E00 / 0x1E00, shown on the
+  message line; the setup window's chat), the time-control and time-bonus messages (0x4C02,
+  0x4306), pause (0x4C00/01). Not done: the DiploWin between online players (its network offers
+  0x1506..0x150F, COMMDIPLO of 0x1501), Console_time_controls' dialog, MultiWin's network rows
+  (time, locks, the chat button) and the scenario file transfer.
 * What the original never sends to the players (so their copies differ there too): the
   monuments, the abstract map (only world_build's Path_continents computes it), the
   world-generation generator; each machine's unit stacking order and focus bit are its own.
-* tests/online/run.sh: two processes (host and client) on localhost, three turns, states compared
-  each turn, the checksums; a provoked desync resent by the host.
+  After a resynch only the failed blocks are resent: data the checksums do not cover (a faction's
+  military strength, the tiles' visibility) can keep a trace of the desync.
+* tests/online/run.sh (run it alone: two processes): the setup, three turns one player at a time
+  with the computer factions in lockstep, a unit moved twice through the locks, a chat line, the
+  states compared each turn and no checksum difference; then a desync provoked on the client
+  (SMACX_NET_DESYNC) found by the host's checksums and its units resent.

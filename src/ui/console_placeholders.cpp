@@ -6,6 +6,9 @@
 #include "ui/win.h"
 #include "engine/ui_bridge.h"
 #include "engine/globals.h"
+#include "engine/memmap.h"
+#include "engine/log.h"
+#include "engine/net.h"
 #include "engine/parse.h"
 #include "engine/rules.h"
 #include "engine/strings.h"
@@ -28,11 +31,45 @@ void THISCALL MapWin_draw_cursor(uint8_t*) { ui_invalidate_map(); }
 // TIMECONTROLS dialog, HOSTTIME and the synchronisation are multiplayer's, out of scope).
 void THISCALL Console_time_controls(uint8_t*) {}
 
-// Console_chat (0x515770): outside multiplayer nothing; in multiplayer the CHATASK text entry and
-// message_chat to the chosen players (the online phase, docs/MULTIPLAYER.md).
-void THISCALL Console_chat(uint8_t*, int32_t) {
+// Console_chat (0x515770, ctrl+C / the Network menu): outside multiplayer nothing. During the
+// upkeep not yet reached: FINISHUPKEEP. Else CHATASK (the text, 255 characters): a text starting
+// with '!' goes to every player (0x4E00, without the '!'); with some players excluded by the chat
+// mask (NetSessionState[40], 0x93E960) to each player still listed, or to `to` (a faction; < 1:
+// the diplomatic partner during a commlink) as 0x1E00; else to everyone (0x4E00).
+void THISCALL Console_chat(uint8_t*, int32_t to) {
     if (!MultiplayerActive) return;
-    console_not_reconstructed("Console_chat (multiplayer)");
+    if (ControlTurnC && !(NetSessionState[15] & (1 << (CurrentPlayerFaction & 31))) && !NetSessionState[8]) {
+        NetMsg_pop(&NetMsg, "FINISHUPKEEP", 1000, 0, nullptr);
+        return;
+    }
+    if (X_pop_ask("CHATASK", 0xFF, reinterpret_cast<const char*>(mem::host(0x939FE8)), 0, 0)) return;
+    if (ParseStrBuffer[0][0] == '!') {
+        message_chat(0x4E00, 0, ParseStrBuffer[0] + 1);
+        log_say("Sent CHAT ALL(1)", ParseStrBuffer[0], 0, 0, 0);
+        return;
+    }
+    uint8_t humans = FactionStatus[0];
+    int32_t mask = NetSessionState[40];
+    if (NetSessionState[4] > 1 && (humans & mask) != humans) {
+        for (int32_t f = 1; f < 8; f++) {
+            uint32_t bit = 1u << f;
+            if (!(humans & bit)) continue;
+            int32_t target = to;
+            if (to < 1) {
+                target = *reinterpret_cast<int32_t*>(mem::host(0x73B790));  // the diplomatic partner
+                if (!NetCommlinkActive) {
+                    if (!ControlWaitLoop && !(mask & bit)) continue;
+                    target = f;
+                }
+            }
+            if (f != target) continue;
+            message_chat(0x1E00, f, ParseStrBuffer[0]);
+            log_say("Sent CHAT", ParseStrBuffer[0], f, 0, 0);
+        }
+        return;
+    }
+    message_chat(0x4E00, 0, ParseStrBuffer[0]);
+    log_say("Sent CHAT ALL(2)", ParseStrBuffer[0], 0, 0, 0);
 }
 
 // Console_custom_my_faction (0x4DD1B0, ctrl+shift+F / the Game menu): the CUSTOMNAMES popup of the
