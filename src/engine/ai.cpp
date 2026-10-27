@@ -1758,8 +1758,8 @@ void EnemyStrategy::own_unit(int32_t veh) {
 bool EnemyStrategy::disband_obsolete() {
     VEH& v = *unit;
     bool obsolete = !human() && (Units[v.unit_id].obsolete_factions & self_bit) &&
-                    !Console_upgrade(&MainConsole, veh_id) && ((CurrentTurn + veh_id) & 3) == 0 &&
-                    CurrentTurn > 50 && v.status_icon != 'F' && v.status_icon != '1' && v.status_icon != '2';
+                    !Console_upgrade(&MainConsole, veh_id) && ((CurrentTurn + veh_id) & 3) == 0 && CurrentTurn > 50 &&
+                    v.status_icon != 'F' && v.status_icon != '1' && v.status_icon != '2';
     if (obsolete) {
         uint8_t p = (uint8_t)Units[v.unit_id].plan;
         obsolete = !(p == 1 && f.region_base_plan[region] <= 2) && p < 8 && p != f.region_base_plan[region] &&
@@ -1790,8 +1790,8 @@ bool EnemyStrategy::disband_obsolete() {
                 if ((pu.unit_flags & UNIT_ACTIVE) && !(self_bit & pu.obsolete_factions) &&
                     pu.plan == Units[v.unit_id].plan && unit_triad(u) == unit_triad(v.unit_id)) {
                     // BUG(original): arm_val takes an armor id but is passed unit ids.
-                    int32_t own = g_compat.arm_val_unit_ids ? arm_val(unit_id, faction_id)
-                                                            : armor_val(unit_id, faction_id);
+                    int32_t own =
+                        g_compat.arm_val_unit_ids ? arm_val(unit_id, faction_id) : armor_val(unit_id, faction_id);
                     int32_t other = g_compat.arm_val_unit_ids ? arm_val(u, faction_id) : armor_val(u, faction_id);
                     if (own < other) better = true;
                 }
@@ -1814,8 +1814,8 @@ void EnemyStrategy::mark_garrison() {
         if (base_id >= 0) {
             int32_t want = garrison_check(base_id);
             int32_t margin = garrison_check(base_id);
-            int32_t have = stack_check(veh_at(game().bases[base_id].x, game().bases[base_id].y), 0xB,
-                                       0x10000000, 0x10000000, faction_id);
+            int32_t have = stack_check(veh_at(game().bases[base_id].x, game().bases[base_id].y), 0xB, 0x10000000,
+                                       0x10000000, faction_id);
             if (ai_rules::garrison_short(want, margin, have)) v.state |= 0x10000000;
         }
     }
@@ -1844,8 +1844,7 @@ int32_t EnemyStrategy::plan_step() {
                 for (int32_t j = 0; j < game().base_count; j++) {
                     if (j == v.home_base_id) continue;
                     const BASE& b = game().bases[j];
-                    if (tile_region(b.x, b.y) != region || (b.state_flags & mask) || b.mineral_surplus >= 2)
-                        continue;
+                    if (tile_region(b.x, b.y) != region || (b.state_flags & mask) || b.mineral_surplus >= 2) continue;
                     int32_t d = vdist(v.x, v.y, b.x, b.y);
                     if (d < best) {
                         best_base = j;
@@ -1962,8 +1961,7 @@ void EnemyStrategy::foreign_unit(int32_t veh_id) {
         if (Units[v.unit_id].plan == PLAN_TERRAFORM && unit_triad(v.unit_id) == TRIAD_SEA) {
             MAP* sq = map_tile(v.x, v.y);
             if ((sq->climate & 0xE0) < 0x60 && !tile_has_base(sq) &&
-                ((v.faction_id == (uint32_t)faction_id &&
-                  (v.flags & (VFLAG_LURKER | VFLAG_INVISIBLE)) != 0x440) ||
+                ((v.faction_id == (uint32_t)faction_id && (v.flags & (VFLAG_LURKER | VFLAG_INVISIBLE)) != 0x440) ||
                  (v.visibility & self_bit))) {
                 add_goal(faction_id, AI_GOAL_UNK_1, (f.player_flags & PFLAG_UNK_80000) ? 4 : 2, v.x, v.y, -1);
             }
@@ -2682,8 +2680,15 @@ struct AirPower {
     int32_t bx = -1, by = -1;  // local_20 / local_24 (missile target)
 
     AirPower(int32_t veh, int32_t dist_own_, int32_t zoc_, int32_t* px_, int32_t* py_)
-        : veh_id(veh), v(game().vehs[veh]), dist_own(dist_own_), zoc(zoc_), px(px_), py(py_),
-          faction_id(v.faction_id), self_bit((uint8_t)(1 << (faction_id & 31))), f(game().factions[faction_id]),
+        : veh_id(veh),
+          v(game().vehs[veh]),
+          dist_own(dist_own_),
+          zoc(zoc_),
+          px(px_),
+          py(py_),
+          faction_id(v.faction_id),
+          self_bit((uint8_t)(1 << (faction_id & 31))),
+          f(game().factions[faction_id]),
           here_region(tile_region(*px_, *py_)) {}
     int8_t plan_of() const { return Units[v.unit_id].plan; }
     void go(int32_t icon, int32_t x, int32_t y) {
@@ -2943,15 +2948,13 @@ int32_t AirPower::conventional() {
             (near = base_find_faction(t.x, t.y, faction_id)) >= 0 &&
             air_dist2(t.x, t.y, game().bases[near].x, game().bases[near].y) <= 4) {
             close = true;
-        } else if ((t.faction_id != faction_id || (t.flags & 0x440) == 0x440) &&
-                   !(self_bit & t.visibility) &&
+        } else if ((t.faction_id != faction_id || (t.flags & 0x440) == 0x440) && !(self_bit & t.visibility) &&
                    (base_id < 0 || ((uint8_t)game().bases[base_id].faction_id != faction_id &&
                                     !(game().bases[base_id].visibility & self_bit)))) {
             continue;
         }
         if (veh_triad(j) == TRIAD_AIR && base_id < 0) continue;
-        int32_t odds =
-            compute_odds(battle_resolve(veh_id, 0, t.x, t.y, 0, 0, nullptr), faction_id, veh_id, j, -2);
+        int32_t odds = compute_odds(battle_resolve(veh_id, 0, t.x, t.y, 0, 0, nullptr), faction_id, veh_id, j, -2);
         int32_t mult;
         if (base_id < 0) {
             odds /= 2;
@@ -3087,8 +3090,8 @@ std::optional<int32_t> AirPower::intercept() {
         MAP* tsq = map_tile(t.x, t.y);
         if (faction_id == t.faction_id) {
             bool cand = plan_of() == PLAN_AIR_SUPERIORITY && Chassis[Units[v.unit_id].chassis_id].range != 1 &&
-                        (!(tsq->items & BIT_BASE_IN_TILE) || (tsq->val2 & 0xF) > 7) &&
-                        !(tsq->items & BIT_AIRBASE) && !stack_check(j, 6, ABL_CARRIER, -1, -1);
+                        (!(tsq->items & BIT_BASE_IN_TILE) || (tsq->val2 & 0xF) > 7) && !(tsq->items & BIT_AIRBASE) &&
+                        !stack_check(j, 6, ABL_CARRIER, -1, -1);
             if (!cand) continue;
             int32_t left = speed(j, 0) - t.moves_spent;
             if (!(left < 0 || (left < 1000 && left == 0))) continue;
@@ -3127,8 +3130,7 @@ std::optional<int32_t> AirPower::intercept() {
             }
         } else if (plan_of() != PLAN_AIR_SUPERIORITY || !(v.state & VSTATE_ON_ALERT) ||
                    v.order_auto_type != ORDERA_ON_ALERT) {
-            int32_t odds =
-                compute_odds(battle_resolve(veh_id, 0, t.x, t.y, 0, 0, nullptr), faction_id, veh_id, j, -2);
+            int32_t odds = compute_odds(battle_resolve(veh_id, 0, t.x, t.y, 0, 0, nullptr), faction_id, veh_id, j, -2);
             MAP* sq = map_tile(t.x, t.y);
             if (tile_base_owner(sq) >= 0) {
                 if (plan_of() == PLAN_OFFENSE) continue;
