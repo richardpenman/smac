@@ -32,6 +32,7 @@ void ui_set_drag_target(int32_t x, int32_t y);
 // taken) and drawing (menu.cpp).
 bool console_menu_mouse(int32_t type, int32_t x, int32_t y);
 bool console_menu_key(int32_t key);
+void console_menu_toggle();  // the MENU button (MainInterface_on_iface_button_clicked 0x3EB)
 void console_menu_draw(Buffer* screen);
 // The pull-down of menu `index` (Menu_id_to_index: 3 Action, 9 Terraform, ...) shown at the screen
 // position (x, y) as MapWin_right_menu shows it; the chosen command runs (menu.cpp).

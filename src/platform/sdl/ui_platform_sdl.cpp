@@ -10,6 +10,7 @@
 #include <SDL.h>
 #include <SDL_ttf.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <map>
@@ -93,12 +94,14 @@ int32_t to_mods(Uint16 m) {
     return ((m & KMOD_SHIFT) ? MOD_SHIFT : 0) | ((m & KMOD_CTRL) ? MOD_CTRL : 0) | ((m & KMOD_ALT) ? MOD_ALT : 0);
 }
 
-// Window coordinates -> client (frame) coordinates when the window is scaled.
+// The mouse's client (frame) coordinates. The renderer's logical size (SDL_RenderSetLogicalSize)
+// already maps the mouse events of a scaled or letterboxed window (a resized window, macOS
+// fullscreen) to the frame's coordinates; scaling them again by the window's size sent every click
+// of a window not 1024x768 elsewhere (the console's MENU button missed). Only the letterbox
+// margins are clamped.
 void to_client(int32_t wx, int32_t wy, int32_t* x, int32_t* y) {
-    int32_t ww = g_width, wh = g_height;
-    if (g_window) SDL_GetWindowSize(g_window, &ww, &wh);
-    *x = ww > 0 ? wx * g_width / ww : wx;
-    *y = wh > 0 ? wy * g_height / wh : wy;
+    *x = std::clamp(wx, 0, std::max(0, g_width - 1));
+    *y = std::clamp(wy, 0, std::max(0, g_height - 1));
 }
 
 bool translate(const SDL_Event& e, Event* ev) {
@@ -110,6 +113,8 @@ bool translate(const SDL_Event& e, Event* ev) {
         ev->type = e.type == SDL_KEYDOWN ? EV_KEY_DOWN : EV_KEY_UP;
         ev->key = to_vk(e.key.keysym.sym);
         ev->mods = to_mods(e.key.keysym.mod);
+        // A held Alt (macOS: Option) repeats; the menu column toggles on each Alt press.
+        if (e.key.repeat && ev->key == VKEY_MENU) return false;
         return ev->key != 0;
     case SDL_TEXTINPUT:
         if ((uint8_t)e.text.text[0] < 0x80 && e.text.text[0]) {

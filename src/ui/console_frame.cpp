@@ -167,7 +167,7 @@ void console_frame_mouse(int32_t type, int32_t x, int32_t y) {
     if (type != UiInput::LUP) return;
     // MainInterface_on_iface_button_clicked: 0x3EB the menu, 0x3EC commlink (Alt / the menu
     // bar's HQ menu is the keyboard way to them).
-    if (in(kMenuBtn)) console_menu_key(0x40000 | VKEY_MENU);
+    if (in(kMenuBtn)) console_menu_toggle();
     else if (in(kCommBtn)) MultiWin_show(nullptr);
 }
 

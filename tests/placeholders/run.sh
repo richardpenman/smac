@@ -234,7 +234,7 @@ fi
 D() { printf 'DOWN,%.0s' $(seq 1 $1); }
 E=$(printf 'ENTER,%.0s' $(seq 1 45))
 for t in 15 16 17 18 19; do
-    run tour$t $NEW --keys "ENTER,A-h,RIGHT,RIGHT,RIGHT,RIGHT,$(D $t)ENTER,${E}UNITS"
+    run tour$t $NEW --keys "ENTER,A-h,LEFT,LEFT,$(D $t)ENTER,${E}UNITS"  # HQ, GAME, HELP
 done
 check tour15 "the terraforming lessons" "tutwin TOURRAIN: kind 2"
 check tour15 "altitude" "tutwin TOURALT: kind 2"
@@ -345,12 +345,12 @@ if [ -f "$ROOT/work/saves_late/turn_300.sav" ]; then
     nocrash opsrail
 fi
 
-# 20. The menus' look (AlphaMenu, menu.cpp, from the asm: no screenshot of the original's could be
-#     taken): a column of nine menu2.pcx buttons (0x8B x 0x12 under a 6 high top) above the
-#     console, the shown menus from the top (HELP at the bottom); the open menu's PullDown at its
-#     right (PullDown_on_redraw with AlphaMenu's fill functions); AlphaMenu_show when it opens.
+# 20. The menus' look (AlphaMenu, menu.cpp; the original's in tests/alphamenu): a column of nine
+#     menu2.pcx buttons (0x8B x 0x12 under a 6 high top) above the console, every menu (NETWORK,
+#     SCENARIO and EDIT MAP too); the open menu's PullDown at its right (PullDown_on_redraw with
+#     AlphaMenu's fill functions); AlphaMenu_show when it opens.
 run menucol $NEW --keys "ENTER,A-m,DOWN,DOWN,SHOT:menu.bmp,ESC,A-h,ESC"
-check menucol "the column, MAP its third button" "^menu column at 0,343 \\(139x168\\): Map at 0,385"
+check menucol "the column, MAP its fourth button" "^menu column at 0,343 \\(139x168\\): Map at 0,403"
 check menucol "HQ the second" "^menu column at 0,343 \\(139x168\\): HQ at 0,367"
 check menucol "AlphaMenu_show when the column opens (the slide skipped unattended)" "^alphamenu show \\(sound [01], slide $([ "$SMACX_ANIMATE" = 1 ] && echo 1 || echo 0)\\)"
 nocrash menucol
@@ -450,6 +450,19 @@ if [ -f "$ROOT/work/saves_late/turn_200.sav" ]; then
     check fdlimit "the popup after them has its text" "popup REALLYQUIT shown: 755x300 at 150,255 \\(2 items\\)"
     nocheck fdlimit "every sound found" "cannot play"
     nocrash fdlimit
+fi
+
+# 26. A player's first start (no --outdir: the per-user directory, here XDG_DATA_HOME below OUT):
+#     the new Alpha Centauri.Ini has "Sliding windows" off (a deliberate default of smacx, UI_PLAN
+#     section 13), so the menu column opens without its slide; the tests' ini keeps it on (case 20).
+if [ "$(uname)" = Linux ]; then
+    rm -rf "$OUT/firstrun"; mkdir -p "$OUT/firstrun"
+    (cd "$ROOT" && XDG_DATA_HOME="$OUT/firstrun" SMACX_GAMEDIR="$ROOT/game" SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" \
+        --hidden $NEW --keys "ENTER,A-m,ESC" > "$OUT/firstrun.log" 2>&1; echo "$?" > "$OUT/firstrun.rc")
+    check firstrun "the seeded ini's preferences without 0x8000000" "^alphamenu show \\(sound [01], slide 0\\)"
+    if grep -q "^Preferences=10110011111000011101110110110110" "$OUT/firstrun/smacx/Alpha Centauri.Ini"; then
+        echo "PASS firstrun: the ini's Preferences"; else echo "FAIL firstrun: the ini's Preferences"; FAIL=1; fi
+    nocrash firstrun
 fi
 
 exit $FAIL

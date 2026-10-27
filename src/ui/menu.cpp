@@ -5,13 +5,14 @@
 // command ids and separators of the original (table below, read from the asm) and the items it
 // hides at init.
 //
-// The look from the asm (no screenshot of the original's menu could be taken: its XTEST Alt does not
-// open it): AlphaMenu's column of buttons above the console (AlphaMenu_init / compute / on_redraw /
-// adjust, menu2.pcx), the open menu's pull-down drawn by the reconstructed PullDown
-// (PullDown_on_redraw with AlphaMenu's fill functions, pulldown.cpp) at the column's right; the
-// item visibility of
-// pfncMainMenuUpdateVisible (only the init's hidden items and the menus of other modes: Network in
-// multiplayer, Scenario and Edit Map in the scenario editor). A chosen item runs its command id
+// The look from the asm, compared with the original's screenshots (terranx.exe under Wine: its MENU
+// button clicked; its Alt does not reach the game under XTEST): AlphaMenu's column of buttons above
+// the console (AlphaMenu_init / compute / on_redraw / adjust, menu2.pcx), all nine menus, shown and
+// hidden with the MENU button (and Alt / Esc), sliding in and out (AlphaMenu_show / hide); a button
+// opens its pull-down, drawn by the reconstructed PullDown (PullDown_on_redraw with AlphaMenu's fill
+// functions, pulldown.cpp) at the column's right; a chosen item or Esc closes the pull-down and
+// the column stays (AlphaMenu's flags 5). The item visibility of pfncMainMenuUpdateVisible. A
+// chosen item runs its command id
 // through Console_menu_proc (console_menu.cpp), as Menu_menu_event does.
 #include <cstdio>
 #include <cstdlib>
@@ -131,6 +132,7 @@ bool g_built = false;
 bool g_open = false;  // the bar is shown
 int32_t g_cur = -1;  // open pull-down (-1: the bar only)
 int32_t g_sel = -1;  // selected item of the pull-down
+bool g_kbd = false;  // the column shown by Alt: the menus' letters and the arrows open them
 
 // "Ctrl+Shift+F1" -> virtual key with modifier bits; 0 when it is no key.
 int32_t parse_key(std::string s) {
@@ -234,11 +236,10 @@ void build() {
     }
 }
 
-bool menu_shown(const Menu& m) {
-    if (m.section == "NETWORK") return MultiplayerActive != 0;
-    if (m.section == "SCENARIO" || m.section == "EDITOR") return (GameState & STATE_SCENARIO_EDITOR) != 0;
-    return true;
-}
+// Every menu has its button: MainMenu_menu_init adds the nine with the shown flag and nothing hides
+// a whole menu (Menu_UNK6 / UNK7, the menu's flag 1, have no callers): NETWORK, SCENARIO and EDIT MAP
+// are in the column in a single-player game too (the original's screenshot).
+bool menu_shown(const Menu&) { return true; }
 
 int32_t color(int32_t r, int32_t g, int32_t b) { return Palette_get_nearest_palette_index(&GamePalette, r, g, b, 1); }
 
@@ -317,7 +318,10 @@ void build_pulldown(const Menu& m) {
         if (it.disabled && !it.separator) PullDown_disable_item(&g_pd, it.id);
         if (it.checked) PullDown_check_item(&g_pd, it.id);
     }
-    pulldown_place(&g_pd, m.x + m.w, m.y);
+    // AlphaMenu_on_adjust_pulldown_pos: x the column's right, y its button's spot plus the window's
+    // offset (12, read from the original's screenshot: NETWORK's pull-down at 140,398 under its
+    // button at 0,385), then PullDown_show's +1 of a parentless pull-down.
+    pulldown_place(&g_pd, m.x + m.w + 1, m.y + 12 + 1);
 }
 UiRect pulldown_rect(const Menu& m) {
     build_pulldown(m);
@@ -330,33 +334,36 @@ int32_t item_at(const Menu& m, int32_t y) {
     return pulldown_row_at(&g_pd, y - g_pd.y);
 }
 
-void close_menus() {
-    g_open = false;
+// Menu_hide_menus: the open pull-down closed (the column stays).
+void close_pulldown() {
+    if (g_cur < 0) return;
     g_cur = -1;
     g_sel = -1;
+    std::fprintf(stderr, "menu pull-down closed\n");
     ui_invalidate();
 }
 
 void choose(const Item& it) {
     if (it.disabled) return;  // (Menu_menu_event: a disabled item does nothing)
-    close_menus();
+    // Menu_on_left_up / Menu_on_key_click (Enter): the pull-down closed, the menu kept (AlphaMenu's
+    // flags 5: bit 4, the column stays shown), the item's id to the menu procedure.
+    close_pulldown();
     std::fprintf(stderr, "menu item %03X %s\n", it.id, it.text.c_str());
     Console_menu_proc(&MainConsole, it.id);  // Menu_menu_event -> Console_menu_daemon
 }
 
-// AlphaMenu_show (0x403680): the column shown with fx\amenu2.wav (the interface sounds) and, with
-// the "animate interface" preference outside multiplayer, slid in: its picture drawn six times in
-// its rectangle, from y = bottom - top piece's height up by a fifth of its height per frame
-// (DAT_00691AF8 ms apart). Unattended runs skip the frames.
-void alphamenu_show() {
+// AlphaMenu_show (0x403680) / AlphaMenu_hide (0x403830): fx\amenu2.wav (the interface sounds) and,
+// with the "animate interface" preference outside multiplayer, the column's slide: its picture
+// drawn six times in its rectangle (DAT_00691AF8 ms apart), by a fifth of the rectangle's height
+// per frame: shown, from the bottom less the top piece up; hidden, from its place down to the
+// bottom less the top piece. Unattended runs skip the frames.
+void alphamenu_slide(bool show) {
     if (GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE) Wave_play_2(mem::host(0x6A7090));
-    std::fprintf(
-        stderr, "alphamenu show (sound %d, slide %d)\n", (GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE) ? 1 : 0,
-        (GamePreferences & PREF_AV_SLIDING_WINDOWS) && !MultiplayerActive && !g_ui_unattended ? 1 : 0);
+    bool slide = (GamePreferences & PREF_AV_SLIDING_WINDOWS) && !MultiplayerActive && !g_ui_unattended;
+    std::fprintf(stderr, "alphamenu %s (sound %d, slide %d)\n", show ? "show" : "hide",
+                 (GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE) ? 1 : 0, slide ? 1 : 0);
     Buffer* scr = ui_screen_canvas();
-    if (!(GamePreferences & PREF_AV_SLIDING_WINDOWS) || MultiplayerActive || g_ui_unattended || !scr ||
-        !scr->data)
-        return;
+    if (!slide || !scr || !scr->data) return;
     load_art();
     // The column's picture: drawn alone into a screen-sized canvas of colour 9.
     Buffer pic;
@@ -366,20 +373,26 @@ void alphamenu_show() {
     Buffer_set_clip(&pic, &all);
     Buffer_fill_3(&pic, &all, 9);
     int32_t keep = g_cur;
+    bool shown = g_open;
     g_cur = -1;
+    g_open = true;
     console_menu_draw(&pic);
     g_cur = keep;
+    // The screen under the column: without it (shown) / without its pull-down (hidden).
+    g_open = false;
+    ui_invalidate();
     ui_present();
+    g_open = shown;
     std::vector<uint8_t> screen(scr->data, scr->data + (size_t)scr->stride * scr->height);
     const int32_t x0 = column_x(), top = column_y(), h = column_h(), bottom = top + h;
     const int32_t w = g_art.top.full_width;
-    const int32_t step = h / 5;
-    int32_t y = bottom - g_art.top.full_height;
+    const int32_t step = h / 5, last = bottom - g_art.top.full_height;
+    int32_t y = show ? last : top;
     std::fprintf(stderr, "alphamenu slide %dx%d at %d,%d\n", w, h, x0, top);
     for (int32_t f = 0; f < 6; f++) {
         uint32_t t = platform::ticks_ms();
         std::memcpy(scr->data, screen.data(), screen.size());
-        for (int32_t j = top; j < bottom && j < scr->height; j++) {
+        for (int32_t j = std::max(top, y); j < bottom && j < scr->height; j++) {
             int32_t sj = j - y + top;  // the picture's row shown at screen row j
             if (j < 0 || sj < top || sj >= bottom) continue;
             const uint8_t* src = pic.data + (size_t)sj * pic.stride;
@@ -389,30 +402,54 @@ void alphamenu_show() {
         }
         platform::video_present(scr->data, scr->stride, scr->width, scr->height,
                                 reinterpret_cast<const platform::Rgb*>(GamePalette.rgb));
-        y -= step;
+        if (show) y -= step;
+        else y = std::min(y + step, last);
         while ((int32_t)(platform::ticks_ms() - t) < *reinterpret_cast<int32_t*>(mem::host(0x691AF8)))
             platform::delay_ms(1);
     }
     std::memcpy(scr->data, screen.data(), screen.size());
+    ui_invalidate();
 }
 
-void open_menu(int32_t i) {
-    if (!g_open) {
-        g_open = true;
-        alphamenu_show();
-    }
+// MainInterface_on_iface_button_clicked (0x3EB, the MENU button): AlphaMenu_show when hidden, else
+// Menu_hide_menus and AlphaMenu_hide.
+void show_column(bool kbd) {
+    if (g_open) return;
+    g_hover = -1;
+    g_kbd = kbd;
+    layout(nullptr);
+    alphamenu_slide(true);
     g_open = true;
+    std::fprintf(stderr, "menu column shown at %d,%d (%dx%d)\n", column_x(), column_y(), g_art.top.full_width,
+                 column_h());
+    ui_invalidate();
+}
+void hide_column() {
+    if (!g_open) return;
+    close_pulldown();
+    g_hover = -1;  // (AlphaMenu_hide: DAT_00696E3C = -1)
+    alphamenu_slide(false);
+    g_open = false;
+    g_kbd = false;
+    std::fprintf(stderr, "menu column hidden\n");
+    ui_invalidate();
+}
+
+// Menu_on_left_down / Menu_on_key_click: the menu's pull-down shown, its first item selected when
+// opened by the keyboard.
+void open_menu(int32_t i, bool by_key) {
+    show_column(by_key);
     g_cur = i;
     g_sel = -1;
     layout(nullptr);
-    if (i >= 0) {
-        const Menu& m = g_menus[i];
-        std::fprintf(stderr, "menu column at %d,%d (%dx%d): %s at %d,%d\n", column_x(), column_y(),
-                     g_art.top.full_width, column_h(), m.title.c_str(), m.x, m.y);
-    }
-    if (i >= 0) {
-        for (size_t k = 0; k < g_menus[i].items.size(); k++) {
-            if (!g_menus[i].items[k].hidden && !g_menus[i].items[k].separator) {
+    const Menu& m = g_menus[i];
+    build_pulldown(m);
+    std::fprintf(stderr, "menu column at %d,%d (%dx%d): %s at %d,%d; pull-down at %d,%d (%dx%d)\n", column_x(),
+                 column_y(), g_art.top.full_width, column_h(), m.title.c_str(), m.x, m.y, g_pd.x, g_pd.y, g_pd.w,
+                 g_pd.h);
+    if (by_key) {
+        for (size_t k = 0; k < m.items.size(); k++) {
+            if (!m.items[k].hidden && !m.items[k].separator && !m.items[k].disabled) {
                 g_sel = (int32_t)k;
                 break;
             }
@@ -421,129 +458,188 @@ void open_menu(int32_t i) {
     ui_invalidate();
 }
 
+// Menu_on_key_click's Left / Right: the previous / next menu in the column's order (MainMenu_menu_init's,
+// kAddOrder), wrapping; from -1 (d 1) the first.
 int32_t step_menu(int32_t i, int32_t d) {
-    int32_t n = (int32_t)g_menus.size();
-    for (int32_t k = 0; k < n; k++) {
-        i = ((i + d) % n + n) % n;
-        if (menu_shown(g_menus[i])) return i;
+    int32_t pos = -1;
+    for (int32_t k = 0; k < 9; k++)
+        if (i >= 0 && i < (int32_t)g_menus.size() && g_menus[i].index == kAddOrder[k]) pos = k;
+    if (pos < 0 && d < 0) pos = 0;
+    for (int32_t n = 0; n < 9; n++) {
+        pos = ((pos + d) % 9 + 9) % 9;
+        for (size_t j = 0; j < g_menus.size(); j++)
+            if (g_menus[j].index == kAddOrder[pos] && menu_shown(g_menus[j])) return (int32_t)j;
     }
     return i;
+}
+
+// The menu whose accelerator is the key's letter (Menu_on_key_click: toupper / tolower), -1 none.
+// In the column's order: Alt+H is HQ's, before HELP's.
+int32_t menu_for_key(int32_t vk) {
+    for (int32_t k = 0; k < 9; k++)
+        for (size_t i = 0; i < g_menus.size(); i++)
+            if (g_menus[i].index == kAddOrder[k] && menu_shown(g_menus[i]) && g_menus[i].accel &&
+                std::toupper((unsigned char)g_menus[i].accel) == vk)
+                return (int32_t)i;
+    return -1;
+}
+
+// The column's button at (x, y), -1 none (AlphaMenu's spots).
+int32_t button_at(int32_t x, int32_t y) {
+    for (size_t i = 0; i < g_menus.size(); i++) {
+        const Menu& m = g_menus[i];
+        if (m.w && x >= m.x && x < m.x + m.w && y >= m.y && y < m.y + m.h) return (int32_t)i;
+    }
+    return -1;
+}
+bool in_column(int32_t x, int32_t y) {
+    int32_t x0 = column_x(), y0 = column_y();
+    return x >= x0 && x < x0 + g_art.top.full_width && y >= y0 && y < y0 + column_h();
 }
 
 }  // namespace
 
 void AlphaMenu_hide_main() {
-    if (g_open) close_menus();
+    if (g_open) hide_column();
 }
 
+void console_menu_toggle() {
+    build();
+    if (g_open) hide_column();
+    else show_column(false);
+}
+
+// The keys (Win_on_key, before the console): Alt (macOS: Option) shows the column, Alt+letter
+// opens that menu; with a pull-down open (PullDown modal, Menu_on_key_click) the arrows, Enter, the
+// items' letters, Esc / Alt (the pull-down closed, the column kept). With the column shown and no
+// pull-down the other keys reach the console (AlphaMenu is not modal), except Esc (hides it) and,
+// after Alt, the menus' letters and the arrows / Enter (the first menu).
 bool console_menu_key(int32_t key) {
     build();
     int32_t vk = key & 0xFFFF;
+    bool alt = (key & 0x40000) != 0;
     if (Win_is_visible(&BaseWin) && !g_open) return false;
-    if (!g_open) {
-        if (vk == VKEY_MENU || (key & 0x40000)) {
-            // Alt opens the bar; Alt+letter the menu with that accelerator.
-            if (vk == VKEY_MENU) {
-                open_menu(-1);
-                return true;
+    if (g_cur >= 0) {
+        if (vk == VKEY_ESCAPE || vk == VKEY_MENU) {
+            close_pulldown();
+            return true;
+        }
+        Menu& m = g_menus[g_cur];
+        int32_t n = (int32_t)m.items.size();
+        auto move = [&](int32_t d) {
+            for (int32_t k = 0; k < n; k++) {
+                g_sel = (g_sel < 0 && d < 0) ? n - 1 : ((g_sel + d) % n + n) % n;
+                if (!m.items[g_sel].hidden && !m.items[g_sel].separator) break;
             }
-            for (size_t i = 0; i < g_menus.size(); i++) {
-                if (menu_shown(g_menus[i]) && g_menus[i].accel == vk) {
-                    open_menu((int32_t)i);
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-    if (vk == VKEY_ESCAPE || vk == VKEY_MENU) {
-        close_menus();
-        return true;
-    }
-    if (g_cur < 0) {
-        int32_t first = step_menu(-1, 1);
-        if (vk == VKEY_RETURN || vk == VKEY_DOWN) open_menu(first);
-        else if (vk == VKEY_RIGHT) open_menu(first);
-        else {
-            for (size_t i = 0; i < g_menus.size(); i++)
-                if (menu_shown(g_menus[i]) && g_menus[i].accel == vk) open_menu((int32_t)i);
-        }
-        return true;
-    }
-    Menu& m = g_menus[g_cur];
-    int32_t n = (int32_t)m.items.size();
-    auto move = [&](int32_t d) {
-        for (int32_t k = 0; k < n; k++) {
-            g_sel = ((g_sel + d) % n + n) % n;
-            if (!m.items[g_sel].hidden && !m.items[g_sel].separator) break;
-        }
-        ui_invalidate();
-    };
-    switch (vk) {
-    case VKEY_DOWN: move(1); break;
-    case VKEY_UP: move(-1); break;
-    case VKEY_LEFT: open_menu(step_menu(g_cur, -1)); break;
-    case VKEY_RIGHT: open_menu(step_menu(g_cur, 1)); break;
-    case VKEY_RETURN:
-        if (g_sel >= 0) choose(m.items[g_sel]);
-        break;
-    default:
-        for (const Item& it : m.items) {
-            if (!it.hidden && !it.separator && it.accel == vk) {
-                choose(it);
+            ui_invalidate();
+        };
+        switch (vk) {
+        case VKEY_DOWN: move(1); break;
+        case VKEY_UP: move(-1); break;
+        case VKEY_LEFT:
+        case 0x64: open_menu(step_menu(g_cur, -1), true); break;
+        case VKEY_RIGHT:
+        case 0x66: open_menu(step_menu(g_cur, 1), true); break;
+        case VKEY_RETURN:
+            if (g_sel >= 0) choose(m.items[g_sel]);
+            else close_pulldown();
+            break;
+        default:
+            if (alt && menu_for_key(vk) >= 0) {
+                open_menu(menu_for_key(vk), true);
                 break;
             }
+            for (const Item& it : m.items) {
+                if (!it.hidden && !it.separator && !it.disabled && it.accel &&
+                    std::toupper((unsigned char)it.accel) == vk) {
+                    choose(it);
+                    break;
+                }
+            }
+            break;
         }
-        break;
+        return true;
     }
-    return true;
+    if (vk == VKEY_MENU) {  // (pressed before the letter of Alt+letter: never hides the column)
+        if (g_open) g_kbd = true;
+        else show_column(true);
+        return true;
+    }
+    if (alt && menu_for_key(vk) >= 0) {
+        open_menu(menu_for_key(vk), true);
+        return true;
+    }
+    if (!g_open) return false;
+    if (vk == VKEY_ESCAPE) {
+        hide_column();
+        return true;
+    }
+    if (g_kbd) {
+        if (menu_for_key(vk) >= 0) {
+            open_menu(menu_for_key(vk), true);
+            return true;
+        }
+        if (vk == VKEY_RETURN || vk == VKEY_DOWN || vk == VKEY_RIGHT || vk == VKEY_UP || vk == VKEY_LEFT) {
+            open_menu(step_menu(-1, 1), true);
+            return true;
+        }
+    }
+    return false;
 }
 
+// The mouse (before the console's frame and map): AlphaMenu_on_mouse_move's hover, Menu_on_left_down
+// (a button opens its pull-down, the open one's button closes it), the pull-down's rows (released
+// on a row: chosen); a press outside closes an open pull-down (PullDown modal) and is consumed,
+// without one it goes on to the map / console, the column staying (AlphaMenu's flag 4).
 bool console_menu_mouse(int32_t type, int32_t x, int32_t y) {
     build();
     if (!g_open) return false;
+    layout(nullptr);
+    bool pd = false;
+    if (g_cur >= 0) {
+        UiRect r = pulldown_rect(g_menus[g_cur]);
+        pd = x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+    }
+    int32_t b = button_at(x, y);
     if (type == UiInput::MOVE) {
-        int32_t hover = -1;  // AlphaMenu_on_mouse_move: the button under the mouse
-        for (size_t i = 0; i < g_menus.size(); i++) {
-            const Menu& m = g_menus[i];
-            if (m.w && x >= m.x && x < m.x + m.w && y >= m.y && y < m.y + m.h) hover = (int32_t)i;
-        }
-        if (hover != g_hover) {
-            g_hover = hover;
+        if (b != g_hover) {
+            g_hover = b;
             ui_invalidate();
         }
         if (g_cur >= 0) {
-            UiRect r = pulldown_rect(g_menus[g_cur]);
-            if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) {
-                int32_t i = item_at(g_menus[g_cur], y);
-                if (i != g_sel) {
-                    g_sel = i;
-                    ui_invalidate();
-                }
+            int32_t i = pd ? item_at(g_menus[g_cur], y) : -1;
+            if (i >= 0 && g_menus[g_cur].items[i].disabled) i = -1;
+            if (i != g_sel) {
+                g_sel = i;
+                ui_invalidate();
             }
         }
-        return true;
+        return g_cur >= 0 || in_column(x, y);
     }
-    if (type != UiInput::LDOWN && type != UiInput::LUP) return true;
-    for (size_t i = 0; i < g_menus.size(); i++) {  // the column's buttons (AlphaMenu's spots)
-        const Menu& m = g_menus[i];
-        if (m.w && x >= m.x && x < m.x + m.w && y >= m.y && y < m.y + m.h) {
-            if (type == UiInput::LDOWN) open_menu((int32_t)i);
-            return true;
-        }
-    }
-    if (g_cur >= 0) {
-        UiRect r = pulldown_rect(g_menus[g_cur]);
-        if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) {
-            if (type == UiInput::LUP) {
-                int32_t i = item_at(g_menus[g_cur], y);
-                if (i >= 0) choose(g_menus[g_cur].items[i]);
+    if (type == UiInput::LDOWN || type == UiInput::RDOWN) {
+        if (b >= 0) {
+            if (type == UiInput::LDOWN) {
+                if (b == g_cur) close_pulldown();
+                else open_menu(b, false);
             }
             return true;
         }
+        if (pd) return true;
+        if (g_cur >= 0) {
+            close_pulldown();
+            return true;
+        }
+        return in_column(x, y);
     }
-    if (type == UiInput::LDOWN) close_menus();
-    return true;
+    if (type == UiInput::LUP || type == UiInput::RUP) {
+        if (pd) {
+            int32_t i = item_at(g_menus[g_cur], y);
+            if (i >= 0) choose(g_menus[g_cur].items[i]);
+            return true;
+        }
+        return in_column(x, y) || b >= 0;
+    }
+    return in_column(x, y) || pd;
 }
 
 void console_menu_check(int32_t index, int32_t id, bool on) {
