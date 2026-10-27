@@ -53,7 +53,9 @@
 // map preview: its zoom, centre and route lines), and the commands SHOT[:FILE]
 // (screenshot), SAVE:FILE (save the game
 // and its generators in FILE.rng, relative to --outdir), UNITS (list the human's units on
-// stderr), PIXEL:XxY (the presented screen's palette index and colour at X,Y), WAIT:MS (no
+// stderr), PIXEL:XxY (the presented screen's palette index and colour at X,Y), WAITFOR:TEXT (no
+// scripted input until the online game noted a line containing TEXT ("net: ..." on stderr, after
+// the last line a WAITFOR matched; 300 s at most), WAIT:MS (no
 // scripted input for MS ms: the waiting loop runs its timers and animations as for a player who
 // waits), QUIT. --exit-after-keys (default with --hidden) quits when they run out.
 // Such unattended runs skip the animations (window slides, unit moves, booms, battle reports,
@@ -618,6 +620,10 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         if (c3 != std::string::npos) out->command += " " + tok.substr(c3 + 1);
         return true;
     }
+    if (tok.rfind("WAITFOR:", 0) == 0) {  // WAITFOR:TEXT, until a network note contains TEXT (test aid)
+        out->command = "waitfor " + tok.substr(8);
+        return true;
+    }
     if (tok.rfind("WAIT:", 0) == 0) {  // WAIT:MS, real time passing, then a present (test aid)
         out->command = "wait " + tok.substr(5);
         return true;
@@ -844,6 +850,25 @@ int main(int argc, char** argv) {
     ui_script_keys(g_opt.keys);
     g_harness_top_menu = menu ? main_menu : start_game_menu;
     g_harness_turn_upkeep = harness_turn_upkeep;
+    // An online game: the state (no save) before each turn_upkeep, to compare the players' copies.
+    g_harness_net_turn = [] {
+        if (g_opt.snapshots.empty()) return;
+        char name[32];
+        std::snprintf(name, sizeof(name), "turn_%03d", CurrentTurn);
+        std::string base = (fs::path(g_opt.snapshots) / name).string();
+        write_state(base + ".state");
+        if (FILE* f = std::fopen((base + ".rng").c_str(), "w")) {
+            std::fprintf(f, "crt %u\ngame %u\nturn %d\n", crt_rand_state(), game_random_state(), CurrentTurn);
+            std::fclose(f);
+        }
+        // SMACX_NET_DESYNC=TURN (test aid): this copy's last unit changes its morale at that turn, a desync
+        // the other players' checksums find.
+        const char* d = std::getenv("SMACX_NET_DESYNC");
+        if (d && std::atoi(d) == CurrentTurn && VehCount > 0) {
+            Vehs[VehCount - 1].morale ^= 1;
+            std::fprintf(stderr, "net: desync provoked (unit %d, turn %d)\n", VehCount - 1, CurrentTurn);
+        }
+    };
     // Observer games: the pause is taken before turn_upkeep (harness_turn_upkeep), not in the
     // round-end Console_human_turn.
     g_harness_observer_pause = [] { return 0; };

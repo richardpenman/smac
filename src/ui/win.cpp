@@ -18,6 +18,7 @@
 #include <set>
 
 #include "engine/clock.h"
+#include "engine/net.h"
 #include "engine/random.h"
 #include "engine/save.h"
 #include "engine/turn.h"
@@ -631,9 +632,46 @@ static void ui_mouse(int32_t type, int32_t x, int32_t y) {
 
 // WAIT:MS at the front of the script: no scripted input until MS have passed, the waiting loop
 // running as without input (its timers, animations and presents), as a player who waits.
+namespace {
+std::vector<std::string> g_net_notes;  // ui_net_note: the online game's notes (WAITFOR)
+size_t g_net_notes_seen = 0;             // the notes before this one are matched already
+bool (*g_idle_hook)() = nullptr;
+}  // namespace
+
+void ui_net_note(const std::string& text) {
+    std::fprintf(stderr, "%s\n", text.c_str());
+    g_net_notes.push_back(text);
+}
+
+void ui_set_idle_hook(bool (*hook)()) { g_idle_hook = hook; }
+
+// WAITFOR:TEXT: true once a note after the last match contains TEXT (then the match moves on).
+static bool net_note_seen(const std::string& text) {
+    for (size_t i = g_net_notes_seen; i < g_net_notes.size(); i++) {
+        if (g_net_notes[i].find(text) != std::string::npos) {
+            g_net_notes_seen = i + 1;
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool script_ready() {
     static bool waiting = false;
     static uint32_t deadline = 0;
+    while (!g_script.empty() && g_script.front().command.rfind("waitfor ", 0) == 0) {
+        static uint32_t since = 0;
+        uint32_t now = platform::ticks_ms();
+        if (!since) since = now;
+        std::string what = g_script.front().command.substr(8);
+        if (!net_note_seen(what)) {
+            if (now - since < 300000) return false;
+            std::fprintf(stderr, "waitfor %s: timed out\n", what.c_str());
+        }
+        since = 0;
+        g_script.pop_front();
+        ui_trace(("waitfor done " + what).c_str());
+    }
     while (!g_script.empty() && g_script.front().command.rfind("wait ", 0) == 0) {
         uint32_t now = platform::ticks_ms();
         if (!waiting) {
@@ -649,6 +687,7 @@ static bool script_ready() {
 }
 
 void GAMEAPI wait_task() {
+    if (MultiplayerActive) Net_handle_sys_msg(&NetState);  // (do_all_tasks: the session's events)
     // do_video: the window is presented when it changed.
     if (g_dirty || g_map_dirty) ui_present();
     if (script_ready()) {
@@ -861,7 +900,8 @@ bool ui_wait_input(UiInput* in) {
         }
         if (g_script_given && g_ui_exit_when_script_done && g_script.empty()) return false;
         if (ControlTurnA) return false;
-        if (g_input.empty()) pump_platform(50);
+        if (g_idle_hook && g_idle_hook()) return false;  // (the network setup window: started)
+        if (g_input.empty()) pump_platform(g_idle_hook ? 10 : 50);
         planwin_tick(platform::ticks_ms());  // the modal popup's timers: PlanWin_blink, line_timer
         reports_tick(platform::ticks_ms());  // the reports' base locator (bl_daemon)
         auto_play_tick(false);

@@ -28,6 +28,10 @@ Buffer* ui_screen_canvas();
 // The map view must be redrawn (draw_map, draw_tile, ...) / the screen must be presented again.
 void ui_invalidate_map();
 void ui_invalidate();
+// The online game's notes ("net: ..." lines on stderr; WAITFOR:TEXT in a script waits for one).
+void ui_net_note(const std::string& text);
+// A hook run by ui_wait_input while it waits (the network setup window); true stops the wait.
+void ui_set_idle_hook(bool (*hook)());
 // The help bubble (Win_set_bubble_text): `text` (lines split at '^') above the screen point
 // (x, y); cleared by the next mouse move over the window (Win_clear_bubble_text).
 void ui_bubble_set(const char* text, int32_t x, int32_t y);

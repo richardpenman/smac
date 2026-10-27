@@ -86,6 +86,9 @@ if(SMACX_HYBRID)
 else()
   add_library(smacx_engine STATIC ${ENGINE_SOURCES} ${GEN_DIR}/native_stubs.cpp)
   target_include_directories(smacx_engine PUBLIC src)
+  if(WIN32)
+    target_link_libraries(smacx_engine PUBLIC ws2_32)  # the online transport (platform/net_tcp)
+  endif()
   # The headless UI (src/headless) is the default implementation of the engine's UI bridge
   # (engine/ui_bridge.h): a static library with one object file per UI area, linked after the
   # executable's own objects. An executable that defines every function of an area (smacx: src/ui)

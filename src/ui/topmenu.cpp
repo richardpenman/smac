@@ -778,49 +778,7 @@ int32_t GAMEAPI custom_planet(int32_t setup_win, int32_t no_dialogs) {
     return 0;
 }
 
-// ---- multiplayer_init (0x58DB30) ----
-// AlphaNet_pick_service (0x4E26E0) as AlphaNet_setup (0x4E31E0, from NetDaemon_init(0)) runs it:
-// SELECTSERVICE (jackal.txt) with the network services and, last, the hotseat/email game (label
-// 0x1128, id 9999: PbemActive). Returns 1 when cancelled. smacx has no network service yet (the
-// online phase, docs/MULTIPLAYER.md): only the hotseat/email item is listed.
-static int32_t pick_service() {
-    PbemActive = 0;
-    BasePop* pop = popup_new();
-    int32_t r = 1;
-    if (BasePop_start(pop, "jackal", "SELECTSERVICE", -1, nullptr, 0x42, nullptr) == 0) {
-        BasePop_item(pop, label_get(0x1128 / 4), 9999);
-        int32_t a = BasePop_exec_3(pop, 0, 0);
-        if (a == 9999) {
-            PbemActive = 1;
-            r = 0;
-        }
-    }
-    popup_delete(pop);
-    return r;
-}
-
-// The original sets up the network game from here (NetWin_exec: the MULTIPLAYER SETUP window,
-// then config / send_rules / send_game / send_files). The hotseat/email item of the service list
-// (PbemActive) goes to the HOTSEAT menu, top_menu(1): the game then starts as a single-player
-// one with several humans (config_game's HOTSEATADD, control_turn's handovers). Returns 0 when a
-// game starts, else the top menu shows again. The lobby start (multiplayer_init(1)) and the
-// network services are the online phase's.
-int32_t GAMEAPI multiplayer_init(int32_t lobby) {
-    if (lobby || pick_service()) {
-        // (The original's reset of the net state, Lock_clear, AlphaNet_close.)
-        MultiplayerActive = 0;
-        PbemActive = 0;
-        return 1;
-    }
-    if (PbemActive) {
-        MultiplayerActive = 0;
-        int32_t r = top_menu(1);
-        if (!r) return 0;
-        PbemActive = 0;
-        return r;
-    }
-    return 1;
-}
+// ---- multiplayer_init (0x58DB30): ui/netwin.cpp ----
 
 // ---- show_credits (0x428DF0, CreditsWin 0x428780..0x428DD0) ----
 // credits2.pcx (credits.pcx at 800x600) over the screen through its own palette (layer 2) and, in

@@ -10,6 +10,7 @@
 // turn_upkeep, poison the stack before engine entry points, stop after N turns, skip the
 // observer's end-of-round pause and run its script in place of the main menu.
 extern int32_t (*g_harness_turn_upkeep)();  // control_turn -> turn_upkeep
+extern void (*g_harness_net_turn)();  // net_control_turn: before turn_upkeep (smacx --snapshots)
 extern int32_t (*g_harness_faction_upkeep)(int32_t);  // control_turn -> faction_upkeep
 extern int32_t (*g_harness_enemy_turn)(int32_t);  // control_turn -> enemy_turn
 extern int32_t (*g_harness_human_turn)();  // control_turn -> Console_human_turn (human)

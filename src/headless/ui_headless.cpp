@@ -106,6 +106,4 @@ void ui_stringlist_add(uint8_t* list, int32_t id, char* text) {
     *reinterpret_cast<int32_t*>(list + 0x14) = (int32_t)entries.size() - 1;
 }
 void GAMEAPI do_all_draws() {}
-void THISCALL Lock_clear(uint8_t*) {}
-void THISCALL AlphaNet_close(uint8_t*) {}
 #endif

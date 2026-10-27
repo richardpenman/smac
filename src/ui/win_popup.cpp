@@ -263,10 +263,18 @@ int32_t GAMEAPI POP3(const char* label, int32_t, int32_t, int32_t, int32_t) {
 }
 
 // NetMsg_pop (0x47A890): in single player (a3 0, or no interface window open) a modal popup with
-// an OK button; the timed message box of multiplayer games is not reconstructed.
+// an OK button. In a network game the original shows the message box without waiting (a timer of
+// `delay` ms or NetMsg_close hides it); approximated: the text goes to the message line (and a
+// "netmsg LABEL: text" line to stderr) and the game goes on at once.
 int32_t THISCALL NetMsg_pop(uint8_t*, const char* label, int32_t delay, int32_t a3, const char* pcx) {
     PopupHolder h;
     popup_start(h.pop, ScriptFileName, label, -1, nullptr, 0);
+    if (MultiplayerActive) {
+        std::string text = BasePop_text(h.pop);
+        std::fprintf(stderr, "netmsg %s: %s\n", label, text.c_str());
+        ui_set_message(text);
+        return 0;
+    }
     if (pcx && !MultiplayerActive && delay < 0) BasePop_set_picture(h.pop, pcx);
     (void)a3;
     BasePop_exec_3(h.pop, 0, 0);

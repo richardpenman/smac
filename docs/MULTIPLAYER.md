@@ -153,3 +153,34 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   a wrong one on load, SAVE AND EXIT at each handover, a save loaded twice (HOTNOTAMPER; the
   record's load count 2), the other player told at their next turn (HOTTAMPER2), and the save
   refused as a single-player load (PASSWORDEDLOADATTEMPT).
+
+**Phase 3 (online, TCP between smacx copies): in progress.**
+* Group 1, the transport (done): src/platform/net_tcp.{h,cpp} (frames: a 16-byte header -- size,
+  kind, from, to -- then the payload; the host relays; pids: the host 1, the clients 2, 3, ... in
+  join order; join / leave events; non-blocking sockets, POSIX and Winsock), unit-tested by
+  tests/unit/test_net_tcp.cpp (framing at any split, oversized frames, routing, the player list, a
+  host and two clients on localhost). src/engine/net_link.cpp gives the original's Net_send /
+  Net_get / Net_get_player_name / Net_close / Net_handle_sys_msg over it (a message to everyone
+  also reaches its sender, as with Net_init's session flags; DirectPlay's player list sent to a
+  joining player becomes its NetDaemon_on_player_added calls). Hybrid builds keep DirectPlay.
+* Group 2, the setup (done): src/ui/netwin.cpp: multiplayer_init's network path, AlphaNet_setup
+  (SELECTSERVICE: the hotseat/email item, then "Internet (TCP/IP)"; NETCONNECT_JOIN_OR_CREATE;
+  smacx's TCPHOST / TCPJOIN popups (smacxnet.txt) for the name, address and port, kept in the
+  prefs Net Name / Net Address / Net Port), NetWin_config_players, NetWin_setup_faction_data,
+  NetWin_fill_player, NetWin_on_button_clicked (ready / start, NOTALLREADY), NetWin_prepare_game
+  (Random_reseed(1000)); the setup packets (0x0F02/03/04/0D) in the engine. Approximated: the
+  MULTIPLAYER SETUP window is a plain list (F the faction, C a chat line, Enter ready / start, Esc
+  cancel); the host's map and rule settings stay the defaults (a random map, NetSetupType 0); no
+  scenario file transfer (NetDaemon_send_files, 0x0F05..0x0F0C).
+* Group 3, turns, synch and locks (working, being extended): src/engine/net_daemon.cpp (routing,
+  message_* / synch_*, NetDaemon_synch's blocks -- the rule tables travel in the original's 32-bit
+  layout --, send_rules / send_game, the locks' requests, order_veh / action / await_*, the
+  deletion list, game_checksum), net_process.cpp (process_message), net_lock.cpp (Lock,
+  PlayerLock, SquareLock), net_turn.cpp (net_control_turn, net_upkeep and its phases,
+  net_end_of_turn, net_not_my_turn, mash_planes, set_time_controls). Approximated: NetMsg_pop in
+  a network game writes to the message line instead of its timed box.
+* What the original never sends to the players (so their copies differ there too): the
+  monuments, the abstract map (only world_build's Path_continents computes it), the
+  world-generation generator; each machine's unit stacking order and focus bit are its own.
+* tests/online/run.sh: two processes (host and client) on localhost, three turns, states compared
+  each turn, the checksums; a provoked desync resent by the host.

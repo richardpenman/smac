@@ -146,7 +146,12 @@ bool host_mkdir(const char* path) {
 
 namespace {
 std::string g_saves_dir;  // set_saves_dir
+std::vector<std::pair<std::string, std::string>> g_builtin_files;  // set_builtin_file
 }  // namespace
+
+void set_builtin_file(const char* name, const char* host_path) {
+    g_builtin_files.emplace_back(name, host_path);
+}
 
 void set_saves_dir(const char* dir) {
     g_saves_dir = dir ? dir : "";
@@ -195,6 +200,13 @@ const char* resolve_path(const char* path, char* out, uint32_t out_size) {
         }
         if (e == std::string::npos) break;
         pos = e + 1;
+    }
+    if (!ok && !g_builtin_files.empty()) {
+        size_t slash = p.find_last_of('/');
+        std::string file = slash == std::string::npos ? p : p.substr(slash + 1);
+        for (const auto& b : g_builtin_files) {
+            if (ieq(b.first, file)) result = b.second;
+        }
     }
     std::snprintf(out, out_size, "%s", result.c_str());
     return out;

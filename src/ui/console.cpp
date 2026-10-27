@@ -1225,8 +1225,28 @@ void THISCALL Console_end_my_turn(uint8_t* self) {
         return;
     }
     if (MultiplayerActive) {
-        console_not_reconstructed("Console_end_my_turn (multiplayer)");
-        return;
+        if ((GameMoreRules & 0x10) && CurrentFaction != CurrentPlayerFaction) {  // not our turn
+            const MFaction& m = MFactions[CurrentFaction];
+            PluralDefault = 0;
+            GenderDefault = m.is_leader_female;
+            parse_says(0, m.title_leader, -1, -1);
+            PluralDefault = 0;
+            GenderDefault = m.is_leader_female;
+            parse_says(1, m.name_leader, -1, -1);
+            GenderDefault = m.noun_gender;
+            PluralDefault = m.is_noun_plural;
+            parse_says(2, m.noun_faction, -1, -1);
+            const char* name = Net_get_player_name(&NetState, AlphaNet_who_2_pid(&NetState, CurrentFaction));
+            parse_says(3, name ? name : "", -1, -1);
+            NetMsg_pop(&NetMsg, "SIMULWHOSE", 5000, 0, nullptr);
+            return;
+        }
+        if ((GameState & 2) && !(GameMoreRules & 0x10) && (NetTurnDoneMask & (1 << (CurrentPlayerFaction & 31))) &&
+            NetTurnDoneMask != 0xFF) {  // the end of turn withdrawn
+            NetMsg_pop(&NetMsg, "ATTEMPTTOCANCEL", 5000, 0, nullptr);
+            message_data(0x2302, 0, CurrentTurn, 0, 0, 0);
+            return;
+        }
     }
     if (!mw(self, kConTurnActive)) return;
     if (!(GameState & 2)) {

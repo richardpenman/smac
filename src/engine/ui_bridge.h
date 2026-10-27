@@ -204,8 +204,6 @@ ADDR_NATIVE(0x5BF7D0) int32_t GAMEAPI X_pops_11(const char* label, int32_t flags
 GLOBAL_NATIVE(const char* [8], FactionPortraits, 0x6846D8);
 ADDR_NATIVE(0x453F70) void GAMEAPI load_flags();
 // Network UI objects closed when an iron man multiplayer game is saved.
-ADDR_NATIVE(0x5900D0) void THISCALL Lock_clear(uint8_t* lock);
-ADDR_NATIVE(0x4E25B0) void THISCALL AlphaNet_close(uint8_t* net);
 // Multiplayer setup: name of the loaded game and its kind (0x811D1C, 0x811E20).
 GLOBAL(char[256], NetGameFileName, 0x811D1C);
 GLOBAL(int32_t, NetGameFileKind, 0x811E20);
