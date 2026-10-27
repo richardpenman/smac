@@ -598,9 +598,19 @@ static void default_sliding_windows_off(const std::string& path) {
     win32::WritePrivateProfileStringA("Alpha Centauri", "Preferences", bits.c_str(), path.c_str());
 }
 
-void seed_ini(const std::string& path) {
+void seed_ini(const std::string& path, const std::string& udir) {
     std::error_code ec;
-    if (fs::exists(path, ec)) return;
+    // An ini from before this default loses "Sliding windows" once (smacx.cfg records it), so a
+    // player who turns them on again keeps them.
+    const char* kMigrated = "sliding_windows_off";
+    if (fs::exists(path, ec)) {
+        if (config_get(udir, kMigrated).empty()) {
+            default_sliding_windows_off(path);
+            config_set(udir, kMigrated, "1");
+            std::fprintf(stderr, "smacx: \"Sliding windows\" turned off in %s (once)\n", path.c_str());
+        }
+        return;
+    }
     bool copied = false;
     if (char* base = SDL_GetBasePath()) {
         std::string bundled = std::string(base) + "Alpha Centauri.Ini";
@@ -609,6 +619,7 @@ void seed_ini(const std::string& path) {
     }
     if (!copied) write_file(path, kDefaultIni, sizeof(kDefaultIni));
     default_sliding_windows_off(path);
+    config_set(udir, kMigrated, "1");
 }
 
 void show_error(const std::string& text) {

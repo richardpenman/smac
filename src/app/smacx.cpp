@@ -795,7 +795,7 @@ int main(int argc, char** argv) {
         }
         if (g_opt.ini.empty()) {
             ini_copy = (fs::path(udir) / "Alpha Centauri.Ini").string();
-            gamedata::seed_ini(ini_copy);
+            gamedata::seed_ini(ini_copy, udir);
         } else {
             ini_copy = fs::absolute(g_opt.ini).string();
         }

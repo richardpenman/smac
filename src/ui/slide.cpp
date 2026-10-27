@@ -11,6 +11,7 @@
 // 8, 8, 15 x 0x211) along its sides, the outer ones not above y 0xEE (0x5E at 800); at the end
 // slide_show draws the arms into the window's canvas.
 // Unattended runs (--hidden with scripted keys) skip the frames (the sound and the arms stay).
+#include <cstdlib>
 #include <cstring>
 #include <vector>
 
@@ -97,6 +98,9 @@ void frame(const std::vector<uint8_t>& screen, Buffer* scr, const Buffer* win, i
 }
 
 void wait_frame(uint32_t start) {
+    // SMACX_SLIDELOG=1: each frame's start and the time its drawing and present took (profiling).
+    static const bool log = std::getenv("SMACX_SLIDELOG") != nullptr;
+    if (log) std::fprintf(stderr, "slide frame at %u ms: drawn in %u ms\n", start, platform::ticks_ms() - start);
     while ((int32_t)(platform::ticks_ms() - start) < *reinterpret_cast<int32_t*>(mem::host(0x691AF8)))
         platform::delay_ms(1);
 }

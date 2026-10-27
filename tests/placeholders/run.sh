@@ -463,6 +463,22 @@ if [ "$(uname)" = Linux ]; then
     if grep -q "^Preferences=10110011111000011101110110110110" "$OUT/firstrun/smacx/Alpha Centauri.Ini"; then
         echo "PASS firstrun: the ini's Preferences"; else echo "FAIL firstrun: the ini's Preferences"; FAIL=1; fi
     nocrash firstrun
+    # An ini from before that default (sliding windows on) loses them once; turned on again, they
+    # stay (smacx.cfg records the migration).
+    on="10111011111000011101110110110110"
+    ini="$OUT/firstrun/smacx/Alpha Centauri.Ini"
+    rm -f "$OUT/firstrun/smacx/smacx.cfg"
+    sed -i "s/^Preferences=.*/Preferences=$on/" "$ini"
+    for pass in 1 2; do
+        (cd "$ROOT" && XDG_DATA_HOME="$OUT/firstrun" SMACX_GAMEDIR="$ROOT/game" SDL_VIDEODRIVER=dummy timeout 600 \
+            "$SMACX" --hidden $NEW --keys "ENTER" > "$OUT/migrate$pass.log" 2>&1)
+        grep "^Preferences=" "$ini" > "$OUT/migrate$pass.prefs"
+        sed -i "s/^Preferences=.*/Preferences=$on/" "$ini"
+    done
+    if grep -q "^Preferences=10110011111000011101110110110110" "$OUT/migrate1.prefs" && \
+       grep -q "^Preferences=$on" "$OUT/migrate2.prefs"; then
+        echo "PASS firstrun: an older ini's sliding windows turned off once"
+    else echo "FAIL firstrun: an older ini's sliding windows turned off once"; FAIL=1; fi
 fi
 
 # 27. Enter / space with the message list shown (M): Console_on_key_click's
