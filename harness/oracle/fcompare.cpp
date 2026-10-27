@@ -13,7 +13,9 @@
 #include "engine/clock.h"
 #include "engine/globals.h"
 #include "engine/hybrid_patch.h"
+#include "engine/memmap.h"
 #include "fcompare_table.h"
+#include "state_hash.h"
 
 namespace {
 
@@ -31,8 +33,11 @@ bool g_on = false;
 int g_from = 0, g_to = -1;
 bool g_hook_turn = true, g_hook_faction = false, g_hook_enemy = false;
 int g_limit_pure = 2000, g_limit_mut = 100;
+int g_every = 1; /* every=N: only the hooks of turns from, from + N, ... */
+bool g_golden = false; /* golden: record the original's results (golden.tsv) */
 std::vector<FcState> g_funcs;
 FILE* g_log;
+FILE* g_golden_file;
 uint64_t g_total_calls, g_total_bad;
 
 /* deterministic private generator (does not touch the game's generators) */
@@ -51,6 +56,48 @@ void flog(const char* fmt, ...) {
     vfprintf(g_log, fmt, ap);
     va_end(ap);
     fflush(g_log);
+}
+
+/* ---- golden records (harness/README.md "Golden records") ----
+ * golden.tsv: "STATE <turn> <state hash>" at each recorded hook, then one line per call of a
+ * function that changes no game memory (no FC_MUTATES, no FC_PATHS):
+ * <name> <turn> <args> <return> <outputs> <crt state> <game state> (tab-separated), the original's
+ * results. src/tools/golden.py imports the file into tests/golden/; smacx_headless --golden
+ * replays it. */
+bool golden_eligible(const FcFunc& f) { return !(f.flags & (FC_MUTATES | FC_PATHS)); }
+void gput(const char* fmt, ...) {
+    if (!g_golden_file) {
+        char p[MAX_PATH];
+        snprintf(p, sizeof(p), "%s\\golden.tsv", oracle_outdir());
+        g_golden_file = fopen(p, "w");
+        if (!g_golden_file) return;
+    }
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(g_golden_file, fmt, ap);
+    va_end(ap);
+}
+/* A string output: bytes outside 0x21..0x7E, '%' and ',' as %XX. */
+std::string golden_escape(const char* s) {
+    std::string r;
+    for (; *s; s++) {
+        uint8_t c = (uint8_t)*s;
+        if (c <= 0x20 || c >= 0x7F || c == '%' || c == ',') {
+            char b[4];
+            snprintf(b, sizeof(b), "%%%02X", c);
+            r += b;
+        } else {
+            r += (char)c;
+        }
+    }
+    return r;
+}
+/* FNV-1a 32 of a FA_BUF buffer after the call. */
+uint32_t golden_buf_hash(const int32_t* b) {
+    uint32_t h = 2166136261u;
+    for (int k = 0; k < 17; k++)
+        for (int j = 0; j < 4; j++) h = (h ^ (((uint32_t)b[k] >> (8 * j)) & 0xFF)) * 16777619u;
+    return h;
 }
 
 /* ---- state snapshots ---- */
@@ -249,6 +296,7 @@ bool compare_one(FcState& st, const Call& c, int nargs, const char* where) {
                 outs[side][i] = 0x7777;
                 a[i] = (uint32_t)(uintptr_t)&outs[side][i];
             } else if (i < nargs && f.args[i].kind == FA_STR) {
+                memset(strs[side][i], 0, sizeof(strs[side][i])); /* defined bytes after the string */
                 strcpy(strs[side][i], "x");
                 a[i] = (uint32_t)(uintptr_t)strs[side][i];
             } else if (i < nargs && (f.args[i].kind == FA_BUF || f.args[i].kind == FA_BUF_OPT)) {
@@ -304,6 +352,37 @@ bool compare_one(FcState& st, const Call& c, int nargs, const char* where) {
             *(uint32_t*)0x9BB568 = game0;
         }
         engine_set_logic_clock_state(clock0);
+    }
+    if (g_golden && golden_eligible(f)) {
+        std::string args, outv;
+        char b[64];
+        for (int i = 0; i < nargs; i++) {
+            if (i) args += ",";
+            FcArgKind k = f.args[i].kind;
+            if (k == FA_OUT || k == FA_STR) {
+                args += k == FA_OUT ? "&" : "&s";
+            } else if (k == FA_BUF || k == FA_BUF_OPT) {
+                snprintf(b, sizeof(b), "b%u", c.a[i]);
+                args += c.a[i] == 0xFFFFFFFF ? "null" : b;
+            } else {
+                args += std::to_string((int32_t)c.a[i]);
+            }
+            if (k == FA_OUT || k == FA_STR || ((k == FA_BUF || k == FA_BUF_OPT) && c.a[i] != 0xFFFFFFFF)) {
+                if (!outv.empty()) outv += ",";
+                if (k == FA_OUT) {
+                    outv += std::to_string(outs[0][i]);
+                } else if (k == FA_STR) {
+                    outv += "s" + golden_escape(strs[0][i]);
+                } else {
+                    snprintf(b, sizeof(b), "h%08X", golden_buf_hash(bufs[0][i]));
+                    outv += b;
+                }
+            }
+        }
+        if (f.flags & FC_VOID) snprintf(b, sizeof(b), "-");
+        else snprintf(b, sizeof(b), "%d", (int32_t)ret[0]);
+        gput("%s\t%d\t%s\t%s\t%s\t%u\t%u\n", f.name, CurrentTurn, args.empty() ? "-" : args.c_str(), b,
+             outv.empty() ? "-" : outv.c_str(), after[0].crt, after[0].game);
     }
     std::string why;
     if (!(f.flags & FC_VOID) && ret[0] != ret[1]) {
@@ -490,6 +569,10 @@ void fcompare_cmd(const char* args) {
             g_hook_turn = t.find("turn") != std::string::npos;
             g_hook_faction = t.find("faction") != std::string::npos;
             g_hook_enemy = t.find("enemy") != std::string::npos;
+        } else if (!t.compare(0, 6, "every=")) {
+            g_every = atoi(t.c_str() + 6) > 0 ? atoi(t.c_str() + 6) : 1;
+        } else if (t == "golden") {
+            g_golden = true;
         } else if (!t.compare(0, 6, "limit=")) {
             sscanf(t.c_str() + 6, "%d,%d", &g_limit_pure, &g_limit_mut);
         } else if (t == "all") {
@@ -501,21 +584,24 @@ void fcompare_cmd(const char* args) {
             select_func((t[0] == '+' || t[0] == '-') ? t.c_str() + 1 : t.c_str(), on);
         }
     }
+    if (g_golden) g_hook_turn = true, g_hook_faction = g_hook_enemy = false; /* replayed at turn_upkeep */
     g_on = true;
-    oracle_logf("fcompare: %d functions, turns %d-%d, hooks%s%s%s, limits %d/%d\n", (int)g_funcs.size(), g_from, g_to,
-                g_hook_turn ? " turn" : "", g_hook_faction ? " faction" : "", g_hook_enemy ? " enemy" : "",
-                g_limit_pure, g_limit_mut);
+    oracle_logf("fcompare: %d functions, turns %d-%d every %d, hooks%s%s%s, limits %d/%d%s\n", (int)g_funcs.size(),
+                g_from, g_to, g_every, g_hook_turn ? " turn" : "", g_hook_faction ? " faction" : "",
+                g_hook_enemy ? " enemy" : "", g_limit_pure, g_limit_mut, g_golden ? ", golden records" : "");
 }
 
 void fcompare_hook(const char* where, int arg) {
-    if (!g_on || CurrentTurn < g_from || CurrentTurn > g_to) return;
+    if (!g_on || CurrentTurn < g_from || CurrentTurn > g_to || (CurrentTurn - g_from) % g_every) return;
     if ((where[0] == 't' && !g_hook_turn) || (where[0] == 'f' && !g_hook_faction) || (where[0] == 'e' && !g_hook_enemy))
         return;
     g_rng = 0x9E3779B9u ^ (uint32_t)(CurrentTurn * 977 + arg * 31 + where[0]);
     uint64_t c0 = g_total_calls, b0 = g_total_bad;
     char w[32];
     snprintf(w, sizeof(w), "%s%d", where, arg);
+    if (g_golden) gput("STATE\t%d\t%016llX\n", CurrentTurn, (unsigned long long)state_hash());
     for (auto& st : g_funcs) run_func(st, w);
+    if (g_golden_file) fflush(g_golden_file);
     flog("T%d %s: %llu calls, %llu mismatches\n", CurrentTurn, w, (unsigned long long)(g_total_calls - c0),
          (unsigned long long)(g_total_bad - b0));
     oracle_logf("fcompare T%d %s: %llu calls, %llu mismatches\n", CurrentTurn, w,
@@ -526,6 +612,7 @@ void fcompare_hook(const char* where, int arg) {
 void fcompare_finish() {
     if (!g_on) return;
     write_summary();
+    if (g_golden_file) fclose(g_golden_file), g_golden_file = nullptr;
     oracle_logf("fcompare total: %llu calls, %llu mismatches\n", (unsigned long long)g_total_calls,
                 (unsigned long long)g_total_bad);
 }

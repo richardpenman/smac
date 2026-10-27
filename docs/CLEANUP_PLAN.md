@@ -22,11 +22,12 @@ Every commit passes `src/tools/gate.sh`. The script exits non-zero on any failur
 | --- | --- | --- |
 | `static` | No original address was lost or added. The names table is current. Every fcompare entry names a declared function. Every `BUG(original)` site names a declared compat flag, and docs/COMPAT.md is current. | `src/tools/names.py check`, `src/tools/compat.py check` |
 | `build` | Native, ASan and hybrid builds compile | `cmake` into `$GATE_PREFIX-{native,asan,hybrid}` |
-| `unit` | Unit tests pass, also under ASan | `ctest` (smoke + `smacx_unit`), ASan `smacx_unit` |
+| `unit` | Unit tests pass, also under ASan; the original's recorded results of 197 functions still hold | `ctest` (smoke, `smacx_unit`, the golden replays, `names.py check`), ASan `smacx_unit` and golden replays |
 | `native` | The game is identical to the original on all 29 scenarios | `harness/verify.sh native <all>` |
 | `observer` | smacx, with every UI area replaced, plays observer games identical to the original's | `smacx --human 0 --snapshots` vs `work/ref`: tiny20 small12 std8 late140 |
 | `asan` | No memory or UB errors, same game | ASan `smacx_headless` + `compare.py`: tiny20 small12 std8 late140 council131 |
 | `hybrid` | Each reconstructed function still drops into the original | `harness/verify.sh hybrid all` tiny20 small12 std8 late140 |
+| `diffnative` | After the hybrid freeze: the native build plays new seeds and the 29 scenarios exactly as the frozen `hybrid-final` build does. Runs only when the baseline exists. | `src/tools/diffnative.sh --baseline $GATE_BASELINE` (default `hybrid-final`) |
 | `fcompare` | Function by function against the original. Run when a commit touches the functions listed in `GATE_FCOMPARE`. | `harness/verify.sh fcompare "$GATE_FCOMPARE"` |
 | `ui` | The scripted UI behaviour is unchanged, with no memory or UB errors | `tests/*/run.sh` (animated: `smacx --animate`, every slide, move, boom and movie played) with the native smacx, then with the ASan smacx (no sanitizer report in any case's log) |
 
@@ -67,8 +68,9 @@ as a C++ symbol. fcompare and patch specs also use the source name (`"none +vect
   whose signatures can no longer be cdecl. Tag it `hybrid-final`. After that, verify
   native-vs-native: the `hybrid-final` build becomes the reference, alongside `work/ref`.
   Snapshots of both builds are compared on the 29 scenarios **and on any number of new seeds and
-  saves** (cheap, no Wine). This is stronger coverage than the 29 references alone. Add
-  `src/tools/diffnative.sh` for it before the freeze.
+  saves** (cheap, no Wine). This is stronger coverage than the 29 references alone.
+  `src/tools/diffnative.sh` does it (increment 18); the gate's `diffnative` step runs it once the
+  tag exists.
 
 ## 3. Globals become game-state objects
 
@@ -200,11 +202,11 @@ and the screenshot comparisons (`tests/*/compare.sh`, which need Wine).
   pieces after the split), terrain math (`crop_yield`, `mine_yield` on a synthetic map), base
   growth formulas, social effects (`social_calc`), save round-trip (load a save, write it, compare
   bytes).
-* **Golden tests from the original:** an fcompare mode that records `(arguments, state hash) →
-  result` of the original for pure functions into `tests/golden/<fn>.tsv`, once, under Wine. A
-  data-dependent unit test category (skipped without `game/` and `data_image.bin`) loads the
-  scenario save and replays the records natively. This keeps original-checked unit tests alive
-  after the hybrid freeze.
+* **Golden tests from the original** (done, increment 17): an fcompare mode records `(arguments,
+  state hash) → result` of the original for pure functions into `tests/golden/<fn>.tsv`, once,
+  under Wine. A data-dependent test category (ctest `golden_*`, skipped without `game/` and
+  `data_image.bin`) plays the scenario natively and replays the records at their turns. This keeps
+  original-checked function tests alive after the hybrid freeze.
 * Every split or rewritten function gets unit tests for the extracted pure parts in the same
   commit.
 
@@ -242,8 +244,8 @@ Each row is one commit (or a few), and each passes the gate.
 | 14 | Split `order_veh` (176 gotos) | L | done (see note 14) |
 | 15 | Methods on layout structs (`Base::`, `Faction::`, `Veh::`) with `ADDR` forwarders | L | first pass done (see note 15) |
 | 16 | Scratch globals → contexts/locals | L | native part done; image globals after the freeze (see note 16) |
-| 17 | Golden-record fcompare mode + data-dependent unit tests | M | |
-| 18 | `diffnative.sh` (native-vs-baseline on new seeds); tag `hybrid-final` | S | |
+| 17 | Golden-record fcompare mode + data-dependent unit tests | M | done (see note 17) |
+| 18 | `diffnative.sh` (native-vs-baseline on new seeds); tag `hybrid-final` | S | script done (see note 18); the tag is set by the user |
 | 19 | Split `enemy_move` and the AI (stack residues as explicit context) | XL | |
 | 20 | Native state containers + explicit save/snapshot serialisation (phase B) | XL | |
 | 21 | UI windows: typed views, then classes | L | |
@@ -564,3 +566,56 @@ Notes on the increments:
       `VehAttackFlags` of the move and combat code. Stale reads become named context fields.
     Proof: the gate, with fcompare on `base_build`, `speed`, `Path_move`, `base_minerals`,
     `base_energy`, `wants_to_attack`.
+
+17. fcompare's `golden` option (harness/oracle/fcompare.cpp; `every=<n>` picks every n-th turn)
+    writes the original's side of every call it makes to a function that changes no game memory
+    (no `FC_MUTATES`, no `FC_PATHS`): arguments, return value, out-parameters, strings, buffer
+    hashes, generator states, and per hook the hash of the state regions (`harness/state_hash.h`).
+    `harness/golden.sh record` runs it under Wine (hybrid.dll, no patches) on tiny20 (turns 5, 12,
+    19) and late140 (turns 140, 142), at most 20 calls per function and hook, and
+    `src/tools/golden.py import` files the result as `tests/golden/<function>.tsv` plus
+    `states.tsv`: 197 functions, 17103 calls, 0.7 MB. `mandate_color` is not recorded (it returns
+    UI palette indices that headless builds never set up; `golden.py`'s `NOT_RECORDED`). The
+    replay is `smacx_headless <scenario> --golden tests/golden` (src/app/golden.cpp; implies
+    `--original-bugs`): it plays the scenario, checks the state hash at each recorded turn and calls
+    the functions through a table generated from fcompare_table.h (`golden.py gen`), comparing the
+    results in the width of the return type. Rather than a doctest case that loads a save, the
+    replay plays the scenario itself: a recorded turn's state then is exactly the one the records
+    were made on (proved by the hash), which loading a mid-game save would not guarantee for the
+    values a save does not hold. ctest runs it as `golden_tiny20` and `golden_late140` (label
+    `data`; exit 77, skipped, without the game's data, the data image or late140's saved game), so
+    the gate's unit step includes it; the unit step also replays both under ASan. Both pass with 0
+    mismatches; a record changed by hand fails (checked). One fix made the records reproducible:
+    fcompare's `FA_STR` buffers were uninitialised after the initial "x", and `bung_clear` (which
+    writes 8 bytes) left a string whose end was stack garbage; fcompare and the replay now zero the
+    buffers first.
+    Also: `names.py check` failed on main since the multiplayer work (274f013 onward), which
+    declared 71 network functions with `ADDR` and turned `Lock_clear`, `synch_energy` and
+    `AlphaNet_close` from `ADDR_NATIVE` declarations (engine/ui_bridge.h, ui/basewin.h) into
+    reconstructions (engine/net.h) without refreshing the table (`names.py update`); those commits
+    were not cleanup commits and the gate was not run on them. The table is refreshed, and ctest
+    now runs `names.py check` (test `names_table`), so a plain `make test` catches a stale table.
+
+18. `src/tools/diffnative.sh` plays the same games with a baseline `smacx_headless` and with the
+    build under test, one game at a time, and compares every snapshot with `harness/compare.py`
+    (plus the number of snapshots and the exit status). The baseline is a build directory or a git
+    revision (default the tag `hybrid-final`), which it builds once into `build/baseline-<commit>`
+    from a temporary worktree (`smacx_headless` only). The games: `--seeds N` new games whose
+    seeds, map size (0-2), difficulty and random leaders derive from the game's number (`--first K`
+    picks another set), `--save FILE` games loaded from saves with seeds of their own, and
+    `--scenarios` the harness scenarios (`all`: the 29). Both builds play with `--original-bugs`,
+    as every comparison with the original or an original-behaviour baseline must; `--fixes`
+    compares the games with the fixes instead (both builds then play the game's default, which a
+    refactoring must not change either). Checked: two identical builds pass; a baseline that plays
+    a different game (the fixes against the original's bugs) fails on the first snapshot; the
+    previous commit (d6a4db6) built as the baseline against this increment's build passes on new
+    seeds (6 games of 40 turns), two late saves (turns 140 and 200) and all 29 scenarios, and with
+    `--fixes` on 3 new games. The gate's new `diffnative` step runs it when the
+    baseline exists (`GATE_BASELINE`, default `hybrid-final`; `--seeds 6 --turns 40 --scenarios
+    all`, `--quick` `--seeds 2 --turns 20`).
+    The freeze itself: the commit of this increment is the last whose every function the hybrid
+    build and fcompare can check against the original, so it is the one to tag `hybrid-final`
+    (`git tag -a hybrid-final -m "..." <commit> && git push origin hybrid-final`; only `v*` tags
+    start the release workflow). Until the tag exists, `diffnative.sh --baseline <commit>` does
+    the same.
+

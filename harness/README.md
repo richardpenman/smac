@@ -13,6 +13,8 @@ on the same scripted scenario, and compares the game state turn by turn.
 | `wine_env.sh` | The prefix and text setup every run of the original uses (fonts, FreeType; see below). |
 | `verify.sh` | Run scenarios in hybrid or native mode and compare with cached oracle references (`smacx_headless --original-bugs`: the reconstruction plays with the original's bugs, engine/compat.h; hybrid.dll always does). |
 | `compare.py` | Field-level diff of two snapshot directories. |
+| `golden.sh` | Records the original's results of functions (`tests/golden`) and replays them on the reconstruction (see "Golden records"). |
+| `state_hash.h` | Hash of the compared state regions (golden records). |
 | `state_regions.h` | The game-state memory regions that are compared. |
 | `scenarios/*.cmd` | Standard scenarios. |
 
@@ -133,9 +135,11 @@ slotlog <func> <prologue_len> <off>...  log return address, 8 args, [entryESP+of
                       EBX/ESI/EDI/EBP at each entry of an original function (logger runs on a
                       private stack; the caller's register locals and frame are visible this way)
 patch <spec>          hybrid only: all | none | +name | -name ...
-fcompare <from> <to> [hooks=turn,faction,enemy] [limit=<pure>,<mut>] <spec>
+fcompare <from> <to> [hooks=turn,faction,enemy] [limit=<pure>,<mut>] [every=<n>] [golden] <spec>
                       hybrid only: compare original and reconstructed functions on the live
-                      state at the selected hooks of turns from..to (see "Function comparison")
+                      state at the selected hooks of turns from..to (every n-th turn from
+                      <from>; see "Function comparison"); golden also records the original's
+                      results (see "Golden records")
 hangdump <seconds>    log where the main thread waits after that many seconds without progress
 poke <hexaddr> <1|2|4> <value>         setup: write a value into the memory image (see below)
 poketile <x> <y> <offset> <1|2|4> <value>  setup: write into a map tile (MAP, 44 bytes)
@@ -339,3 +343,34 @@ It runs each scenario with no patches, prints the functions with mismatches, tho
 differently from the original on that state with those arguments: fix it (the log line gives a
 reproducible case). Caveat: callees run as originals in the first call and as reconstructions in
 the second, so a mismatch can also come from a reconstructed callee; compare callees first.
+
+## Golden records
+
+fcompare needs the original running under Wine. Golden records keep its verdicts: the original's
+results of the functions that change no game memory (the fcompare table's entries without
+`FC_MUTATES` or `FC_PATHS`, 197 functions; `src/tools/golden.py` lists the one exception,
+`mandate_color`, which returns UI palette indices headless builds never set up), recorded on the
+states of harness scenarios and replayed on the reconstruction without Wine.
+
+* Recording: `harness/golden.sh record [scenario...]` (default tiny20 late140) runs the scenario
+  in hybrid.dll with no patches and `fcompare <from> <to> every=<n> limit=20,0 golden <spec>`
+  (tiny20: turns 5, 12, 19; late140: turns 140, 142). At each of these turn_upkeep hooks fcompare
+  writes `STATE <turn> <hash>` (`state_hash.h`: FNV-1a 64 of the `state_regions.h` regions, masked
+  bytes as 0) and, for every call it makes, the arguments and the original's return value,
+  out-parameters, strings (the buffers are zeroed before the call), buffer hashes and generator
+  states into `golden.tsv`; `src/tools/golden.py import` files them as `tests/golden/states.tsv`
+  and `tests/golden/<function>.tsv` (format in its docstring), replacing that scenario's earlier
+  rows. fcompare's own comparison runs at the same time; the records are the original's results
+  either way.
+* Replay: `smacx_headless <scenario.cmd> --golden tests/golden` (implies `--original-bugs`)
+  plays the scenario and, at the turn_upkeep hook of each recorded turn, checks the state hash
+  (the game is where the records were made) and calls each function with the recorded arguments,
+  as fcompare does (generators and logic clock reset before each call; `FC_SETBASE` sets the base,
+  `FC_COMPUTE` runs `base_compute(1)`, memory restored afterwards). Return values are compared in
+  the width of the function's return type. Any difference fails the run (exit 1; mismatches in
+  `oracle.log`). Without the game's data, the data image or the scenario's saved game it exits
+  with 77. `harness/golden.sh replay` runs it; ctest runs it as `golden_tiny20` and
+  `golden_late140` (label `data`, skipped with 77), the gate's unit step also under ASan.
+* The replay table (`generated/golden_funcs.h`, `golden.py gen`) is built from
+  `fcompare_table.h` and `re/original_names.tsv`. Re-record after changing a recorded scenario,
+  the table's argument domains, or the state regions (the state hash).

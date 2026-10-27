@@ -84,7 +84,10 @@ The native build needs CMake 3.20+, Python 3 (it generates the original-function
 C++17 compiler with `<filesystem>`. Game data is only needed at run time: `smacx` finds the game
 itself; `smacx_headless` reads `game/` and `src/data/data_image.bin` (see "Getting started").
 `smacx_smoke` (`ctest`) is a portability self-test that needs no game data; `smacx_unit` (`ctest`,
-doctest) holds the engine's unit tests. Cleanup work (docs/CLEANUP_PLAN.md) is gated by
+doctest) holds the engine's unit tests. ctest's `golden_*` tests replay the original's recorded
+results of 197 functions (`tests/golden`, harness/README.md "Golden records") and need the game's
+data (skipped without it); `names_table` checks that `re/original_names.tsv` matches the `ADDR`
+declarations (`src/tools/names.py update` after adding or renaming one). Cleanup work (docs/CLEANUP_PLAN.md) is gated by
 `src/tools/gate.sh`.
 
 The hybrid build used by the comparison harness (Linux):

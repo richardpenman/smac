@@ -12,7 +12,9 @@
 #             entries name declared functions) and src/tools/compat.py check (every BUG(original)
 #             site names a declared compat flag, docs/COMPAT.md current)
 #   build     native (smacx_headless, smacx, smacx_unit), ASan native, hybrid (i686 mingw)
-#   unit      ctest in the native build (smacx_smoke, smacx_unit) and smacx_unit under ASan
+#   unit      ctest in the native build (smacx_smoke, smacx_unit, the golden records of
+#             tests/golden replayed by smacx_headless --golden, names.py check) and, under ASan,
+#             smacx_unit and the golden replays
 #   native    harness/verify.sh native over every harness/scenarios/*.cmd
 #   observer  smacx (every UI area replaced) in observer mode (--human 0) against the oracle
 #             references: tiny20 small12 std8 late140
@@ -25,6 +27,11 @@
 #             late140; --quick: tiny20). Runs the original under Wine, one process at a time.
 #   fcompare  only when GATE_FCOMPARE is set (a patch spec, e.g. "none +vector_dist"): verify.sh
 #             fcompare on $GATE_FCOMPARE_SCENARIOS (default tiny20 small12 std8)
+#   diffnative  only when the baseline exists (GATE_BASELINE, default the tag hybrid-final: the
+#             hybrid freeze, docs/CLEANUP_PLAN.md section 2): src/tools/diffnative.sh, the native
+#             build against the baseline's smacx_headless on new seeds and the harness scenarios
+#             ($GATE_DIFFNATIVE_OPTS, default "--seeds 6 --turns 40 --scenarios all"; --quick:
+#             "--seeds 2 --turns 20"), with the original's bugs
 #   ui        tests/*/run.sh (scripted smacx checks, animated: slides, moves, booms, movies), each
 #             against the native smacx, then again against the ASan smacx (no sanitizer report)
 #
@@ -129,10 +136,17 @@ if want unit; then
     ctest --test-dir "$NATIVE" --output-on-failure > "$OUT/unit.log" 2>&1 || ok=0
     if [ -x "$ASAN/smacx_unit" ]; then
         "$ASAN/smacx_unit" >> "$OUT/unit.log" 2>&1 || ok=0
+        for s in tiny20 late140; do  # the golden records (ctest's golden_*; 77: no game data)
+            ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0}" "$ASAN/smacx_headless" "harness/scenarios/$s.cmd" \
+                --golden tests/golden --outdir "$OUT/unit_golden/$s" >> "$OUT/unit.log" 2>&1
+            st=$?
+            [ $st = 0 ] || [ $st = 77 ] || ok=0
+        done
         grep -qE "AddressSanitizer|runtime error" "$OUT/unit.log" && ok=0
     fi
     n=$(grep -o "test cases: *[0-9]*" "$OUT/unit.log" | head -n 1 | tr -s " ")
-    if [ $ok = 1 ]; then report unit PASS "ctest + ASan smacx_unit ($n)"; else report unit FAIL "see $OUT/unit.log"; fi
+    g=$(grep -c "^golden PASS" "$OUT/unit.log")
+    if [ $ok = 1 ]; then report unit PASS "ctest + ASan smacx_unit ($n) and ASan golden replays ($g passed)"; else report unit FAIL "see $OUT/unit.log"; fi
 fi
 
 # ---- native ----------------------------------------------------------------------------------
@@ -237,6 +251,19 @@ if want fcompare && [ -n "${GATE_FCOMPARE:-}" ]; then
         report fcompare PASS "\"$GATE_FCOMPARE\" on $FC_SCEN"
     else
         report fcompare FAIL "see $OUT/fcompare.log"
+    fi
+fi
+
+# ---- diffnative: native against the frozen baseline (after the hybrid freeze) -------------------
+BASELINE="${GATE_BASELINE:-hybrid-final}"
+if want diffnative && { [ -x "$BASELINE/smacx_headless" ] || git rev-parse --verify --quiet "$BASELINE^{commit}" > /dev/null; }; then
+    if [ $QUICK = 1 ]; then DN_OPTS="${GATE_DIFFNATIVE_OPTS:---seeds 2 --turns 20}"
+    else DN_OPTS="${GATE_DIFFNATIVE_OPTS:---seeds 6 --turns 40 --scenarios all}"; fi
+    # shellcheck disable=SC2086
+    if JOBS="$JOBS" DIFFNATIVE_OUT="$OUT/diffnative" src/tools/diffnative.sh --baseline "$BASELINE" --build "$NATIVE" $DN_OPTS > "$OUT/diffnative.log" 2>&1; then
+        report diffnative PASS "$(tail -n 1 "$OUT/diffnative.log" | cut -d'(' -f2 | cut -d, -f1) against $BASELINE"
+    else
+        report diffnative FAIL "see $OUT/diffnative.log"
     fi
 fi
 

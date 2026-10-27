@@ -98,9 +98,16 @@ else()
   add_library(smacx_ui_headless STATIC ${HEADLESS_SOURCES})
   target_link_libraries(smacx_ui_headless PUBLIC smacx_engine)
   target_link_libraries(smacx_engine PUBLIC smacx_ui_headless)
-  add_executable(smacx_headless src/app/headless.cpp)
+  # Golden records (src/app/golden.cpp): the replay table of the functions fcompare records.
+  add_custom_command(
+    OUTPUT ${GEN_DIR}/golden_funcs.h
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/src/tools/golden.py gen ${GEN_DIR}/golden_funcs.h
+    DEPENDS ${CMAKE_SOURCE_DIR}/harness/oracle/fcompare_table.h ${CMAKE_SOURCE_DIR}/re/original_names.tsv
+            ${CMAKE_SOURCE_DIR}/src/tools/golden.py
+    COMMENT "Generating the golden replay table")
+  add_executable(smacx_headless src/app/headless.cpp src/app/golden.cpp ${GEN_DIR}/golden_funcs.h)
   target_link_libraries(smacx_headless PRIVATE smacx_engine)
-  target_include_directories(smacx_headless PRIVATE harness)
+  target_include_directories(smacx_headless PRIVATE harness ${GEN_DIR})
   # Portability smoke test (no game data needed): ctest, or run smacx_smoke.
   enable_testing()
   add_executable(smacx_smoke tests/smoke.cpp)
@@ -112,6 +119,19 @@ else()
   target_include_directories(smacx_unit PRIVATE third_party tests/unit)
   target_link_libraries(smacx_unit PRIVATE smacx_engine)
   add_test(NAME unit COMMAND smacx_unit WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+  # Golden records (tests/golden, harness/README.md "Golden records"): the original's results of
+  # functions, replayed on the states of their scenarios. Need the game's data (game/,
+  # src/data/data_image.bin; late140 also its saved game): skipped without them.
+  foreach(scenario tiny20 late140)
+    add_test(NAME golden_${scenario}
+             COMMAND smacx_headless harness/scenarios/${scenario}.cmd --golden tests/golden
+                     --outdir ${CMAKE_BINARY_DIR}/golden_out/${scenario}
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(golden_${scenario} PROPERTIES SKIP_RETURN_CODE 77 LABELS data)
+  endforeach()
+  # The names table (re/original_names.tsv) must match the ADDR declarations.
+  add_test(NAME names_table COMMAND ${Python3_EXECUTABLE} src/tools/names.py check
+           WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
   # Native game with the SDL2 UI (src/ui, src/platform/sdl). Uses tools/sdl2 when present.
   find_package(SDL2 CONFIG QUIET HINTS ${CMAKE_SOURCE_DIR}/tools/sdl2/lib/cmake/SDL2)
   find_package(SDL2_ttf CONFIG QUIET HINTS ${CMAKE_SOURCE_DIR}/tools/sdl2/lib/cmake/SDL2_ttf)

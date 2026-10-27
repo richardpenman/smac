@@ -4,10 +4,15 @@
 // in the same format, so harness/compare.py can diff the two. Usage:
 //
 //   smacx_headless <script.cmd> [--outdir DIR] [--gamedir DIR] [--image FILE] [--original-bugs]
+//                  [--golden DIR]
 //
 // --original-bugs plays with the original's bugs (engine/compat.h), as the comparisons with the
 // original need (harness/verify.sh and the gate pass it); without it the game plays with the
 // fixes (the gate's fixes step).
+// --golden DIR replays the golden records of the script's scenario (DIR/*.tsv, src/tools/golden.py;
+// golden.h) at their turns and implies --original-bugs. Exit status 0 when every record matched,
+// 1 otherwise, 77 when the game data, the data image or the scenario's saved game is missing
+// (ctest counts that as skipped).
 // --gamedir is the original game's data directory (default: game); the runner chdirs into it.
 // The game runs as in the original: control_game (0x52AA30) boots and calls the script in place of
 // the main menu (top_menu).
@@ -44,6 +49,7 @@
 #include "engine/setup.h"
 #include "engine/turn.h"
 #include "engine/world.h"
+#include "golden.h"
 #include "rules_dump.h"
 
 namespace fs = std::filesystem;
@@ -53,6 +59,8 @@ static int g_turn_limit = -1;
 static int g_viewer = 0;
 static FILE* g_log = nullptr;
 static bool g_game_started = false;  // set by newgame/load
+static bool g_golden = false;        // --golden: replay golden records
+constexpr int kExitSkipped = 77;     // --golden without the game's data (ctest SKIP_RETURN_CODE)
 
 static void logf_(const char* fmt, ...) {
     if (!g_log) {
@@ -228,9 +236,11 @@ static void before_turn_upkeep() {
     char name[64];
     std::snprintf(name, sizeof(name), "turn_%03d", CurrentTurn);
     snapshot(name);
+    if (g_golden) golden_hook(g_log);
     if (g_turn_limit >= 0 && CurrentTurn >= g_turn_limit) {
-        logf_("turn limit reached, exiting\nexit=0\n");
-        std::exit(0);
+        int status = g_golden ? golden_finish(g_log) : 0;
+        logf_("turn limit reached, exiting\nexit=%d\n", status);
+        std::exit(status);
     }
 }
 
@@ -398,6 +408,10 @@ static int32_t run_script() {
             cmd_newgame(args);
         } else if (!std::strcmp(cmd, "load")) {
             g_game_started = true;
+            if (g_golden && !fs::exists(args)) {
+                std::printf("golden: skipped: no saved game %s\n", args);
+                std::exit(kExitSkipped);
+            }
             logf_("load %s -> %d\n", args, load_daemon(args, 0));
         } else if (!std::strcmp(cmd, "save")) {
             uint32_t crt = crt_rand_state(), game = game_random_state();
@@ -444,6 +458,7 @@ int main(int argc, char** argv) {
     std::string script, gamedir = "game", image = "src/data/data_image.bin";
     std::string ini = "harness/oracle/runtime/Alpha Centauri.Ini";
     bool original_bugs = false;
+    std::string golden_dir;
     for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
         if (a == "--outdir" && i + 1 < argc) g_outdir = argv[++i];
@@ -451,13 +466,28 @@ int main(int argc, char** argv) {
         else if (a == "--image" && i + 1 < argc) image = argv[++i];
         else if (a == "--ini" && i + 1 < argc) ini = argv[++i];
         else if (a == "--original-bugs") original_bugs = true;
+        else if (a == "--golden" && i + 1 < argc) golden_dir = argv[++i];
         else script = a;
     }
     if (script.empty()) {
         std::fprintf(stderr,
                      "usage: smacx_headless <script.cmd> [--outdir DIR] [--gamedir DIR] [--image FILE] [--ini FILE]\n"
-                     "                      [--original-bugs]\n");
+                     "                      [--original-bugs] [--golden DIR]\n");
         return 2;
+    }
+    if (!golden_dir.empty()) {
+        // The records are the original's results: replayed with the original's bugs.
+        g_golden = original_bugs = true;
+        if (!fs::exists(image) || !fs::exists(fs::path(gamedir) / "terranx.exe")) {
+            std::printf("golden: skipped: no game data (%s) or data image (%s)\n", gamedir.c_str(), image.c_str());
+            return kExitSkipped;
+        }
+        std::string err;
+        long n = golden_load(golden_dir, fs::path(script).stem().string(), &err);
+        if (n <= 0) {
+            std::printf("golden: %s\n", n < 0 ? err.c_str() : "no records for this scenario");
+            return 1;
+        }
     }
     compat_set_original_bugs(original_bugs);
     g_original_bugs_forced = original_bugs;
@@ -490,13 +520,15 @@ int main(int argc, char** argv) {
     // end_of_game -> show_replay: final snapshot and exit, as the oracle (harness/README.md "End of game").
     g_harness_game_end = [] {
         snapshot("game_end");
-        logf_("game over: turn=%d GameState=%08X, exiting\nexit=0\n", CurrentTurn, (uint32_t)GameState);
-        std::exit(0);
+        int status = g_golden ? golden_finish(g_log) : 0;
+        logf_("game over: turn=%d GameState=%08X, exiting\nexit=%d\n", CurrentTurn, (uint32_t)GameState, status);
+        std::exit(status);
     };
     // pfncWinMain -> control_game: boot (system_init, game_init, preferences), then the script in
     // place of the main menu; "turns" returns into the game loop.
     control_game();
     std::fclose(f);
-    logf_("exit=0\n");
-    return 0;
+    int status = g_golden ? golden_finish(g_log) : 0;
+    logf_("exit=%d\n", status);
+    return status;
 }
