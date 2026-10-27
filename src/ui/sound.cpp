@@ -166,6 +166,14 @@ void sound_startup(bool enabled) {
     const char* e = std::getenv("SMACX_SOUNDLOG");
     g_log = e && *e && *e != '0';
     platform::audio_init(enabled);
+    // An exit() from inside the game (the end of a scripted or harness game, show_replay) skips
+    // sound_shutdown: the audio device is closed before the statics its callback reads (voices,
+    // streams, the music) are destroyed, or the audio thread writes into freed memory.
+    static bool registered = false;
+    if (!registered) {
+        registered = true;
+        std::atexit([] { platform::audio_shutdown(); });
+    }
 }
 
 void sound_shutdown() {

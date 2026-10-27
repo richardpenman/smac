@@ -690,6 +690,10 @@ void socialwin_point(int32_t which, int32_t* x, int32_t* y) {
 // SocialWin_close (FUN_004b26d0): the buttons and groups closed, the hover state cleared.
 void THISCALL SocialWin_close(uint8_t*) {
     sw_clear_buttons(&g_sw);
+    // (The buttons are deleted here: no pointer to them may outlive the window, or the next
+    // SocialWin_exec's reset sets the freed buttons' states before it makes new ones.)
+    for (BaseButton*& b : g_sw.model_btn) b = nullptr;
+    for (BaseButton*& b : g_sw.effect_btn) b = nullptr;
     g_sw.resetting = 0;
     g_sw.effect_focus = -1;
 }

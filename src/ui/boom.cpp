@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "engine/battle.h"
+#include "engine/compat.h"
 #include "engine/diplo_act.h"
 #include "engine/globals.h"
 #include "engine/map.h"
@@ -42,7 +43,21 @@ GLOBAL(int32_t, BoomActive, 0x915620);  // DAT_00915620: set while boom draws
 namespace {
 
 int32_t& mwi(uint8_t* win, uint32_t off) { return *reinterpret_cast<int32_t*>(win + off); }
-const UNIT& unit_of(int32_t veh) { return Units[Vehs[veh].unit_id]; }
+// The unit of a vehicle; the original also reads Vehs[-1] here (no unit on the target tile): it
+// lies in the Reactor table (rules_orig_byte), as in veh.cpp's veh_unit_raw.
+int32_t veh_unit(int32_t veh) {
+    if ((uint32_t)veh < 2049) return Vehs[veh].unit_id;
+    COMPAT_ORIGINAL(out_of_range_reads);
+    int32_t u = rules_orig_i16(0x952828 + (uint32_t)veh * 0x34 + offsetof(VEH, unit_id));
+    return u;
+}
+const UNIT& unit_of(int32_t veh) { return Units[veh_unit(veh)]; }
+// Its x (i 0) or y (1), Vehs[-1]'s from the Reactor table as above.
+int32_t veh_pos(int32_t veh, int32_t i) {
+    if ((uint32_t)veh < 2049) return i ? Vehs[veh].y : Vehs[veh].x;
+    COMPAT_ORIGINAL(out_of_range_reads);
+    return rules_orig_i16(0x952828 + (uint32_t)veh * 0x34 + (i ? 2 : 0));
+}
 const uint8_t* xtable(int32_t group) { return mem::host(0x6F1B7Cu + (uint32_t)group * 0x1000); }
 Sprite* shot_sprite(int32_t row, int32_t frame) { return ArtSprite(0x7A9B30u + (uint32_t)(row * 16 + frame) * 0x2C); }
 Sprite* boom_sprite(int32_t kind, int32_t frame) { return ArtSprite(0x7AB460u + (uint32_t)(kind * 16 + frame) * 0x2C); }
@@ -90,19 +105,19 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
     int32_t psi_or_num = 0, row_or_den = 0, shot_table = 0;  // [ebp-0x10], [ebp-0xC], local_38
     if (!anim) {
         if (unit_of(first).chassis_id == 8 && (flags & 1)) {
-            FX_play_loc(&Sounds, 0x52, Vehs[first].x, Vehs[first].y);
+            FX_play_loc(&Sounds, 0x52, veh_pos(first, 0), veh_pos(first, 1));
             return 0;
         }
         if (flags & 1) {
             if (unit_of(first).weapon_id == 0xF || unit_of(second).weapon_id == 0xF) psi_or_num = 1;
-            if (Vehs[second].unit_id == 1) FX_play(&Sounds, 1);
+            if (veh_unit(second) == 1) FX_play(&Sounds, 1);
         }
         if (!psi_or_num && !(flags & 8)) {
             first = VehDrawDefendID;
             second = VehDrawAttackID;
         }
         if ((flags & 2) && second >= 0) {
-            int32_t u = Vehs[second].unit_id;
+            int32_t u = veh_unit(second);
             if (u == 8 || u == 9 || u == 10 || u == 0xE || u == 0xF || u == 0x13) flags |= 0x100;
         }
         if (flags & 1) {
@@ -161,7 +176,7 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
             r = {px, py, px + zoom_scale(win, sw), py + zoom_scale(win, sh)};
             if (!(flags & 1)) {
                 if (!(flags & 0x100)) {
-                    if (Vehs[second].unit_id == 0xF) FX_play_loc(&Sounds, 0x5A, Vehs[second].x, Vehs[second].y);
+                    if (veh_unit(second) == 0xF) FX_play_loc(&Sounds, 0x5A, veh_pos(second, 0), veh_pos(second, 1));
                     else if (unit_of(first).chassis_id != 8) FX_play_loc(&Sounds, 0x3E, x, y);
                 } else {
                     FX_play_loc(&Sounds, 0x3D, x, y);
@@ -208,8 +223,8 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
             static const int8_t kWeapon[15] = {-1,   4,    0x49, 0x4A, 0x59, 0x4C, 0x4D, 0x4E,
                                                0x4F, 0x50, 0x51, 0x58, 0x55, 0x56, 0x57};
             int32_t w = unit_of(second).weapon_id;
-            if (w >= 1 && w <= 14) FX_play_loc(&Sounds, kWeapon[w], Vehs[second].x, Vehs[second].y);
-            if (Vehs[first].unit_id == 0xF) FX_play_loc(&Sounds, 0x5A, Vehs[second].x, Vehs[second].y);
+            if (w >= 1 && w <= 14) FX_play_loc(&Sounds, kWeapon[w], veh_pos(second, 0), veh_pos(second, 1));
+            if (veh_unit(first) == 0xF) FX_play_loc(&Sounds, 0x5A, veh_pos(second, 0), veh_pos(second, 1));
         } else {
             FX_play(&Sounds, 0);
         }
@@ -239,7 +254,7 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
                     if (!shot) {
                         int32_t kind = (flags & 0x100)  ? 3
                                        : (flags & 0x80) ? 2
-                                                        : (Units[Vehs[second].unit_id].reactor_id > 1 ? 1 : 0);
+                                                        : (Units[veh_unit(second)].reactor_id > 1 ? 1 : 0);
                         s = boom_sprite(kind, f);
                         table = kind == 3 ? 6 : 0;
                     } else {

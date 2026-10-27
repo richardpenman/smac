@@ -129,6 +129,13 @@ real time pass with no input (timers and animations run meanwhile). Timings (the
 one after another): animated about 220 s, fast about 145 s; the slowest suite is placeholders.
 `src/tools/gate.sh`'s `ui` step runs them with the native smacx and again with the ASan build.
 
+`tests/long/session.sh [OUTDIR] [SEED...]` is a manual test, not one of the suites (it is not a
+`run.sh`, so neither the suites' loops nor the gate pick it up): a new game played for about 45
+turns from `tests/long/long.keys` (moves, go-to drags, the base window, menus, reports, combat,
+end of turn) with animations on, by default against the ASan build (`build/bug-asan/smacx`; any
+smacx with `SMACX=`). Each seed is one game; a sanitizer report or an abnormal end fails it.
+About 5-10 minutes per seed under ASan.
+
 ## Recreating what is not in the repository
 
 Not in the repository (copyrighted or regenerable): the game, the installers, tools, reference

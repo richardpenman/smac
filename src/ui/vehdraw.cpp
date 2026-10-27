@@ -6,7 +6,6 @@
 #include <string>
 
 #include "engine/compat.h"
-#include "engine/rules.h"
 #include "engine/map.h"
 #include "engine/battle.h"
 #include "engine/globals.h"
@@ -1382,13 +1381,9 @@ void THISCALL MapWin_draw_vehicles(uint8_t* win, int32_t x, int32_t y, int32_t p
         if (!known()) return;
         mode = 3;
         int32_t sel = MapWinVehA;
-        // BUG(original): no unit selected (-1): Vehs[-1]'s position (the dword before the Reactor
-        // table, 0x9527F4) is compared.
-        COMPAT_ORIGINAL(out_of_range_reads);
-        bool at = (uint32_t)sel < 2049 ? x == Vehs[sel].x && y == Vehs[sel].y
-                                       : x == rules_orig_i16(0x952828 + (uint32_t)sel * 0x34) &&
-                                             y == rules_orig_i16(0x952828 + (uint32_t)sel * 0x34 + 2);
-        if (at && (FactionStatus[0] & (1 << Vehs[sel].faction_id)) &&
+        // (No unit selected, -1: the original compares Vehs[-1]'s fields, but veh_selectable(-1) is 0,
+        // so the test fails whatever they hold; tested first here.)
+        if (sel >= 0 && x == Vehs[sel].x && y == Vehs[sel].y && (FactionStatus[0] & (1 << Vehs[sel].faction_id)) &&
             veh_selectable(sel) && !(Vehs[sel].state & 0x4200)) {
             v = sel;
             if (MapWinInVehMode && MapWinField23BF8 && MapWinField23BE4 && Vehs[sel].order == 0 && !MapWinField23C00 &&

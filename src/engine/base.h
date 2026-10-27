@@ -28,8 +28,11 @@ constexpr uint32_t kBasesAddr = 0x97D040;  // address of Bases[0] in the origina
 // The current base (*CurrentBase).
 inline BASE& cur_base() { return *reinterpret_cast<BASE*>(mem::host(CurrentBasePtr)); }
 // Whether a base has a facility (bit test; facility_id < 96).
+// (The original reads Bases[-1] for base -1, e.g. crop_yield of a tile without a base: the bytes
+// before the table, read here as raw memory.)
 inline bool base_fac(int32_t base_id, int32_t facility_id) {
-    return (game().bases[base_id].facilities_built[facility_id >> 3] & (1 << (facility_id & 7))) != 0;
+    const uint8_t* b = reinterpret_cast<const uint8_t*>(&game().bases[0]) + base_id * (int32_t)sizeof(BASE);
+    return (b[offsetof(BASE, facilities_built) + (facility_id >> 3)] & (1 << (facility_id & 7))) != 0;
 }
 // Owner of a secret project (-1 none or destroyed).
 inline int32_t project_owner(int32_t project_id) {
