@@ -7,14 +7,14 @@ Every bug of the original that the reconstruction reproduces is behind one of th
 flag off stops the game at its first site (`compat_unfixed`). Sites are the `BUG(original)`
 comments; each names its flag with `COMPAT_ORIGINAL(flag)` next to it.
 
-128 flags, 174 sites.
+128 flags, 175 sites.
 
 ## bugs at several sites
 
 | Flag | Bug, and the fix | Sites |
 | --- | --- | --- |
 | `read_after_kill` | A vehicle is read after kill() removed it (the next vehicle's data). Fix: read before the kill. | `src/engine/action.cpp` (2), `src/engine/battle.cpp` (2) |
-| `out_of_range_reads` | Reads outside a table (Vehs[-1], Bases[-1], Factions[-1], diplo_status[-1] or [8], Units[-1], TechOwners past its end, Facility[negative], ...); the reconstruction reads what the original's memory holds there. Fix: test the index and use the value of "none". | `src/engine/ai.cpp` (2), `src/engine/ai_move.cpp` (2), `src/engine/base_misc.cpp` (2), `src/engine/base_terraform.cpp`, `src/engine/battle.cpp` (11), `src/engine/design.cpp`, `src/engine/diplomacy.cpp` (4), `src/engine/path.cpp`, `src/engine/score.cpp`, `src/engine/veh.cpp` (2) |
+| `out_of_range_reads` | Reads outside a table (Vehs[-1], Bases[-1], Factions[-1], diplo_status[-1] or [8], Units[-1], TechOwners past its end, Facility[negative], ...); the reconstruction reads what the original's memory holds there. Fix: test the index and use the value of "none". | `src/ui/vehdraw.cpp`, `src/engine/ai.cpp` (2), `src/engine/ai_move.cpp` (2), `src/engine/base_misc.cpp` (2), `src/engine/base_terraform.cpp`, `src/engine/battle.cpp` (11), `src/engine/design.cpp`, `src/engine/diplomacy.cpp` (4), `src/engine/path.cpp`, `src/engine/score.cpp`, `src/engine/veh.cpp` (2) |
 | `arm_val_unit_ids` | arm_val takes an armor id but is passed unit ids (reads past Armor). Fix: pass Units[id].armor_id. | `src/engine/ai.cpp`, `src/engine/base_misc.cpp` (2), `src/engine/design.cpp` |
 | `queue_scan_one_past` | Queue scans include the slot after the queue (queue_items[queue_size]). Fix: stop at queue_size - 1. | `src/engine/base.cpp` (2), `src/engine/save.cpp` |
 

@@ -6,6 +6,7 @@
 #include <string>
 
 #include "engine/compat.h"
+#include "engine/rules.h"
 #include "engine/map.h"
 #include "engine/battle.h"
 #include "engine/globals.h"
@@ -1003,6 +1004,9 @@ void tile_up(int32_t veh_id, int32_t x, int32_t y, bool tilt, float* up) {
     up[0] = 0.0f;
     up[1] = 0.0f;
     up[2] = 1.0f;
+    // A tile off the map (the lift position of a unit lifted twice, a slide past the map's
+    // edge): the original reads past its map array there; the unit stays upright here.
+    if (x < 0 || y < 0 || x >= MapAreaX || y >= MapAreaY) return;
     const UNIT& u = Units[Vehs[veh_id].unit_id];
     if (!tilt || (MapTiles[MapHalfX * y + (x >> 1)].climate & 0xE0) < 0x60 ||
         (u.chassis_id == 0 && Weapon[u.weapon_id].mode < 3))
@@ -1378,7 +1382,13 @@ void THISCALL MapWin_draw_vehicles(uint8_t* win, int32_t x, int32_t y, int32_t p
         if (!known()) return;
         mode = 3;
         int32_t sel = MapWinVehA;
-        if (x == Vehs[sel].x && y == Vehs[sel].y && (FactionStatus[0] & (1 << Vehs[sel].faction_id)) &&
+        // BUG(original): no unit selected (-1): Vehs[-1]'s position (the dword before the Reactor
+        // table, 0x9527F4) is compared.
+        COMPAT_ORIGINAL(out_of_range_reads);
+        bool at = (uint32_t)sel < 2049 ? x == Vehs[sel].x && y == Vehs[sel].y
+                                       : x == rules_orig_i16(0x952828 + (uint32_t)sel * 0x34) &&
+                                             y == rules_orig_i16(0x952828 + (uint32_t)sel * 0x34 + 2);
+        if (at && (FactionStatus[0] & (1 << Vehs[sel].faction_id)) &&
             veh_selectable(sel) && !(Vehs[sel].state & 0x4200)) {
             v = sel;
             if (MapWinInVehMode && MapWinField23BF8 && MapWinField23BE4 && Vehs[sel].order == 0 && !MapWinField23C00 &&

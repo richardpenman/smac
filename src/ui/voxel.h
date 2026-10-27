@@ -92,7 +92,7 @@ struct VoxelScene {
     float v_light[3]{};  // +0x60: light direction
     float v_shadow[3]{};  // +0x6C: shadow projection direction
     float v_shadow_z = 0;  // +0x78
-    float v_offset[2]{};  // +0x7C: offset (scaled by v_zoom)
+    float v_offset[3]{};  // +0x7C: offset (x, y scaled by v_zoom; z added to the depth base)
     float v_shift[2]{};  // +0x88: offset (pixels)
     float v_zoom = 0;  // +0x90
     float v_shadow_shift[2]{};  // +0x94

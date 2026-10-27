@@ -393,7 +393,7 @@ int32_t THISCALL Scene_init(VoxelScene* self) {
     self->c_clip[3] = 0xFF;
     self->c_clip[4] = 0x100;
     self->c_clip[5] = 0x100;
-    self->v_offset[0] = self->v_offset[1] = 0.0f;
+    self->v_offset[0] = self->v_offset[1] = self->v_offset[2] = 0.0f;
     self->v_shift[0] = self->v_shift[1] = 0.0f;
     self->v_zoom = 1.0f;
     self->v_shadow_shift[0] = self->v_shadow_shift[1] = 0.0f;

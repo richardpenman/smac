@@ -215,7 +215,8 @@ const char* THISCALL Buffer_find_line_break_l(Buffer* self, const char* text, in
         const char* r = Font_find_line_break_l(slot_font(self, bt.break_font), seg, width, (int32_t)(p - seg));
         if (r) {
             bt.link_state = 0;
-            if (r[-1] == ' ' || r == seg) return r;
+            // (r == seg tested first: the original reads the byte before the text there, same result.)
+            if (r == seg || r[-1] == ' ') return r;
             // memrchr (0x628AF0): the last space before r
             for (const char* q = r; q != text; q--)
                 if (*q == ' ') return q;
