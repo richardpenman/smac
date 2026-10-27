@@ -79,7 +79,7 @@ void save_rect(Buffer* to, Buffer* from, int32_t x, int32_t y, int32_t w, int32_
     Buffer_copy_4(from, to, x, y, 0, 0, w, h);
 }
 
-bool animate() { return !g_ui_exit_when_script_done || std::getenv("SMACX_ANIM"); }
+bool animate() { return !g_ui_unattended || std::getenv("SMACX_ANIM"); }
 
 }  // namespace
 
@@ -217,7 +217,7 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
     if (drawing) {
         int32_t frames = anim == 0 ? 16 : (g_buster_ok ? (int32_t)g_buster.frames.size() / 2 : 0);
         uint32_t last = platform::ticks_ms();
-        bool nowait = g_ui_exit_when_script_done;
+        bool nowait = g_ui_unattended;
         const char* shot_file = std::getenv("SMACX_ANIM_SHOT");
         for (int32_t f = 0; f < frames; f++) {
             if (MultiplayerActive && shot && (f & 1)) continue;

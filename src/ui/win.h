@@ -69,6 +69,10 @@ void ui_script_keys(const std::vector<ScriptedKey>& keys);
 void ui_trace(const char* what);
 // Called when the scripted keys run out with nothing left to do (no display): the game quits.
 extern bool g_ui_exit_when_script_done;
+// Unattended runs (--hidden or --exit-after-keys without --animate): the animations, slides, unit
+// moves, battle reports and movies are skipped or shown without waiting. With --animate a scripted
+// run plays every one of them as an interactive game does (and still quits when its keys end).
+extern bool g_ui_unattended;
 extern std::string g_ui_outdir;
 extern int32_t g_ui_shots;
 

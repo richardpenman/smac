@@ -56,7 +56,7 @@ void load() {
 }
 
 bool animate() {
-    return (GamePreferences & PREF_AV_SLIDING_WINDOWS) && !MultiplayerActive && !g_ui_exit_when_script_done;
+    return (GamePreferences & PREF_AV_SLIDING_WINDOWS) && !MultiplayerActive && !g_ui_unattended;
 }
 
 int32_t outer_top() { return ScreenWidth != 800 ? 0xEE : 0x5E; }

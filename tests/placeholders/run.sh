@@ -8,6 +8,9 @@
 # Each case runs smacx with scripted keys (hidden, SDL dummy video) and checks its log. Exit status
 # 0 when every check passes.
 set -u
+# Animated by default (smacx --animate: slides, unit moves, booms, battle reports and movies play
+# with their waits, as in an interactive game); TEST_FAST=1 runs unattended (skips them).
+if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SMACX="$(realpath "${SMACX:-$ROOT/build/ph-native/smacx}")"
@@ -427,5 +430,13 @@ check newtech "techlongs.txt's text" "^screentext blurb The early colonists quic
 check newtech "the description button selected" "^newtechwin button 2 sprite 28x34 set 1"
 if [ "$(grep -c '^screentext blurb quote' "$OUT/newtech.log")" = 2 ]; then echo "PASS newtech: the quote again"; else echo "FAIL newtech: the quote again"; FAIL=1; fi
 nocrash newtech
+
+# 24. Re-entrant presents (a stack overflow seen on macOS): a unit with a go-to order shown in the
+#     status pane (view mode, the cursor on it) draws its path (StatusWin_draw_active ->
+#     MapWin_dest_line -> Path_find), whose message pump (do_all_non_input) presented the screen
+#     again from inside the present, without end once 50 ms had passed since the last one.
+run gotoredraw $NEW --keys "ENTER,DRAG:530x200:700x330,v,KP2,KP1,WAIT:200,SHOT:goto.bmp,WAIT:200,UNITS"
+check gotoredraw "the go-to order kept" "unit 4 f1 Scout Patrol \(35,9\) order 24"
+nocrash gotoredraw
 
 exit $FAIL

@@ -8,6 +8,9 @@
 # answers the popups log ("popup LABEL answer: N"). Screenshots of every popup go to
 # OUTDIR/<case>/pop_NNN_LABEL.bmp (SMACX_POPUP_SHOTS). Exit status 0 when every check passes.
 set -u
+# Animated by default (smacx --animate: slides, unit moves, booms, battle reports and movies play
+# with their waits, as in an interactive game); TEST_FAST=1 runs unattended (skips them).
+if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
 # No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"

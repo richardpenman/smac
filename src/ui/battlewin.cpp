@@ -205,7 +205,7 @@ void THISCALL BattleWin_clear(uint8_t*) {
 }
 
 void THISCALL BattleWin_pulse_timer(uint8_t*) {
-    if (g_ui_exit_when_script_done) {  // unattended: the report ends at once
+    if (g_ui_unattended) {  // unattended: the report ends at once
         g_deadline = 0;
         SubInterface_release_iface_mode(&BattleWin);
         return;
@@ -360,7 +360,7 @@ void THISCALL BattleWin_battle_report(uint8_t*, int32_t atk, int32_t def, int32_
     BlitDestScale = BlitSourceScale = 1;
     snapshot();
     do_non_input();
-    g_deadline = g_ui_exit_when_script_done ? 0 : platform::ticks_ms() + 5000;  // Time_pulse
+    g_deadline = g_ui_unattended ? 0 : platform::ticks_ms() + 5000;  // Time_pulse
     std::fprintf(stderr, "battle report: %d (%s) vs %d (%s) strength %d / %d\n", atk, ua.name, def, ud.name, off, dstr);
     if (const char* shot = std::getenv("SMACX_BATTLE_SHOT")) ui_screenshot(g_ui_outdir + "/" + shot);  // test aid
 }

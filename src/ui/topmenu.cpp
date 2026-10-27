@@ -267,7 +267,7 @@ int32_t run_menu(std::vector<std::string> items, std::string caption, int32_t ac
     // The slide (SetupWin_do_menu_rightside): frames 0..5 of every item's frame, at least 10 ms
     // each, then the texts; on leaving, frames 6..11 (not for unattended runs).
     auto slide = [&](int32_t from, int32_t to) {
-        if (g_ui_exit_when_script_done) return;
+        if (g_ui_unattended) return;
         sw_show(&w);
         for (int32_t f = from; f <= to; f++) {
             uint32_t t0 = platform::ticks_ms();

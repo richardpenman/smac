@@ -83,7 +83,7 @@ bool movie_play(const char* path) {
     std::fprintf(stderr, "movie %s: %dx%d, %d frames, sound %u ms\n", path, m.width(), m.height(), m.frames(),
                  snd ? snd->ms() : 0);
     std::vector<uint32_t> rgb;
-    if (g_ui_exit_when_script_done) {
+    if (g_ui_unattended) {
         const char* e = std::getenv("SMACX_MOVIE_FRAMES");
         int32_t n = std::min(e ? std::atoi(e) : 0, m.frames());
         int32_t good = 0;

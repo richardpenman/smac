@@ -352,9 +352,9 @@ void alphamenu_show() {
     if (GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE) Wave_play_2(mem::host(0x6A7090));
     std::fprintf(
         stderr, "alphamenu show (sound %d, slide %d)\n", (GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE) ? 1 : 0,
-        (GamePreferences & PREF_AV_SLIDING_WINDOWS) && !MultiplayerActive && !g_ui_exit_when_script_done ? 1 : 0);
+        (GamePreferences & PREF_AV_SLIDING_WINDOWS) && !MultiplayerActive && !g_ui_unattended ? 1 : 0);
     Buffer* scr = ui_screen_canvas();
-    if (!(GamePreferences & PREF_AV_SLIDING_WINDOWS) || MultiplayerActive || g_ui_exit_when_script_done || !scr ||
+    if (!(GamePreferences & PREF_AV_SLIDING_WINDOWS) || MultiplayerActive || g_ui_unattended || !scr ||
         !scr->data)
         return;
     load_art();

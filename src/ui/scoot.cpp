@@ -47,10 +47,10 @@ bool tile_in_window(uint8_t* win, int32_t x, int32_t y) {
     return tx >= ox && tx < mwi(win, kMwColsEven) + mwi(win, kMwColsOdd) + ox;
 }
 
-bool animate() { return !g_ui_exit_when_script_done || std::getenv("SMACX_ANIM"); }
+bool animate() { return !g_ui_unattended || std::getenv("SMACX_ANIM"); }
 
 void wait_ms(uint32_t* last, int32_t ms) {
-    if (g_ui_exit_when_script_done) return;
+    if (g_ui_unattended) return;
     uint32_t now;
     do {
         do_non_input();

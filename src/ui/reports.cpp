@@ -1248,7 +1248,7 @@ void sat_start_attack(Buffer* c, int32_t f, int32_t target, int32_t kind, int32_
     std::fprintf(stderr, "sat attack start: faction %d on %d kind %d base %d (explosion at %d,%d)\n", f, target, kind,
                  base, a.ex, a.ey);
     // Unattended runs: the frames at once (as the slides).
-    if (g_ui_exit_when_script_done)
+    if (g_ui_unattended)
         while (a.expl) sat_expl_step(c);
 }
 }  // namespace

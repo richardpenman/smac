@@ -34,6 +34,7 @@
 #include "ui/topmenu.h"
 
 bool g_ui_exit_when_script_done = false;
+bool g_ui_unattended = false;
 std::string g_ui_outdir = ".";
 int32_t g_ui_shots = 0;
 
@@ -198,6 +199,13 @@ bool run_command(const std::string& cmd) {
             std::fprintf(stderr, "unit %d f%d %s (%d,%d) order %d moves %d state %08X %s\n", i, v.faction_id,
                          Units[v.unit_id].name, v.x, v.y, v.order, v.moves_spent, v.state, veh_ready(i) ? "ready" : "");
         }
+        return true;
+    }
+    if (cmd.rfind("wait ", 0) == 0) {  // test aid: WAIT:MS, real time passing (the screen left dirty)
+        uint32_t t = platform::ticks_ms(), ms = (uint32_t)std::strtoul(arg.c_str(), nullptr, 0);
+        while (platform::ticks_ms() - t < ms) platform::delay_ms(5);
+        ui_invalidate();
+        ui_present();
         return true;
     }
     if (cmd.rfind("basedump", 0) == 0) {  // test aid: the base window's canvases (basewin.h)
@@ -511,8 +519,20 @@ static void draw_bubble(Buffer* s) {
     }
 }
 
+// A present composes every window, and some windows' draws run engine code that pumps messages
+// (StatusWin_draw_active's go-to line: MapWin_dest_line -> Path_find -> do_all_non_input). In the
+// original those pumps never re-enter a draw (WM_PAINT is not dispatched re-entrantly and the
+// windows draw into their buffers); here a present from inside a present only leaves the screen
+// to be shown again later.
+static bool g_presenting = false;
+
 void ui_present() {
     if (!g_ready) return;
+    if (g_presenting) return;
+    struct Guard {
+        Guard() { g_presenting = true; }
+        ~Guard() { g_presenting = false; }
+    } guard;
     g_layers.assign((size_t)g_canvas.stride * g_canvas.height, 0);
     if (g_desktop) {
         // The opening screens: black behind the windows (the desktop window, the menus).

@@ -1,7 +1,7 @@
 // smacx: the native game with the SDL2 UI.
 //
 //   smacx [--new [k=v ...] | --save FILE.sav] [--human N] [--viewer N] [--seed CRT,GAME|clock]
-//         [--keys K1,K2,...] [--exit-after-keys] [--turns N] [--shot FILE.bmp] [--snapshots DIR]
+//         [--keys K1,K2,...] [--exit-after-keys] [--animate] [--turns N] [--shot FILE.bmp] [--snapshots DIR]
 //         [--rng FILE] [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR]
 //         [--gamedir DIR] [--image FILE] [--ini FILE] [--nosound]
 //
@@ -53,7 +53,11 @@
 // map preview: its zoom, centre and route lines), and the commands SHOT[:FILE]
 // (screenshot), SAVE:FILE (save the game
 // and its generators in FILE.rng, relative to --outdir), UNITS (list the human's units on
-// stderr), QUIT. --exit-after-keys (default with --hidden) quits when they run out.
+// stderr), WAIT:MS (real time passing, then the screen presented), QUIT. --exit-after-keys
+// (default with --hidden) quits when they run out.
+// Such unattended runs skip the animations (window slides, unit moves, booms, battle reports,
+// movies); --animate (or SMACX_ANIMATE=1) plays them all with their waits as an interactive game
+// does and still quits at the end of the keys (the test suites' default; TEST_FAST=1: unattended).
 // Environment: SMACX_KEYLOG=1 logs every key dispatched to the console; SMACX_ALLUNITS=1 makes
 // UNITS list every faction's units.
 // --seed CRT,GAME: the generators' seeds (the harness's seed command); default 0,0 with --keys or
@@ -133,7 +137,7 @@ struct Options {
     std::string new_args;
     int human = -1, viewer = -1, zoom = 0x7FFF, cx = -1, cy = -1, width = 1024, height = 768, turns = 0;
     unsigned seed_crt = 0, seed_game = 0;
-    bool seeded = false, seed_given = false, hidden = false, exit_after_keys = false, nosound = false;
+    bool seeded = false, seed_given = false, hidden = false, exit_after_keys = false, nosound = false, animate = false;
     std::vector<ScriptedKey> keys;
 } g_opt;
 
@@ -609,6 +613,10 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         if (c3 != std::string::npos) out->command += " " + tok.substr(c3 + 1);
         return true;
     }
+    if (tok.rfind("WAIT:", 0) == 0) {  // WAIT:MS, real time passing, then a present (test aid)
+        out->command = "wait " + tok.substr(5);
+        return true;
+    }
     if (tok == "QUIT" || tok == "UNITS") {
         out->command = tok == "QUIT" ? "quit" : "units";
         return true;
@@ -665,7 +673,7 @@ int usage() {
     std::fprintf(
         stderr,
         "usage: smacx [--new [k=v ...] | --save FILE.sav] [--human N] [--viewer N] [--seed CRT,GAME|clock]\n"
-        "             [--keys K1,K2,..] [--exit-after-keys] [--turns N] [--shot FILE.bmp] [--snapshots DIR] [--rng "
+        "             [--keys K1,K2,..] [--exit-after-keys] [--animate] [--turns N] [--shot FILE.bmp] [--snapshots DIR] [--rng "
         "FILE]\n"
         "             [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR] [--gamedir DIR]\n"
         "             [--image FILE] [--ini FILE] [--dump FILE.smxmap [--like REF.smxmap] [--scroll-from X,Y]\n"
@@ -714,6 +722,7 @@ int main(int argc, char** argv) {
         else if (a == "--hidden") g_opt.hidden = true;
         else if (a == "--nosound") g_opt.nosound = true;
         else if (a == "--exit-after-keys") g_opt.exit_after_keys = true;
+        else if (a == "--animate") g_opt.animate = true;
         else if (a == "--keys") {
             std::string list = next() + ",";
             for (size_t p = 0, c; (c = list.find(',', p)) != std::string::npos; p = c + 1) {
@@ -813,7 +822,9 @@ int main(int argc, char** argv) {
     ui_screen_init(g_opt.width, g_opt.height);
     g_ui_outdir = g_opt.outdir;
     g_ui_exit_when_script_done = g_opt.exit_after_keys || g_opt.hidden;
-    diplowin_set_animate(!g_opt.seeded);
+    if (const char* e = std::getenv("SMACX_ANIMATE")) g_opt.animate |= std::atoi(e) != 0;
+    g_ui_unattended = g_ui_exit_when_script_done && !g_opt.animate;
+    diplowin_set_animate(!g_opt.seeded || g_opt.animate);
     ui_script_keys(g_opt.keys);
     g_harness_top_menu = menu ? main_menu : start_game_menu;
     g_harness_turn_upkeep = harness_turn_upkeep;
