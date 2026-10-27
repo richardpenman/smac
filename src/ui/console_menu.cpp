@@ -1,8 +1,9 @@
 // Console_menu_proc (0x51BC70, reached from the menu bar through Menu_menu_event ->
 // Console_menu_daemon): the commands of the menu bar's items by command id (menu.cpp), and
-// Console_next_cursor (0x510B70). Reconstructed from the asm. The scenario editor's commands
-// (0x600.., 0xA00..: Console_editor_*) and the multiplayer ones (chat, time controls, the
-// multiplayer window's buttons, hang up) call functions that are not reconstructed (logged).
+// Console_next_cursor (0x510B70). Reconstructed from the asm, with the scenario editor's commands
+// (0x600.., 0xA00..: Console_editor_*; other ids do nothing, as the original's switch) and the
+// network menu (chat, the commlink panel's button 2, time controls); the network play's own
+// paths (hang up, the time bonus in multiplayer) are the online phase's (docs/MULTIPLAYER.md).
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -483,9 +484,9 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
         popp(ScriptFileName, "VERSIONCONTROLX", 0, "ac_logo_sm.pcx", 0);
         break;
     // Network
-    case 0x800: console_not_reconstructed("Console_chat"); break;
+    case 0x800: Console_chat(self, 0); break;
     case 0x801: X_pop("VOICEOVERDATA", 0); break;  // (pop_wait as the expiry function)
-    case 0x802: console_not_reconstructed("MultiWin_on_button_clicked"); break;
+    case 0x802: MultiWin_on_button_clicked(&MultiWinObj, 2); break;
     case 0x803: Console_custom_my_faction(self); break;
     case 0x804: Console_time_controls(self); break;
     case 0x805: Console_zoom_to_upkeep_base(self); break;
@@ -589,6 +590,6 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
         case 0xA54: Console_editor_lock2(); return;
         default: break;
         }
-        console_not_reconstructed("Console_menu_proc: scenario editor command");
+        // Other ids: nothing (the original's switch defaults).
     }
 }

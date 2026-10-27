@@ -25,6 +25,7 @@
 #include "engine/veh.h"
 #include "ui/basewin_internal.h"
 #include "ui/pulldown.h"
+#include "ui/reports.h"
 #include "ui/console.h"
 #include "engine/veh.h"
 #include "engine/map.h"
@@ -135,9 +136,9 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
         }
         if (next) continue;
         if (item == 9999) {
-            // The old design workshop list (design_workshop 0x583E30, not reconstructed: the
-            // picker never returns 9999), then the list again.
-            console_not_reconstructed("design_workshop");
+            // The old design workshop (design_workshop: the picker never returns 9999, so this is
+            // unreachable as in the original), then the list again.
+            design_workshop(cb.faction_id, 1);
             refresh_base(self);
             prodwin_rebuild();
             continue;
@@ -280,7 +281,7 @@ void THISCALL BaseWin_garrison_click(uint8_t* self, int32_t veh_id, int32_t x, i
         Console_set_move(&MainConsole, 1);
         mw(&MainConsole, kConAnySelect) = 1;
         if (Win_is_visible(&BaseWin)) bw_close_window(self);
-        else if (Win_is_visible(&ReportWindow)) console_not_reconstructed("ReportIf_done");
+        else if (Win_is_visible(&ReportWindow)) ReportIf_done(&ReportIfObj);
     };
     if (!right && (GameMorePreferences & MPREF_ADV_CLICK_VEH_CANCELS_ORDERS)) {
         if (!veh_selectable(veh_id) || net_lock_veh(&veh_id, 0)) return;
@@ -391,7 +392,7 @@ void THISCALL BaseWin_garrison_click(uint8_t* self, int32_t veh_id, int32_t x, i
         pfncMoveMap(&MainConsole, u.x, u.y, 1);
         Console_set_cursor(&MainConsole, u.x, u.y);
         if (Win_is_visible(&BaseWin)) bw_close_window(self);
-        else if (Win_is_visible(&ReportWindow)) console_not_reconstructed("ReportIf_done");
+        else if (Win_is_visible(&ReportWindow)) ReportIf_done(&ReportIfObj);
         return;
     case 0x5A: Console_editor_edit_veh(&MainConsole, veh_id); break;
     default: break;

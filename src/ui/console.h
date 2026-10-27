@@ -53,6 +53,8 @@ GLOBAL(int32_t, ConsoleNotReady, 0x93A944);  // a key arrived before the game wa
 GLOBAL(int32_t, NewBaseX, 0x685478);  // site shown while naming a new base
 GLOBAL(int32_t, NewBaseY, 0x68547C);
 GLOBAL(uint8_t, ReportWindow, 0x876478);  // a report window (Thinker: ReportWin)
+GLOBAL(uint8_t, ReportIfObj, 0x885F38);  // the reports' main interface part (ReportIf)
+GLOBAL(uint8_t, MultiWinObj, 0x7FD648);  // the commlink panel (MultiWin)
 GLOBAL(int32_t, NetLockHeld, 0x93E940);  // multiplayer: this client holds the unit lock
 
 // ---- reconstructed functions (also: Console_human_turn, Console_focus, Console_ready_search,
@@ -259,6 +261,20 @@ ADDR_NATIVE(0x48C320) int32_t GAMEAPI popt(const char* file, const char* label, 
 // entry in ParseStrBuffer[0].
 ADDR_NATIVE(0x5BFAB0)
 int32_t GAMEAPI X_pop_ask(const char* label, int32_t max_len, const char* text, int32_t a4, int32_t a5);
+
+// MultiWin_on_button_clicked (0x477F00, multiwin.cpp): 0 the chat, 1 the Council, else nothing.
+ADDR_NATIVE(0x477F00) void THISCALL MultiWin_on_button_clicked(uint8_t* self, int32_t id);
+// Console_chat (0x515770): the CHATASK message to the other players; nothing outside multiplayer.
+ADDR_NATIVE(0x515770) void THISCALL Console_chat(uint8_t* console, int32_t faction_id);
+
+// design_workshop (0x583E30, designwin.cpp): the old design workshop's prototype list (unreachable
+// in the original: BaseWin_production's 9999 answer); with `pick` the slot to design in opens.
+ADDR_NATIVE(0x583E30) int32_t GAMEAPI design_workshop(int32_t faction_id, int32_t pick);
+
+// The auto play timer (win.cpp): Console_on_key_click's ctrl+shift+F11 starts / stops it; its tick
+// (auto_play_callback 0x50E890) from smacx's input loops (main_loop: the console's).
+void auto_play_toggle();
+void auto_play_tick(bool main_loop);
 
 // ---- not original functions ----
 // Placeholder of an original function that is not reconstructed: logs the name once (stderr) and

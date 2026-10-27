@@ -634,7 +634,11 @@ void basewin_client_to_screen(int32_t* x, int32_t* y) {
     *y += g_bw.y;
 }
 
-int32_t THISCALL Win_is_visible(uint8_t* win) { return win == &BaseWin && g_bw.visible ? 1 : 0; }
+bool report_visible();
+int32_t THISCALL Win_is_visible(uint8_t* win) {
+    if (win == &ReportWindow) return report_visible() ? 1 : 0;  // the reports (reports.cpp)
+    return win == &BaseWin && g_bw.visible ? 1 : 0;
+}
 
 void THISCALL GraphicWin_redraw(uint8_t* win) {
     if (win == &BaseWin && g_bw.visible) BaseWin_on_redraw(win);

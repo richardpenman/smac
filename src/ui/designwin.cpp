@@ -55,6 +55,7 @@
 #include "engine/diplo_act.h"
 #include "engine/globals.h"
 #include "engine/map.h"
+#include "engine/net.h"
 #include "engine/parse.h"
 #include "engine/proto.h"
 #include "engine/rules.h"
@@ -1462,5 +1463,122 @@ void designwin_log_protos() {
             "proto %d name '%s' chassis %d weapon %d armor %d reactor %d abil %#x flags %#x obsolete %d cost %d\n", u,
             x.name, x.chassis_id, x.weapon_id, x.armor_id, x.reactor_id, x.ability_flags, x.unit_flags,
             (x.obsolete_factions >> f) & 1, x.cost);
+    }
+}
+
+// ---- design_workshop (0x583E30): the old design workshop's prototype list ----
+// BaseWin_production calls it (with `pick` 1) when the production picker answers 9999, which the
+// picker never does: in the original it is unreachable (its popups DESIGNSHOP, DESIGNNAME,
+// DESIGNNO and NOUPGRADE are still in Script.txt). With `pick`: the faction's slot to design
+// in (the first free slot scores 999, an obsolete prototype without units 900 - queued; the best
+// wins) opens DesignWin_exec on it. Otherwise the DESIGNSHOP list of the basic and the faction's
+// prototypes (ProtoSortList after proto_sort, all 128 entries; free slots as "- (label 0x1B8) -";
+// "-name|" with obsolete / not prototyped / cost / say_stats): the pressed #button 0 cancels, 2
+// renames (DESIGNNAME, synch_proto), 3 toggles the prototype's obsolete flag (synch_obs; the list
+// again), 4 upgrades the units to the first matching prototype (same plan, group and triad, not
+// obsolete, prototyped: upgrade_prototype; none: NOUPGRADE; the list again), any other opens
+// DesignWin_exec on a faction prototype (a basic one: DESIGNNO). Returns DesignWin_exec's answer or
+// -1. Approximated: the list's items are text (hq_list_draw draws their unit pictures; item
+// height from the zoom), popups_medium's style is not applied.
+int32_t GAMEAPI design_workshop(int32_t faction_id, int32_t pick) {
+    std::fprintf(stderr, "design_workshop: faction %d pick %d\n", faction_id, pick);
+    if (pick) {
+        int32_t best = 0, slot = -1;
+        for (int32_t i = 0; i < 0x40; i++) {
+            int32_t id = faction_id * 0x40 + i, score = -1;
+            const UNIT& u = Units[id];
+            if (!(u.unit_flags & 1)) score = 999;
+            else if ((u.obsolete_factions & (1 << faction_id)) && !Factions[faction_id].units_active[id])
+                score = 900 - Factions[faction_id].units_queue[id];
+            if (score > best) {
+                best = score;
+                slot = id;
+            }
+        }
+        if (slot >= 0) return DesignWin_exec(&DesignWin, faction_id, slot);
+    }
+    for (;;) {
+        proto_sort(faction_id);
+        BasePop* pop = popup_new();
+        Popup_start(pop, ScriptFileName, "DESIGNSHOP", -1, nullptr, 2);
+        PopupDialogState = 5;
+        const uint8_t bit = (uint8_t)(1 << faction_id);
+        for (int32_t k = 0; k < 128; k++) {
+            int32_t id = ProtoSortList[k];
+            int32_t owner = id / 64;
+            if (owner != 0 && owner != faction_id) continue;
+            const UNIT& u = Units[id];
+            std::string t;
+            if (!(u.unit_flags & 1)) {
+                if (owner == 0) continue;
+                t = std::string("- ") + label_get(0x1B8 / 4) + " -";
+            } else {
+                if (owner == 0 && !has_tech(u.preq_tech, faction_id)) continue;
+                if (u.obsolete_factions & bit) t += "-";
+                t += u.name;
+                t += "|";
+                if (u.obsolete_factions & bit) t += std::string(label_get(0x368 / 4)) + ", ";
+                if (!(u.unit_flags & 4) && id > 0x3F) t += std::string(label_get(0x2E4 / 4)) + ", ";
+                t += std::string(label_get(0x160 / 4)) + ": ";
+                t += std::to_string(cost_factor(faction_id, 1, -1) * u.cost) + ", ";
+                char stats[256];
+                std::snprintf(stats, sizeof(stats), "%s", t.c_str());
+                say_stats(stats, id, nullptr);
+                t = stats;
+            }
+            BasePop_item(pop, t.c_str(), id);
+        }
+        int32_t sel = BasePop_exec_3(pop, 0, 0);
+        int32_t button = BasePop_button_pressed(pop);
+        popup_delete(pop);
+        popups_normal();
+        FX_play(&Sounds, 0xF);
+        std::fprintf(stderr, "design_workshop: answer %d button %d\n", sel, button);
+        if (button == 0) return -1;
+        if (sel < 0 || sel >= 0x200) return -1;  // (no item: smacx guard)
+        UNIT& u = Units[sel];
+        if (button == 2) {
+            if (X_pop_ask("DESIGNNAME", 0x1F, u.name, 0, 0) == 0) {
+                crt_strcpy(u.name, ParseStrBuffer[0]);
+                synch_proto(sel);
+            }
+            return -1;
+        }
+        if (button == 3) {
+            if (!(u.obsolete_factions & bit)) {
+                u.unit_flags &= 0xFDF7;
+            } else {
+                if (u.unit_flags & 8) u.unit_flags |= 0x200;
+                u.unit_flags |= 8;
+            }
+            u.obsolete_factions ^= bit;
+            synch_obs(sel);
+            continue;
+        }
+        if (button == 4) {
+            // (NetDaemon_lock: none outside multiplayer.)
+            int32_t j = 0;
+            for (; j < 0x40; j++) {
+                int32_t id = faction_id * 0x40 + j;
+                const UNIT& n = Units[id];
+                if (id != sel && (n.unit_flags & 1) && !(n.obsolete_factions & bit) && (n.unit_flags & 4) &&
+                    n.plan == u.plan && n.group_id == u.group_id &&
+                    Chassis[n.chassis_id].triad == Chassis[u.chassis_id].triad) {
+                    upgrade_prototype(faction_id, id, sel, 0);
+                    break;
+                }
+            }
+            if (j >= 0x40) {
+                bool alien = MFactions[faction_id].rule_flags & 0x80;
+                popp(ScriptFileName, "NOUPGRADE", 0, alien ? "alunit_sm.pcx" : "unit_sm.pcx", 0);
+            }
+            continue;
+        }
+        if (sel / 64 != 0) {
+            u.unit_flags &= 0xFF7F;
+            return DesignWin_exec(&DesignWin, faction_id, sel);
+        }
+        NetMsg_pop(&NetMsg, "DESIGNNO", 5000, 0, nullptr);
+        return -1;
     }
 }

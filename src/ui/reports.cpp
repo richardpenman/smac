@@ -1839,17 +1839,17 @@ void ReportScreen::on_key(int32_t key) {
     int32_t vk = key & 0xFFFF;
     if (key & 0x30000) return;
     if (vk == 0xD || vk == 0x1B) {
-        sw_close(this);
+        ReportIf_done(&ReportIfObj);  // Win_release_modal, SubInterface_release_iface_mode
         return;
     }
     if (vk == 0x70) return;  // F1: help (vtable + 0xB0), not reconstructed
     if (vk > 0x70 && vk < 0x78) {
-        if (kind() == vk - 0x6F) sw_close(this);
+        if (kind() == vk - 0x6F) ReportIf_done(&ReportIfObj);
         else switch_report(vk - 0x6F);
         return;
     }
     if (vk < 0x21 || vk > 0x28) {
-        if (vk >= 0x30 && vk <= 0x5A) sw_close(this);
+        if (vk >= 0x30 && vk <= 0x5A) ReportIf_done(&ReportIfObj);
         return;
     }
     int32_t page = std::max(rows_shown, 1);
@@ -1889,6 +1889,19 @@ void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t
             see_map_check();
             std::fprintf(stderr, "sat edit: faction %d kind %d -> %d\n", f, k, *v[k]);
         }
+        return;
+    }
+    if (parent == 0 && kind() == kOps && index >= 0x800 && index < 0xC00 && !dbl) {
+        // ReportWin_on_left_click / ReportWin_on_right_click: a unit of the garrison view (spot
+        // index 0x800 + base, type the unit): the base made current (BaseWin_soft_zoom), then the
+        // base window's unit menu (BaseWin_garrison_click; activating the unit closes the report).
+        int32_t base_id = index - 0x800;
+        if (Bases[base_id].faction_id != CurrentPlayerFaction) return;
+        std::fprintf(stderr, "Reports %s click garrison: base %d unit %d\n", right ? "right" : "left", base_id, type);
+        BaseWin_soft_zoom(&BaseWin, base_id);
+        // (The menu at the click: the coordinates as the main interface's, which the function maps.)
+        const UiRect& mp = mi_rect(kMiPos);
+        BaseWin_garrison_click(&BaseWin, type, x + this->x - mp.left, y + this->y - mp.top, right ? 1 : 0);
         return;
     }
     if (type == 99) {  // the window's scroll bar (Scroll 0x882584): a line or a page
@@ -2226,7 +2239,9 @@ void open_reports(int32_t k) {
         bool blind = !(GameState & STATE_OMNISCIENT_VIEW) && (GameRules & RULES_BLIND_RESEARCH);
         labs_tree_tech() = (blind || r < 0 || r > 0x59) ? 0 : r;
     }
+    iface_set_mode(5);  // SubInterface_set_iface_mode(ReportIf)
     sw_run(s);
+    iface_release_mode(5);
     sw_clear_buttons(s);
     s->ops_iface.clear();
     s->labs_iface.clear();
@@ -2235,6 +2250,13 @@ void open_reports(int32_t k) {
 }
 
 }  // namespace
+
+void THISCALL ReportIf_done(uint8_t*) {
+    sw_close(&g_rs);  // Win_release_modal(ReportWindow)
+    iface_release_mode(5);  // SubInterface_release_iface_mode
+}
+
+bool report_visible() { return g_rs.open; }
 
 // report_labs .. report_score (0x4AC9A0..0x4ACB80): the kind, then the window opened or switched.
 void GAMEAPI report_labs() { open_reports(kLabs); }

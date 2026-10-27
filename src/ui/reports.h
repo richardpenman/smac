@@ -14,6 +14,13 @@ ADDR_NATIVE(0x4ACA90) void GAMEAPI report_projects();
 ADDR_NATIVE(0x4ACAE0) void GAMEAPI report_sat();
 ADDR_NATIVE(0x4ACB30) void GAMEAPI report_security();
 
+// ReportIf_done (0x4A3930): the report closes (Win_release_modal of the report window,
+// SubInterface_release_iface_mode of ReportIf: interface mode 5). Console_on_key_click (Enter / Esc
+// in mode 5) and BaseWin_garrison_click (a unit activated from the base operations' garrison view).
+ADDR_NATIVE(0x4A3930) void THISCALL ReportIf_done(uint8_t* self);
+// Not original: whether the report window is open (Win_is_visible of ReportWindow 0x876478).
+bool report_visible();
+
 // Not original: the view of base operations (0 production, 1 citizens, 2 garrison).
 void reports_set_ops_view(int32_t view);
 

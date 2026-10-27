@@ -520,6 +520,10 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         out->command = "cmd " + tok.substr(4);
         return true;
     }
+    if (tok.rfind("WORKSHOP:", 0) == 0) {  // WORKSHOP:PICK, design_workshop(viewer, PICK) (unreachable in play, test aid)
+        out->command = "workshop " + tok.substr(9);
+        return true;
+    }
     if (tok == "EDITSTATE") {  // the scenario editor's pane (editpane.cpp, test aid)
         out->command = "editstate";
         return true;

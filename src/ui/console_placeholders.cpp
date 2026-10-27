@@ -28,6 +28,13 @@ void THISCALL MapWin_draw_cursor(uint8_t*) { ui_invalidate_map(); }
 // TIMECONTROLS dialog, HOSTTIME and the synchronisation are multiplayer's, out of scope).
 void THISCALL Console_time_controls(uint8_t*) {}
 
+// Console_chat (0x515770): outside multiplayer nothing; in multiplayer the CHATASK text entry and
+// message_chat to the chosen players (the online phase, docs/MULTIPLAYER.md).
+void THISCALL Console_chat(uint8_t*, int32_t) {
+    if (!MultiplayerActive) return;
+    console_not_reconstructed("Console_chat (multiplayer)");
+}
+
 // Console_custom_my_faction (0x4DD1B0, ctrl+shift+F / the Game menu): the CUSTOMNAMES popup of the
 // viewer's faction (in the scenario editor, EDITORWHO first picks the faction): the leader's
 // name, the faction's formal name, noun and adjective, the leader's title and adjective, and the

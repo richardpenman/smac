@@ -237,7 +237,11 @@ computer players move with the engine.
   runs Console_menu_proc (console_menu.cpp, reconstructed: every Game / HQ / Map / Action /
   Terraform / Help / Network command, the display toggles with their check marks and keys,
   Console_next_cursor, Console_survey, Console_zoom_to_upkeep_base, Console_show_scen_objectives,
-  Console_corner_the_market). The scenario editor's commands and the multiplayer ones log.
+  Console_corner_the_market), the scenario editor's commands (other ids do nothing, as the
+  original), Console_chat (nothing outside multiplayer), the auto play timer (ctrl+shift+F11:
+  auto_play_callback's random keys and clicks; tests/placeholders case 33). ReportIf_done closes
+  the reports (Enter / Esc in interface mode 5, a unit activated from base operations' garrison
+  view: case 29); design_workshop, unreachable in the original (case 31, WORKSHOP:PICK test aid).
 * **Save / load**: ctrl+S / ctrl+L (and the Game menu) run the engine's save_game / load_game with
   a simple file box (console_filebox.cpp): a name field, a list of saves; original naming.
 * **Placeholders** (src/ui/console_placeholders.cpp): the scenario editor, time controls,
@@ -417,9 +421,12 @@ F10 hall of fame, F11 menu detail, F12 the commlink panel (MainInterface_on_ifac
   (monument.txt with MonuWin_on_redraw's parse slots), pictures (monbigN.pcx) and the recorded
   latest monument; the background FLC is not decoded. FameWin: frame.pcx / hof.pcx, the faction's
   top five of hallfame.jhh (read and written in --outdir).
-* **Commlink panel** (multiwin.cpp: MultiWin): contacts, treaties, votes, commlink_attempt, the
-  right click's menu (report_intel, renounce_pact, demands_withdrawal, call_council), the Council
-  button (call_council). Modal here (the original keeps it beside the map).
+* **Commlink panel** (multiwin.cpp: MultiWin): MultiWin_draw / MultiWin_draw_player's
+  single-player drawing with multi.pcx's art (the numbered contacts, treaties, the row under the
+  mouse highlighted, NO CONTACTS, the votes), commlink_attempt, the right click's menu
+  (report_intel, renounce_pact, demands_withdrawal, call_council), MultiWin_on_button_clicked (the
+  Council button: call_council; the network menu's id 2: nothing). Modal here (the original keeps
+  it beside the map). tests/placeholders case 30.
 * **Testing**: tests/reports/run.sh (SCREENSTATE / FACTIONSTATE dumps, saves reloaded);
   tests/reports/compare.sh drives the plain original (orig_reports.steps, Difficulty=2) through
   QUICK START and the same keys and scores each screen against smacx's.

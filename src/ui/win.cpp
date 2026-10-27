@@ -229,6 +229,11 @@ bool run_command(const std::string& cmd) {
         Console_menu_proc(&MainConsole, (int32_t)std::strtol(arg.c_str(), nullptr, 0));
         return true;
     }
+    if (cmd.rfind("workshop ", 0) == 0) {  // test aid: design_workshop (unreachable in play, console.h)
+        int32_t r = design_workshop(CurrentPlayerFaction, std::atoi(arg.c_str()));
+        std::fprintf(stderr, "design_workshop returned %d\n", r);
+        return true;
+    }
     if (cmd == "editstate") {  // test aid: the scenario editor's pane (editpane.cpp)
         editpane_log_state();
         return true;
@@ -678,6 +683,7 @@ void GAMEAPI wait_task() {
         return;
     }
     console_ui_tick();
+    auto_play_tick(true);
     // The palette cycles' timers (Palette_timer_callback; AnimatePalette shows them at once). As
     // the other timers, not while scripted keys remain (PALTICK steps them).
     if (palette_cycles_tick(platform::ticks_ms())) g_dirty = true;
@@ -699,6 +705,68 @@ void GAMEAPI wait_task() {
     case platform::EV_MOUSE_MOVE: ui_mouse(UiInput::MOVE, ev.x, ev.y); break;
     default: break;
     }
+}
+
+// ---- the auto play timer (Console_on_key_click's ctrl+shift+F11, timer 0x939E88) ----
+// A debugging aid of the original: auto_play_callback (0x50E890) every 100 ms posts a random key
+// (two times in three: WM_KEYDOWN / WM_KEYUP of game_random(0, 0xFF)) or a left click at a random
+// screen position; every 100 calls, with no modal window up and the turn able to end (GameState
+// bit 2), it ends the turn (Console_end_my_turn). As the original, the click's position is packed
+// wrongly ((y & 0xFF) << 8 | (x & 0xFF) as the x coordinate, 0 as the y), and starting the timer
+// makes every faction the AI's (FactionStatus[0] = 0) while stopping it makes faction 4 the human
+// (0x10). Approximated: the timer runs in smacx's input loops (the main loop, the modal popups'
+// and windows' loops; the turn ends only from the main loop, the original's WinModalState 0), the
+// posted key is the random byte without the original's sign extension.
+namespace {
+bool g_auto_play = false;  // the timer runs (0x939E8C)
+uint32_t g_auto_play_last = 0;
+int32_t g_auto_play_count = 0;  // 0x939FD0
+}  // namespace
+
+void auto_play_toggle() {
+    if (g_auto_play) {
+        g_auto_play = false;  // Time_stop
+        FactionStatus[0] = 0x10;
+    } else {
+        FactionStatus[0] = 0;
+        g_auto_play = true;  // pfncStartTimer(auto_play_callback, 0, 100, 5)
+        g_auto_play_last = platform::ticks_ms();
+    }
+    std::fprintf(stderr, "auto play timer %s (human players %02X)\n", g_auto_play ? "started" : "stopped",
+                 FactionStatus[0]);
+}
+
+void auto_play_tick(bool main_loop) {
+    if (!g_auto_play) return;
+    uint32_t now = platform::ticks_ms();
+    if (now - g_auto_play_last < 100) return;
+    g_auto_play_last = now;
+    // auto_play_callback
+    g_auto_play_count++;
+    if (g_auto_play_count > 100 && main_loop && (GameState & 2)) {
+        std::fprintf(stderr, "auto play: end of turn %d\n", CurrentTurn);
+        Console_end_my_turn(&MainConsole);
+        g_auto_play_count = 0;
+    }
+    platform::Event ev;
+    if (game_random(0, 2) != 0) {
+        int32_t c = (uint8_t)(char)game_random(0, 0xFF);
+        ev.type = platform::EV_KEY_DOWN;
+        ev.key = c;
+        std::fprintf(stderr, "auto play: key %d\n", c);
+        g_input.push_back(ev);  // (WM_KEYUP: no key-up events in smacx's queue)
+        return;
+    }
+    uint32_t x = (uint32_t)game_random(0, ScreenWidth);
+    uint32_t y = (uint32_t)game_random(0, ScreenHeight);
+    uint32_t lp = (y & 0xFF) << 8 | (x & 0xFF);  // SetCursorPos(x, y); WM_LBUTTONDOWN / UP at lp
+    ev.x = (int32_t)(lp & 0xFFFF);
+    ev.y = (int32_t)(lp >> 16);
+    std::fprintf(stderr, "auto play: click %d,%d\n", ev.x, ev.y);
+    ev.type = platform::EV_LBUTTON_DOWN;
+    g_input.push_back(ev);
+    ev.type = platform::EV_LBUTTON_UP;
+    g_input.push_back(ev);
 }
 
 int32_t GAMEAPI do_non_input() {
@@ -735,6 +803,7 @@ int32_t ui_wait_key() {
         if (g_input.empty()) pump_platform(50);
         planwin_tick(platform::ticks_ms());  // the modal popup's timers: PlanWin_blink, line_timer
         reports_tick(platform::ticks_ms());  // the reports' base locator (bl_daemon)
+        auto_play_tick(false);
         if (g_input.empty()) continue;
         platform::Event ev = g_input.front();
         g_input.pop_front();
@@ -795,6 +864,7 @@ bool ui_wait_input(UiInput* in) {
         if (g_input.empty()) pump_platform(50);
         planwin_tick(platform::ticks_ms());  // the modal popup's timers: PlanWin_blink, line_timer
         reports_tick(platform::ticks_ms());  // the reports' base locator (bl_daemon)
+        auto_play_tick(false);
         if (g_input.empty()) continue;
         platform::Event ev = g_input.front();
         g_input.pop_front();

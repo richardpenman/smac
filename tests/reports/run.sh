@@ -212,13 +212,13 @@ has satattack300 "a satellite fewer" "^report sat anim satellites 2"
 #    report), the Council button (call_council: COUNCILNEEDALL here).
 run commlink147 --save work/saves_late/turn_147.sav --human 3 --keys \
 "DOWN,ENTER,F4,CLICK:500x75,CLICK:120x678,SCREENSTATE,CLICK:120x744,SCREENSTATE,ESC,F12,SHOT:commlink.bmp,SCREENSTATE,\
-RCLICK:950x365,SHOT:menu.bmp,SCREENSTATE,CLICK:900x394,SHOT:intel.bmp,SCREENSTATE,ESC,CLICK:950x478,ENTER,SCREENSTATE,ESC,\
+RCLICK:950x384,SHOT:menu.bmp,SCREENSTATE,CLICK:900x413,SHOT:intel.bmp,SCREENSTATE,ESC,CLICK:950x478,ENTER,SCREENSTATE,ESC,\
 SCREENSTATE"
 nocrash commlink147
 check "governor set to build" "$(r commlink147 'ops 0 ' | head -1 | cut -d' ' -f5-10)" "2 University Base gov BUILD build"
 check "governor off" "$(r commlink147 'ops 0 ' | sed -n 2p | cut -d' ' -f5-11)" "2 University Base gov Governor Off build"
-check "commlink contacts" "$(line commlink147 multistate 1)" "multistate rows 2 4 5 6 7 votes 39 menu -1"
-check "commlink menu" "$(line commlink147 multistate 2 | sed 's/.* menu //')" "4"
+check "commlink contacts" "$(line commlink147 multistate 1)" "multistate rows 2 4 5 6 7 votes 39 menu -1 hover -1"
+check "commlink menu" "$(line commlink147 multistate 2 | sed 's/.* menu //')" "4 hover -1"
 has commlink147 "faction profile" "^multiwin action 2 faction 4"
 has commlink147 "intelligence report" "^report intel CEO Morgan of the Morganites"
 has commlink147 "council" "^popup COUNCILNEEDALL shown"

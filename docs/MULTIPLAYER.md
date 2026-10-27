@@ -1,0 +1,117 @@
+# Multiplayer
+
+Plan for multiplayer in smacx: hotseat, then play-by-email (PBEM), then online play between smacx
+copies over TCP. Single-player behaviour does not change: every path below is taken only with
+`PbemActive` or `MultiplayerActive` set, and the differential harness (`harness/verify.sh`) and
+the scripted suites keep passing at each step. User decisions: smacx to smacx only (no DirectPlay
+compatibility with the original); the original's bugs are replicated (COMPAT flags on).
+
+## How the original is structured
+
+**Entry.** `top_menu` (0x58E360) item MULTIPLAYER calls `multiplayer_init(0)` (0x58DB30). It calls
+`NetDaemon_init` -> `AlphaNet_setup` (0x4E31E0) -> `AlphaNet_pick_service`: the SELECTSERVICE popup
+(jackal.txt) lists the DirectPlay service providers and one more item, label 0x1128 (the
+hotseat/email game), id 9999, which sets `PbemActive`. With `PbemActive` the net layer is closed
+and `multiplayer_init` runs `top_menu(1)`: the HOTSEAT menu (New Multiplayer Game, Multiplayer
+Scenario, Load Multiplayer Game). A network service instead asks NETCONNECT_JOIN_OR_CREATE
+(`AlphaNet_create` / `AlphaNet_join`: the DirectPlay session), then `NetWin_exec` (the MULTIPLAYER
+SETUP window: players, factions, rules, the planet, time controls) and the host sends the rules,
+the game and the files to the others (`NetDaemon_send_rules / send_game / send_files`).
+
+**Hotseat setup** (`config_game` 0x589D30 with `PbemActive`). After each faction is picked:
+HOTSEATADD0 (the human factions so far) + HOTSEATADD1 (add another human player? No / Yes); a
+taken faction gives FACTIONTAKEN. `FactionStatus[0]` gets the human factions, the first is the
+viewer; `clear_tamper` and the PBEM tamper seeds (`timeGetTime + MapRandomSeed`, the system date)
+are set; no planetfall movie. Passwords are not asked here: they are set at the first handover.
+
+**Turns.** `control_game` runs `control_turn` (hotseat / PBEM / single player) or
+`net_control_turn` (network). In `control_turn` a human faction other than the viewer (always with
+`PbemActive`) takes over the screen: the windows are hidden, the screen is cleared and the
+SWITCHING popup is shown (NEXT PLAYER TURN, the leader, the mission year; "Set Password or Press
+ENTER" — SWITCHING2 "Enter Password" once the faction has one; the SAVE AND EXIT button saves
+with `GameMoreRules` 0x40 and quits). A typed password is checked with `checksum_password`
+(three wrong tries: save and quit); a first password is confirmed with VERIFYPASSWORD and stored
+in the faction (+0x88 of Faction, `dword 0x96EA68`). Then the view is centred on the player's first
+base (or unit), and what happened since their last turn is shown: tampering (HOTTAMPER2), saved
+technologies (`tech_advance`), diplomacy requested by other humans (`diplo`), AI contacts
+(`communicate`), the council's pending session or result (COUNCILHOT*).
+
+**Diplomacy between humans.** Between two human players the commlink does not open the AI dialog:
+`commlink_attempt` / `commlink_attempter` call `diplo` (0x444D90 -> FUN_00443F10), the DiploWin:
+a window over the main interface with each side's offers (technologies, energy, maps, treaties and
+pacts, bases, loans), the chat lines (StringBox and EditBox) and the buttons (ids 0xDC4..0xDF7:
+propose, accept, reject, ...). In hotseat / PBEM the request is stored per pair of factions
+(the offer tables at 0x7388D8.. and `DiploStateB / DiploStateC`) and the other player sees it at
+the start of their turn (`control_turn`, above); in network play the offers travel as messages
+(`message_data`, `NetDaemon_await_diplo`, `net_treaty_on / off`, `net_energy`, `net_tech`,
+`net_maps`, `net_pact_ends`, `net_cede_base`, ...). `clear_hotseat_chat` clears the stored chat.
+
+**PBEM.** The same game as hotseat; after SAVE AND EXIT the save is mailed by hand. `save_game`
+counts saves (`PbemSaveCount`), `set_tamper / check_tamper / read_tamper / clear_tamper` detect a
+player reloading the save to retry a turn (HOTTAMPER, HOTTAMPER2, HOTNOTAMPER); loading a
+password-protected save as single player is refused (PASSWORDEDLOADATTEMPT); loading asks the
+faction's password (ENTERPASSWORD / BADPASSWORD).
+
+**Network.** `NetDaemon` (0x52DF30..0x538D10) sits on `AlphaNet` / `Net` (DirectPlay, 0x62D6A0..):
+`Net_send` / `Net_get` move packets; `NetDaemon_send_message` routes a message by its type bits
+(0x4000 timed, 0x8000 to the host, 0xA000 to the current faction in simultaneous play, else to a
+faction); `NetDaemon_process_message` (17.6 KB) handles about 70 message types (0x0F05.., 0x1201..,
+0x1505.., 0x2212.., 0x4304.., 0x4405.., 0x4441..). State changes are replicated by `synch_*`
+(`synch_veh`, `synch_base`, `synch_proto`, `synch_obs`, `synch_bit`, `synch_diplo`, ... ->
+`NetDaemon_synch`) and events by `message_*` (`message_data`, `message_veh`, `message_base`,
+`message_chat`, `message_landmark`, `message_lock`, ...). Exclusive access uses locks
+(`NetDaemon_lock / lock_veh / lock_base / add_global / await_*`). `net_control_turn` (0x52A2E0)
+runs the round: `turn_upkeep` + `net_upkeep` (the host), `net_upkeep_phase`, each player's moves
+(simultaneous or in turn, `GameMoreRules` 0x10), `net_end_of_turn`, `net_not_my_turn`, checksums
+(`do_checksums`), time controls (`turn_timer`, `set_time_controls`). `wait_loop` (0x51F200) is the
+idle loop of every modal wait: without multiplayer `wait_task`, with it `NetDaemon_net_tasks` and
+the diplomatic channels other humans opened (`NetDaemon_open_channel` -> `communicate`).
+MultiWin (the commlink panel) shows the players' time and lock state, its chat button
+(`Console_chat` -> CHATASK -> `message_chat`).
+
+## Phases
+
+**1. Hotseat** (this phase):
+* the SELECTSERVICE popup with the hotseat/email item (no network service yet) ->
+  `multiplayer_init`'s PBEM path -> `top_menu(1)`;
+* `config_game`'s HOTSEATADD0 / HOTSEATADD1 / FACTIONTAKEN loop, the tamper seeds;
+* `control_turn`'s handover: the screen cleared, SWITCHING / SWITCHING2, the passwords
+  (`checksum_password`, VERIFYPASSWORD, three tries), SAVE AND EXIT, the view centred
+  (`ui_hotseat_switch` / `ui_hotseat_show` in src/ui);
+* `diplo` and the DiploWin (FUN_00443F10 and its helpers 0x440F80..0x445080) for two humans;
+* the PbemActive paths already reconstructed in the engine (control_turn, hotseat_take_turn,
+  council, comm_check, save / load) checked in play.
+
+**2. PBEM**: SAVE AND EXIT and reloading (ENTERPASSWORD, BADPASSWORD, PASSWORDEDLOADATTEMPT),
+the tamper checks (`set_tamper`, `check_tamper`, `read_tamper`; HOTTAMPER / HOTNOTAMPER), the
+council's hotseat results across saves. Mostly already in the engine's save / load code.
+
+**3. Online (TCP between smacx copies)**: `Net_*` (DirectPlay) is replaced by a small TCP transport
+under the original `NetDaemon` message protocol, which stays as the original's (same message
+types and payloads, same routing in `NetDaemon_send_message`, same `process_message`):
+* the host listens on a port, clients connect (NETCONNECT_JOIN_OR_CREATE: host or join; join asks
+  the host's address); the SELECTSERVICE list shows "Internet (TCP/IP, smacx)" beside the
+  hotseat/email item;
+* a `Net` replacement with the original's entry points (`Net_send(msg, len, to, guaranteed)`,
+  `Net_get`, `Net_enum_players`, `Net_drop_player`, `Net_handle_sys_msg` for joins / drops),
+  length-prefixed frames on one TCP stream per client, the host relaying between clients as
+  DirectPlay's server did; player ids are the original's (`AlphaNet_pid_2_who`, `who_2_pid`);
+* then `NetWin_exec` (the setup window), `NetDaemon_send_rules / send_game / send_files`, the
+  locks, `net_control_turn` and the message handlers, one group at a time;
+* no voice (`Net_start_voice`), no lobby (`Net_check_for_lobby`), no DirectPlay registry check.
+
+## Testing
+
+* **Every phase**: `NATIVE_BUILD=build/mp-native harness/verify.sh native tiny20 council131` and
+  all `tests/*/run.sh` (animated) pass: single player unchanged.
+* **Hotseat**: `tests/hotseat/run.sh` (animated, scripted keys): a 2-3 human game through the
+  menus (MULTIPLAYER -> the hotseat item -> New Multiplayer Game -> the factions, HOTSEATADD),
+  several turns with the handovers (SWITCHING, a password set and checked, a wrong one), a treaty
+  between two humans through the DiploWin, SAVE AND EXIT and the save reloaded; the log checked
+  (popups shown, `FactionStatus`, the viewer per turn, the treaty in DIPLOSTATE).
+* **PBEM**: the same game saved and exited at each handover and reloaded by the next player;
+  tampering provoked (a save reloaded twice).
+* **Online**: two smacx processes on localhost (one host, one client, `--keys` scripts each, run
+  one after the other's start; the machine allows only one smacx at a time for the suites, so
+  this test runs alone); the messages logged on both sides and the game states compared at each
+  turn's end (`do_checksums` must agree). Unit tests for the frame codec and the message routing.

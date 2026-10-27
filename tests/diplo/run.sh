@@ -79,7 +79,7 @@ check "aicall147 reload Believers" "$(dl aicall147r 1 6 | cut -d' ' -f1-4)" "dip
 #    commlink panel closed by the dialog, MultiWin_hide): the
 #    Spartans get the technologies, their friction drops. Saved and loaded again.
 HIVE="ENTER,ENTER,ENTER,ENTER,ENTER,ENTER,ENTER,ENTER"
-SPARTANS="F12,CLICK:950x382,ENTER,ENTER,ENTER,ENTER,ENTER,ENTER"
+SPARTANS="F12,CLICK:950x400,ENTER,ENTER,ENTER,ENTER,ENTER,ENTER"
 run giftech147 --save work/saves_late/turn_147.sav --human 3 --keys \
 "$HIVE,$SPARTANS,DIPLOSTATE,DOWN,ENTER,SHOT:proposal.bmp,DOWN,ENTER,SHOT:counter.bmp,DOWN,DOWN,ENTER,ENTER,DIPLOSTATE,\
 SHOT:menu.bmp,ENTER,SAVE:after.sav"
@@ -176,7 +176,7 @@ has basetrade147 "hidden after the menu" "^planwin shown 0 "
 #    shown after DiploPop's) must be drawn over DiploPop's window. It was drawn below it: the
 #    player saw a black screen (DiploPop's emptied canvas) with only the window's bottom.
 run techtrade147 --save work/saves_late/turn_147.sav --human 6 --keys \
-"F12,CLICK:950x382,ENTER,ENTER,ENTER,ENTER,ENTER,ENTER,ENTER,DOWN,ENTER,DOWN,DOWN,ENTER,DOWN,DOWN,ENTER,\
+"F12,CLICK:950x400,ENTER,ENTER,ENTER,ENTER,ENTER,ENTER,ENTER,DOWN,ENTER,DOWN,DOWN,ENTER,DOWN,DOWN,ENTER,\
 DOWN,ENTER,PIXEL:512x150,SHOT:newtech.bmp,SCREENSTATE,ENTER,ENTER,ENTER,DIPLOSTATE"
 nocrash techtrade147
 has techtrade147 "the exchange accepted" "^popup TRADETECH0 answer: 1 "

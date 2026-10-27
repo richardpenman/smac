@@ -498,4 +498,80 @@ nocheck basefkeys "ctrl+B: no go-to list" "popup .*GOTO.* shown|planwin open"
 nocheck basefkeys "no placeholder" "not reconstructed: Console_on_key_click"
 nocrash basefkeys
 
+# 29. ReportIf_done: a unit of base operations' garrison view (ReportWin_on_left_click:
+#     BaseWin_garrison_click) activated from its menu closes the report (the report's interface
+#     mode 5 released); Esc in the report (ReportWin_on_key_click) closes it the same way.
+if [ -f "$ROOT/work/saves_late/turn_147.sav" ]; then
+    run reportdone --save work/saves_late/turn_147.sav --human 3 --keys \
+"DOWN,ENTER,F4,CLICK:740x40,CLICK:810x75,SHOT:garrison.bmp,DOWN,ENTER,SCREENSTATE,F4,SCREENSTATE,ESC,SCREENSTATE"
+    check reportdone "garrison click" "^Reports left click garrison: base 2 unit 157"
+    check reportdone "the unit's menu at the click" "^pulldown shown: 5 items at 811,76"
+    check reportdone "activated: the report closed" "$(printf 'pulldown answer: 0 \\(id 2\\)')"
+    if [ "$(grep -a '^screenstate' "$OUT/reportdone.log" | tr '\n' ' ')" = "screenstate none screenstate report screenstate none " ]; then
+        echo "PASS reportdone: closed, reopened, Esc closes"; else echo "FAIL reportdone: closed, reopened, Esc closes"; FAIL=1; fi
+    nocheck reportdone "no placeholder" "not reconstructed: ReportIf_done"
+    nocrash reportdone
+fi
+
+# 30. The commlink panel (MultiWin_draw / MultiWin_draw_player, multi.pcx's art): the contacts
+#     numbered with their treaties, the row under the mouse highlighted (MultiWin_on_mouse_move),
+#     the votes; the network menu's commands outside multiplayer: 0x802 (MultiWin_on_button_clicked
+#     with id 2) and 0x800 (Console_chat) do nothing; the Council button (MultiWin_on_button_clicked
+#     1: call_council). A new game: NO CONTACTS.
+if [ -f "$ROOT/work/saves_late/turn_147.sav" ]; then
+    run commlink --save work/saves_late/turn_147.sav --human 3 --keys \
+"DOWN,ENTER,F12,MOVE:950x384,SHOT:commlink.bmp,SCREENSTATE,CMD:0x802,CMD:0x800,CLICK:950x480,ENTER,ESC"
+    check commlink "contacts numbered" "^screentext 2\\. Morgan"
+    check commlink "treaty" "^screentext VENDETTA"
+    check commlink "votes" "^screentext VOTES:  39"
+    check commlink "Morgan's row highlighted" "^multistate rows 2 4 5 6 7 votes 39 menu -1 hover 4"
+    check commlink "Council button" "^multiwin council"
+    nocheck commlink "no placeholder" "not reconstructed"
+    nocrash commlink
+fi
+run nocontacts $NEW --keys "ENTER,F12,SHOT:nocontacts.bmp,SCREENSTATE,ESC"
+check nocontacts "NO CONTACTS" "^screentext NO CONTACTS"
+nocrash nocontacts
+
+# 31. design_workshop (unreachable in play: BaseWin_production's answer 9999; WORKSHOP: is the test
+#     aid): with `pick` the first free slot opens the design workshop; the DESIGNSHOP list: Mark
+#     Obsolete (#button 3) on the Formers, the list again, Rename (#button 2: DESIGNNAME), the
+#     list shows the new name and the obsolete mark.
+run workshop $NEW --keys "ENTER,WORKSHOP:1,SCREENSTATE,ESC,ENTER,WORKSHOP:0,DOWN,DOWN,CLICK:512x498,DOWN,DOWN,CLICK:347x498,\
+BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,BACK,X,y,z,ENTER,WORKSHOP:0,SHOT:workshop.bmp,ESC"
+check workshop "pick: the design workshop" "^screenstate design"
+check workshop "the list" "^popup DESIGNSHOP shown: .* \\(67 items\\)"
+check workshop "obsolete" "^design_workshop: answer 1 button 3"
+check workshop "rename" "^popup DESIGNNAME shown"
+check workshop "renamed" "^design_workshop returned -1"
+nocrash workshop
+
+# 32. The scenario editor's other command ids do nothing (Console_menu_proc's switch defaults).
+run editorids $NEW --keys "ENTER,C-k,DOWN,ENTER,ENTER,CMD:0xA22,CMD:0xA5F,CMD:0x61F,C-k,ENTER"
+nocheck editorids "no placeholder" "not reconstructed"
+nocrash editorids
+
+# 33. The auto play timer (ctrl+shift+F11): random keys and clicks (auto_play_callback) while
+#     real time passes; started, every faction is the AI's; stopped, faction 4 is the human.
+run autoplay $NEW --keys "ENTER,C-S-F11,WAIT:1500,C-S-F11,UNITS"
+check autoplay "started" "^auto play timer started \\(human players 00\\)"
+check autoplay "random input" "^auto play: (key|click) "
+check autoplay "stopped" "^auto play timer stopped \\(human players 10\\)"
+nocheck autoplay "no placeholder" "not reconstructed"
+nocrash autoplay
+
+# 34. An Alien Artifact linked to a Network Node (the network layer's single-player paths: synch_veh,
+#     NetDaemon_await_synch): the editor builds the Network Node in base 0 (EDITORFAC) and puts an
+#     artifact east of it (EDITORUNIT), the artifact moves in: ARTIFACT, "link" chosen: the tech.
+D7="DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN"
+run artifact $NEW --keys "ENTER,C-k,DOWN,ENTER,ENTER,BASE:0,e,$D7,DOWN,ENTER,$D7,ENTER,ESC,ESC,v,KP6,S-F1,$D7,ENTER,C-k,ENTER,\
+v,UNITS,KP4,SHOT:artifact.bmp,DOWN,ENTER,ENTER,UNITS"
+check artifact "network node" "^base editor: base 0 facility 8 built"
+check artifact "the artifact" "^editor: unit 20 \\(Alien Artifact\\) of faction 1 at 37,7"
+check artifact "linked" "^popup ARTIFACT answer: 1 "
+check artifact "the technology" "^popup ARTIFACTTECH shown"
+if grep -qa "^unit 20 f1 Alien Artifact" <(sed -n '/popup ARTIFACT answer/,$p' "$OUT/artifact.log"); then
+    echo "FAIL artifact: the artifact consumed"; FAIL=1; else echo "PASS artifact: the artifact consumed"; fi
+nocrash artifact
+
 exit $FAIL

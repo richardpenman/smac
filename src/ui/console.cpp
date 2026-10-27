@@ -1529,7 +1529,7 @@ bool confirm_quit() {
 // flag and returns); the movement keys after it are then skipped (0x51B078).
 void console_function_keys(uint8_t* self, int32_t vk, bool in_base) {
     switch (vk) {
-    case 0x20043: console_not_reconstructed("Console_chat"); break;
+    case 0x20043: Console_chat(self, 0); break;
     case 0x77: report_score(0); break;  // F8
     case 8: {  // Backspace: back in the cursor history
         if (in_base) break;
@@ -1563,7 +1563,7 @@ void console_function_keys(uint8_t* self, int32_t vk, bool in_base) {
         break;
     case 0x1B:  // Esc
         if (InfcList[InfcUsed] != 5) confirm_quit();
-        else console_not_reconstructed("ReportIf_done");
+        else ReportIf_done(&ReportIfObj);
         break;
     case 0x70: Datalink_exec(&DatalinkWin, 0xE, 0); break;  // F1
     case 0x71: report_labs(); break;  // F2
@@ -1632,7 +1632,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     case 0x30050: DebugKeyLetters[0] = 'p'; break;
     case 0x30052: DebugKeyLetters[2] = 'r'; break;
     case 0x30054: DebugKeyLetters[4] = 't'; break;
-    case 0x3007A: console_not_reconstructed("Console_on_key_click: auto play timer"); break;
+    case 0x3007A: auto_play_toggle(); break;  // ctrl+shift+F11: the auto play timer
     default: break;
     }
     AlphaMenu_hide_main();
@@ -1748,7 +1748,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         do_non_input();
     });
     if (vk == 0xD && InfcList[InfcUsed] == 5) {
-        console_not_reconstructed("ReportIf_done");
+        ReportIf_done(&ReportIfObj);
         if (Win_is_visible(&BaseWin)) BaseWin_exit(&BaseWin);
         return 1;
     }
@@ -1813,7 +1813,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
             if (!net_busy) Console_automate(self, mw(self, kConVeh), 0);
             break;
         case 'P':
-            if (MultiplayerActive) console_not_reconstructed("MultiWin_draw");
+            if (MultiplayerActive) MultiWin_on_button_clicked(&MultiWinObj, 2);  // (id 2: nothing)
             break;
         case 'T': Console_time_controls(self); break;
         case '^': Console_use_time_bonus(self); break;
