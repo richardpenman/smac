@@ -309,6 +309,9 @@ void THISCALL MultiWin_show(uint8_t*) {
         b->text_color[0] = 0x65;
         b->text_color[1] = b->text_color[2] = 0x41;
     }
+    // (In a network game the original panel stays beside the map while the main loop runs
+    // wait_loop: here the modal panel runs it while it waits.)
+    s->modal_cb = 0x51F200;  // wait_loop
     sw_run(s);
     sw_clear_buttons(s);
 }

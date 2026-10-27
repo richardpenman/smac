@@ -18,6 +18,7 @@
 #include <set>
 
 #include "engine/clock.h"
+#include "engine/diplomacy.h"
 #include "engine/net.h"
 #include "engine/random.h"
 #include "engine/save.h"
@@ -636,7 +637,36 @@ namespace {
 std::vector<std::string> g_net_notes;  // ui_net_note: the online game's notes (WAITFOR)
 size_t g_net_notes_seen = 0;             // the notes before this one are matched already
 bool (*g_idle_hook)() = nullptr;
+int32_t g_modal_cb = 0;  // the running modal's callback: pop_wait (0x5398E0) / pop_expire (0x539920)
 }  // namespace
+
+// The callback a modal window or popup runs while it waits (Win_set_modal's / BasePop_exec_3's):
+// in a network game pop_wait / pop_expire run wait_loop (the messages); a zero return ends the modal.
+int32_t ui_set_modal_callback(int32_t addr) {
+    int32_t old = g_modal_cb;
+    g_modal_cb = addr;
+    return old;
+}
+
+namespace {
+const bool* g_modal_open = nullptr;
+}
+const bool* ui_set_modal_open(const bool* open) {
+    const bool* old = g_modal_open;
+    g_modal_open = open;
+    return old;
+}
+
+static bool modal_callback() {
+    if (!g_modal_cb || !MultiplayerActive) return true;
+    if (g_modal_cb == 0x5398E0) return pop_wait() != 0;
+    if (g_modal_cb == 0x539920) return pop_expire() != 0;
+    if (g_modal_cb == 0x51F200) {  // (smacx: a modeless window of the original made modal)
+        wait_loop();
+        return !ControlTurnA;
+    }
+    return true;
+}
 
 void ui_net_note(const std::string& text) {
     std::fprintf(stderr, "%s\n", text.c_str());
@@ -901,6 +931,8 @@ bool ui_wait_input(UiInput* in) {
         if (g_script_given && g_ui_exit_when_script_done && g_script.empty()) return false;
         if (ControlTurnA) return false;
         if (g_idle_hook && g_idle_hook()) return false;  // (the network setup window: started)
+        if (!modal_callback()) return false;
+        if (MultiplayerActive && g_modal_open && !*g_modal_open) return false;
         if (g_input.empty()) pump_platform(g_idle_hook ? 10 : 50);
         planwin_tick(platform::ticks_ms());  // the modal popup's timers: PlanWin_blink, line_timer
         reports_tick(platform::ticks_ms());  // the reports' base locator (bl_daemon)

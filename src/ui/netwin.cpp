@@ -127,12 +127,6 @@ void ui_main_chat(const char* text, int32_t faction_id) {
     ui_set_message(text);
 }
 
-void ui_diplo_chat(const char* text) { ui_net_note(std::string("net: diplo chat ") + text); }
-void ui_diplo_closed(int32_t faction_id) {
-    char line[80];
-    std::snprintf(line, sizeof(line), "net: diplomacy closed by faction %d", faction_id);
-    ui_net_note(line);
-}
 
 void ui_multiwin_draw() { ui_invalidate(); }
 void ui_net_close_windows() {}

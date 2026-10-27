@@ -9,8 +9,10 @@
 // the diplomatic channels (0x8240 / 0x8241 / 0x1240, 0x15xx). A 0x2000 / 0x8000 event without a
 // handler at the server is relayed to every player as 0x4000 with the server's time and sequence
 // number (the deletion list renumbering its unit ids first, NetDaemon_fixup_message).
-// Not reconstructed: the scenario file transfer (0x0F05..0x0F0C: NetDaemon_send_files), the
-// DiploWin's network offers (0x1506..0x150F) and the diplomatic popups of 0x1501 (COMMDIPLO).
+// The DiploWin between two humans: 0x1501 the call (COMMDIPLO), 0x1502..0x1505 its answers and the
+// channel closed, 0x1506..0x150F the offers, states and the deal (the window's side in
+// ui/diplo_hotseat.cpp through ui_diplo_net).
+// Not reconstructed: the scenario file transfer (0x0F05..0x0F0C: NetDaemon_send_files).
 #include <cstdio>
 #include <cstring>
 
@@ -60,6 +62,16 @@ void say_leader(int32_t f) {
     PluralDefault = MFactions[f].is_noun_plural;
     GenderDefault = MFactions[f].noun_gender;
     parse_says(2, MFactions[f].noun_faction, -1, -1);
+}
+
+// $TITLE0 $NAME1 of faction f (the channel's answers).
+void say_leader2(int32_t f) {
+    PluralDefault = 0;
+    GenderDefault = MFactions[f].is_leader_female;
+    parse_says(0, MFactions[f].title_leader, -1, -1);
+    PluralDefault = 0;
+    GenderDefault = MFactions[f].is_leader_female;
+    parse_says(1, MFactions[f].name_leader, -1, -1);
 }
 
 // The player of faction f named in $STR3 (the AlphaNet slot's name).
@@ -703,7 +715,7 @@ void THISCALL NetDaemon_process_message(uint8_t* net, uint8_t* msg, int32_t size
             crt_strcat(StrBuffer, reinterpret_cast<char*>(&m[4]));
             ui_main_chat(StrBuffer, who);
         } else {
-            ui_diplo_chat(reinterpret_cast<char*>(&m[4]));
+            ui_diplo_chat(reinterpret_cast<char*>(&m[4]), who);
         }
         break;
     }
@@ -784,9 +796,129 @@ void THISCALL NetDaemon_process_message(uint8_t* net, uint8_t* msg, int32_t size
     case 0x1505:
         log_say_values("Received CLOSE CHAN", who, 0, 0);
         if (NetCommlinkActive) {
-            ui_diplo_closed(who);
+            ui_diplo_closed(who);  // (Win_release_modal: the DiploWin closed)
             NetCommlinkActive = 0;
+            if (GameLanguage == 0) {
+                say_leader2(who);
+                NetMsg_pop(&NetMsg, "DIPLOCLOSE", 5000, 0, nullptr);
+            }
         }
+        break;
+
+    // ---- the DiploWin between two humans (commlink_attempt's 0x1501, FUN_00443F10) ----
+    case 0x1501: {  // OPEN CHAN: another player calls us
+        log_say_values("Received OPEN CHAN", who, 0, 0);
+        uint32_t bit = 1u << (who & 31);
+        if ((uint32_t)DiploRefused() & bit) {
+            message_data(0x1503, who, 0, 0, 0, 0);
+            break;
+        }
+        if (fld(net, 0x1BAC) == 0) {
+            if (NetCommlinkActive) {
+                // We were calling them too: the channel opens at once.
+                if (who == DiploPartner() && !ui_diplo_net(0, 0, 0)) {
+                    message_data(0x1502, who, 0, 0, 0, 0);
+                    NetCommlinkActive = 1;
+                    diplo(CurrentPlayerFaction, who);
+                    break;
+                }
+            } else if (!DiploWinState) {
+                if (PopWaitActive) {  // in a popup: busy
+                    message_data(0x1504, who, 1, 0, 0, 0);
+                    break;
+                }
+                int32_t r;
+                char note0[64];
+                std::snprintf(note0, sizeof(note0), "net: COMMDIPLO from faction %d", who);
+                ui_net_note_text(note0);
+                for (;;) {  // COMMDIPLO: the communications officer (4: the leader's profile, asked again)
+                    say_leader(who);
+                    parse_num(0, game_random(0, 10) + 1);
+                    parse_says(3, get_him_her(who, 0), -1, -1);
+                    r = X_pops("COMMDIPLO", FactionPortraits[who], 0x539920);
+                    if ((GameState & 0x800) || r != 4) break;
+                    report_intel(who);
+                }
+                char note[64];
+                std::snprintf(note, sizeof(note), "net: COMMDIPLO from faction %d: %d", who, r);
+                ui_net_note_text(note);
+                if (!(GameState & 0x800) && r == 0) {
+                    message_data(0x1502, who, 0, 0, 0, 0);
+                    NetCommlinkActive = 1;
+                    diplo(CurrentPlayerFaction, who);
+                    break;
+                }
+                if (!(GameState & 0x800) && r == 3) DiploRefused() |= (int32_t)bit;
+                message_data(0x1503, who, r == 2, 0, 0, 0);
+                break;
+            }
+        }
+        message_data(0x1504, who, 0, 0, 0, 0);
+        break;
+    }
+    case 0x1502:  // OPEN ACKNOWLEDGE: the player we called answers
+        log_say_values("Received OPEN ACKNOWLEDGE", who, 0, 0);
+        if (!NetCommlinkActive || who == DiploPartner()) {
+            if (!ui_diplo_net(0, 0, 0)) {
+                message_data(0x2441, 0, CurrentPlayerFaction, who, 8, 0);
+                diplo(CurrentPlayerFaction, who);
+            }
+        } else {
+            message_data(0x1505, who, 0, 0, 0, 0);
+        }
+        break;
+    case 0x1503:  // OPEN REFUSE
+    case 0x1504:  // OPEN BUSY
+        NetCommlinkActive = 0;
+        log_say_values(type == 0x1503 ? "Received OPEN REFUSE" : "Received OPEN BUSY", who, 0, 0);
+        say_leader2(who);
+        if (m[4] == 0 || m[4] == 1) {
+            static const char* const labels[2][2] = {{"DIPLOREFUSE", "DIPLOREFUSE1"}, {"DIPLOBUSY", "DIPLOBUSY1"}};
+            NetMsg_pop(&NetMsg, labels[type == 0x1504][m[4]], 5000, 0, nullptr);
+        }
+        break;
+    case 0x1506:  // OPEN OFFER: their offer added (FUN_00441490(1, type, value))
+        log_say_values("Received OPEN OFFER", who, m[4], m[5]);
+        ui_diplo_net(type, m[4], m[5]);
+        break;
+    case 0x1507:  // KILL OFFER: theirs removed (FUN_004413F0(1, index))
+        log_say_values("Received KILL OFFER", who, m[4], 0);
+        ui_diplo_net(type, m[4], 0);
+        break;
+    case 0x1508:  // CLEAR OFFER
+        log_say_values("Received CLEAR OFFER", who, 0, 0);
+        ui_diplo_net(type, 0, 0);
+        break;
+    case 0x1509:  // CHANNEL STATUS: their state (1 agreed, 2 rejected), FUN_004426F0
+        log_say_values("Received CHANNEL STATUS", who, m[4], 0);
+        ui_diplo_net(type, m[4], 0);
+        break;
+    case 0x150A:  // MAYBE DEAL: both agreed on their side; ours answers
+        log_say_values("Received MAYBE DEAL", who, 0, 0);
+        if (ui_diplo_net(1, 0, 0) == 1 && ui_diplo_net(2, 0, 0) == 1)
+            message_data(0x150B, who, 0, 0, 0, 0);
+        else
+            message_data(0x150C, who, ui_diplo_net(1, 0, 0), ui_diplo_net(2, 0, 0), 0, 0);
+        break;
+    case 0x150B:  // YES DEAL: FUN_00442740 (the lower faction executes it)
+        log_say_values("Received YES DEAL", who, 0, 0);
+        ui_diplo_net(type, 0, 0);
+        break;
+    case 0x150C:  // NO DEAL: the states as they see them
+        log_say_values("Received NO DEAL", who, 0, 0);
+        ui_diplo_net(type, m[4], m[5]);
+        break;
+    case 0x150D:  // DONE DEAL: FUN_004429C0
+        log_say_values("Received DONE DEAL", who, 0, 0);
+        ui_diplo_net(type, 0, 0);
+        break;
+    case 0x150E:
+        log_say_values("Received DEMAND WITHDRAWAL", who, 0, 0);
+        break;
+    case 0x150F:  // a human told of a vendetta others agreed against them
+        log_say_values("Received VENDETTA WARNING", who, 0, 0);
+        say_leader(who);
+        NetMsg_pop(&NetMsg, "VENDETTAWARNING", 5000, 0, nullptr);
         break;
 
     default:

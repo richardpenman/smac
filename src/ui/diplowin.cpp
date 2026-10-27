@@ -39,6 +39,7 @@
 #include "engine/diplomacy.h"
 #include "engine/log.h"
 #include "engine/map.h"
+#include "engine/memmap.h"
 #include "engine/net.h"
 #include "engine/net_misc.h"
 #include "engine/parse.h"
@@ -535,12 +536,41 @@ char* GAMEAPI get_he_she(int32_t faction_id, int32_t mode) {
     return HisHerBuffer;
 }
 
-// commlink_attempter (0x5589E0), single player: faction_id_with | 0x10 (not met / eradicated)
-// shows the message and refuses. The debug dialog (Ctrl/Shift in debug mode) and the
-// multiplayer locks and channels are not reconstructed.
+// commlink_attempter (0x5589E0): faction_id_with | 0x10 (not met / eradicated) shows the message
+// and refuses; in a network game a player who ended the turn (one player at a time off: ALREADYDONE)
+// and a channel already being opened (DIPLOALREADY: continue, or close it and call again) refuse,
+// as do the turn's end and the input lock. The debug dialog (Ctrl/Shift in debug mode, the
+// DiploWin with any faction) is not reconstructed.
+namespace {
+void say_title_name(int32_t f) {
+    GenderDefault = MFactions[f].is_leader_female;
+    PluralDefault = 0;
+    parse_says(0, MFactions[f].title_leader, -1, -1);
+    GenderDefault = MFactions[f].is_leader_female;
+    PluralDefault = 0;
+    parse_says(1, MFactions[f].name_leader, -1, -1);
+}
+}  // namespace
+
 int32_t GAMEAPI commlink_attempter(int32_t, int32_t faction_id_with) {
     DiploSecondFaction = faction_id_with;
-    if (!(faction_id_with & 0x10)) return 0;
+    if (!(faction_id_with & 0x10)) {
+        if (MultiplayerActive && !(GameMoreRules & 0x10) && (NetTurnDoneMask & (1 << (CurrentPlayerFaction & 31)))) {
+            NetMsg_pop(&NetMsg, "ALREADYDONE", 5000, 0, nullptr);
+            return 1;
+        }
+        if (NetCommlinkActive) {
+            int32_t partner = *reinterpret_cast<int32_t*>(mem::host(0x73B790));
+            say_title_name(partner);
+            int32_t r = X_pop("DIPLOALREADY", 0);
+            if (r == 0) return 1;
+            message_data(0x1505, partner, 0, 0, 0, 0);
+            ui_diplo_closed(partner);  // GraphicWin_close of the DiploWin
+            if (r > 1) return 1;
+        }
+        if (MultiplayerActive && (ControlTurnC || NetLocked)) return 1;
+        return 0;
+    }
     int32_t f = faction_id_with & ~0x10;
     const MFaction& m = MFactions[f];
     PluralDefault = 0;
@@ -584,12 +614,37 @@ void GAMEAPI commlink_attempt(int32_t fw) {
         return;
     }
     if (commlink_attempter(f, fw)) return;
-    if (MultiplayerActive) return;  // channels and DIPLOCOMM: not reconstructed
+    if (MultiplayerActive) {
+        if (FactionStatus[0] & (1 << fw)) {
+            // Another human: the call (0x1501, COMMDIPLO on their side); the DiploWin opens with
+            // their answer (0x1502, NetDaemon_process_message).
+            NetCommlinkActive = 1;
+            *reinterpret_cast<int32_t*>(mem::host(0x73B790)) = fw;
+            message_data(0x1501, fw, f, fw, 0, 0);
+            say_title_name(fw);
+            parse_num(0, fw);
+            ui_net_note("net: calling faction " + std::to_string(fw));
+            NetMsg_pop(&NetMsg, "DIPLOCOMM", 5000, 0, nullptr);
+            return;
+        }
+        log_say_values("Commlink open channel", f, fw, 0);
+        if (NetDaemon_open_channel(&NetState, f, fw)) {
+            say_title_name(fw);
+            NetMsg_pop(&NetMsg, "NOCHANNEL", 5000, 0, nullptr);
+            return;
+        }
+    }
     if (PbemActive && (FactionStatus[0] & (1 << fw))) {
         diplo(f, fw);
         return;
     }
     communicate(f, fw, 1);
+    if (MultiplayerActive) {
+        log_say_values("Sending TREATY_ON", f, fw, 0);
+        message_data(0x2441, 0, f, fw, (int32_t)0x88000008, 0);
+        NetDaemon_await_diplo(&NetState, 0x441);
+        return;
+    }
     treaty_on(f, fw, 0x88000008);
 }
 

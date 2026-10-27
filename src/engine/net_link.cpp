@@ -181,7 +181,8 @@ void ui_netwin_faction_data(const uint8_t*) {}
 void ui_netwin_pick_pass(int32_t) {}
 void ui_netwin_chat(int32_t, const char*) {}
 void ui_main_chat(const char*, int32_t) {}
-void ui_diplo_chat(const char*) {}
+void ui_diplo_chat(const char*, int32_t) {}
+int32_t ui_diplo_net(int32_t, int32_t, int32_t) { return 0; }
 void ui_diplo_closed(int32_t) {}
 void ui_multiwin_draw() {}
 const uint8_t* ui_netwin_faction_blob() { return nullptr; }

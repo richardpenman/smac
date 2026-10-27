@@ -184,9 +184,25 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   Approximated: NetMsg_pop in a network game writes to the message line instead of its timed box.
 * Group 4 (in part): the chat (Console_chat: CHATASK, message_chat 0x4E00 / 0x1E00, shown on the
   message line; the setup window's chat), the time-control and time-bonus messages (0x4C02,
-  0x4306), pause (0x4C00/01). Not done: the DiploWin between online players (its network offers
-  0x1506..0x150F, COMMDIPLO of 0x1501), Console_time_controls' dialog, MultiWin's network rows
+  0x4306), pause (0x4C00/01). Not done: Console_time_controls' dialog, MultiWin's network rows
   (time, locks, the chat button) and the scenario file transfer.
+* The DiploWin between online players (done): commlink_attempt's network path (another human:
+  0x1501 and DIPLOCOMM; a computer faction: NetDaemon_open_channel / NOCHANNEL, communicate, the
+  commlink treaty through 0x2441), commlink_attempter's ALREADYDONE / DIPLOALREADY / input-lock
+  refusals; process_message's 0x1501 (refused callers: 0x1503; busy: 0x1504; the officer's
+  COMMDIPLO with its channel number (game_random), the leader's profile (report_intel), "call back
+  later" and "no further messages" (0x7FFF74)), 0x1502 (the caller's commlink treaty 0x2441 and
+  its DiploWin), 0x1503 / 0x1504 (DIPLOREFUSE(1) / DIPLOBUSY(1)), 0x1505 (the window released,
+  DIPLOCLOSE), 0x1506..0x1509 (their offer added / removed / cleared, their state;
+  FUN_004426F0's MAYBE DEAL), 0x150A..0x150D (MAYBE / YES / NO / DONE DEAL: both machines ask,
+  the lower faction executes FUN_00442740 -- net_tech, net_energy, net_treaty_on,
+  net_double_cross --, the other is told), 0x150E, 0x150F (VENDETTAWARNING); the chat lines
+  (FUN_004412F0). src/ui/diplo_hotseat.cpp holds the window's side (ui_diplo_net); the modal
+  windows and popups now run their callback while they wait (Win_set_modal / BasePop_exec_3:
+  pop_wait / pop_expire -> wait_loop in a network game; src/ui/win.cpp ui_set_modal_callback), so
+  a player in the DiploWin or a popup keeps receiving messages, and a message can close the window
+  (Win_release_modal). The commlink panel, modal here, runs wait_loop while it is open (the
+  original's panel is modeless beside the running main loop).
 * What the original never sends to the players (so their copies differ there too): the
   monuments, the abstract map (only world_build's Path_continents computes it), the
   world-generation generator; each machine's unit stacking order and focus bit are its own.
@@ -195,4 +211,6 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
 * tests/online/run.sh (run it alone: two processes): the setup, three turns one player at a time
   with the computer factions in lockstep, a unit moved twice through the locks, a chat line, the
   states compared each turn and no checksum difference; then a desync provoked on the client
-  (SMACX_NET_DESYNC) found by the host's checksums and its units resent.
+  (SMACX_NET_DESYNC) found by the host's checksums and its units resent; a third game has the
+  two humans trade in the DiploWin (the call answered, a chat line, a treaty and 5 credits
+  offered, both agree, the deal done by the host) with the treaty and credits checked on both.

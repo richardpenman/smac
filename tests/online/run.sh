@@ -11,6 +11,7 @@
 # through the locks. A second game
 # provokes a desync (SMACX_NET_DESYNC=TURN: the client changes a unit's morale at that turn): the host finds
 # the vehicles' checksum different and resends the units; the next turn's units and bases agree.
+# A third game has the two humans make a deal in the DiploWin (a treaty and energy credits).
 #
 #   tests/online/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/net-native/smacx)
 #
@@ -116,4 +117,36 @@ if grep -q "^turn_003" "$OUT/desync-compare.txt" && ! sed -n '/^turn_003/,$p' "$
 else
     echo "FAIL desync: the units and bases equal again after the resynch (see $OUT/desync-compare.txt)"; FAIL=1
 fi
+# 3. Diplomacy between the two humans (the DiploWin over the network): the host calls the client
+# from the commlink panel (F12: commlink_attempt's 0x1501, DIPLOCOMM), the client answers COMMDIPLO
+# (0x1502) and both DiploWins open; the host chats, offers a treaty and 5 energy credits
+# (0x1506) and agrees (0x1509), the client sees the offers and agrees: MAYBE / YES DEAL
+# (0x150A / 0x150B), the host (the lower faction) executes the deal (net_treaty_on, net_energy)
+# and tells the client (0x150D). The treaty and the credits must agree on both machines.
+HDIPLO="WAITFOR:player turn faction 1,ENTER,WAIT:500,F12,CLICK:950x366,WAITFOR:diplo 1 2,h,i,ENTER,\
+CLICK:790x467,CLICK:400x467,5,ENTER,CLICK:330x519,WAITFOR:diplo: deal done between 1 and 2,WAIT:300,DIPLOSTATE,ESC,ESC,$END"
+CDIPLO="WAITFOR:COMMDIPLO from faction 1,ENTER,WAITFOR:diplo 2 1,WAITFOR:diplo chat: ,\
+WAITFOR:diplo: faction 1 state 1,CLICK:330x519,WAITFOR:diplo: deal done by faction 1,WAITFOR:diplo: closed by faction 1,DIPLOSTATE"
+HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:player 2 ready 1,ENTER,WAITFOR:game started,ENTER,\
+$HDIPLO,$HTURN,$HTURN,WAITFOR:player turn faction 1,WAIT:2000"
+CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAIT:500,ENTER,\
+WAITFOR:game started,ENTER,$CDIPLO,$CTURN,$CTURN,$CTURN,WAITFOR:player turn faction 1,WAIT:1000"
+game diplo
+for side in host client; do
+    log="diplo-$side"
+    check $log "the DiploWin opened" "^diplo (1 2|2 1)$"
+    check $log "the chat line" "^diplo chat: .*:  hi$"
+    check $log "the deal done" "^diplo: deal done (between 1 and 2|by faction 1)$"
+    check $log "the treaty between the two" "^diplo [12] status [0-9A-F]{7}[2367ABEF] "
+    nocheck $log "the checksums agree" "checksum [0-9]+ differs"
+    nocheck $log "no crash" "not reconstructed|abort|Assertion"
+done
+check diplo-client "the call answered (COMMDIPLO)" "^net: COMMDIPLO from faction 1: 0"
+check diplo-host "the treaty and credits offered" "^diplo offer: side 0 type 1 value 5"
+check diplo-client "the offers seen" "^diplo offer: side 1 type 3 value 0"
+check diplo-host "the host gave 5 credits" "^diplostate f1 credits 95 "
+check diplo-client "the client got them" "^diplostate f2 credits 105 "
+check diplo-client "the host's credits as the client sees them" "^diplo 1 status .* credits 95 "
+compare diplo "host and client states equal each turn"
+
 exit $FAIL

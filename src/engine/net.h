@@ -181,7 +181,12 @@ void ui_netwin_faction_data(const uint8_t* msg);           // NetWin_setup_facti
 void ui_netwin_pick_pass(int32_t a1);                      // NetWin_pick_pass
 void ui_netwin_chat(int32_t idx, const char* text);        // NetWin_new_chat
 void ui_main_chat(const char* text, int32_t faction_id);   // MainInterface_chat
-void ui_diplo_chat(const char* text);                      // the DiploWin's chat line (FUN_004412F0)
+void ui_diplo_chat(const char* text, int32_t faction_id);  // the DiploWin's chat line (FUN_004412F0)
+// The DiploWin's side of the diplomatic messages (ui/diplo_hotseat.cpp): op 0x1506 their offer added
+// (a type, b value), 0x1507 removed (a its index), 0x1508 cleared, 0x1509 their state (a),
+// 0x150B the deal done (FUN_00442740), 0x150C the states (a theirs, b ours), 0x150D done
+// (FUN_004429C0); queries: 0 the window shown, 1 our state, 2 theirs.
+int32_t ui_diplo_net(int32_t op, int32_t a, int32_t b);
 void ui_diplo_closed(int32_t faction_id);                  // DIPLOCLOSE: the channel closed
 void ui_multiwin_draw();                                   // MultiWin_draw(0)
 const uint8_t* ui_netwin_faction_blob();                   // the NetWin's faction data (+0x772C)

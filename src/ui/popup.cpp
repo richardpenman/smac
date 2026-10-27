@@ -1418,7 +1418,7 @@ bool edit_key(BasePop* p, int32_t key, bool* fresh) {
 
 // ---- BasePop_exec_3 (0x602600) ----
 
-int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
+int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t callback) {
     // Popup_on_exec (0x405910): popups of mode 1 (message line) and 2 (base message) are not shown;
     // 0x3EA is a base message that is also shown.
     int32_t kind = p->mode % 10000;
@@ -1444,6 +1444,12 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t) {
     // The opening screens' dialogs (desktop mode, before a game) are always shown.
     if (!FactionStatus[0] && !ui_desktop()) no_display = 1;
     if (no_display || (p->flags & 0x8000)) return 0;
+    // The modal's callback (pop_wait / pop_expire: a network game's messages while it waits).
+    struct ModalCb {
+        int32_t old;
+        explicit ModalCb(int32_t cb) : old(ui_set_modal_callback(cb)) {}
+        ~ModalCb() { ui_set_modal_callback(old); }
+    } modal_cb(callback);
     // BasePop_exec_3: the show sound block's callback (popup_wave_callback).
     if (p->wave >= 0) sound_popup_wave(p->wave, p->wave_vol);
     // The window (GraphicWin_init) and its position (Popup_show / BasePop_exec_3).

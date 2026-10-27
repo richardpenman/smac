@@ -26,9 +26,12 @@
 // DIPLOMACY with their buttons, AGREE / REJECT / CLOSE; the chat in the main interface's lower
 // centre pane (StringBox, EditBox).
 // Approximated: the boxes' art (interface.pcx box sprites as the original's), the StringBox and
-// EditBox (a list of the last lines and a text line), the panes' FUN_00443E50 background; the
-// multiplayer messages (message_data, message_chat) are the online phase's (no-ops here).
+// EditBox (a list of the last lines and a text line), the panes' FUN_00443E50 background.
+// In a network game each side's changes travel as messages (message_data 0x1506..0x150F,
+// message_chat 0x1E00) and the other player's arrive through ui_diplo_net / ui_diplo_chat
+// (NetDaemon_process_message) while the window waits (its pop_expire callback).
 #include <algorithm>
+#include <cstdarg>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -89,8 +92,18 @@ void refresh() {  // vtable +0xF8: the window redrawn
     ui_invalidate();
 }
 
+// A log line, also a note for the online tests' WAITFOR (ui_net_note).
+void dnote(const char* fmt, ...) {
+    char line[400];
+    va_list ap;
+    va_start(ap, fmt);
+    std::vsnprintf(line, sizeof(line), fmt, ap);
+    va_end(ap);
+    ui_net_note(line);
+}
+
 void log_offer(const char* what, int32_t side, int32_t t, int32_t v) {
-    std::fprintf(stderr, "diplo %s: side %d type %d value %d\n", what, side, t, v);
+    dnote("diplo %s: side %d type %d value %d", what, side, t, v);
 }
 
 // FUN_004413F0: offer `idx` of `side` removed.
@@ -183,7 +196,7 @@ void execute() {
     g_dw.state[0] = 3;
     g_dw.count[1] = 0;
     g_dw.count[0] = 0;
-    std::fprintf(stderr, "diplo: deal done between %d and %d\n", g_dw.me, g_dw.them);
+    dnote("diplo: deal done between %d and %d", g_dw.me, g_dw.them);
     message_data(0x150D, g_dw.them, 0, 0, 0, 0);
     refresh();
 }
@@ -242,7 +255,7 @@ void command(int32_t id) {
         g_dw.state[0] = 1;
         refresh();
         message_data(0x1509, g_dw.them, 1, 0, 0, 0);
-        std::fprintf(stderr, "diplo: faction %d agrees\n", g_dw.me);
+        dnote("diplo: faction %d agrees", g_dw.me);
         if (g_dw.state[0] == 1 && g_dw.state[1] == 1) {
             message_data(0x150A, g_dw.them, 0, 0, 0, 0);
             if (PbemActive) execute();
@@ -253,7 +266,7 @@ void command(int32_t id) {
         g_dw.state[0] = 2;
         refresh();
         message_data(0x1509, g_dw.them, 2, 0, 0, 0);
-        std::fprintf(stderr, "diplo: faction %d rejects\n", g_dw.me);
+        dnote("diplo: faction %d rejects", g_dw.me);
         if (MultiplayerActive || PbemActive) break;
         g_dw.count[1] = 0;
         random_offers();
@@ -546,7 +559,7 @@ void DiploWin::on_key(int32_t key) {
         line += " ";
         line += edit;
         chat.push_back({CurrentPlayerFaction, line});
-        std::fprintf(stderr, "diplo chat: %s\n", line.c_str());
+        dnote("diplo chat: %s", line.c_str());
         g_changed = true;
         edit.clear();
         return;
@@ -580,6 +593,19 @@ void DiploWin::log_state() {
     std::fprintf(stderr, " chat %d\n", (int32_t)chat.size());
 }
 
+// FUN_004412F0: a chat line from the other player ("LEADER:  text").
+void add_chat(const char* text, int32_t f) {
+    std::string line = MFactions[f].name_leader;
+    win32::CharUpperA(&line[0]);
+    line += ": ";
+    line += " ";
+    line += text;
+    g_dw.chat.push_back({f, line});
+    dnote("diplo chat: %s", line.c_str());
+    g_changed = true;
+    if (g_dw.open) refresh();
+}
+
 uint8_t* pair_list(int32_t a, int32_t b) {
     if (b < a) std::swap(a, b);
     return DiploMessageLists[a][b];
@@ -587,13 +613,57 @@ uint8_t* pair_list(int32_t a, int32_t b) {
 
 }  // namespace
 
+// The network side (engine/net.h): the other player's messages applied to the window.
+void ui_diplo_chat(const char* text, int32_t faction_id) { add_chat(text, faction_id); }
+
+void ui_diplo_closed(int32_t faction_id) {  // Win_release_modal
+    dnote("diplo: closed by faction %d", faction_id);
+    if (g_dw.open) sw_close(&g_dw);
+}
+
+int32_t ui_diplo_net(int32_t op, int32_t a, int32_t b) {
+    switch (op) {
+    case 0: return g_dw.open ? 1 : 0;  // Win_is_visible
+    case 1: return g_dw.state[0];      // DAT_0073B6FC
+    case 2: return g_dw.state[1];      // DAT_0073B700
+    case 0x1506: add_offer(1, a, b); break;
+    case 0x1507: remove_offer(1, a); break;
+    case 0x1508: g_dw.count[1] = 0; break;
+    case 0x1509:  // FUN_004426F0
+        g_dw.state[1] = a;
+        dnote("diplo: faction %d state %d", g_dw.them, a);
+        if (g_dw.state[0] == 1 && g_dw.state[1] == 1) {
+            message_data(0x150A, g_dw.them, 0, 0, 0, 0);
+            if (PbemActive) execute();
+        }
+        break;
+    case 0x150B: execute(); break;
+    case 0x150C:
+        g_dw.state[1] = a;
+        g_dw.state[0] = b;
+        break;
+    case 0x150D:  // FUN_004429C0
+        g_dw.state[1] = 3;
+        g_dw.state[0] = 3;
+        g_dw.count[1] = 0;
+        g_dw.count[0] = 0;
+        dnote("diplo: deal done by faction %d", g_dw.them);
+        break;
+    default: return 0;
+    }
+    if (g_dw.open) refresh();  // GraphicWin_redraw
+    return 0;
+}
+
 void GAMEAPI diplo(int32_t f, int32_t fw) {
     DiploWin* s = &g_dw;
     if (s->open) return;
-    std::fprintf(stderr, "diplo %d %d\n", f, fw);
+    dnote("diplo %d %d", f, fw);
     s->name = "diplo";
     s->me = f;
     s->them = fw;
+    *reinterpret_cast<int32_t*>(mem::host(0x73B790)) = fw;  // (the window's +0xAB8: the channel's partner)
+    s->modal_cb = 0x539920;  // pop_expire
     s->h = 0x254 - MiConsoleHeight;
     basewin_mi_init();
     sw_init(s, (ScreenWidth - 800) / 2, (ScreenHeight - MiConsoleHeight) - s->h, 0x340, s->h, true);

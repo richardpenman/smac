@@ -32,6 +32,11 @@ void ui_invalidate();
 void ui_net_note(const std::string& text);
 // A hook run by ui_wait_input while it waits (the network setup window); true stops the wait.
 void ui_set_idle_hook(bool (*hook)());
+// The running modal's callback (pop_wait / pop_expire by address; 0 none); returns the previous one.
+int32_t ui_set_modal_callback(int32_t addr);
+// The running modal window's open flag (ui_wait_input returns false once it is cleared, e.g. by a
+// message closing the window from the callback); returns the previous one.
+const bool* ui_set_modal_open(const bool* open);
 // The help bubble (Win_set_bubble_text): `text` (lines split at '^') above the screen point
 // (x, y); cleared by the next mouse move over the window (Win_clear_bubble_text).
 void ui_bubble_set(const char* text, int32_t x, int32_t y);

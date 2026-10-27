@@ -44,6 +44,8 @@ struct ScreenWin {
     // slide_show / slide_hide (slide.cpp) when the window opens / closes (the original's
     // on_status of the datalinks, reports, design workshop, social engineering, preferences).
     bool slide = false;
+    // The modal's callback while it waits (ui_set_modal_callback: pop_wait / pop_expire).
+    int32_t modal_cb = 0;
 
     virtual ~ScreenWin() { sw_forget(this); }
     virtual void redraw() = 0;

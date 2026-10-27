@@ -185,6 +185,10 @@ void sw_run(ScreenWin* s) {
         slide_show_window(&s->canvas, s->x, s->y, nullptr, false);
     }
     const UiRect& mp = mi_rect(kMiPos);
+    // Win_set_modal's callback (a network game's messages while the window waits); a message may
+    // close the window (Win_release_modal), which ends the wait.
+    int32_t old_cb = ui_set_modal_callback(s->modal_cb);
+    const bool* old_open = ui_set_modal_open(&s->open);
     while (s->open && !ControlTurnA) {
         if (Win_is_visible(&BaseWin)) {
             // A base window opened from the screen takes the input until it closes.
@@ -265,6 +269,8 @@ void sw_run(ScreenWin* s) {
         s->on_click(parent, index, type, lx, ly, false, false);
         if (s->open) redraw(s);
     }
+    ui_set_modal_callback(old_cb);
+    ui_set_modal_open(old_open);
     s->open = false;
     g_stack.erase(std::remove(g_stack.begin(), g_stack.end(), s), g_stack.end());
     ui_invalidate();
