@@ -87,6 +87,7 @@ struct DiploWindow {
     bool shown = false;
     Buffer canvas;
     int32_t x = 0, y = 0;
+    uint32_t seq = 0;  // ui_window_seq() when shown
     DiploWindow() { Buffer_ctor(&canvas); }
 } g_win;
 
@@ -115,6 +116,7 @@ void window_show() {
     slide_show_window(&g_win.canvas, g_win.x, g_win.y);
     mi_slide(true);
     g_win.shown = true;
+    g_win.seq = ui_window_seq();
     std::fprintf(stderr, "diplopop window shown at %d,%d %dx%d\n", g_win.x, g_win.y, w, h);
 }
 
@@ -169,6 +171,8 @@ void diplowin_log_state() {
 
 void diplowin_set_animate(bool on) { g_animate = on; }
 int32_t diplowin_faction() { return g_faction; }
+
+uint32_t diplowin_window_seq() { return g_win.shown ? g_win.seq : 0xFFFFFFFFu; }
 
 void diplowin_draw_window(Buffer* screen) {
     if (!g_win.shown) return;

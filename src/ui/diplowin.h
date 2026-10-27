@@ -25,6 +25,9 @@ bool diplowin_hq_shown();
 int32_t diplowin_faction();
 // DiploPop's own window (the dialog's popups are drawn into it) onto the screen, under the popups.
 void diplowin_draw_window(Buffer* screen);
+// When DiploPop's window was shown (ui_window_seq; 0xFFFFFFFF when hidden): the windows shown
+// after it (a new technology, a report from its PROFILE button) are drawn over it.
+uint32_t diplowin_window_seq();
 // The diplomacy menu's initial selection (COUNCILVOTEGOV: the human's own entry; popup_menus.cpp).
 void ui_diplo_menu_set_active(int32_t value);
 // The menu's selection callback (Popup +0x3280: battle_routine).

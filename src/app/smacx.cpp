@@ -53,9 +53,9 @@
 // map preview: its zoom, centre and route lines), and the commands SHOT[:FILE]
 // (screenshot), SAVE:FILE (save the game
 // and its generators in FILE.rng, relative to --outdir), UNITS (list the human's units on
-// stderr), WAIT:MS (no scripted input for MS ms: the waiting loop runs its timers and animations
-// as for a player who waits), QUIT. --exit-after-keys (default with --hidden) quits when they run
-// out.
+// stderr), PIXEL:XxY (the presented screen's palette index and colour at X,Y), WAIT:MS (no
+// scripted input for MS ms: the waiting loop runs its timers and animations as for a player who
+// waits), QUIT. --exit-after-keys (default with --hidden) quits when they run out.
 // Such unattended runs skip the animations (window slides, unit moves, booms, battle reports,
 // movies); --animate (or SMACX_ANIMATE=1) plays them all with their waits as an interactive game
 // does and still quits at the end of the keys (the test suites' default; TEST_FAST=1: unattended).
@@ -616,6 +616,12 @@ bool parse_key(std::string tok, ScriptedKey* out) {
     }
     if (tok.rfind("WAIT:", 0) == 0) {  // WAIT:MS, real time passing, then a present (test aid)
         out->command = "wait " + tok.substr(5);
+        return true;
+    }
+    if (tok.rfind("PIXEL:", 0) == 0) {  // PIXEL:XxY, the screen's colour there (test aid)
+        int32_t x = 0, y = 0;
+        if (std::sscanf(tok.c_str() + 6, "%dx%d", &x, &y) != 2) return false;
+        out->command = "pixel " + std::to_string(x) + " " + std::to_string(y);
         return true;
     }
     if (tok == "QUIT" || tok == "UNITS") {

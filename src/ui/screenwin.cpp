@@ -147,6 +147,11 @@ void sw_close(ScreenWin* s) {
     ui_invalidate();
 }
 
+static void push(ScreenWin* s) {
+    s->seq = ui_window_seq();
+    g_stack.push_back(s);
+}
+
 static void redraw(ScreenWin* s) {
     s->texts.clear();
     s->redraw();
@@ -154,7 +159,7 @@ static void redraw(ScreenWin* s) {
 }
 
 void sw_show(ScreenWin* s) {
-    if (std::find(g_stack.begin(), g_stack.end(), s) == g_stack.end()) g_stack.push_back(s);
+    if (std::find(g_stack.begin(), g_stack.end(), s) == g_stack.end()) push(s);
     redraw(s);
 }
 
@@ -170,13 +175,13 @@ void sw_hide(ScreenWin* s) {
 void sw_run(ScreenWin* s) {
     s->open = true;
     bool shown = std::find(g_stack.begin(), g_stack.end(), s) != g_stack.end();
-    if (!shown) g_stack.push_back(s);
+    if (!shown) push(s);
     redraw(s);
     if (s->slide && !shown) {
         // slide_show: the window rises into view (drawn without it first).
         g_stack.erase(std::remove(g_stack.begin(), g_stack.end(), s), g_stack.end());
         ui_present();
-        g_stack.push_back(s);
+        push(s);
         slide_show_window(&s->canvas, s->x, s->y, nullptr, false);
     }
     const UiRect& mp = mi_rect(kMiPos);
@@ -268,9 +273,10 @@ void sw_run(ScreenWin* s) {
 
 ScreenWin* screen_top() { return g_stack.empty() ? nullptr : g_stack.back(); }
 
-void screens_compose(Buffer* screen) {
+void screens_compose(Buffer* screen, uint32_t from, uint32_t to) {
     const UiRect& mp = mi_rect(kMiPos);
     for (ScreenWin* s : g_stack) {
+        if (s->seq < from || s->seq >= to) continue;
         blit_keyed(screen, &s->canvas, s->x, s->y);
         ui_layer_mark(s->x, s->y, &s->canvas, s->layer);
         for (BaseButton* b : s->buttons) {

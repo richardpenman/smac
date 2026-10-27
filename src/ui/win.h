@@ -73,6 +73,8 @@ extern bool g_ui_exit_when_script_done;
 // moves, battle reports and movies are skipped or shown without waiting. With --animate a scripted
 // run plays every one of them as an interactive game does (and still quits when its keys end).
 extern bool g_ui_unattended;
+// The next number of the windows' show order (their z-order where windows are composed apart).
+uint32_t ui_window_seq();
 extern std::string g_ui_outdir;
 extern int32_t g_ui_shots;
 

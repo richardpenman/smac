@@ -168,4 +168,17 @@ has basetrade147 "the first base's point" "^planwin shown 1 zoom -13 centre 24,2
 has basetrade147 "the menu in DiploPop's window" "^popup PROPOSEBASE shown: 700x450 at 178,105"
 has basetrade147 "hidden after the menu" "^planwin shown 0 "
 
+# 8. A technology exchange (turn_147 as faction 6, the Believers): Morgan called (row 3 of the
+#    commlink panel; their pact accepted), a proposal for their research data, our own offered
+#    (TRADETECH0: "It's a deal"): the new technology's window (NewTechWin, a full-screen window
+#    shown after DiploPop's) must be drawn over DiploPop's window. It was drawn below it: the
+#    player saw a black screen (DiploPop's emptied canvas) with only the window's bottom.
+run techtrade147 --save work/saves_late/turn_147.sav --human 6 --keys \
+"F12,CLICK:950x382,ENTER,ENTER,ENTER,ENTER,ENTER,ENTER,ENTER,DOWN,ENTER,DOWN,DOWN,ENTER,DOWN,DOWN,ENTER,\
+DOWN,ENTER,PIXEL:512x150,SHOT:newtech.bmp,SCREENSTATE,ENTER,ENTER,ENTER,DIPLOSTATE"
+nocrash techtrade147
+has techtrade147 "the exchange accepted" "^popup TRADETECH0 answer: 1 "
+has techtrade147 "the new technology's window" "^screentext WE HAVE ACQUIRED TECHNOLOGY!"
+has techtrade147 "drawn over DiploPop's window (its title)" "^pixel 512,150 index 72 "
+
 exit $FAIL

@@ -32,6 +32,7 @@ struct ScreenWin {
     int32_t x = 0, y = 0;  // window position on the screen
     Buffer canvas;  // the window's canvas (+0x444 of the GraphicWin)
     bool iface = false;  // uses the main interface (SubInterface)
+    uint32_t seq = 0;  // ui_window_seq() when last shown (the z-order against DiploPop's window)
     Buffer mi;  // the main interface's canvas while the window is open
     std::vector<BaseButton*> buttons;  // parent 0: the window, 1: the main interface
     Spots spots[2];  // clickable spots of the window / the main interface
@@ -84,7 +85,8 @@ std::string sw_label(uint32_t off);
 std::string sw_upper(std::string s);
 
 // ---- composition and test aids (win.cpp) ----
-void screens_compose(Buffer* screen);
+// The windows shown (sequence ui_window_seq) at or after from and before to, bottom to top.
+void screens_compose(Buffer* screen, uint32_t from = 0, uint32_t to = 0xFFFFFFFFu);
 // The open screen (top of the stack), null when none.
 ScreenWin* screen_top();
 // SCREENSTATE: the open screen's name, texts and state on stderr ("screenstate ..." lines).

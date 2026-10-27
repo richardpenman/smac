@@ -35,6 +35,11 @@
 
 bool g_ui_exit_when_script_done = false;
 bool g_ui_unattended = false;
+
+uint32_t ui_window_seq() {
+    static uint32_t seq = 0;
+    return ++seq;
+}
 std::string g_ui_outdir = ".";
 int32_t g_ui_shots = 0;
 
@@ -188,6 +193,17 @@ bool run_command(const std::string& cmd) {
             std::fprintf(f, "crt %u\ngame %u\nclock %u\nturn %d\n", crt_rand_state(), game_random_state(),
                          engine_logic_clock_state(), CurrentTurn);
             std::fclose(f);
+        }
+        return true;
+    }
+    if (cmd.rfind("pixel ", 0) == 0) {  // test aid: the presented screen at x, y
+        int32_t x = 0, y = 0;
+        std::sscanf(arg.c_str(), "%d %d", &x, &y);
+        ui_present();
+        if (x >= 0 && y >= 0 && x < g_canvas.width && y < g_canvas.height) {
+            uint8_t i = g_canvas.data[(size_t)y * g_canvas.stride + x];
+            std::fprintf(stderr, "pixel %d,%d index %d rgb %d,%d,%d\n", x, y, i, GamePalette.rgb[i][0],
+                         GamePalette.rgb[i][1], GamePalette.rgb[i][2]);
         }
         return true;
     }
@@ -550,9 +566,13 @@ void ui_present() {
             }
         }
     }
-    screens_compose(&g_canvas);  // full-screen windows (reports, social engineering; screenwin.h)
+    // Full-screen windows (reports, social engineering; screenwin.h), those shown after DiploPop's
+    // window over it (the new technology of a trade, PROFILE's report).
+    uint32_t diplo_seq = diplowin_window_seq();
+    screens_compose(&g_canvas, 0, diplo_seq);
     basewin_compose(&g_canvas);  // the base window over the console frame
     diplowin_draw_window(&g_canvas);  // DiploPop's window (the diplomacy dialog's popups in it)
+    screens_compose(&g_canvas, diplo_seq);
     console_menu_draw(&g_canvas);
     pulldown_draw_windows(&g_canvas);
     tutwin_draw_lines(&g_canvas);  // TutWin's pointer lines (Win_window_line_raw on the screen)
