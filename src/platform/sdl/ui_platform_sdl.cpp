@@ -301,7 +301,10 @@ bool video_init(const char* title, int32_t width, int32_t height, bool hidden) {
         std::fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError());
         return false;
     }
-    g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    // No vsync: the game paces its animations itself (window slides 20 ms a frame, unit moves 16,
+    // the menu's 10), as the original's blits did. A present waiting for the display's refresh
+    // (16.7 ms at 60 Hz) made those frames land 17 or 33 ms apart in turn: jerky slides and moves.
+    g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_ACCELERATED);
     if (!g_renderer) g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_SOFTWARE);
     if (!g_renderer) {
         std::fprintf(stderr, "SDL_CreateRenderer: %s\n", SDL_GetError());
