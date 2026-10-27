@@ -328,11 +328,21 @@ win_popup.cpp, popup_menus.cpp); every engine popup call opens the original's di
   field with Cancel, council menu; mouse clicks; three turns of late saves as a human faction).
   tests/popups/compare.sh drives the plain original (terranx.exe without the oracle, Wine + Xvfb,
   XTEST keys: tests/popups/orig_drive.py, orig_quickstart.steps) through QUICK START to its first
-  popups and stacks them with smacx's (tests/popups/cmp.py). Differences found: the text glyphs
-  (the original runs "Arial Narrow" under Wine, which substitutes another face with 20-pixel
-  lines; smacx uses the game's arialn*.ttf, 19-pixel lines), hence line breaks and a one or two
-  pixel shift of what follows the text (which also moves the scan-line phase of the box
-  textures), and the main interface's arms beside the frame (slide_show, not reconstructed).
+  popups and stacks them with smacx's (tests/popups/cmp.py). The frames, boxes, text and its line
+  breaks are the same; what differs is the game (the quick start's faction) and the item under
+  the original's mouse.
+* **Text** (platform/sdl/ui_platform_sdl.cpp, as GDI draws on the game's 8-bit DIBs): the faces
+  of Font_init (Arial; config_popups' Arial Narrow from 13 pixels; the title's "Alpha Centauri",
+  ALPHC___.TTF) from the game folder or the system; tmHeight / tmAscent / tmDescent / leadings as
+  GDI computes them for lfHeight = -pixels: the font's VDMX entry for the size when it has one
+  (Arial Narrow: 20-pixel rows at 16 pixels), else the OS/2 Windows ascent and descent scaled;
+  each glyph drawn at the pen with FreeType's monochrome hinting (the hdmx widths Windows uses),
+  the pen advanced by its advance; GetTextExtentPoint32 the sum of the same advances, so a text
+  is exactly as wide as measured; cp1252 to Unicode; bold / italic synthesised only when the file
+  lacks them. The original runs under Wine with the game's fonts installed and FreeType's v35
+  interpreter (harness/wine_env.sh), which makes Wine measure as Windows does; the comparisons
+  with it (tests/basewin, tests/menu, tests/popups, tests/placeholders' map dumps) are then exact
+  for text.
 
 
 ## 7. Unit models (voxel renderer)
@@ -624,11 +634,12 @@ original does (smacx's main_menu only adds the seeding and the human player for 
   original through the same screens (orig_menu.steps) and scores them (fraction of pixels within
   tolerance): the main menu, its highlighted second item, the scenario menu, the map menu, the
   planet's size, ocean, erosion, native life, clouds, the difficulty and the rules 0.999 to 1.000
-  (pixel exact but for a few text pixels); the load FileBox 0.983; the faction picker 0.909 (list
-  and portrait text glyphs: the original runs Arial Narrow under Wine's substitute, see section 6);
-  the name popup over the picker 0.937; PLANETFALL 0.738 (the same text, one line less with the
-  game's arialn.ttf, so the box is lower); the preferences 0.869 (and its check boxes reflect
-  different preferences); the save FileBox in a game 0.847 (the original's base window behind it).
+  (pixel exact but for a few text pixels); the load FileBox 0.984; the faction picker 1.000 (its
+  list in the dialogs' default font, ListBox_draw_item's item rectangle); the name popup over the
+  picker 0.999 (its button reads CANCEL in the original); PLANETFALL 1.000; the preferences 0.871
+  (the window is placed 8 pixels further right, and its check boxes reflect different
+  preferences); the save FileBox in a game 0.848 (smacx's own file box, 2 pixels lower; the
+  original's base window behind it).
   The credits (animated) and the multiplayer setup (a placeholder) are not scored.
 
 ## 12. Sound, music and movies (phase 10)
@@ -751,7 +762,7 @@ tests/placeholders/compare.sh (orig_rmenu.steps; orig_basewin.steps by eye).
 | City map cursor texture | pfncDrawCityMap's Texture_draw_trans_3 | done | — |
 | Menu commands | Console_menu_proc, Console_next_cursor, the display toggles and their keys | done (console_menu.cpp) | — |
 | Menu items without a function | Console_survey, Console_zoom_to_upkeep_base, Console_show_scen_objectives, Console_corner_the_market | done | — |
-| Menu bar look and item visibility | Menu_on_redraw, PullDown_pulldown_update, pfncMainMenuUpdateVisible | done: item visibility (menu.cpp: pfncMainMenuUpdateVisible's shown / hidden / disabled items, the terraforming orders renamed with their turns); the look and behaviour from the asm, compared with the original's screenshots (terranx.exe under Wine, its MENU button clicked; its Alt does not reach the game under XTEST): the main view's menus are AlphaMenu's (the Menu subclass overriding Menu_on_redraw: AlphaMenu_init / compute / on_redraw / adjust), a column of menu2.pcx buttons (menu.pcx at 800) above the console, all nine menus in MainMenu_menu_init's order (nothing hides a whole menu: NETWORK, SCENARIO and EDIT MAP are shown in a single-player game too), titles in capitals in text.pcx's colours, the open button's and the hovered button's states. The MENU button (MainInterface_on_iface_button_clicked 0x3EB) shows / hides the column with AlphaMenu_show / AlphaMenu_hide (fx\\amenu2.wav, the six-frame slide in / out); a button opens its pull-down (the reconstructed PullDown with AlphaMenu_fill_func / backfill_func) at the column's right, level with the button plus 13 (AlphaMenu_on_adjust_pulldown_pos and PullDown_show's +1; the offset measured on the original's screenshot); the open button again, Esc, Alt or a press outside close the pull-down; a chosen item closes it and the column stays (AlphaMenu's flags 5: no menu switch on hover, kept shown); with the column shown and no pull-down the map and the console keep the mouse and the keys. Keys (Menu_on_key_click): Alt+letter the menu (in the column's order: Alt+H is HQ), Left / Right the previous / next menu, Up / Down / Enter / the items' letters. smacx's choices: Alt alone shows the column (letters and arrows then open the menus), Esc on the column hides it. tests/alphamenu (windowed, animated), tests/placeholders case 20. Remaining difference: the pull-down's rows are 18 pixels high, the original's 20 (its font's metrics under Wine) | — |
+| Menu bar look and item visibility | Menu_on_redraw, PullDown_pulldown_update, pfncMainMenuUpdateVisible | done: item visibility (menu.cpp: pfncMainMenuUpdateVisible's shown / hidden / disabled items, the terraforming orders renamed with their turns); the look and behaviour from the asm, compared with the original's screenshots (terranx.exe under Wine, its MENU button clicked; its Alt does not reach the game under XTEST): the main view's menus are AlphaMenu's (the Menu subclass overriding Menu_on_redraw: AlphaMenu_init / compute / on_redraw / adjust), a column of menu2.pcx buttons (menu.pcx at 800) above the console, all nine menus in MainMenu_menu_init's order (nothing hides a whole menu: NETWORK, SCENARIO and EDIT MAP are shown in a single-player game too), titles in capitals in text.pcx's colours, the open button's and the hovered button's states. The MENU button (MainInterface_on_iface_button_clicked 0x3EB) shows / hides the column with AlphaMenu_show / AlphaMenu_hide (fx\\amenu2.wav, the six-frame slide in / out); a button opens its pull-down (the reconstructed PullDown with AlphaMenu_fill_func / backfill_func) at the column's right, level with the button plus 13 (AlphaMenu_on_adjust_pulldown_pos and PullDown_show's +1; the offset measured on the original's screenshot); the open button again, Esc, Alt or a press outside close the pull-down; a chosen item closes it and the column stays (AlphaMenu's flags 5: no menu switch on hover, kept shown); with the column shown and no pull-down the map and the console keep the mouse and the keys. Keys (Menu_on_key_click): Alt+letter the menu (in the column's order: Alt+H is HQ), Left / Right the previous / next menu, Up / Down / Enter / the items' letters. smacx's choices: Alt alone shows the column (letters and arrows then open the menus), Esc on the column hides it. tests/alphamenu (windowed, animated), tests/placeholders case 20. The pull-down's rows are 20 pixels high, as the original's (Arial Narrow's GDI metrics) | — |
 | Status panes | StatusWin_draw_status, StatusWin_draw_active, say_morale, StatusWin_set_loc / redraw / reset | done (maininfc.cpp) | — |
 | World map pane | WorldWin_on_redraw, MapWin_gen_bases_only, WorldWin_draw_box, WorldWin_tile_to_pixel | done (nearest-pixel stretch for maps larger than the pane) | — |
 | Date box, TURN COMPLETE, globe buttons | MainInterface_set_date, MainInterface_redraw_complete, MainInterface_init's geometry | done (turn.flc not decoded) | — |

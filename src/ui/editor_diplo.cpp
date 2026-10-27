@@ -60,7 +60,6 @@ struct DiploEdWin : ScreenWin {
     bool state[13] = {};
     std::vector<int32_t> list;  // the ListBox's factions
     Font font{};  // +0xA24: Arial 14
-    Font check_font{};  // the check boxes' (the dialogs' default: bold Arial 14)
     UiRect list_r{}, check_r{};
     int32_t row_h = 16;
 
@@ -183,12 +182,12 @@ struct DiploEdWin : ScreenWin {
             spot_add(&spots[0], 100 + (int32_t)i, 0, list_r.left, y, list_r.right - list_r.left, row_h);
         }
         // The check boxes (CheckBox: the popups' marks 0x779504 clear / 0x779530 checked; the
-        // dialogs' bold Arial 14, rows of 24 as PrefWin's).
+        // dialogs' default font, CheckBox_close's: popup_dialog_font; rows of 24 as PrefWin's).
         check_r = {w / 2 + 4, 0x1F, (w / 2) * 2 - 4, 0x172};
         for (int32_t i = 0; i < 13; i++) {
             int32_t y = check_r.top + 4 + i * 24;
             popup_draw_check(&canvas, check_r.left - 2, y - 2, state[i] ? 2 : 1);
-            sw_font(&canvas, &check_font, mem_i(0x8C6C74), mem_i(0x8C6C78));
+            sw_font(&canvas, popup_dialog_font(), mem_i(0x8C6C74), mem_i(0x8C6C78));
             sw_text(this, &canvas, label_get(kChecks[i].label / 4), check_r.left + 0x10, y);
             spot_add(&spots[0], 200 + i, 0, check_r.left, y - 4, check_r.right - check_r.left, 24);
         }
@@ -274,8 +273,6 @@ void GAMEAPI Console_editor_diplomacy() {
     w.other = f;
     Font_ctor(&w.font);
     Font_init(&w.font, "Arial", 0xE, 0);
-    Font_ctor(&w.check_font);
-    Font_init(&w.check_font, "Arial", 0xE, 1);
     for (int32_t i = 1; i < 8; i++) {
         if (i == f) continue;
         w.list.push_back(i);

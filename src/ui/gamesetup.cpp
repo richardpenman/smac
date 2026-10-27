@@ -189,23 +189,27 @@ struct PickWin : ScreenWin {
         sw_text_cent(this, &canvas, sw_label(0x1168), t);
         UiRect lf{list.left - 3, list.top - 3, list.right + 0x15, list.bottom + 3};
         Buffer_box_sprite(&canvas, &lf, box_def(3));
-        // The rows (PickWin_on_dialog_item_back_draw: item boxes 27..29 and their text colours).
+        // The rows (PickWin_on_dialog_item_back_draw: item boxes 27..29 and their text colours) in
+        // the list's font: the dialogs' default when it was made (Dialog_ctor: popups_normal's).
         for (int32_t i = 0; i < 7; i++) {
             int32_t f = i + 1;
             if (mode == 2 && !(FactionStatus[1] & (1 << f))) continue;
             int32_t state = group == 0x105 ? 0 : (f == sel ? 2 : 0);
+            // ListBox_draw_item's item rectangle: the row less the 3 pixels between items; the
+            // text 1 pixel in from either side and 2 down (measured on the original's screen).
             UiRect r = row(i);
+            r.bottom -= 3;
             Buffer_box_sprite(&canvas, &r, box_def(27 + state));
             int32_t c = mem_i32(0x8C6C9C - state * 8), sh = mem_i32(0x8C6CA0 - state * 8);
-            sw_font(&canvas, font, c, sh);
+            sw_font(&canvas, popup_dialog_font(), c, sh);
             std::string text = slot_text(f);
             size_t bar = text.find('|');
             std::string left = text.substr(0, bar);
-            sw_text(this, &canvas, left, r.left + 2, r.top + 3);
+            sw_text(this, &canvas, left, r.left + 1, r.top + 2);
             if (bar != std::string::npos) {
                 std::string right = text.substr(bar + 1);
                 int32_t tw = Buffer_text_width(&canvas, right.c_str());
-                sw_text(this, &canvas, right, r.right - 2 - tw, r.top + 3);
+                sw_text(this, &canvas, right, r.right - 1 - tw, r.top + 2);
             }
         }
         // The line from the radio button to the selected row (or to every row: PLAY RANDOM).

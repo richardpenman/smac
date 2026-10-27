@@ -76,7 +76,7 @@ allow-list, so no game data or anything derived from `terranx.exe` can ship.
 | llvm-mingw 20260922 | `tools/llvm-mingw-*` | Windows cross compiler: i686 for `oracle.dll`/`hybrid.dll` (`cmake/i686-mingw.cmake`), x86-64 native builds (`cmake/x86_64-mingw.cmake`). |
 | Python venv | `tools/venv` | pefile, capstone, pillow, numpy, mss. |
 | SDL2 2.30.11 + SDL2\_ttf 2.24.0 | `tools/sdl2` | Built from source (`tools/SDL2-*`); X11/ALSA loaded dynamically. Headers for the build came from Debian `-dev` packages unpacked into `tools/sysroot`. |
-| Wine prefix | `work/wineprefix` | Private; crash debugger disabled. |
+| Wine prefix | `work/wineprefix` | Private; crash debugger disabled; the game's fonts installed by `harness/wine_env.sh`. |
 
 ## Building with CMake directly
 

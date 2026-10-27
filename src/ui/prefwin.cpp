@@ -386,7 +386,8 @@ struct PrefWin : ScreenWin {
         for (size_t i = 0; i < items[page].size() && i < ids.size(); i++) {
             int32_t id = ids[i];
             popup_draw_check(&canvas, panel.left + 4, y - 2, state[id] ? 2 : 0);
-            sw_font(&canvas, &font, mem_i32(0x8C6C74), mem_i32(0x8C6C78));
+            // The check boxes' Dialog (Dialog_init_2) keeps the dialogs' default font.
+            sw_font(&canvas, popup_dialog_font(), mem_i32(0x8C6C74), mem_i32(0x8C6C78));
             sw_text(this, &canvas, items[page][i], panel.left + 0x18, y);
             spot_add(&spots[0], id, 0, panel.left + 2, y - 4, panel.right - panel.left - 4, 24);
             y += 24;

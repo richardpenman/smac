@@ -222,7 +222,8 @@ WAIT:300,NETMSG:UPKEEP4,WAIT:300,CLICK:511x72,WAIT:300,$END,$W"
     check panel-host "hidden again (F12)" "^multiwin hidden"
     check panel-host "the closed panel's time row clicked" "^multiwin time row clicked"
     check panel-host "the time controls (TIMECONTROLS)" "^popup TIMECONTROLS shown"
-    check panel-host "the NetMsg box shown" "^netmsg box UPKEEP4: OK at 511,72"
+    # (its text rows are 20 pixels high, Arial Narrow's GDI height as in the original)
+    check panel-host "the NetMsg box shown" "^netmsg box UPKEEP4: OK at 511,74"
     check panel-host "its Close button clicked" "^netmsg OK clicked"
     count panel-host "the turns go on" "^net: player turn faction 1" 2
     for side in host client; do common panel-$side; done

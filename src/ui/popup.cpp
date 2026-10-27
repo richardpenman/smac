@@ -331,6 +331,11 @@ int32_t g_iface_color(int32_t i) {
     return g_iface_colors[i];
 }
 
+Font* popup_dialog_font() {
+    popup_art_init();
+    return &g_fonts[g_main_font][0];
+}
+
 void popup_art_init() {
     if (g_art_ok) return;
     g_art_ok = true;

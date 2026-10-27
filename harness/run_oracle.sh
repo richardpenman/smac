@@ -22,7 +22,8 @@ rm -f "$RUN/saves" && mkdir -p "$RUN/saves"
 sed 's/^outdir .*/outdir oracle_out/' "$SCRIPT" > "$RUN/oracle.cmd"
 [ -n "${PATCH_SPEC:-}" ] && echo "$PATCH_SPEC" > "$RUN/oracle.patch"
 grep -q '^outdir' "$RUN/oracle.cmd" || sed -i '1i outdir oracle_out' "$RUN/oracle.cmd"
-export WINEPREFIX="$ROOT/work/wineprefix" WINEDEBUG=-all
+# The prefix, the game's fonts and Windows' text measurement (harness/wine_env.sh).
+. "$ROOT/harness/wine_env.sh"
 # private X display per run
 DISP=$(( 100 + RANDOM % 800 ))
 Xvfb ":$DISP" -screen 0 1024x768x24 >/dev/null 2>&1 &

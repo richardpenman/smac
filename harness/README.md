@@ -10,10 +10,24 @@ on the same scripted scenario, and compares the game state turn by turn.
 | `oracle/launch.c` → `oracle_launch.exe` | Starts terranx.exe suspended and injects the DLL. |
 | `../src/app/headless.cpp` → `smacx_headless` | Runs the same scripts on the pure reconstruction. |
 | `run_oracle.sh` | One isolated oracle/hybrid run (own run dir, pristine ini, own X display). |
+| `wine_env.sh` | The prefix and text setup every run of the original uses (fonts, FreeType; see below). |
 | `verify.sh` | Run scenarios in hybrid or native mode and compare with cached oracle references. |
 | `compare.py` | Field-level diff of two snapshot directories. |
 | `state_regions.h` | The game-state memory regions that are compared. |
 | `scenarios/*.cmd` | Standard scenarios. |
+
+## Text as on Windows
+
+`wine_env.sh` (sourced by `run_oracle.sh` and `tests/popups/orig_drive.py`) installs the game's
+fonts into the prefix once (arialn*.ttf and ALPHC___.TTF, "Alpha Centauri", which the game's
+installer puts into the system's fonts; terranx.exe itself only adds arialn.ttf, so Wine would draw
+bold Arial Narrow by emboldening the regular face) and sets FreeType's v35 TrueType interpreter.
+With the default v40 interpreter Wine's GetTextExtentPoint32 sums unhinted advances while its
+TextOut on the game's 8-bit DIBs draws with the hinted (hdmx) ones, so the original measured text
+differently from how it drew it and from Windows. With v35 both use the hinted widths, as Windows
+does, and smacx's text (platform/sdl/ui_platform_sdl.cpp: GDI's VDMX metrics, glyphs placed at
+the hinted advances) matches the original's pixel for pixel. Text-dependent references made
+before this setup (map and base window dumps, screenshots) do not match it.
 
 ## Determinism measures (oracle side)
 

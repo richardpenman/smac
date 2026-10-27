@@ -183,6 +183,9 @@ int32_t THISCALL Font_width(Font* self, const char* text) {
 
 int32_t THISCALL Font_width_2(Font* self, const char* text, int32_t len) {
     if (!text) return 0;
+    // At most the string's length (the original measures strlen(text) characters when len is longer).
+    int32_t n = (int32_t)std::strlen(text);
+    if (n <= len) len = n;
     return platform::font_text_width(self->handle, text, len);
 }
 

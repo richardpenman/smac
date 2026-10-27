@@ -77,7 +77,9 @@ CLICK:340x724,DOWN,DOWN,ENTER,BASESTATE,UNITS"
     check basewin "picker items" "prodwin items: 67 64 .* -69"
     check basewin "picker menu" "pulldown item 1: Obsolete"
     check basewin "obsolete: the list without 67" "prodwin items: 64 "
-    check basewin "garrison menu at the click" "pulldown shown: 6 items at 341,615"
+    # (the menu's rows are 20 pixels high, Arial Narrow's GDI height, as the original's: it is
+    # moved up to end at the screen's bottom)
+    check basewin "garrison menu at the click" "pulldown shown: 6 items at 341,603"
     check basewin "activated: the window closes" "basestate closed"
     check basewin "activated: order 0" "unit 113 f1 Scout Rover \(3,43\) order 0 moves 0 state 04000000"
     nocrash basewin
@@ -213,7 +215,8 @@ nocheck energy "not a page" "^report labs list 13 "
 nocrash energy
 
 # 13. The map view of turn_300 as faction 3 sees it, against the original (the oracle's mapdump of
-#     the same save and view: orig_t300_view.smxmap is its header, the pixels' MD5 below): the
+#     the same save and view: orig_t300_view.smxmap is its header, the pixels' MD5 below; the
+#     original's text measured as on Windows, harness/wine_env.sh): the
 #     bases' art is their founder's (base_draw: faction_id_former), the drone riot icon, and
 #     faction 5's black population boxes (its search key is FUNGBOY, its art spartans.pcx: the
 #     original draws them so too).
@@ -222,7 +225,7 @@ if [ -f "$ROOT/work/saves_late/turn_300.sav" ]; then
         --dump "$OUT/map300.smxmap" --like "$ROOT/tests/placeholders/orig_t300_view.smxmap"
     md5=$("$ROOT/tools/venv/bin/python" -c "import hashlib,sys; print(hashlib.md5(open(sys.argv[1],'rb').read()[808:]).hexdigest())" "$OUT/map300.smxmap" 2>/dev/null)
     echo "map300 md5 $md5" >> "$OUT/map300.log"
-    check map300 "the original's pixels" "map300 md5 f895ca60f35e21d0cf931ff4029227ef"
+    check map300 "the original's pixels" "map300 md5 22ffb7b8dd3dced5e76ac84dea6ad3d6"
     nocrash map300
 fi
 
@@ -271,7 +274,8 @@ nocrash bubbles
 
 # 17. The map view's partial redraws and overlays (mapwin_radius.cpp) on turn_300 as faction 3 sees
 #     it, against the original (the oracle's mapdump with options= / radius=, same view; the
-#     pixels' MD5 below; orig_t300_r4.smxmap is its header): MapWin_draw_radius on a canvas
+#     pixels' MD5 below, the oracle's dumps of harness/wine_env.sh's Wine; orig_t300_r4.smxmap is
+#     its header): MapWin_draw_radius on a canvas
 #     cleared to 0 (radius 0, 2, and 1 across the map's wrap), the AI goals (options 0x2000:
 #     MapWin_gen_overlays), the keypad legend and the diplomatic table (0x20000 MapWin_draw_legend,
 #     0x100000 MapWin_draw_wars; their MD5s are smacx's: the original's differs in 10 pixels of the
@@ -286,20 +290,20 @@ if [ -f "$ROOT/work/saves_late/turn_300.sav" ]; then
         check $name "the original's pixels" "$name md5 $want"
         nocrash $name
     }
-    mapcase map_base eca8a12b4ebf3931a16f1a69b0f5ef09
-    mapcase map_r0 83d3c1b4cf47c9b9652285f0b28eaebf --dump-radius 3,15,0
-    mapcase map_r2 a774f8162217db2fe7ade169baa9ff6f --dump-radius 4,16,2
-    mapcase map_r1e ee008b079a3459cc0f83707454bf8511 --dump-radius 40,2,1
-    mapcase map_goals 1df5c340869907f34a3598a600d76145 --dump-options 2000
-    mapcase map_legend b4433f7bd947debba97a24d0795292b4 --dump-options 120000
-    mapcase map_legend_r a57f4a5d64a402e94e7abf13bafc4883 --dump-radius 1,13,1 --dump-options 22000
+    mapcase map_base 6db9a88079b58dc7897430b6b2a06189
+    mapcase map_r0 0a41beb572aae8a1b60d4cd5cc275c3b --dump-radius 3,15,0
+    mapcase map_r2 19e227d453e25cbb57ef41ae5a33f375 --dump-radius 4,16,2
+    mapcase map_r1e 35650b90d57f0b25c100484f27043f4a --dump-radius 40,2,1
+    mapcase map_goals 47a4c060ad506ee7ef28ca98d895785a --dump-options 2000
+    mapcase map_legend 016ae5b33655334a4914e81c19c42b6c --dump-options 120000
+    mapcase map_legend_r 22ddda3128f7852d49c29fbe4e831108 --dump-radius 1,13,1 --dump-options 22000
     # Scrolled redraws (pfncRedrawMap with the scroll flag: the old canvas shifted, the uncovered
     # columns and rows drawn): from 60,9 the original's picture is its full redraw's; from 7,17
     # it differs from it (the oracle's mapdump scrollfrom=). The unit at the left edge turns by
     # the camera yaw of its own tilt, not the last unit drawn's (vehdraw_draw: compute_camera
     # before the rotation).
-    mapcase map_scroll eca8a12b4ebf3931a16f1a69b0f5ef09 --scroll-from 60,9
-    mapcase map_scroll2 df47e3c947c6a1a0082d4d0b57c8fe80 --scroll-from 7,17
+    mapcase map_scroll 6db9a88079b58dc7897430b6b2a06189 --scroll-from 60,9
+    mapcase map_scroll2 b3630019dfe9805c35e8afbfe6f87ed3 --scroll-from 7,17
 fi
 
 # 18. Palette cycling (load_cycling, Palette_init_cycle / start_cycle, Palette_timer_callback): the

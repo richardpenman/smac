@@ -28,7 +28,7 @@ fi
 cat "$ROOT/harness/oracle/runtime/Alpha Centauri.Ini" "$ROOT/tests/reports/orig_extra.ini" > "$OUT/menu.ini"
 (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 300 "$SMACX" --hidden --seed 1,2 --ini "$OUT/menu.ini" \
     --outdir "$OUT/smacx" --keys "SHOT:topmenu.bmp,DOWN,SHOT:topmenu_down.bmp,DOWN,ENTER,SHOT:scenariomenu.bmp,\
-ESC,DOWN,ENTER,SHOT:loadgame.bmp,ESC,DOWN,ENTER,SHOT:multimenu.bmp,ENTER,DOWN,ENTER,SHOT:credits.bmp,ESC,\
+ESC,DOWN,ENTER,SHOT:loadgame.bmp,ESC,DOWN,ENTER,SHOT:multimenu.bmp,ESC,DOWN,ENTER,SHOT:credits.bmp,ESC,\
 UP,UP,UP,UP,UP,ENTER,SHOT:mapmenu.bmp,DOWN,ENTER,SHOT:worldsize.bmp,ENTER,SHOT:worldland.bmp,ENTER,\
 SHOT:worldtides.bmp,ENTER,SHOT:worldlife.bmp,ENTER,SHOT:worldclouds.bmp,ENTER,SHOT:difficulty.bmp,ENTER,\
 SHOT:userules.bmp,ENTER,SHOT:pickwin.bmp,DOWN,DOWN,ENTER,SHOT:name.bmp,ENTER,SHOT:planetfall.bmp,ENTER,\

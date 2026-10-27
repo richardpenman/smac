@@ -22,7 +22,10 @@ open(p,'w').write(ini)
 disp=':%d'%random.randint(900,990)
 X=subprocess.Popen(['Xvfb',disp,'-screen','0','1024x768x24'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 time.sleep(1.5)
-env=dict(os.environ,DISPLAY=disp,WINEPREFIX=ROOT+'/work/wineprefix',WINEDEBUG='-all')
+# The prefix with the game's fonts and Windows' text measurement (harness/wine_env.sh).
+wenv=subprocess.run(['bash','-c','ROOT="$1"; . "$1/harness/wine_env.sh"; env -0','-',ROOT],capture_output=True).stdout
+env=dict(os.environ,**dict(kv.split('=',1) for kv in wenv.decode().split('\0') if kv.startswith(('WINE','FREETYPE'))))
+env['DISPLAY']=disp
 W=subprocess.Popen(['wine','terranx.exe'],cwd=run,env=env,stdout=open(run+'/wine.log','w'),stderr=subprocess.STDOUT)
 os.environ['DISPLAY']=disp
 from Xlib import display, X as XX, XK

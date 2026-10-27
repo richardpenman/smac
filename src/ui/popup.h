@@ -64,6 +64,9 @@ int32_t THISCALL Buffer_tile_mask(Buffer* self, Buffer* tile, int32_t sx, int32_
 void popup_art_init();
 // iface.pcx's colours of load_interface (0x68A5A0 + 4 i).
 int32_t g_iface_color(int32_t i);
+// Dialog_set_def_dialog_font's font (0x9B8EC0, popups_normal: config_popups' main string font,
+// MainFontSize): the font a Dialog / ListBox gets when it is made (Dialog_ctor, Dialog_close).
+Font* popup_dialog_font();
 
 // ---- BasePop / Popup ----
 class BasePop;
