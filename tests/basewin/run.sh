@@ -105,4 +105,13 @@ check "late147 production" "$(queue late147 2)" "$ans"
 check "late147 hurry" "$(field late147 3 credits) $(field late147 3 minerals)" "99 24/24"
 check "late147 next / previous" "$(field late147 4 base) $(field late147 5 base)" "24 2"
 
+# 3. The units present row when they do not fit (turn_147, faction 1, base 30: 10 units, 8 cells):
+#    the cells lie between the stack arrows 0x3F1 (at the bottom pane's left, MainInfc +0xABC:
+#    0xF4..0x100) and 0x3F2, as BaseWin_draw_garrison (0x4105A7) places them; the original's
+#    canvas has the same units at the same places (tests/basewin/compare.sh turn_147:30).
+run garrison --save work/saves_late/turn_147.sav --human 1 --keys "BASE:30,BASESTATE,SHOT:garrison.bmp,ESC"
+aborts garrison
+check "garrison row" "$(grep -m1 '^basegarrison' "$OUT/garrison.log")" \
+    "basegarrison arrows 1 cells 73:257+61 91:318+61 116:379+61 60:440+61 201:501+61 195:562+61 57:623+61 58:684+61"
+
 exit $FAIL

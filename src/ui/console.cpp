@@ -1407,6 +1407,9 @@ void THISCALL Console_cursor_key(uint8_t* self, int32_t, int32_t key, int32_t) {
 }
 
 void THISCALL pfncProcZoomKey(uint8_t*, int32_t command, int32_t index) {
+    // index < 0 is unreachable in play, in the original too: every caller passes 0 or the
+    // window's own index (Console_on_key, Console_menu_proc 0x51C467, MapWin_on_button_clicked
+    // 0x46F947). The scripted test aid ZOOMAT (tests/console/run.sh) reaches it.
     if (index < 0) {
         // The mouse over the world map pane: the main view zooms, centred on the tile there; else
         // the first map window of a reduced zoom under the mouse, centred on the tile under it;
@@ -1425,11 +1428,14 @@ void THISCALL pfncProcZoomKey(uint8_t*, int32_t command, int32_t index) {
         } else {
             for_each_mapwin([&](int32_t i, uint8_t* w) {
                 if (index >= 0 || map_win(w).zoom >= 0) return;
-                // BUG(reconstruction): the original (0x515229) reads the GraphicWin's width and
-                // height at the window's virtual base; this reads +0x4C4 / +0x4C8 of the MapWin
-                // itself (kept as it is: the cleanup changes no behaviour).
-                int32_t cw = *reinterpret_cast<int32_t*>(w + 0x4C4), ch = -*reinterpret_cast<int32_t*>(w + 0x4C8);
-                if (mx < 0 || my < 0 || mx >= cw || my >= ch) return;
+                // The window's size from its GraphicWin at the virtual base (0x515222..0x515234;
+                // the main view's at +0x23D94). The original takes the mouse relative to the
+                // window (Win_get_mouse_pos 0x5EC8A0); smacx's map windows are at the screen's
+                // origin, so the screen position is the same.
+                MapWinNative* native = ui_mapwin_native(w);
+                if (!native) return;
+                const GraphicWin& gw = native->graphic();
+                if (mx < 0 || my < 0 || mx >= gw.width || my >= -gw.height) return;
                 if (pfncPtToTile(w, mx, my, &tx, &ty) != 0 || !seen(tx, ty)) return;
                 map_win(w).center_x = tx;
                 map_win(w).center_y = ty;

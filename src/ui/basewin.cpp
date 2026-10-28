@@ -1045,6 +1045,11 @@ void basewin_log_state() {
                  b.minerals_accumulated, b.minerals_accumulated_2, Factions[b.faction_id].energy_credits);
     for (int32_t i = 0; i <= b.queue_size && i < 10; i++) std::fprintf(stderr, " %d", b.queue_items[i]);
     std::fprintf(stderr, " state %08X gov %08X\n", b.state_flags, b.governor_flags);
+    // The units present row (BaseWin_draw_garrison's spots, main interface coordinates).
+    std::fprintf(stderr, "basegarrison arrows %d cells", g_garrison_arrows ? 1 : 0);
+    for (const Spot& s : g_bw.spots_iface.list)
+        if (s.type == 6) std::fprintf(stderr, " %d:%d+%d", s.index, s.r.left, s.r.right - s.r.left);
+    std::fprintf(stderr, "\n");
 }
 
 bool basewin_dump(const char* path) {
@@ -1135,7 +1140,7 @@ bool basewin_mouse(int32_t type, int32_t x, int32_t y, bool double_click, bool r
         return true;
     }
     if (parent == 1 && g_garrison_arrows && type == UiInput::LUP) {
-        // The stack arrows (MainInterface 0x3F0: the top unit to the bottom, 0x3F2: the bottom
+        // The stack arrows (MainInterface 0x3F1: the top unit to the bottom, 0x3F2: the bottom
         // unit to the top) on the base's units.
         if (int32_t id = stack_arrow_at(lx, ly)) {
             int32_t v = veh_at(cur_base().x, cur_base().y);

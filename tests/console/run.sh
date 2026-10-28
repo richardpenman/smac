@@ -71,6 +71,14 @@ run mouse $NEW --keys "ENTER,DRAG:530x200:640x260,UNITS,v,CLICK:300x300,UNITS,SH
 check mouse "drag: go-to order 24" "unit 4 f1 Scout Patrol \(35,9\) order 24"
 nocrash mouse
 
+# 3b. pfncProcZoomKey's zoom at the mouse (index -1; unreachable in play, the test aid ZOOMAT:XxY):
+#     at zoom 0 every window zooms out around its centre; at a reduced zoom the main view is
+#     centred on the seen tile under the mouse (the window's size read from its GraphicWin).
+run zoomat $NEW --keys "ENTER,ZOOMAT:530x200,ZOOMAT:600x150"
+check zoomat "zoom 0: zoomed out around the centre" "^zoomat 530,200 tile 35,7 centre 35,7 -> zoom -2 centre 35,7$"
+check zoomat "zoom -2: centred on the tile under the mouse" "^zoomat 600,150 tile 35,5 centre 35,7 -> zoom -4 centre 35,5$"
+nocrash zoomat
+
 # 4. Unit orders through the menus (Alt+A: Action; the items run Console_menu_proc).
 run menu $NEW --keys "ENTER,A-a,SHOT:menu_action.bmp,ESC,ALT,RIGHT,SHOT:menu_game.bmp,ESC,A-a,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,UNITS"
 check menu "a menu command chosen" "menu item [0-9A-F]+ "

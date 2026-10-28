@@ -31,7 +31,7 @@ Every commit passes `src/tools/gate.sh`. The script exits non-zero on any failur
 
 When to run what:
 
-* Per commit: `src/tools/gate.sh` (until `hybrid-final` is tagged: `GATE_BASELINE=178475a`).
+* Per commit: `src/tools/gate.sh` (the tag `hybrid-final` is set, on 178475a).
 * While working: `src/tools/gate.sh --quick` (one scenario for asan, short diffnative games), or
   `--only static,build,unit,native`.
 * Until the freeze (step 20) the gate also had a `hybrid` step (`harness/verify.sh hybrid all` on
@@ -253,7 +253,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 15 | Methods on layout structs (`Base::`, `Faction::`, `Veh::`) with `ADDR` forwarders | L | first pass done (see note 15) |
 | 16 | Scratch globals → contexts/locals | L | native part done; image globals after the freeze (see note 16) |
 | 17 | Golden-record fcompare mode + data-dependent unit tests | M | done (see note 17) |
-| 18 | `diffnative.sh` (native-vs-baseline on new seeds); tag `hybrid-final` | S | script done (see note 18); the tag is set by the user |
+| 18 | `diffnative.sh` (native-vs-baseline on new seeds); tag `hybrid-final` | S | done (see note 18); the tag is set (178475a) |
 | 19 | Split `enemy_move` and the AI (stack residues as explicit context) | XL | done (see note 19) |
 | 20 | Native state containers + explicit save/snapshot serialisation (phase B) | XL | done (see note 20) |
 | 21 | UI windows: typed views, then classes | L | done (see note 21) |
@@ -673,8 +673,8 @@ Notes on the increments:
     UI suites.
 
 20. Three commits. The baseline of every comparison is the build of 178475a (the end of step 19,
-    the last commit the full gate checked with the hybrid build; `diffnative.sh --baseline 178475a`
-    until the user tags `hybrid-final`).
+    the last commit the full gate checked with the hybrid build; `diffnative.sh --baseline 178475a`,
+    now tagged `hybrid-final`).
     * Serialisation (state still in the image). `engine/serialize.h`: a `Writer` and a `Reader`
       (little-endian integers in their own width, fields in order) and one field list per record
       type, `serialize(io, record)`, which both writes and reads (`engine/state_io.cpp`: GamePrefs,
@@ -782,12 +782,19 @@ Notes on the increments:
     * Names (section 7.3): the 95 `FUN_*` addresses in src/ui comments got names, written
       `Class_method (0xADDR)` (e.g. `ProdWin_draw_cell (0x4927C0)`, `DiploWin_add_offer
       (0x441490)`); CRT helpers by their CRT name.
-    Findings, kept as they are (behaviour unchanged): pfncProcZoomKey's mouse zoom reads the
-    window's size at MapWin + 0x4C4 / 0x4C8 instead of at its GraphicWin (0x515229 reads through
-    the virtual base), so whether the zoom follows the mouse depends on what those bytes of the
-    object hold (not checked); BaseWin_draw_garrison's stack row reads MainInterface + 0xAC4 where maininfc.cpp
-    reads the left arrow's right edge (+0xAB4). The first is a difference from the original and
-    gets a proper fix after the cleanup.
+    Findings, kept as they were in the step (behaviour unchanged) and fixed after it:
+    pfncProcZoomKey's mouse zoom read the window's size at MapWin + 0x4C4 / 0x4C8 instead of at
+    its GraphicWin (0x515222..0x515234 read through the virtual base), so the main view never
+    followed the mouse; it now reads `MapWinNative::graphic()`. The path (index -1) is
+    unreachable in play, in the original too (every caller passes 0 or the window's index), so
+    the console suite reaches it through the test aid `ZOOMAT:XxY`. BaseWin_draw_garrison's
+    stack row reads MainInterface + 0xAC4 as the original does (0x4105A7: the right edge of
+    +0xABC, the rectangle of button 0x3F1, which MainInterface_init 0x45A883 puts at the bottom
+    pane's left; the main screen's row uses 0x3F0's +0xAB4, 0x4B8276). smacx never set +0xABC,
+    so with more units than cells the base window's row started at x 1, over the queue pane, and
+    drew 0x3F0's arrow: +0xABC is now set and the base window shows 0x3F1 / 0x3F2 (the basewin
+    suite's garrison case; tests/basewin/compare.sh turn_147:30 has the original's units at the
+    same places).
     Left of section 7: typed views for the other window objects still read by offset (StatusWin
     `sw()` / `InfoWin`, InfoWindow `fld()`, TutWin `tf()`, BattleWin, NetState, the main interface's
     mode at +0x1E8FC; about 150 sites), and the window objects themselves moving out of the image,

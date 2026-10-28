@@ -133,5 +133,7 @@ extern bool g_fac_bar_shown, g_sup_bar_shown;
 extern int32_t g_fac_bar_page;
 // The units present pane's stack arrows (maininfc.cpp): shown when the units do not fit.
 extern bool g_garrison_arrows;
+// The stack arrows' sprites and rectangles (MainInterface_init's part, once).
+void stack_arrows_load();
 void stack_arrows_draw(Buffer* mi);
 int32_t stack_arrow_at(int32_t x, int32_t y);

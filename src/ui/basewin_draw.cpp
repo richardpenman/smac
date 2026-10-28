@@ -1953,8 +1953,10 @@ void THISCALL BaseWin_draw_garrison(uint8_t* self, int32_t flag) {
         for (; v >= 0; v = Vehs[v].next_veh_id_stack) count++;
         per = (r.right - r.left) / (cw + 5);
         if (per < count) {
-            // The main interface's stack arrows (buttons 0x3F0 / 0x3F2) at both ends of the pane;
-            // the cells share the width between them.
+            // The main interface's stack arrows at both ends of the pane: 0x3F1 at the bottom
+            // pane's left (+0xABC, 0x4105A7) and 0x3F2 (+0xACC); the cells share the width
+            // between them.
+            stack_arrows_load();
             r.left = main_interface().rect_abc.right + 1;
             r.right = main_interface().arrow_right.left - 1;
             cw = (r.right - r.left) / per - 5;

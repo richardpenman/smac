@@ -245,6 +245,21 @@ bool run_command(const std::string& cmd) {
         if (id >= 0 && id < BaseCount) BaseWin_zoom(&BaseWin, id, 0);
         return true;
     }
+    if (cmd.rfind("zoomat ", 0) == 0) {
+        // test aid: the mouse moved to (x, y), then pfncProcZoomKey's zoom out at the mouse (index
+        // -1, unreachable in play): logs the tile under the mouse before and the view after.
+        int32_t x = 0, y = 0, tx = -1, ty = -1;
+        std::sscanf(arg.c_str(), "%d %d", &x, &y);
+        console_ui_mouse(UiInput::MOVE, x, y);
+        uint8_t* view = MapWins[0];
+        int32_t from_x = map_win(view).center_x, from_y = map_win(view).center_y;
+        int32_t off = pfncPtToTile(view, x, y, &tx, &ty);
+        pfncProcZoomKey(&MainConsole, 0x204, -1);
+        std::fprintf(stderr, "zoomat %d,%d tile %d,%d%s centre %d,%d -> zoom %d centre %d,%d\n", x, y, tx, ty,
+                     off ? " (off the map)" : "", from_x, from_y, map_win(view).zoom, map_win(view).center_x,
+                     map_win(view).center_y);
+        return true;
+    }
     if (cmd == "menustate") {  // test aid: the open menu column of the opening screens (topmenu.h)
         topmenu_log_state();
         return true;

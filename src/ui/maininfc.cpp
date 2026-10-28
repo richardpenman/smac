@@ -728,7 +728,8 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
         for (; v >= 0; v = Vehs[v].next_veh_id_stack) count++;
     }
     int32_t fit = (r.right - r.left) / (cw + 0x10);
-    // More than fit: the row between the scroll arrows (buttons 0x3F0 / 0x3F2 shown; 0x3F1 never).
+    // More than fit: the row between the scroll arrows (buttons 0x3F0 / 0x3F2 shown; 0x3F1 is the
+    // base window's).
     if (fit < count) {
         r.left = main_interface().arrow_left.right + 1;
         r.right = main_interface().arrow_right.left - 1;
@@ -1004,15 +1005,17 @@ void maininfc_geometry() {
 
 namespace {
 
-// The stack row's scroll arrows (MainInterface_init: buttons 0x3F0 / 0x3F2 with the arrows of
-// interface.pcx (0x18D + 13 k, 0x99 / 0xC4; 12 x 42, three states), 4 pixels inside the stack pane,
-// vertically centred; 0x3F1 at the bottom pane's left is never shown).
+// The stack row's scroll arrows (MainInterface_init 0x45A80E..0x45A8D3 and 0x45AE42..: buttons
+// 0x3F0 / 0x3F2 with the arrows of interface.pcx (0x18D + 13 k, 0x99 / 0xC4; 12 x 42, three
+// states), 4 pixels inside the stack pane, vertically centred; 0x3F1, the left arrow's art too, at
+// the bottom pane's left (+0xABC) at the same height. The main screen's stack row shows 0x3F0 and
+// 0x3F2, the base window's garrison row 0x3F1 and 0x3F2 (BaseWin_draw_garrison).
 struct Arrow {
     Sprite spr[3];
     bool shown = false, pressed = false;
     uint32_t rect_off = 0;
     int32_t id = 0;
-} g_arrow[2];
+} g_arrow[3];  // 0x3F0, 0x3F2, 0x3F1
 bool g_arrows_loaded = false;
 
 void load_arrows() {
@@ -1024,6 +1027,8 @@ void load_arrows() {
     for (int32_t j = 0; j < 2; j++)
         for (int32_t k = 0; k < 3; k++)
             pfncSpriteFromCanvasRectTrans(&g_arrow[j].spr[k], &ifc, 9, 0x18D + 0xD * k, 0x99 + 0x2B * j, 0xC, 0x2A, 0);
+    for (int32_t k = 0; k < 3; k++)
+        pfncSpriteFromCanvasRectTrans(&g_arrow[2].spr[k], &ifc, 9, 0x18D + 0xD * k, 0x99, 0xC, 0x2A, 0);
     const UiRect s = main_interface().stack_pane;
     int32_t w = g_arrow[0].spr[0].width, h = g_arrow[0].spr[0].height;
     int32_t top = s.top + (s.bottom - h - s.top) / 2;
@@ -1033,6 +1038,10 @@ void load_arrows() {
     g_arrow[0].id = 0x3F0;
     g_arrow[1].rect_off = offsetof(MainInterface, arrow_right);
     g_arrow[1].id = 0x3F2;
+    const int32_t bl = main_interface().pane_bottom.left;
+    main_interface().rect_abc = {bl, top, bl + w, top + h};
+    g_arrow[2].rect_off = offsetof(MainInterface, rect_abc);
+    g_arrow[2].id = 0x3F1;
 }
 
 bool in_rect(int32_t x, int32_t y, const UiRect& r) { return x >= r.left && x < r.right && y >= r.top && y < r.bottom; }
@@ -1338,11 +1347,12 @@ static void worldwin_click(int32_t px, int32_t py, int32_t sx, int32_t sy, bool 
 }
 
 // The stack arrows in the base window's copy of the main interface (BaseWin_draw_garrison shows
-// MainInfc's buttons 0x3F0 / 0x3F2 when the units present do not fit), and the one at (x, y).
+// MainInfc's buttons 0x3F1 / 0x3F2 when the units present do not fit), and the one at (x, y).
+void stack_arrows_load() { load_arrows(); }
 void stack_arrows_draw(Buffer* mi) {
     load_arrows();
     for (Arrow& a : g_arrow) {
-        if (!a.spr[0].width) continue;
+        if (a.id == 0x3F0 || !a.spr[0].width) continue;
         const UiRect& r = mi_rect(a.rect_off);
         BlitDestScale = BlitSourceScale = 1;
         pfncSpriteStretchCopyToCanvas(&a.spr[0], mi, 9, r.left, r.top);
@@ -1351,7 +1361,7 @@ void stack_arrows_draw(Buffer* mi) {
 int32_t stack_arrow_at(int32_t x, int32_t y) {
     load_arrows();
     for (Arrow& a : g_arrow)
-        if (in_rect(x, y, mi_rect(a.rect_off))) return a.id;
+        if (a.id != 0x3F0 && in_rect(x, y, mi_rect(a.rect_off))) return a.id;
     return 0;
 }
 

@@ -613,6 +613,12 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         out->command = (tok[0] == 'R' ? "rclick " : "move ") + std::to_string(x) + " " + std::to_string(y);
         return true;
     }
+    if (tok.rfind("ZOOMAT:", 0) == 0) {  // ZOOMAT:XxY, zoom out at the mouse there (test aid, win.cpp)
+        int32_t x = 0, y = 0;
+        if (std::sscanf(tok.c_str() + 7, "%dx%d", &x, &y) != 2) return false;
+        out->command = "zoomat " + std::to_string(x) + " " + std::to_string(y);
+        return true;
+    }
     if (tok.rfind("DRAG:", 0) == 0) {  // DRAG:X1xY1:X2xY2, the go-to drag of a held left button
         int32_t x1 = 0, y1 = 0, x2 = 0, y2 = 0;
         if (std::sscanf(tok.c_str() + 5, "%dx%d:%dx%d", &x1, &y1, &x2, &y2) != 4) return false;
