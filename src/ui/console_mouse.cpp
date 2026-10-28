@@ -226,6 +226,11 @@ void console_ui_tick() {
         last_blink = now;
         blink_timer();
     }
+    static uint32_t last_blink2 = 0;  // blink2_timer (start_timers: 100 ms)
+    if (now - last_blink2 >= 100) {
+        last_blink2 = now;
+        maininfc_blink2();
+    }
     // InfoWin_init's timer (10, every 50 ms): the info pane's typing.
     static uint32_t last_info = 0;
     if (now - last_info >= 50) {

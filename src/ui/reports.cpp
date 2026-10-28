@@ -1007,6 +1007,8 @@ void ReportScreen::list_draw(Buffer* m, int32_t parent, const UiRect& lr, const 
         spot_add(&spots[parent], 1, type + 100, sb.r.left, sb.r.bottom - w, w, w);
         spot_add(&spots[parent], -n, type + 100, sb.r.left, sb.r.top + w, w, (sb.r.bottom - sb.r.top) - 2 * w);
         list_bars[type & 7] = sb;
+        int32_t* t = &top;
+        sw_scroll_bar(this, parent, sb, [t](int32_t pos) { *t = pos; });
     }
     const UiRect& lr_ = lr2;
     Buffer_set_clip(m, &lr_);
@@ -1745,6 +1747,7 @@ void ReportScreen::redraw() {
             spot_add(&spots[0], 1, 99, sb.r.left, sb.r.bottom - w, w, w);
             spot_add(&spots[0], -rows_shown, 99, sb.r.left, sb.r.top + w, w, (sb.r.bottom - sb.r.top) - 2 * w);
             page_bar = sb;
+            sw_scroll_bar(this, 0, sb, [this](int32_t pos) { scroll = pos; });
             state.push_back("page scroll " + num(sb.pos) + " of " + num(sb.max));
         }
     }

@@ -42,7 +42,9 @@
 // --keys: scripted input, consumed before real input. Tokens: a character (b, B = shift+b, ., [ ...),
 // LEFT RIGHT UP DOWN HOME END PGUP PGDN ENTER SPACE TAB BACK ESC PAUSE F1..F12, KP1..KP9 (keypad),
 // C-x (ctrl), S-x (shift), CLICK:XxY (a left click in a popup; S-CLICK:XxY with shift held), RCLICK:XxY (a right click; S-RCLICK /
-// C-RCLICK with shift / ctrl held: the map's right-click menu), NETMSG:LABEL (a network game's NetMsg box),
+// C-RCLICK with shift / ctrl held: the map's right-click menu), PRESS:XxY / RELEASE:XxY (the left
+// button pressed / released there: a hold, as a scroll bar's thumb dragged by MOVE:XxY), NETMSG:LABEL (a network game's NetMsg box), MESSAGE:TEXT (a message added to the
+// info pane's message list),
 // POPUP:FILE/LABEL[/FLAGS[/PCX]]
 // (shows a script popup, a test aid), PLAYSOUND:FILE (decodes and plays a WAV / MP3 file on the
 // voice object, logging its length), MUSICRENDER:FILE:SECONDS (the music's next seconds into a WAV
@@ -580,6 +582,10 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         out->command = "movie " + tok.substr(6);
         return true;
     }
+    if (tok.rfind("MESSAGE:", 0) == 0) {  // MESSAGE:TEXT, the message list's MessageWin_add_message (test aid)
+        out->command = "message " + tok.substr(8);
+        return true;
+    }
     if (tok.rfind("NETMSG:", 0) == 0) {  // NETMSG:LABEL, a network game's NetMsg box (test aid)
         out->command = "netmsg " + tok.substr(7);
         return true;
@@ -611,6 +617,13 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         size_t c = tok.find(':');
         if (std::sscanf(tok.c_str() + c + 1, "%dx%d", &x, &y) != 2) return false;
         out->command = (tok[0] == 'R' ? "rclick " : "move ") + std::to_string(x) + " " + std::to_string(y);
+        return true;
+    }
+    if (tok.rfind("PRESS:", 0) == 0 || tok.rfind("RELEASE:", 0) == 0) {  // the left button down / up
+        int32_t x = 0, y = 0;
+        size_t c = tok.find(':');
+        if (std::sscanf(tok.c_str() + c + 1, "%dx%d", &x, &y) != 2) return false;
+        out->command = (tok[0] == 'P' ? "press " : "release ") + std::to_string(x) + " " + std::to_string(y);
         return true;
     }
     if (tok.rfind("ZOOMAT:", 0) == 0) {  // ZOOMAT:XxY, zoom out at the mouse there (test aid, win.cpp)

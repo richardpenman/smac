@@ -130,5 +130,12 @@ has gamma "gammastate pos 103 old 100" || c=1
 has gamma "gamma: 103 (OK)" || c=1
 grep -q "^Gamma Correction=103" "$OUT/gamma/Alpha Centauri.Ini" || c=1
 check gamma $c "see $OUT/gamma.log"
+# The scroll bar's thumb dragged (scroll.cpp, a horizontal bar held in sw_run): to 2.00, the release
+# moves nothing more.
+run gammadrag --new size=0 --human 1 --seed 1,2 --keys "ENTER,C-p,CLICK:253x323,PRESS:470x454,MOVE:512x454,RELEASE:512x454,SCREENSTATE,ESC,ESC"
+c=0
+has gammadrag "scroll press part 5 (bar 394,442..630,466 pos 100 of 1..400)" || c=1
+has gammadrag "gammastate pos 200 old 100" || c=1
+check gammadrag $c "see $OUT/gammadrag.log"
 
 exit $FAIL

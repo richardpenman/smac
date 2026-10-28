@@ -1096,8 +1096,51 @@ bool basewin_mouse(int32_t type, int32_t x, int32_t y, bool double_click, bool r
         lx = x - g_bw.x;
         ly = y - g_bw.y;
     }
+    // The panes' scroll bars held under the left button (Scroll_on_left_down .. on_left_up): the
+    // thumb dragged, a button's pressed look; the release is the bar's click only on the part
+    // pressed (scroll_click), not after a drag.
+    static int32_t held_parent = -1;
+    auto pane_bar = [&](int32_t p) -> const ScrollBar* {
+        return p == 0 ? (g_fac_bar_shown ? &g_fac_bar : nullptr)
+                      : (g_sup_bar_shown && base_win().sup_bar ? &g_sup_bar : nullptr);
+    };
+    auto pane_redraw = [&](int32_t p) {
+        if (p == 0) BaseWin_draw_facilities(self, 0);
+        else BaseWin_draw_supported(self, 0);
+    };
+    if (held_parent >= 0 && scroll_held() && (type == UiInput::MOVE || type == UiInput::LUP)) {
+        int32_t hp = held_parent;
+        int32_t bx = hp ? x - mp.left : x - g_bw.x, by = hp ? y - mp.top : y - g_bw.y;
+        const ScrollBar* bar = pane_bar(hp);
+        if (type == UiInput::MOVE) {
+            int32_t pos = bar ? bar->pos : 0;
+            if (bar && scroll_motion(*bar, bx, by, &pos)) {
+                (hp == 0 ? base_win().fac_scroll : base_win().sup_scroll) = pos;
+                pane_redraw(hp);
+            }
+            return true;
+        }
+        held_parent = -1;
+        int32_t part = scroll_release();
+        if (bar && part != SCROLL_THUMB && scroll_part(*bar, bx, by) == part) {
+            int32_t d = scroll_click(*bar, bx, by, hp == 0 ? g_fac_bar_page : 1);
+            int32_t& pos = (hp == 0 ? base_win().fac_scroll : base_win().sup_scroll);
+            pos = std::max(bar->min, std::min(pos + d, bar->max));
+        }
+        pane_redraw(hp);
+        base_win().drag_state = -1;
+        return true;
+    }
     if (parent < 0) return true;  // the map around the window: no action
     if (type == UiInput::MOVE) ui_bubble_clear();  // BaseWin_on_mouse_move: Win_clear_bubble_text
+    if (type == UiInput::LDOWN && !button_at(parent, lx, ly)) {
+        const ScrollBar* bar = pane_bar(parent);
+        if (bar && scroll_press(*bar, lx, ly) != SCROLL_NONE) {
+            held_parent = parent;
+            pane_redraw(parent);
+            return true;
+        }
+    }
     BaseButton* b = button_at(parent, lx, ly);
     if (b) {
         // BaseButton_on_left_down / on_left_up: pressed look, the click on release inside.

@@ -1,7 +1,7 @@
 // The main interface's panes drawn by the original's code: the status panes of StatusWin (InfoWin
 // 0x8C5568: StatusWin_draw_status 0x4B6570, StatusWin_draw_active 0x4B4CF0, StatusWin_redraw,
 // StatusWin_set_loc, StatusWin_reset), the date box (MainInterface_set_date 0x45BE80), "TURN
-// COMPLETE" (MainInterface_redraw_complete 0x45C3A0) and the world map (WorldWin_on_redraw
+// COMPLETE" (MainInterface_redraw_complete 0x45C3A0, with turn.flc's frames) and the world map (WorldWin_on_redraw
 // 0x4C3EC0 with MapWin_gen_bases_only 0x469B40 and WorldWin_draw_box 0x4C4630), with the pane
 // rectangles of MainInterface_init (0x459680). They draw into the main interface's canvas
 // (basewin.cpp's MainInfc canvas), composed by console_frame.cpp.
@@ -26,6 +26,7 @@
 #include "engine/battle.h"
 #include "engine/crt.h"
 #include "engine/design.h"
+#include "engine/game.h"
 #include "engine/globals.h"
 #include "engine/map.h"
 #include "engine/probe.h"
@@ -47,6 +48,7 @@
 #include "ui/basewin_internal.h"
 #include "ui/console.h"
 #include "ui/console_frame.h"
+#include "ui/flic.h"
 #include "ui/font_text.h"
 #include "ui/mapwin.h"
 #include "ui/popup.h"
@@ -828,10 +830,37 @@ void maininfc_set_date() {
 }
 
 // MainInterface_redraw_complete (0x45C3A0): "TURN COMPLETE" in spot 5.
+namespace {
+int32_t g_turn_frame = 0;  // turn.flc's frame (the Flic at MainInterface + 0x24550: +0xA10)
+
+// MainInterface_redraw_complete's test: the turn's end awaited (GameState 2 with the console
+// waiting, or a network game's players done), not another player's turn of a one-at-a-time game.
+bool turn_complete_shown() {
+    if (!(GameState & 2)) return false;
+    if (MultiplayerActive && (GameMoreRules & 0x10) && CurrentFaction != CurrentPlayerFaction) return false;
+    if (!console_win(&MainConsole).waiting &&
+        (!MultiplayerActive || NetTurnDoneMask == 0xFF || NetTurnDoneMask == 0))
+        return false;
+    return true;
+}
+}  // namespace
+
 void maininfc_redraw_complete() {
     if (InfcList[InfcUsed] != 0) return;
     Buffer* c = canvas();
     UiRect r = main_interface().turn_complete;
+    // turn.flc (MainInterface_init: FUN_00629E50 at the spot's top left): its first frame while the
+    // turn goes on (FUN_0062A280: rewound); the turn complete, its frames in turn (FUN_0062A070,
+    // the next frame at each blink2_timer tick: maininfc_blink2) -- the orange frame's animation.
+    // (Its pixels are the game palette's indices as they are: the main interface's canvas is
+    // synchronised to the game palette, FUN_00629E50's Buffer_sync_to_palette.)
+    static Flc flc;
+    static int32_t loaded = 0;  // 1 loaded, -1 missing
+    if (!loaded) loaded = flc_load("turn.flc", &flc, nullptr) && !flc.frames.empty() ? 1 : -1;
+    if (loaded > 0) {
+        if (!turn_complete_shown()) g_turn_frame = 0;
+        flc_draw(c, &flc, r.left, r.top, g_turn_frame);
+    }
     uint32_t label = 0x68;
     if (MultiplayerActive && (GameState & 2) && !(GameMoreRules & 0x10) && NetTurnDoneMask != 0xFF &&
         (NetTurnDoneMask & (1 << (CurrentPlayerFaction & 31))))
@@ -839,12 +868,23 @@ void maininfc_redraw_complete() {
     char text[256];
     std::snprintf(text, sizeof(text), "%s", lbl(label));
     for (char* p = text; *p; p++) *p = (char)crt_toupper((uint8_t)*p);
-    // (turn.flc: the original plays the turn animation frame under the text, frame 0 while the
-    // turn goes on; the FLC is not decoded: the spot keeps the console art)
-    Buffer_set_font(c, find_font(14, 1), nullptr, nullptr, nullptr);  // MainInterface + 0x2166C
+    static Font font;  // MainInterface + 0x2166C (MainInterface_init: Font_init("Arial", 14, 1))
+    static bool font_ok = (Font_init(&font, "Arial", 14, 1), true);
+    (void)font_ok;
+    Buffer_set_font(c, &font, nullptr, nullptr, nullptr);
     Buffer_set_text_color(c, 0x65, -1, 1, 1);
-    // (the turn's state chooses turn.flc's frame only; the text is always written)
     Buffer_write_cent_l_7(c, text, &r, (int32_t)std::strlen(text));
+}
+
+// blink2_timer (0x50EE30, every 100 ms; start_timers): no base window, social engineering, boom,
+// ControlTurnA or game not started; the TURN COMPLETE box redrawn, its animation a frame on.
+void maininfc_blink2() {
+    const int32_t boom = *reinterpret_cast<int32_t*>(mem::host(0x915620));  // (DAT_00915620: boom draws)
+    if (Win_is_visible(&BaseWin) || Win_is_visible(&SocialWin) || boom || ControlTurnA || GameNotStarted) return;
+    if (InfcList[InfcUsed] != 0) return;
+    if (!turn_complete_shown()) return;
+    g_turn_frame++;
+    ui_invalidate();
 }
 
 // ---- WorldWin ----

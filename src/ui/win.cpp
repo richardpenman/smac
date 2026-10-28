@@ -330,6 +330,7 @@ bool run_command(const std::string& cmd) {
     }
     if (cmd == "infostate") {  // test aid: the info pane's displays and texts (infowin.h)
         infowin_log_state();
+        detailmap_log_state();
         return true;
     }
     if (cmd.rfind("infotick", 0) == 0) {  // test aid: N steps of the info pane's timer (infowin.h)
@@ -374,6 +375,10 @@ bool run_command(const std::string& cmd) {
     }
     if (cmd.rfind("movie", 0) == 0) {  // test aid: a movie by name (movie.cpp)
         amovie_project_name(arg.c_str());
+        return true;
+    }
+    if (cmd.rfind("message", 0) == 0) {  // test aid: MessageWin_add_message(text, 0) (infowin.cpp)
+        MessageWin_add_message(&MessageWin, arg.c_str(), 0);
         return true;
     }
     if (cmd.rfind("netmsg", 0) == 0) {  // test aid: NetMsg_pop(label, no timer, the box) (win_popup.cpp)
@@ -819,6 +824,12 @@ void GAMEAPI wait_task() {
             console_ui_drag(x1, y1, x2, y2, shot[0] ? g_ui_outdir + "/" + shot : std::string());
         } else if (std::sscanf(k.command.c_str(), "move %d %d", &x1, &y1) == 2) {
             ui_mouse(UiInput::MOVE, x1, y1);
+        } else if (std::sscanf(k.command.c_str(), "press %d %d", &x1, &y1) == 2) {
+            ui_mouse(UiInput::MOVE, x1, y1);
+            ui_mouse(UiInput::LDOWN, x1, y1);
+        } else if (std::sscanf(k.command.c_str(), "release %d %d", &x1, &y1) == 2) {
+            ui_mouse(UiInput::MOVE, x1, y1);
+            ui_mouse(UiInput::LUP, x1, y1);
         } else if (k.command == "close") {
             close_requested(CloseAt::MAIN);
         } else if (!k.command.empty()) {
@@ -997,6 +1008,13 @@ bool ui_wait_input(UiInput* in) {
             }
             if (std::sscanf(k.command.c_str(), "move %d %d", &x, &y) == 2) {  // MOVE:XxY
                 in->type = UiInput::MOVE;
+                in->x = x;
+                in->y = y;
+                return true;
+            }
+            bool press = std::sscanf(k.command.c_str(), "press %d %d", &x, &y) == 2;
+            if (press || std::sscanf(k.command.c_str(), "release %d %d", &x, &y) == 2) {  // PRESS / RELEASE
+                in->type = press ? UiInput::LDOWN : UiInput::LUP;
                 in->x = x;
                 in->y = y;
                 return true;

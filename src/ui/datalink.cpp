@@ -449,6 +449,7 @@ void DatalinkState::redraw() {
     if ((int32_t)items.size() > visible()) {
         ScrollBar sb = scroll_for_list(&lr, false, top, (int32_t)items.size(), visible());
         scroll_draw(c, sb);
+        sw_scroll_bar(this, 0, sb, [this](int32_t pos) { top = pos; });
     }
     Buffer_set_clip(c, &lr);
     for (int32_t k = 0; k < visible() && top + k < (int32_t)items.size(); k++) {

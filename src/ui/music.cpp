@@ -29,6 +29,7 @@
 #include "engine/ui_bridge.h"
 #include "platform/ui_platform.h"
 #include "platform/win32.h"
+#include "ui/console.h"
 #include "ui/sound.h"
 
 namespace {
@@ -940,8 +941,9 @@ void GAMEAPI load_music(int32_t faction_id) {
 // desktop_init (0x58EE60): the game's windows are set up natively by smacx; its music part.
 // PrefWin_init (called by desktop_init) then sets the volumes of the audio page's sliders from the
 // preferences (PrefWin_on_scrolling: master, voices, effects, music).
-int32_t GAMEAPI desktop_init(int32_t) {
+int32_t GAMEAPI desktop_init(int32_t reset) {
     load_music(CurrentPlayerFaction);
+    detailmap_system_init(reset);  // (mapwin_system_init: MapWins[1])
     sound_apply_volume_prefs();
     return 0;
 }

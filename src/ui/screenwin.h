@@ -15,11 +15,13 @@
 // operations report) gets the input while it is open, as the original's modal stack does.
 #pragma once
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
 #include "ui/basewin_internal.h"
 #include "ui/gfx.h"
+#include "ui/scroll.h"
 #include "ui/win.h"
 
 struct ScreenWin;
@@ -46,6 +48,14 @@ struct ScreenWin {
     bool slide = false;
     // The modal's callback while it waits (ui_set_modal_callback: pop_wait / pop_expire).
     int32_t modal_cb = 0;
+    // The scroll bars the last redraw drew (sw_scroll_bar): sw_run shows their held buttons pressed
+    // and drags their thumbs (scroll.cpp), `set` taking the dragged position.
+    struct Bar {
+        int32_t parent;
+        ScrollBar bar;
+        std::function<void(int32_t)> set;
+    };
+    std::vector<Bar> bars;
 
     virtual ~ScreenWin() { sw_forget(this); }
     virtual void redraw() = 0;
@@ -68,6 +78,10 @@ void sw_init(ScreenWin* s, int32_t x, int32_t y, int32_t w, int32_t h, bool ifac
 BaseButton* sw_button(ScreenWin* s, const char* text, int32_t id, int32_t x, int32_t y, int32_t w, int32_t h,
                       int32_t parent, Font* font);
 void sw_clear_buttons(ScreenWin* s);
+// A scroll bar drawn on parent 0 / 1 (the window / the main interface): sw_run holds it under the
+// left button (scroll_press .. scroll_release) and gives its dragged thumb's position to `set`; its
+// line and page clicks stay the window's on_click (scroll_click: only the part pressed counts).
+void sw_scroll_bar(ScreenWin* s, int32_t parent, const ScrollBar& bar, std::function<void(int32_t)> set);
 // Runs the modal loop until the window closes (s->open false) or the input ends; redraws first.
 void sw_run(ScreenWin* s);
 void sw_close(ScreenWin* s);

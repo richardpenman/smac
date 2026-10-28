@@ -219,6 +219,11 @@ bool worldwin_detail_shown();
 void worldwin_show_detail_at(int32_t x, int32_t y);
 // The world map pane into the main interface's canvas: the detail map or WorldWin's map.
 void worldpane_draw(Buffer* mi);
+// desktop_init's mapwin_system_init for MapWins[1] (the detail map): reset, active, its own display
+// options (0x40010EE3) and zoom (-8), its canvas the pane's size.
+void detailmap_system_init(int32_t reset);
+// Test aid (INFOSTATE): "detailmap shown .. active .. options .. zoom .. centre x,y".
+void detailmap_log_state();
 ADDR_NATIVE(0x460DD0) void THISCALL pfncMainMenuUpdateVisible(uint8_t* menu, int32_t veh_id);
 ADDR_NATIVE(0x4BC6E0) void THISCALL TutWin_tour(uint8_t* win);
 ADDR_NATIVE(0x4BDDE0) int32_t THISCALL TutWin_reset(uint8_t* win);

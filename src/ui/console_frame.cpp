@@ -7,11 +7,11 @@
 // colour 9 (raw 255) transparent at the bottom of the screen (x = (width - 1024) / 2, y = height
 // - 257); its four panes are filled with the centre tile of box sprite 9; the menu and commlink
 // buttons use the bars of console_x2_a.pcx; "TURN COMPLETE" is written centred in spot 5 in
-// colour 0x65. The pane rectangles below are the init's (fields +0xD80.., 1024 layout).
+// colour 0x65 over turn.flc's frame. The pane rectangles below are the init's (fields +0xD80.., 1024 layout).
 //
 // The status panes, the world map, the date box and "TURN COMPLETE" are drawn by the original's
 // code (maininfc.cpp) into the main interface's canvas, the info pane and its M / I buttons by
-// infowin.cpp. Not drawn: turn.flc, the button highlight states of the menu / commlink buttons.
+// infowin.cpp. Not drawn: the button highlight states of the menu / commlink buttons.
 #include "ui/console_frame.h"
 #include "ui/reports.h"
 

@@ -55,6 +55,8 @@ void worldwin_draw_to(Buffer* mi);
 int32_t worldwin_tile_to_pixel(int32_t x, int32_t y, int32_t* px, int32_t* py);
 void maininfc_set_date();
 void maininfc_redraw_complete();
+// blink2_timer (100 ms): TURN COMPLETE's animation (turn.flc) a frame on while the turn's end waits.
+void maininfc_blink2();
 
 // ---- original functions ----
 // Hides the pull-down menu bar (AlphaMenu at 0x9380DC).

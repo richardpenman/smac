@@ -597,8 +597,33 @@ int32_t prodwin_pick(int32_t faction, int32_t slot, int32_t* mode) {
             else on_key(w, vk);
             continue;
         }
-        if (in.type == UiInput::MOVE) continue;
+        bool bar_shown = w->visible < (int32_t)w->items.size();
+        if (in.type == UiInput::MOVE) {
+            // Scroll_on_mouse_move: the held thumb dragged (a row of cols items), a button's look.
+            ScrollBar sb = scroll_bar(w);
+            int32_t pos = sb.pos;
+            if (bar_shown && scroll_held() && scroll_motion(sb, lx, ly, &pos)) {
+                w->top = pos * w->cols;
+                w->redraw();
+            }
+            continue;
+        }
         BaseButton* b = button_under(w, lx, ly);
+        if (in.type == UiInput::LDOWN && !b && bar_shown && scroll_press(scroll_bar(w), lx, ly) != SCROLL_NONE) {
+            w->redraw();  // (the held button pressed)
+            continue;
+        }
+        if (in.type == UiInput::LUP && scroll_held()) {
+            // Scroll_on_left_up: the bar's click only on the part pressed, not after a drag.
+            ScrollBar sb = scroll_bar(w);
+            int32_t part = scroll_release();
+            if (part != SCROLL_THUMB && scroll_part(sb, lx, ly) == part) {
+                int32_t pos = std::max(0, std::min(sb.pos + scroll_click(sb, lx, ly, w->rows - 1), sb.max));
+                w->top = pos * w->cols;
+            }
+            w->redraw();
+            continue;
+        }
         if (in.type == UiInput::LDOWN) {
             if (b) {
                 b->pressed = 1;

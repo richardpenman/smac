@@ -349,6 +349,34 @@ if [ -f "$ROOT/work/saves_late/turn_300.sav" ]; then
     nocrash opsrail
 fi
 
+# 19b. The scroll bars held under the left button (scroll.cpp: Scroll_on_left_down / on_mouse_move /
+#     on_left_up, BaseButton_on_left_down; PRESS / MOVE / RELEASE): the list popup's thumb dragged
+#     to the end (top 4 of 0..4), its up button drawn pressed while held (ICONS.PCX's third
+#     sprite, index 226) and back after a release elsewhere, which moves nothing; released over
+#     it, a line; the track above the thumb, a page at the press. Base operations' window bar
+#     (a ScreenWin's bar: sw_run): the thumb dragged to row 2, its down button pressed and
+#     released off it (nothing), then clicked (a row).
+run scrollhold $NEW --gamedir "$OUT/cyclegame" --keys "ENTER,POPUP:listtest/LISTTEST/2,PRESS:875x312,MOVE:875x470,\
+RELEASE:875x470,PRESS:875x288,PIXEL:875x288,RELEASE:875x400,PIXEL:875x288,PRESS:875x288,RELEASE:875x288,PRESS:875x350,\
+RELEASE:875x350,ESC"
+check scrollhold "the thumb held" "^scroll press part 5 \(bar 714,21\.\.738,232 pos 0 of 0\.\.4\)"
+check scrollhold "dragged to the end" "^popup LISTTEST list top 4"
+check scrollhold "the up button pressed" "^pixel 875,288 index 226 "
+check scrollhold "and released" "^pixel 875,288 index 185 "
+check scrollhold "released over it: a line" "^popup LISTTEST list top 3"
+check scrollhold "the track: a page" "^popup LISTTEST list top 0"
+nocrash scrollhold
+if [ -f "$ROOT/work/saves_late/turn_300.sav" ]; then
+    run scrollhold2 --save work/saves_late/turn_300.sav --human 3 --keys \
+        "ESC,ESC,ESC,ESC,ESC,ESC,ESC,F4,PRESS:861x60,MOVE:861x300,RELEASE:861x300,SCREENSTATE,PRESS:861x495,PIXEL:861x495,RELEASE:861x420,SCREENSTATE,CLICK:861x495,SCREENSTATE,ESC"
+    check scrollhold2 "the thumb dragged: row 2" "^report page scroll 2 of 5"
+    check scrollhold2 "the down button pressed" "^pixel 861,495 index 226 "
+    if [ "$(grep -c "^report page scroll 2 of 5" "$OUT/scrollhold2.log")" -ge 2 ]; then
+        echo "PASS scrollhold2: released off the button: nothing"; else echo "FAIL scrollhold2: released off the button: nothing"; FAIL=1; fi
+    check scrollhold2 "clicked: a row" "^report page scroll 3 of 5"
+    nocrash scrollhold2
+fi
+
 # 20. The menus' look (AlphaMenu, menu.cpp; the original's in tests/alphamenu): a column of nine
 #     menu2.pcx buttons (0x8B x 0x12 under a 6 high top) above the console, every menu (NETWORK,
 #     SCENARIO and EDIT MAP too); the open menu's PullDown at its right (PullDown_on_redraw with
@@ -492,6 +520,18 @@ check msgdismiss "M: the message list" "infostate mode 1000 "
 check msgdismiss "space: the info pane (I) again" "infostate mode 1001 "
 nocheck msgdismiss "no placeholder" "not reconstructed: ButtonGroup_button_click"
 nocrash msgdismiss
+#     The message list's scroll bar (ListBox_attach: once the messages exceed its five rows; Win_init's
+#     Scroll at its right edge): seven messages (MESSAGE:, a test aid) show the last five; the up
+#     button a line, the thumb dragged to the top, the down button a line.
+run msgbar $NEW --keys "ENTER,MESSAGE:One,MESSAGE:Two,MESSAGE:Three,MESSAGE:Four,MESSAGE:Five,MESSAGE:Six,MESSAGE:Seven,\
+CLICK:745x596,INFOSTATE,CLICK:714x592,INFOSTATE,PRESS:714x631,MOVE:714x590,RELEASE:714x590,INFOSTATE,CLICK:714x664,INFOSTATE"
+check msgbar "the last five shown" "^messages first 2 of 7 rows 5"
+check msgbar "the bar" "^scroll press part 1 \(bar 704,73\.\.724,165 pos 2 of 0\.\.2\)"
+check msgbar "up: a line" "^messages first 1 of 7"
+check msgbar "the thumb dragged to the top" "^messages first 0 of 7"
+if [ "$(grep -c "^messages first 1 of 7" "$OUT/msgbar.log")" -ge 2 ]; then
+    echo "PASS msgbar: down: a line"; else echo "FAIL msgbar: down: a line"; FAIL=1; fi
+nocrash msgbar
 
 # 28. Function keys with the base window open (Console_on_key_click after the base window's keys,
 #     its flag set): F2 opens the research report over it; ctrl+B (the go-to base list) does
@@ -585,5 +625,25 @@ run worldshift $NEW --keys "ENTER,S-CLICK:930x635,SHOT:detail.bmp"
 check worldshift "shift click: the detail map at the view's centre" "^worldwin detail map at 35,7"
 check worldshift "shown" "^worldwin detail map$"
 nocrash worldshift
+#     MapWins[1] is a map window of its own (detailmap.cpp, desktop_init's mapwin_system_init): its
+#     own display options (MapWin_init_2: 0x40010EE3, not the main view's 0x60010EE3) and zoom -8;
+#     the player's unit moved, it stays where it was put (not re-centred on the cursor); the patrol
+#     routes' menu command (0x215) reaches it as every active map window.
+run detailmap $NEW --keys "ENTER,INFOSTATE,S-CLICK:930x635,INFOSTATE,KP6,KP6,KP6,INFOSTATE,CMD:0x215,INFOSTATE"
+check detailmap "set up: the map's middle" "^detailmap shown 0 active 1 options 40010EE3 zoom -8 centre 24,24"
+check detailmap "its own options, at the view's centre" "^detailmap shown 1 active 1 options 40010EE3 zoom -8 centre 35,7"
+if [ "$(grep -c "^detailmap shown 1 active 1 options 40010EE3 zoom -8 centre 35,7" "$OUT/detailmap.log")" -ge 2 ]; then
+    echo "PASS detailmap: not moved with the unit"; else echo "FAIL detailmap: not moved with the unit"; FAIL=1; fi
+check detailmap "the patrol routes on it" "^detailmap shown 1 active 1 options 40410EE3 zoom -8 centre 35,7"
+nocrash detailmap
+
+# 36. TURN COMPLETE's box (MainInterface_redraw_complete with turn.flc, blink2_timer every 100 ms):
+#     the FLC's first frame while the turn goes on (dark, index 201 inside the box), its frames in
+#     turn once every unit is done (the box turns orange).
+run turncomplete $NEW --keys "ENTER,PIXEL:800x583,h,h,h,h,h,h,WAIT:600,PIXEL:800x583,WAIT:300,PIXEL:800x583"
+check turncomplete "the first frame during the turn" "^pixel 800,583 index 201 "
+if grep "^pixel 800,583" "$OUT/turncomplete.log" | tail -n +2 | grep -qv " index 201 "; then
+    echo "PASS turncomplete: the animation's frames at the turn's end"; else echo "FAIL turncomplete: the animation's frames at the turn's end"; FAIL=1; fi
+nocrash turncomplete
 
 exit $FAIL

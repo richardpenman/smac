@@ -1605,18 +1605,42 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t callback) {
             for (const BasePop::Button& bt : p->btns)
                 if (x >= bt.r.left && x < bt.r.right && y >= bt.r.top && y < bt.r.bottom) btn = bt.id;
             int32_t nitems = (int32_t)p->items.size();
-            if (in.type == UiInput::LDOWN && btn == 0x7FFF && hit < 0 && p->item_type == 2 && nitems > p->rows &&
-                p->rows > 0) {
-                // The list box's scroll bar: a line (its buttons) or a page (its track).
-                ScrollBar sb;
+            bool bar = p->item_type == 2 && nitems > p->rows && p->rows > 0;
+            ScrollBar sb;
+            if (bar) {
                 sb.r = scroll_rect(p);
                 sb.max = nitems - p->rows;
                 sb.pos = std::min(p->top_item, sb.max);
-                if (int32_t d = scroll_click(sb, x, y, p->rows)) {
-                    p->top_item = std::max(0, std::min(p->top_item + d, sb.max));
-                    dirty = true;
+            }
+            if (bar && in.type == UiInput::LDOWN && btn == 0x7FFF && hit < 0) {
+                // The list box's scroll bar (Scroll_on_left_down): the track moves a page at once,
+                // a button is held (pressed) and moves a line when released over it, the thumb is
+                // dragged.
+                int32_t part = scroll_press(sb, x, y);
+                if (part != SCROLL_NONE) {
+                    if (part == SCROLL_PAGE_UP || part == SCROLL_PAGE_DOWN)
+                        p->top_item = std::max(0, std::min(p->top_item + scroll_click(sb, x, y, p->rows), sb.max));
+                    redraw(p);
+                    ui_invalidate();
                     continue;
                 }
+            }
+            if (bar && scroll_held() && (in.type == UiInput::MOVE || in.type == UiInput::LUP)) {
+                if (in.type == UiInput::MOVE) {
+                    int32_t pos = sb.pos;
+                    if (!scroll_motion(sb, x, y, &pos)) continue;
+                    p->top_item = pos;
+                } else {
+                    int32_t part = scroll_release();
+                    if (part == SCROLL_UP || part == SCROLL_DOWN) {  // Scroll_on_button_clicked
+                        int32_t d = scroll_click(sb, x, y, p->rows);
+                        p->top_item = std::max(0, std::min(p->top_item + d, sb.max));
+                    }
+                }
+                std::fprintf(stderr, "popup %s list top %d\n", p->label.c_str(), p->top_item);
+                redraw(p);
+                ui_invalidate();
+                continue;
             }
             if (in.type == UiInput::LDOWN) {
                 if (btn != 0x7FFF) {

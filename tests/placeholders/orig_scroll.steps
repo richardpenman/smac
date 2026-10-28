@@ -1,0 +1,58 @@
+; The plain original under Xvfb (tests/popups/orig_drive.py): QUICK START, the start-of-game
+; popups answered; TURN COMPLETE's box during the turn; the detail map (a shift click on the world
+; map pane); the units held until the turn's end (TURN COMPLETE's animation, three shots); the
+; datalinks' list: its down button held, then its thumb dragged.
+wait 10
+click 835 362
+wait 7
+key Return
+wait 4
+key Return
+wait 4
+key Return
+wait 3
+shot start
+click 930 635 S
+wait 2
+shot detail
+key h
+wait 1
+key h
+wait 1
+key h
+wait 1
+key h
+wait 1
+key h
+wait 1
+key h
+wait 2
+shot tc1
+wait 0.3
+shot tc2
+wait 0.3
+shot tc3
+key F1
+wait 4
+shot dl
+press 330 474
+wait 1
+shot dlpress
+release
+wait 1
+press 330 85
+wait 0.5
+move 330 200
+wait 0.5
+move 330 300
+wait 1
+shot dldrag
+release
+wait 1
+shot dlafter
+key Escape
+wait 2
+key C+q
+wait 2
+key Return
+wait 1

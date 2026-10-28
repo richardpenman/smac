@@ -9,8 +9,8 @@
 #    same sound calls in the same order as the original under the oracle (orig_tiny20.log, made by
 #    tests/sound/compare.sh: oracle.dll's "logsound" hooks FX_play, FX_play_loc, FX_fade, FX_stop,
 #    wave_it, ambience, ambience_veh, boom, the movies, load_music, popup_wave_callback and
-#    Wave_play_2 in terranx.exe), the explosion sounds of the original's other map windows aside
-#    (soundcmp.py --one-window).
+#    Wave_play_2 in terranx.exe), with the explosion sounds repeated for the detail map (MapWins[1],
+#    a map window of its own: boom's loop over the active map windows) as in the original.
 # 2. human: the triggers of scripted actions, as the original's code makes them (sound.cpp):
 #    FX_init and load_music at the start, a unit's sound when it is selected (ambience_veh, FX by
 #    chassis), the base window's sounds (fx\menu2.wav, ambience 0xCD / 0xCE, fx\menu down.wav).
@@ -73,7 +73,7 @@ nocrash() {
 # 1. The observer game against the original's calls.
 # (Snapshots as the oracle writes them: save_game reads the logic clock, so they are part of the game.)
 run observer --nosound --new size=0 diff=3 --seed 1001,2001 --human 0 --turns 20 --snapshots "$OUT/observer/snap"
-if python3 "$ROOT/tests/sound/soundcmp.py" "$ROOT/tests/sound/orig_tiny20.log" "$OUT/observer.log" --one-window \
+if python3 "$ROOT/tests/sound/soundcmp.py" "$ROOT/tests/sound/orig_tiny20.log" "$OUT/observer.log" \
     > "$OUT/observer.cmp"; then
     echo "PASS observer: the original's sound calls ($(head -1 "$OUT/observer.cmp"))"
 else

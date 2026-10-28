@@ -202,7 +202,9 @@ struct FileBoxWin : ScreenWin {
         // The list's scroll bar (scroll_normal) when the entries exceed the rows.
         if ((int32_t)entries.size() > n) {
             UiRect lr = list_r;
-            scroll_draw(&canvas, scroll_for_list(&lr, false, top, (int32_t)entries.size(), n));
+            ScrollBar sb = scroll_for_list(&lr, false, top, (int32_t)entries.size(), n);
+            scroll_draw(&canvas, sb);
+            sw_scroll_bar(this, 0, sb, [this](int32_t pos) { top = pos; });
         }
         Buffer_set_clip(&canvas, &all);
         // The edit field.

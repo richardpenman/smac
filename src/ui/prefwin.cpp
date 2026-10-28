@@ -100,8 +100,7 @@ const Page kPages[6] = {
 // CANCEL (BasePop's texts, colour 0xF8, black text). While it is open the window's colours 10..245
 // are the grey ramp corrected by the scroll's gamma (GammaWin_set_palette (0x5C9520): pow(i / 235, 1 / gamma)); OK
 // keeps the gamma (prefs "Gamma Correction", the game palette reloaded with it), CANCEL the old
-// one. Approximated: the scroll bar's thumb is not dragged (its buttons and track are clicked;
-// Left / Right step it).
+// one. The scroll bar's buttons and track are clicked (Left / Right step it), its thumb dragged.
 struct GammaWin : ScreenWin {
     int32_t pos = 100, old = 100;
     bool ok = false;
@@ -154,8 +153,17 @@ struct GammaWin : ScreenWin {
         Buffer_fill_3(&canvas, &track, 0xF8);
         bevel_box({bar.left, bar.top, bar.left + h, bar.bottom}, 7);
         bevel_box({bar.right - h, bar.top, bar.right, bar.bottom}, 7);
-        int32_t tx = bar.left + h + 1 + ((pos - 1) * ((bar.right - bar.left) - 3 * h - 1)) / 399;
+        // (Scroll_compute_thumb_rect: h + 1 + (pos - 1) * (width - 3h - 1) / 399 from the left; the
+        // thumb dragged: scroll.cpp, sw_run.)
+        ScrollBar sb;
+        sb.r = bar;
+        sb.horizontal = true;
+        sb.min = 1;
+        sb.max = 400;
+        sb.pos = pos;
+        int32_t tx = scroll_thumb(sb).left;
         bevel_box({tx, bar.top, tx + h, bar.bottom}, 7);
+        sw_scroll_bar(this, 0, sb, [this](int32_t p) { step(p - pos); });
         for (const UiRect* r : {&okr, &cancelr}) {
             bevel_box(*r, 0xF8);
             std::string t = r == &okr ? "OK" : sw_upper(label_get(102));

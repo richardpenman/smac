@@ -16,7 +16,8 @@
 // cut to nothing (their width is compared with an absolute x; the right-aligned writes use pane
 // relative x) so the graph shows without them.
 // The message list: ListBox_draw_item's rows with MessageWin's callbacks (see msg_draw).
-// Approximated: the message list's scroll bar is not drawn; the character drawn for a
+// The message list's scroll bar once the messages exceed its rows (ListBox_attach, Win_init).
+// Approximated: the character drawn for a
 // progress exactly at a line's start (the original writes the byte below its stack buffer, the
 // high byte of a saved register).
 // Not reconstructed: control_turn's faction boxes in the pane during the computer players' turns
@@ -195,6 +196,16 @@ void msg_scroll_end() {  // ListBox_set_selected_pos(-1, 1)
     ui_invalidate();
 }
 
+// The list's scroll bar (ListBox_attach: flag 8 once the messages exceed the rows; Win_init's
+// default Scroll, Scroll_init_vert_nc: the window's height at its right edge, DAT_009B8DD4 wide,
+// scroll_normal's sprites). `bar` false: no bar.
+bool msg_bar(ScrollBar* sb) {
+    if ((int32_t)g_msgs.size() <= msg_rows()) return false;
+    UiRect r = msg_rect();
+    *sb = scroll_for_list(&r, false, g_msg_first, (int32_t)g_msgs.size(), msg_rows());
+    return true;
+}
+
 // ListBox_on_redraw with MessageWin's callbacks: the box (MessageWin_listbox_fill: fill 9 and box
 // 18), each row's icon (MessageWin_listbox_draw: 4 pixels in, centred on the row) and its text
 // (ListBox_draw_item: Buffer_write_l_4 at the row's top in the list font, the colours of
@@ -225,6 +236,8 @@ void msg_draw(Buffer* c) {
     }
     UiRect all{0, 0, c->width, c->height};
     Buffer_set_clip(c, &all);
+    ScrollBar sb;
+    if (msg_bar(&sb)) scroll_draw(c, sb);
 }
 
 // ---- the mode buttons (MainInterface_init: 1000 "M", 0x3E9 "I", 0x3EA the editor's, hidden) ----
@@ -1003,7 +1016,31 @@ bool infowin_mouse(int32_t type, int32_t x, int32_t y) {
     if (editpane_mouse(type, x, y)) return true;
     if (mi_mode() == 1000) {
         UiRect r = msg_rect();
+        // The list's scroll bar: a button a line at its release, the track a page at the press,
+        // the thumb dragged (Scroll_on_left_down / on_mouse_move / on_left_up).
+        ScrollBar sb;
+        bool bar = msg_bar(&sb);
+        if (bar && scroll_held() && (type == UiInput::MOVE || type == UiInput::LUP)) {
+            int32_t pos = sb.pos;
+            if (type == UiInput::MOVE) {
+                if (scroll_motion(sb, x, y, &pos)) g_msg_first = pos;
+            } else if (int32_t part = scroll_release(); part == SCROLL_UP || part == SCROLL_DOWN) {
+                g_msg_first = std::max(0, std::min(g_msg_first + scroll_click(sb, x, y, msg_rows()), sb.max));
+            }
+            ui_invalidate();
+            return true;
+        }
         if (x < r.left || x >= r.right || y < r.top || y >= r.bottom) return false;
+        if (bar && type == UiInput::LDOWN) {
+            int32_t part = scroll_press(sb, x, y);
+            if (part == SCROLL_PAGE_UP || part == SCROLL_PAGE_DOWN)
+                g_msg_first = std::max(0, std::min(g_msg_first + scroll_click(sb, x, y, msg_rows()), sb.max));
+            if (part != SCROLL_NONE) {
+                ui_invalidate();
+                return true;
+            }
+        }
+        if (bar && x >= sb.r.left) return true;
         if (type == UiInput::LUP && g_msg_font_ok) {
             // ListBox: the row under the mouse selected (MainInterface_on_iface_selected).
             int32_t row = (y - r.top - kMsgMargin) / msg_pitch() + g_msg_first;
@@ -1036,4 +1073,5 @@ void infowin_log_state() {
     for (int32_t p = 0; p < 2; p++)
         for (int32_t i = 0; i < nlines(p); i++) std::fprintf(stderr, "info %d.%d: %s\n", p, i, line(p, i));
     for (const Message& m : g_msgs) std::fprintf(stderr, "message %08X: %s\n", m.id, m.text.c_str());
+    std::fprintf(stderr, "messages first %d of %d rows %d\n", g_msg_first, (int32_t)g_msgs.size(), msg_rows());
 }

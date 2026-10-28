@@ -154,6 +154,7 @@ static void push(ScreenWin* s) {
 
 static void redraw(ScreenWin* s) {
     s->texts.clear();
+    s->bars.clear();
     s->redraw();
     ui_invalidate();
 }
@@ -161,6 +162,17 @@ static void redraw(ScreenWin* s) {
 void sw_show(ScreenWin* s) {
     if (std::find(g_stack.begin(), g_stack.end(), s) == g_stack.end()) push(s);
     redraw(s);
+}
+
+void sw_scroll_bar(ScreenWin* s, int32_t parent, const ScrollBar& bar, std::function<void(int32_t)> set) {
+    for (ScreenWin::Bar& b : s->bars)
+        if (b.parent == parent && b.bar.r.left == bar.r.left && b.bar.r.top == bar.r.top &&
+            b.bar.r.right == bar.r.right && b.bar.r.bottom == bar.r.bottom) {
+            b.bar = bar;
+            b.set = std::move(set);
+            return;
+        }
+    s->bars.push_back({parent, bar, std::move(set)});
 }
 
 void sw_forget(ScreenWin* s) {
@@ -189,6 +201,8 @@ void sw_run(ScreenWin* s) {
     // close the window (Win_release_modal), which ends the wait.
     int32_t old_cb = ui_set_modal_callback(s->modal_cb);
     const bool* old_open = ui_set_modal_open(&s->open);
+    int32_t held_bar = -1;  // a scroll bar held under the left button (s->bars' index at the press)
+    ScreenWin::Bar held;
     while (s->open && !ControlTurnA) {
         if (Win_is_visible(&BaseWin)) {
             // A base window opened from the screen takes the input until it closes.
@@ -204,10 +218,41 @@ void sw_run(ScreenWin* s) {
             continue;
         }
         bool right = in.type == UiInput::RDOWN || in.type == UiInput::RUP;
+        // A held scroll bar's coordinates (its parent's canvas).
+        auto bar_xy = [&](int32_t parent, int32_t* bx, int32_t* by) {
+            *bx = parent ? in.x - mp.left : in.x - s->x;
+            *by = parent ? in.y - mp.top : in.y - s->y;
+        };
         if (in.type == UiInput::MOVE) {
             ui_bubble_clear();  // (Win_clear_bubble_text)
+            if (held_bar >= 0 && scroll_held()) {
+                // Scroll_on_mouse_move / BaseButton_on_mouse_move: the thumb dragged, a button's
+                // pressed look.
+                ScreenWin::Bar& hb = held;
+                int32_t bx, by, pos = hb.bar.pos;
+                bar_xy(hb.parent, &bx, &by);
+                if (scroll_motion(hb.bar, bx, by, &pos)) {
+                    if (pos != hb.bar.pos) {
+                        hb.bar.pos = pos;
+                        if (hb.set) hb.set(pos);
+                    }
+                    redraw(s);
+                }
+                continue;
+            }
             s->on_move(in.x - s->x, in.y - s->y);
             continue;
+        }
+        if (in.type == UiInput::LUP && held_bar >= 0) {
+            // Scroll_on_left_up: the hold ends; the release is the bar's click only on the part
+            // pressed (scroll_click), not after a drag of the thumb.
+            int32_t bx, by;
+            bar_xy(held.parent, &bx, &by);
+            int32_t part = scroll_release();
+            held_bar = -1;
+            bool click = part != SCROLL_THUMB && part != SCROLL_NONE && scroll_part(held.bar, bx, by) == part;
+            redraw(s);
+            if (!click) continue;
         }
         if (in.type == UiInput::RDOWN) continue;
         if (in.type == UiInput::LDOWN) ui_bubble_clear();
@@ -239,6 +284,16 @@ void sw_run(ScreenWin* s) {
             continue;
         }
         if (in.type == UiInput::LDOWN) {
+            if (!b && !right)
+                for (size_t i = 0; i < s->bars.size(); i++)
+                    if (s->bars[i].parent == parent && scroll_press(s->bars[i].bar, lx, ly) != SCROLL_NONE) {
+                        // Scroll_on_left_down / BaseButton_on_left_down: the part held.
+                        held_bar = (int32_t)i;
+                        held = s->bars[i];
+                        redraw(s);
+                        break;
+                    }
+            if (held_bar >= 0) continue;
             if (b) {
                 b->pressed = 1;
                 s->pressed = b;
