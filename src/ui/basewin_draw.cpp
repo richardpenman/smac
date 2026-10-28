@@ -75,7 +75,6 @@ int32_t tc(uint32_t addr) { return text_color(addr); }
 // A font's line height as the window code reads it (+0x0 >= 0: +0x0 + ascent above leading).
 int32_t line_h(const Font* f) { return f->field_0 < 0 ? f->height : f->field_0 + f->ascent_above; }
 
-UiRect rect_at(uint32_t off) { return bw_rect(off); }
 void inset(UiRect* r, int32_t d) {
     r->left += d;
     r->top += d;
@@ -127,12 +126,12 @@ Font* GAMEAPI find_font(int32_t size, int32_t style) {
 void THISCALL BaseWin_draw_info(uint8_t* self, int32_t flag) {
     Buffer* c = mic();
     UiRect old = c->clip;
-    UiRect r = rect_at(kBwRectStapleMI);
+    UiRect r = base_win().rect_staple_mi;
     inset(&r, -3);
     UiRect all{0, 0, c->width, c->height};
     Buffer_set_clip(c, &all);
     Buffer_box_sprite(c, &r, box_def(3));
-    UiRect n = rect_at(kBwRectNameMI);
+    UiRect n = base_win().rect_name_mi;
     Buffer_set_clip(c, &n);
     r = n;
     Buffer_box_sprite(c, &r, box_def(3));
@@ -173,7 +172,7 @@ void THISCALL BaseWin_draw_info(uint8_t* self, int32_t flag) {
 
 void THISCALL BaseWin_draw_misc(uint8_t* self, int32_t flag) {
     Buffer* c = bwc();
-    UiRect r = rect_at(kBwRectMisc);
+    UiRect r = base_win().rect_misc;
     Buffer_set_clip(c, &r);
     Buffer_box_sprite(c, &r, box_def(3));
     inset(&r, 3);
@@ -223,11 +222,11 @@ void THISCALL BaseWin_draw_nutrients(uint8_t* self, int32_t flag) {
     Font font;
     Font_ctor(&font);
     UiRect old = c->clip;
-    UiRect pane = rect_at(kBwRectNutPane);
+    UiRect pane = base_win().rect_nut_pane;
     Buffer_set_clip(c, &pane);
     Buffer_box_sprite(c, &pane, box_def(3));
     Font_init(&font, "Arial", ScreenWidth == 800 ? 10 : 0xC, 0);
-    UiRect t = rect_at(kBwRectNutTitle);
+    UiRect t = base_win().rect_nut_title;
     Buffer_box_sprite(c, &t, box_def(6));
     t.left += 3;
     t.bottom -= 3;
@@ -239,7 +238,7 @@ void THISCALL BaseWin_draw_nutrients(uint8_t* self, int32_t flag) {
     cat(label_get(0x820 / 4));
     upper(StrBuffer);
     Buffer_write_cent_l_7(c, StrBuffer, &t, (int32_t)std::strlen(StrBuffer));
-    t = rect_at(kBwRectNutrients);
+    t = base_win().rect_nutrients;
     Buffer_box_sprite(c, &t, box_def(0));
     t.left += 3;
     t.bottom -= 3;
@@ -351,17 +350,17 @@ void THISCALL BaseWin_draw_commerce(uint8_t* self, int32_t flag) {
     for (int32_t i = 0; i < BaseCount; i++)
         if (kBasesAddr + (uint32_t)i * sizeof(BASE) == CurrentBasePtr) this_base = i;
     UiRect old = c->clip;
-    UiRect pane = rect_at(kBwRectCommercePane);
+    UiRect pane = base_win().rect_commerce_pane;
     Buffer_set_clip(c, &pane);
     Buffer_box_sprite(c, &pane, box_def(3));
     Font_init(&font, "Arial", 10, 1);
-    UiRect t = rect_at(kBwRectCommerce);
+    UiRect t = base_win().rect_commerce;
     Buffer_box_sprite(c, &t, box_def(6));
     inset(&t, 3);
     Buffer_set_font(c, bw_font(), nullptr, nullptr, nullptr);
     Buffer_set_text_color(c, tc(0x8C6CA4), tc(0x8C6CA8), 1, 1);
     StrBuffer[0] = 0;
-    if (MFactions[(uint8_t)Bases[bwf(kBwBase)].faction_id].rule_flags & 0x80) {
+    if (MFactions[(uint8_t)Bases[base_win().base].faction_id].rule_flags & 0x80) {
         cat(label_get(0x114C / 4));
     } else {
         cat(label_get(0x4E4 / 4));
@@ -370,7 +369,7 @@ void THISCALL BaseWin_draw_commerce(uint8_t* self, int32_t flag) {
     Buffer_write_cent_l_7(c, StrBuffer, &t, (int32_t)std::strlen(StrBuffer));
     Buffer_set_font(c, &font, nullptr, nullptr, nullptr);
     Buffer_set_text_color(c, tc(0x8C6CFC), tc(0x8C6D00), 1, 1);
-    t = rect_at(kBwRectCommerce2);
+    t = base_win().rect_commerce2;
     Buffer_box_sprite(c, &t, box_def(0));
     inset(&t, 3);
     int32_t f = (uint8_t)cur_base().faction_id;
@@ -437,7 +436,7 @@ void THISCALL BaseWin_draw_commerce(uint8_t* self, int32_t flag) {
         for (int32_t i = 0; i < 64; i++)
             if (SecretProjects[i] == this_base) n += 5;
         n /= 2;
-        t = rect_at(kBwRectCommerce);
+        t = base_win().rect_commerce;
         inset(&t, 3);
         if (me.sanction_turns) {
             StrBuffer[0] = 0;
@@ -463,7 +462,7 @@ void THISCALL BaseWin_draw_commerce(uint8_t* self, int32_t flag) {
         Buffer_set_text_color(c, tc(0x8C6CFC), tc(0x8C6D00), 1, 1);
         StrBuffer[0] = 0;
         cat(label_get(100 / 4));
-        UiRect r = rect_at(kBwRectCommerce2);
+        UiRect r = base_win().rect_commerce2;
         Buffer_write_cent_l_7(c, StrBuffer, &r, (int32_t)std::strlen(StrBuffer));
     }
     Buffer_set_clip(c, &old);
@@ -483,13 +482,13 @@ void THISCALL BaseWin_draw_facilities(uint8_t* self, int32_t flag) {
     Font font;
     Font_ctor(&font);
     UiRect old = c->clip;
-    UiRect pane = rect_at(kBwRectFacPane);
+    UiRect pane = base_win().rect_fac_pane;
     Buffer_set_clip(c, &pane);
     spot_kill_type(&g_bw.spots_win, 2);
     Font_init(&font, "Arial", ScreenWidth != 800 ? 12 : 10, 0);
     Buffer_box_sprite(c, &pane, box_def(3));
     StrBuffer[0] = 0;
-    UiRect t = rect_at(kBwRectFacTitle);
+    UiRect t = base_win().rect_fac_title;
     Buffer_box_sprite(c, &t, box_def(6));
     inset(&t, 3);
     Buffer_set_font(c, bw_font(), nullptr, nullptr, nullptr);
@@ -499,8 +498,8 @@ void THISCALL BaseWin_draw_facilities(uint8_t* self, int32_t flag) {
     Buffer_write_cent_l_7(c, StrBuffer, &t, (int32_t)std::strlen(StrBuffer));
     Buffer_set_font(c, &font, nullptr, nullptr, nullptr);
     Buffer_set_text_color(c, tc(0x8C6CFC), tc(0x8C6D00), 1, 1);
-    t = rect_at(kBwRectFacList);
-    if (g_bw.buttons[0x15].shown) t.bottom = bwf(kBwRectEditor + 4);
+    t = base_win().rect_fac_list;
+    if (g_bw.buttons[0x15].shown) t.bottom = base_win().rect_editor.top;
     Buffer_box_sprite(c, &t, box_def(0));
     inset(&t, 3);
     int32_t lh = line_h(&font);
@@ -523,7 +522,7 @@ void THISCALL BaseWin_draw_facilities(uint8_t* self, int32_t flag) {
         g_fac_bar.small = true;
         g_fac_bar.min = 0;
         g_fac_bar.max = count - 1;
-        g_fac_bar.pos = std::max(0, std::min(bwf(kBwB10), count - 1));
+        g_fac_bar.pos = std::max(0, std::min(base_win().fac_scroll, count - 1));
         g_fac_bar_page = rows - 1;
     }
     int32_t y = t.top, index = -1;
@@ -531,7 +530,7 @@ void THISCALL BaseWin_draw_facilities(uint8_t* self, int32_t flag) {
         int32_t fac = k == 0 ? 0x1A : (k == 0x1A ? 0 : k);
         if (!listed(fac)) continue;
         index++;
-        if (index < bwf(kBwB10) || index >= bwf(kBwB10) + rows) continue;
+        if (index < base_win().fac_scroll || index >= base_win().fac_scroll + rows) continue;
         StrBuffer[0] = 0;
         int32_t col = tc(0x8C6D44), sh = tc(0x8C6D48);
         if (fac < 0x46 && redundant(fac, faction)) {
@@ -599,7 +598,7 @@ struct ExpRow {
 void THISCALL BaseWin_draw_expenses(uint8_t* self, int32_t flag) {
     bool w1024 = ScreenWidth != 800;
     if (w1024) BaseWin_draw_energy_alloc(self, flag);
-    else if (bwf(0x1A1E4) && flag < 2) {
+    else if (base_win().energy_layout && flag < 2) {
         BaseWin_draw_energy_alloc(self, flag);
         return;
     }
@@ -608,7 +607,7 @@ void THISCALL BaseWin_draw_expenses(uint8_t* self, int32_t flag) {
     Font_ctor(&font);
     Font_init(&font, "Arial", 0xC, 1);
     UiRect old = c->clip;
-    UiRect pane = rect_at(kBwRectExpenses);
+    UiRect pane = base_win().rect_expenses;
     Buffer_set_clip(c, &pane);
     UiRect r{0x17, 0, 0x2BF, 0x194};
     Buffer_box_sprite(c, &r, box_def(9));
@@ -637,13 +636,14 @@ void THISCALL BaseWin_draw_expenses(uint8_t* self, int32_t flag) {
         {0x820, 0x8C6CC4, b.nutrient_intake_2, n_cost, b.nutrient_consumption, 0xBD20, 0xBD4C, ns, 0x8C6CCC},
         {0xA0, 0x8C6CD4, b.mineral_intake_2, m_cost, b.mineral_consumption, 0xBCC8, 0xBCF4, ms, 0x8C6CDC},
         {0x90, 0x8C6CB4, b.energy_intake_2, e_cost, b.energy_inefficiency, 0xBDA4, 0xBC9C, es, 0x8C6CBC}};
-    static const uint32_t kRowRects[3] = {0x40CCC, 0x40CDC, 0x40CBC};
+    static const uint32_t kRowRects[3] = {offsetof(BaseWindow, rect_exp[1]), offsetof(BaseWindow, rect_exp[2]),
+                                          offsetof(BaseWindow, rect_exp[0])};
     int32_t top = 0x107, eq_x = 0, minus_x = 0;
     bool deficit = false;
     for (int32_t k = 0; k < 3; k++, top += 0x15) {
         const ExpRow& row = rows[k];
         bw_rect(kRowRects[k]) = {0xA9, top, 0x2B8, top + 0x14};
-        UiRect lr{k == 0 && !w1024 ? 0xBF : (w1024 ? bwf(kBwRectExpenses) + 3 : 0xA9), top, 0x128, top + 0x14};
+        UiRect lr{k == 0 && !w1024 ? 0xBF : (w1024 ? base_win().rect_expenses.left + 3 : 0xA9), top, 0x128, top + 0x14};
         Buffer_box_sprite(c, &lr, box_def(6));
         inset(&lr, 3);
         Buffer_set_text_color(c, tc(row.color), tc(row.color + 4), 1, 1);
@@ -777,11 +777,11 @@ void THISCALL BaseWin_draw_energy_alloc(uint8_t* self, int32_t flag) {
     bool w1024 = ScreenWidth != 800;
     int32_t f = (uint8_t)cur_base().faction_id;
     UiRect old = c->clip;
-    UiRect pane = rect_at(kBwRectAlloc);
+    UiRect pane = base_win().rect_alloc;
     Buffer_set_clip(c, &pane);
     Font_init(&font, "Arial", 0xC, 1);
     Buffer_set_font(c, &font, nullptr, nullptr, nullptr);
-    const UiRect& cl = bw_rect(kBwClient);
+    const UiRect& cl = base_win().client;
     UiRect r{cl.left + 0x17, cl.top, cl.right - 0x37, cl.bottom};
     Buffer_box_sprite(c, &r, box_def(9));
     Buffer_box_sprite(c, &pane, box_def(3));
@@ -803,7 +803,7 @@ void THISCALL BaseWin_draw_energy_alloc(uint8_t* self, int32_t flag) {
     else if (econ_e > rem) econ_e = rem;
     int32_t labs_e = e - econ_e - psych_e;
     BASE& b = cur_base();
-    UiRect t{w1024 ? bwf(kBwRectAlloc) + 3 : 0xBF, row.top, row.right, row.bottom};
+    UiRect t{w1024 ? base_win().rect_alloc.left + 3 : 0xBF, row.top, row.right, row.bottom};
     Buffer_box_sprite(c, &t, box_def(6));
     inset(&t, 3);
     Buffer_set_text_color(c, tc(0x8C6CB4), tc(0x8C6CB8), 1, 1);
@@ -818,10 +818,12 @@ void THISCALL BaseWin_draw_energy_alloc(uint8_t* self, int32_t flag) {
         uint32_t color, label, rect;
         int32_t pct, energy, bonus, total;
         bool stockpile;
-    } rows[3] = {{0x8C6D5C, 0x5B8, 0x40D0C, econ, econ_e, b.economy_total - econ_e, b.economy_total,
-                  b.queue_items[0] == -0x45 && b.mineral_surplus > 0},
-                 {0x8C6D64, 0xF0, 0x40CFC, labs, labs_e, b.labs_total - labs_e, b.labs_total, false},
-                 {0x8C6D6C, 0x4F8, 0x40CEC, psych, psych_e, b.psych_total - psych_e, b.psych_total, false}};
+    } rows[3] = {
+        {0x8C6D5C, 0x5B8, offsetof(BaseWindow, rect_exp[5]), econ, econ_e, b.economy_total - econ_e, b.economy_total,
+         b.queue_items[0] == -0x45 && b.mineral_surplus > 0},
+        {0x8C6D64, 0xF0, offsetof(BaseWindow, rect_exp[4]), labs, labs_e, b.labs_total - labs_e, b.labs_total, false},
+        {0x8C6D6C, 0x4F8, offsetof(BaseWindow, rect_exp[3]), psych, psych_e, b.psych_total - psych_e, b.psych_total,
+         false}};
     for (const Row& rw : rows) {
         row.top += 0x15;
         row.bottom += 0x15;
@@ -946,7 +948,7 @@ void THISCALL BaseWin_draw_production(uint8_t* self, int32_t flag) {
     Font_ctor(&fa);
     Font_ctor(&fb);
     UiRect old = c->clip;
-    UiRect pane = rect_at(kBwRectQueueMI);
+    UiRect pane = base_win().rect_queue_mi;
     UiRect all{0, 0, c->width, c->height};
     Buffer_set_clip(c, &all);
     BoxDef box = *box_def(3);
@@ -954,14 +956,14 @@ void THISCALL BaseWin_draw_production(uint8_t* self, int32_t flag) {
     box.corner[3] = nullptr;
     UiRect r = pane;
     Buffer_box_sprite(c, &r, &box);
-    const UiRect& q = bw_rect(kBwRectQueueBoxMI);
+    const UiRect& q = base_win().rect_queue_box_mi;
     r = {q.left - 5, q.top + 5, q.right - 5, q.bottom + 5};
     box.corner[0] = nullptr;
     box.edge[0] = nullptr;
     box.corner[1] = nullptr;
     Buffer_box_sprite(c, &r, &box);
     {
-        const UiRect &a = bw_rect(kBwRectChangeMI), &b = bw_rect(kBwRectHurryMI);
+        const UiRect &a = base_win().rect_change_mi, &b = base_win().rect_hurry_mi;
         r = {std::min(a.left, b.left) - 3, std::min(a.top, b.top) - 3, std::max(a.right, b.right) + 3,
              std::max(a.bottom, b.bottom) + 3};
         static Sprite blank;
@@ -1057,7 +1059,7 @@ void THISCALL BaseWin_draw_production(uint8_t* self, int32_t flag) {
             scene.count = 0;
             vehdraw_construct_vehicle(fake, &scene);
             Scene_set_scale(&scene, (float)((double)wide * 0.0007));
-            Scene_set_rotation(&scene, (float)((double)(bwf(0x1E670) + 0x1E) * 0.017444445), 0.0f, 0.0f);
+            Scene_set_rotation(&scene, (float)((double)(base_win().model_turn + 0x1E) * 0.017444445), 0.0f, 0.0f);
             Scene_render(&scene, c, cx, cy, 0);
         }
         r.top += 0x41;
@@ -1193,7 +1195,7 @@ void THISCALL BaseWin_draw_queue(uint8_t* self, int32_t flag) {
     Font_ctor(&f1);
     Font_ctor(&f2);
     UiRect old = c->clip;
-    UiRect pane = rect_at(kBwRectQueueBoxMI);
+    UiRect pane = base_win().rect_queue_box_mi;
     Buffer_set_clip(c, &pane);
     Buffer_box_sprite(c, &pane, box_def(3));
     bool w800 = ScreenWidth == 800;
@@ -1202,7 +1204,7 @@ void THISCALL BaseWin_draw_queue(uint8_t* self, int32_t flag) {
     Font_init(&f2, "Arial", w800 ? 8 : 10, 0);
     f2.field_0 = 4;
     spot_kill_type(&g_bw.spots_iface, 8);
-    UiRect t = rect_at(kBwRectQueueListMI);
+    UiRect t = base_win().rect_queue_list_mi;
     Buffer_box_sprite(c, &t, box_def(6));
     inset(&t, 3);
     Buffer_set_font(c, bw_font(), nullptr, nullptr, nullptr);
@@ -1212,7 +1214,7 @@ void THISCALL BaseWin_draw_queue(uint8_t* self, int32_t flag) {
     upper(StrBuffer);
     Buffer_write_cent_l_7(c, StrBuffer, &t, (int32_t)std::strlen(StrBuffer));
     Buffer_set_font(c, &f1, nullptr, nullptr, nullptr);
-    t = rect_at(kBwRectQueueList2MI);
+    t = base_win().rect_queue_list2_mi;
     Buffer_box_sprite(c, &t, box_def(0));
     int32_t pad = w800 ? 5 : 2;
     t.right -= 5;
@@ -1223,10 +1225,10 @@ void THISCALL BaseWin_draw_queue(uint8_t* self, int32_t flag) {
         int32_t lh = line_h(&f1);
         UiRect row{t.left, y, t.right, y + lh};
         spot_add(&g_bw.spots_iface, slot + 2, 8, row.left, row.top, row.right - row.left, row.bottom - row.top);
-        if (bwf(kBwQueueSel) == slot)
+        if (base_win().queue_sel == slot)
             Buffer_tile(c, box_def(29)->center, row.left, row.top, row.left, row.top, row.right - row.left,
                         row.bottom - row.top);
-        else if (bwf(0x40B30) == slot)
+        else if (base_win().queue_hilite == slot)
             Buffer_tile(c, box_def(27)->center, row.left, row.top, row.left, row.top, row.right - row.left,
                         row.bottom - row.top);
         StrBuffer[0] = 0;
@@ -1242,7 +1244,7 @@ void THISCALL BaseWin_draw_queue(uint8_t* self, int32_t flag) {
             int32_t item = cur_base().queue_items[slot];
             crt_strcat(name, item < 0 ? Strings_get(&StringTable, Facility[-item].name) : Units[item].name);
         }
-        if (bwf(kBwQueueSel) == slot || bwf(0x40B30) == slot) Buffer_set_text_color(c, 0x41, -1, 1, 1);
+        if (base_win().queue_sel == slot || base_win().queue_hilite == slot) Buffer_set_text_color(c, 0x41, -1, 1, 1);
         const char* n = name;
         if (GameLanguage == 0 && !std::strncmp(name, "The ", 4)) n = name + 4;
         cat(n);
@@ -1427,7 +1429,7 @@ void THISCALL pfncDrawCityMap(uint8_t* self, int32_t flag) {
     load_resource_icons();
     Buffer* c = bwc();
     UiRect old = c->clip;
-    UiRect m = rect_at(kBwRectMap);
+    UiRect m = base_win().rect_map;
     UiRect r = m;
     Buffer_set_clip(c, &r);
     Buffer_box_sprite(c, &m, box_def(15));
@@ -1435,7 +1437,7 @@ void THISCALL pfncDrawCityMap(uint8_t* self, int32_t flag) {
     Buffer_fill_3(c, &r, 0x41);
     spot_kill_type(&g_bw.spots_win, 0);
     spot_add(&g_bw.spots_win, 0, 0, m.left, m.top, m.right - m.left, m.bottom - m.top);
-    int32_t mode = bwf(kBwPane);
+    int32_t mode = base_win().pane;
     bool psych = flag < 2 ? mode == 1 : flag == 2;
     bool support = flag < 2 ? mode == 2 : flag == 3;
     if (psych || support) {
@@ -1448,7 +1450,7 @@ void THISCALL pfncDrawCityMap(uint8_t* self, int32_t flag) {
         int32_t y0 = q * 6 + 4 + m.top;
         int32_t q2 = q * 2;
         uint8_t* city = mem::host(0x7D4060);
-        int32_t& elev = *reinterpret_cast<int32_t*>(city + kMwElevScale);
+        int32_t& elev = map_win(city).elev_scale;
         elev = 0;
         ZoomNum = 1;
         ZoomDenom = 1;
@@ -1630,7 +1632,7 @@ void THISCALL BaseWin_draw_psych(uint8_t* self, int32_t) {
     Buffer* c = bwc();
     Font font;
     Font_ctor(&font);
-    UiRect m = rect_at(kBwRectMap);
+    UiRect m = base_win().rect_map;
     Buffer_set_clip(c, &m);
     Buffer_fill_3(c, &m, 0);
     Font_init(&font, "Arial", 0xC, 1);
@@ -1684,7 +1686,7 @@ void THISCALL BaseWin_draw_psych(uint8_t* self, int32_t) {
 void THISCALL BaseWin_draw_support(uint8_t* self, int32_t) {
     static Buffer canvas;
     Buffer* c = bwc();
-    UiRect m = rect_at(kBwRectMap);
+    UiRect m = base_win().rect_map;
     UiRect saved = c->clip;
     Buffer_set_clip(c, &m);
     Buffer_fill_3(c, &m, 0);
@@ -1698,11 +1700,11 @@ void THISCALL BaseWin_draw_support(uint8_t* self, int32_t) {
         Buffer_init(&canvas, w, h, 8, 0);
         ui_mapwin_attach(map, kMapWinVBase, &canvas);
     }
-    mw(map, 0x1DD74) = 1;
-    mw(map, kMwOptions) = (int32_t)0x80000082;
-    mw(map, kMwZoom) = -7;
-    mw(map, kMwElevScale) = 0x19 >> 1;
-    mw(map, kMwOptions) = 0x200402;
+    map_win(map).active = 1;
+    map_win(map).options = (int32_t)0x80000082;
+    map_win(map).zoom = -7;
+    map_win(map).elev_scale = 0x19 >> 1;
+    map_win(map).options = 0x200402;
     int32_t zoom = 2, step_w = 900, step_h = 0x1C2, half_x = MapAreaX / 2;
     do {
         int32_t tw = ZoomNum < 1 ? step_w / 16 : ZoomNum * 0x32 / ZoomDenom;
@@ -1714,9 +1716,9 @@ void THISCALL BaseWin_draw_support(uint8_t* self, int32_t) {
         step_w -= 0x32;
         step_h -= 0x19;
     } while (step_w > 0x32);
-    mw(map, kMwZoom) = zoom;
-    mw(map, kMwCenterX) = Bases[CurrentBaseID].x;
-    mw(map, kMwCenterY) = Bases[CurrentBaseID].y;
+    map_win(map).zoom = zoom;
+    map_win(map).center_x = Bases[CurrentBaseID].x;
+    map_win(map).center_y = Bases[CurrentBaseID].y;
     pfncRedrawMap(map, 1);  // vtable +0xF8
     Buffer_copy_4(&canvas, c, 0, 0, (m.right - m.left) / 2 - w / 2 + m.left, (m.bottom - m.top) / 2 - h / 2 + m.top, w,
                   h);
@@ -1735,7 +1737,7 @@ void THISCALL BaseWin_draw_pop(uint8_t* self, int32_t flag) {
         seed = seed * 0x19660D + 0x3C6EF35F;
         return (int32_t)(((uint32_t)(hi - lo) * (seed & 0xFFFF)) >> 16) + lo;
     };
-    UiRect pane = rect_at(kBwRectPopMI);
+    UiRect pane = base_win().rect_pop_mi;
     UiRect old = c->clip;
     Buffer_set_clip(c, &pane);
     Buffer_box_sprite(c, &pane, box_def(3));
@@ -1836,12 +1838,12 @@ void THISCALL BaseWin_draw_supported(uint8_t* self, int32_t flag) {
     Font font;
     Font_ctor(&font);
     UiRect old = c->clip;
-    UiRect pane = rect_at(kBwRectProdPaneMI);
+    UiRect pane = base_win().rect_prod_pane_mi;
     Buffer_set_clip(c, &pane);
     Buffer_box_sprite(c, &pane, box_def(3));
     Font_init(&font, "Arial", 10, 1);
     spot_kill_type(&g_bw.spots_iface, 7);
-    UiRect t = rect_at(kBwRectProdMI);
+    UiRect t = base_win().rect_prod_mi;
     Buffer_box_sprite(c, &t, box_def(6));
     inset(&t, 3);
     Buffer_set_font(c, bw_font(), nullptr, nullptr, nullptr);
@@ -1851,7 +1853,7 @@ void THISCALL BaseWin_draw_supported(uint8_t* self, int32_t flag) {
     upper(StrBuffer);
     Buffer_write_cent_l_7(c, StrBuffer, &t, (int32_t)std::strlen(StrBuffer));
     Buffer_set_font(c, &font, nullptr, nullptr, nullptr);
-    UiRect r = rect_at(kBwRectProd2MI);
+    UiRect r = base_win().rect_prod2_mi;
     Buffer_box_sprite(c, &r, box_def(0));
     inset(&r, 3);
     int32_t f = (uint8_t)cur_base().faction_id;
@@ -1881,16 +1883,16 @@ void THISCALL BaseWin_draw_supported(uint8_t* self, int32_t flag) {
         x0 = (r.right - (count < cols ? count : cols) * cw - r.left - 0xC) / 2;
         // A scroll bar (scroll_small) at the right edge, range 0 .. rows - 1 (BaseWin_draw_supported:
         // Scroll_init_2 on the main interface).
-        bwf(0x40B20) = 1;
+        base_win().sup_bar = 1;
         g_sup_bar_shown = true;
         g_sup_bar.r = {r.right - 0xF, r.top, r.right, r.bottom};
         g_sup_bar.small = true;
         g_sup_bar.min = 0;
         g_sup_bar.max = (count + cols - 1) / cols - 1;
-        g_sup_bar.pos = std::max(0, std::min(bwf(kBwB14), g_sup_bar.max));
+        g_sup_bar.pos = std::max(0, std::min(base_win().sup_scroll, g_sup_bar.max));
     } else {
         x0 = (r.right - (count < cols ? count : cols) * cw - r.left) / 2;
-        bwf(0x40B20) = 0;
+        base_win().sup_bar = 0;
         g_sup_bar_shown = false;
     }
     x0 += r.left;
@@ -1899,7 +1901,8 @@ void THISCALL BaseWin_draw_supported(uint8_t* self, int32_t flag) {
     for (int32_t i = 0; i < VehCount; i++) {
         if (Vehs[i].faction_id != (uint32_t)f || Vehs[i].home_base_id != CurrentBaseID) continue;
         k++;
-        if (bwf(0x40B20) && !(bwf(kBwB14) * cols <= k && k < (bwf(kBwB14) + rows) * cols)) continue;
+        if (base_win().sup_bar && !(base_win().sup_scroll * cols <= k && k < (base_win().sup_scroll + rows) * cols))
+            continue;
         veh_draw(c, i, x, y, -6, 0x48, 0);
         if (ZoomNum < 1) {
             BlitDestScale = 10;
@@ -1920,7 +1923,7 @@ void THISCALL BaseWin_draw_supported(uint8_t* self, int32_t flag) {
     }
     BlitDestScale = 1;
     BlitSourceScale = 1;
-    if (bwf(0x40B20) && g_sup_bar_shown) scroll_draw(c, g_sup_bar);
+    if (base_win().sup_bar && g_sup_bar_shown) scroll_draw(c, g_sup_bar);
     Buffer_set_clip(c, &old);
     (void)flag;
     ui_invalidate();
@@ -1933,7 +1936,7 @@ void THISCALL BaseWin_draw_garrison(uint8_t* self, int32_t flag) {
     Font font;
     Font_ctor(&font);
     UiRect old = c->clip;
-    UiRect pane = rect_at(kBwRectGarrisonMI);
+    UiRect pane = base_win().rect_garrison_mi;
     Buffer_set_clip(c, &pane);
     Font_init(&font, "Arial", 0xC, 0);
     int32_t lh = line_h(&font);
@@ -1952,8 +1955,8 @@ void THISCALL BaseWin_draw_garrison(uint8_t* self, int32_t flag) {
         if (per < count) {
             // The main interface's stack arrows (buttons 0x3F0 / 0x3F2) at both ends of the pane;
             // the cells share the width between them.
-            r.left = mif(0xAC4) + 1;
-            r.right = mif(0xACC) - 1;
+            r.left = main_interface().rect_abc.right + 1;
+            r.right = main_interface().arrow_right.left - 1;
             cw = (r.right - r.left) / per - 5;
             g_garrison_arrows = true;
         } else {

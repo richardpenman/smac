@@ -534,7 +534,7 @@ void DatalinkState::redraw() {
     Buffer_set_clip(c, &all);
     sw_restore_iface(this);
     // The quote in the main interface's centre pane.
-    UiRect pc = mi_rect(kMiPaneCenter);
+    UiRect pc = main_interface().pane_center;
     UiRect b{pc.left + 3, pc.top + 3, pc.right - 3, pc.bottom - 6};
     Buffer_set_clip(&mi, &b);
     Buffer_set_font(&mi, find_font(0xC, 0), find_font(0xC, 1), find_font(0xC, 2), nullptr);
@@ -668,7 +668,7 @@ void THISCALL Datalink_exec(uint8_t*, int32_t cat, int32_t id) {
     sw_init(&w, X, Y, 0x340, H, true);
     // The category buttons: 0..7 in the left pane (top to bottom), 8..15 in the right pane (bottom to
     // top), 0x18 pixels apart from the pane's bottom.
-    UiRect q = mi_rect(kMiPaneQueue), p = mi_rect(kMiPaneRight);
+    UiRect q = main_interface().pane_queue, p = main_interface().pane_right;
     Font* bf = find_font(0xA, 1);
     for (int32_t k = 0; k < 16; k++) {
         const UiRect& pane = k < 8 ? q : p;

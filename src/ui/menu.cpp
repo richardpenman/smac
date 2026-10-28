@@ -273,7 +273,7 @@ int32_t column_x() { return ScreenWidth == 800 ? 0 : (ScreenWidth - 0x400) / 2; 
 int32_t column_h() { return g_art.top.full_height + g_art.button[0].full_height * (int32_t)g_menus.size(); }
 // AlphaMenu_adjust: the column's top (its bottom on the main interface's top).
 int32_t column_y() {
-    const UiRect& pos = mi_rect(kMiPos);
+    const UiRect& pos = main_interface().pos;
     return (pos.top - pos.bottom) - column_h() + ScreenHeight;
 }
 

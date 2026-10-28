@@ -487,7 +487,7 @@ void ReportScreen::iface_ops() {
     // best base per sort key (the list box of ReportIf_draw_ops); a click on a line sorts.
     if (!ops_best) return;
     Buffer* m = &mi;
-    UiRect p = mi_rect(kMiPaneQueue);
+    UiRect p = main_interface().pane_queue;
     int32_t y = p.top + 0x23, lh = f_small->height + 2;
     UiRect r{p.left + 9, y, p.right - 9, p.bottom - 6};
     Buffer_box_sprite(m, &r, box_def(0));
@@ -587,7 +587,7 @@ void ReportScreen::iface_labs() {
     UiRect all{0, 0, m->width, m->height};
     // The left pane: the tabs' bar, the list's box and the list (Dialog_init_3, font 12, 0x99;
     // labs_write: the category part in the technology's colour).
-    UiRect p = mi_rect(kMiPaneQueue);
+    UiRect p = main_interface().pane_queue;
     int32_t x = p.left + 6, y = p.top + 6, w = (p.right - p.left) - 12, h = (p.bottom - p.top) - 12;
     UiRect r{x, y, x + w, y + 0x1A};
     Buffer_box_sprite(m, &r, box_def(3));
@@ -632,7 +632,7 @@ void ReportScreen::iface_labs() {
     list_draw(m, 1, lr, rows, labs_tab ? labs_tree_tech() : -1, -1, labs_top, 4, "labs list",
               labs_tab ? +[](int32_t id) { return mandate_color(tech_category(id)); } : nullptr);
     // The centre pane: the title and the summary.
-    UiRect c = mi_rect(kMiPaneCenter);
+    UiRect c = main_interface().pane_center;
     bool wide = ScreenWidth != 800;  // ReportIf + 0x1E230
     int32_t cx = c.left + (wide ? 0x4C : 0), cw = (c.right - (wide ? 0x4C : 0)) - c.left, cy = c.top;
     Buffer_set_font(m, f14, find_font(14, 2), find_font(14, 1), nullptr);
@@ -664,7 +664,7 @@ void ReportScreen::iface_labs() {
     state.push_back("labs cost " + num(cost) + " accumulated " + num(f.tech_accumulated) + " per turn " + per);
     // The right pane: the title box, then per category its bar (known / defined technologies) and
     // its name with the percentage.
-    UiRect q = mi_rect(kMiPaneRight);
+    UiRect q = main_interface().pane_right;
     x = q.left + 6;
     y = q.top + 6;
     w = (q.right - q.left) - 12;
@@ -946,10 +946,10 @@ void ReportScreen::iface_energy() {
         if (g_energy_subject > 0x3FF) bsel = g_energy_subject;
         else bpos = 0;
     }
-    pane(mi_rect(kMiPaneQueue), "[" + std::string(label_get(0x2F8 / 4)) + " " + label_get(0xB98 / 4) + "]", bases, bsel,
-         bpos, energy_itop[0], 6, "energy bases");
+    pane(main_interface().pane_queue, "[" + std::string(label_get(0x2F8 / 4)) + " " + label_get(0xB98 / 4) + "]", bases,
+         bsel, bpos, energy_itop[0], 6, "energy bases");
     // The centre pane.
-    UiRect c = mi_rect(kMiPaneCenter);
+    UiRect c = main_interface().pane_center;
     bool wide = ScreenWidth != 800;
     int32_t cx = c.left + (wide ? 0x4C : 0), cw = (c.right - (wide ? 0x4C : 0)) - c.left, cy = c.top;
     Buffer_set_font(m, find_font(14, 0), find_font(14, 2), find_font(14, 1), nullptr);
@@ -974,7 +974,7 @@ void ReportScreen::iface_energy() {
                         (half ? num(mt / 2) + ((mt & 1) ? ".5" : "") : num(mt)) + label_get(0x5EC / 4);
         facs.push_back({s, i});
     }
-    pane(mi_rect(kMiPaneRight), "[" + std::string(label_get(0xF08 / 4)) + "]", facs,
+    pane(main_interface().pane_right, "[" + std::string(label_get(0xF08 / 4)) + "]", facs,
          g_energy_base ? -1 : g_energy_subject, -1, energy_itop[1], 7, "energy facilities");
     state.push_back("energy reserves " + num(f.energy_credits) + " maintenance " + num(f.facility_maint_total) +
                     " net " + num(FactionCurrentNetIncome) + " subject " + num(g_energy_subject) + " base " +
@@ -1354,7 +1354,7 @@ void ReportScreen::iface_sat() {
     for (BaseButton* b : sat_type)
         if (b) b->shown = false;
     for (int32_t side = 0; side < 2; side++) {
-        const UiRect p = mi_rect(side ? kMiPaneRight : kMiPaneQueue);
+        const UiRect p = (side ? main_interface().pane_right : main_interface().pane_queue);
         int32_t x = p.left + 6, y = p.top + 6, w = (p.right - p.left) - 12, h = (p.bottom - p.top) - 12;
         UiRect clip = p;
         Buffer_set_clip(m, &clip);
@@ -1536,7 +1536,7 @@ void ReportScreen::draw_security() {
 
 void ReportScreen::iface_security() {
     Buffer* m = &mi;
-    UiRect p = mi_rect(kMiPaneQueue);
+    UiRect p = main_interface().pane_queue;
     UiRect r{p.left + 6, p.top + 6, p.right - 6, p.bottom - 6};
     Buffer_box_sprite(m, &r, box_def(3));
     int32_t y = r.top + 6, lh = f_small->height + 4;
@@ -1679,7 +1679,7 @@ void ReportScreen::redraw() {
         // The centre pane's header (ReportIf_draw_*): the report, M.Y.; base operations: the
         // energy reserves.
         static const uint32_t names[9] = {0xAE0, 0, 0xAC4, 0xA98, 0xACC, 0xAD0, 0xAD4, 0xAD8, 0xADC};
-        UiRect cp = mi_rect(kMiPaneCenter);
+        UiRect cp = main_interface().pane_center;
         int32_t k = kind() >= 0 && kind() <= 8 ? kind() : 0;
         std::string h = up(adj(faction)) + " " + up(sw_label(names[k])) + ",  " + sw_label(0xB68) + " " +
                         num(game_year(CurrentTurn));
@@ -1900,7 +1900,7 @@ void ReportScreen::on_click(int32_t parent, int32_t index, int32_t type, int32_t
         std::fprintf(stderr, "Reports %s click garrison: base %d unit %d\n", right ? "right" : "left", base_id, type);
         BaseWin_soft_zoom(&BaseWin, base_id);
         // (The menu at the click: the coordinates as the main interface's, which the function maps.)
-        const UiRect& mp = mi_rect(kMiPos);
+        const UiRect& mp = main_interface().pos;
         BaseWin_garrison_click(&BaseWin, type, x + this->x - mp.left, y + this->y - mp.top, right ? 1 : 0);
         return;
     }
@@ -2046,7 +2046,7 @@ void locator_step() {
     static const int8_t kFrame[12] = {0, 0, 1, 2, 3, 2, 3, 2, 1, 0, 0, -1};  // steps -1 .. 10
     int32_t fr = kFrame[g_bl + 1];
     if (fr >= 0 && g_dots[fr].width) {
-        UiRect pane = mi_rect(0xCFC);
+        UiRect pane = main_interface().world_map;
         BlitDestScale = BlitSourceScale = 1;
         pfncSpriteStretchCopyToCanvas(&g_dots[fr], &g_rs.mi, g_dots[fr].key, pane.left + g_bl_x, pane.top + g_bl_y);
     }
@@ -2134,7 +2134,7 @@ void open_reports(int32_t k) {
     s->f_text = find_font(12, 0);
     s->f_small = find_font(12, 0);
     sw_clear_buttons(s);
-    const UiRect& b = mi_rect(kMiPaneBottom);
+    const UiRect& b = main_interface().pane_bottom;
     int32_t y = ((b.bottom + b.top) - 0x24) / 2;
     for (int32_t i = 0; i < 7; i++) {
         BaseButton* bt = sw_button(s, nullptr, i + 2, b.left + 0x11 + i * (0x1E + 12), y, 0x1E, 0x24, 1, s->f_small);
@@ -2168,7 +2168,7 @@ void open_reports(int32_t k) {
     // satellites or Facility 41 bases), the kinds in the right pane (placed by iface_sat), ATTACK
     // (label 0xCB8, boxes 47 / 46 / 45) under the view button 0xD3D at the panel's bottom.
     {
-        const UiRect& lp = mi_rect(kMiPaneQueue);
+        const UiRect& lp = main_interface().pane_queue;
         int32_t tx = lp.left + 9, tw = (lp.right - lp.left) - 0x12, ty = lp.top + 0x20;
         for (int32_t f = 0; f < 8; f++) s->sat_target[f] = nullptr;
         for (int32_t f = 1; f < 8; f++) {
@@ -2206,7 +2206,7 @@ void open_reports(int32_t k) {
     sw_button(s, up(sw_label(0xA64)).c_str(), 9, cx + 1, in.bottom + 7, cx - dl - 1, 0x14, 0, s->f_bold);
     // Base operations' main interface: the GOVERNOR / BEST BASES tabs and the governor buttons.
     s->ops_iface.clear();
-    const UiRect& q = mi_rect(kMiPaneQueue);
+    const UiRect& q = main_interface().pane_queue;
     int32_t gx = q.left + 9, gw = (q.right - q.left) - 0x12;
     s->ops_iface.push_back(
         sw_button(s, up(sw_label(0x7B8)).c_str(), 0xD0A, gx, q.top + 9, gw / 2 - 1, 0x14, 1, s->f_bold));

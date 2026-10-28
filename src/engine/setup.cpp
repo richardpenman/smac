@@ -712,8 +712,8 @@ int32_t GAMEAPI setup_player(int32_t faction_id, int32_t killer_id, int32_t forc
         F.unk_27 = F.tech_ranking * 3 / 4;
     }
     if (f == CurrentPlayerFaction) {
-        mapwin_field(MapWins[0], 0x1DD9C) = x;
-        mapwin_field(MapWins[0], 0x1DDA0) = y;
+        map_win(MapWins[0]).center_x = x;
+        map_win(MapWins[0]).center_y = y;
         for (int32_t i = 0; i < 32; i++) {
             MapWinCursorX[i] = x;
             MapWinCursorY[i] = y;
@@ -1538,7 +1538,7 @@ void GAMEAPI crash_landing(int32_t faction_id) {
         crt_strcpy(game().bases[base_id].name, ParseStrBuffer[0]);
         make_base_unique(base_id);
     }
-    mapwin_field(MapWins[0], 0x1DD70) |= 0x8C0;
+    map_win(MapWins[0]).options |= 0x8C0;
     draw_map(1);
     flush_input();
     ui_crash_landing_close();

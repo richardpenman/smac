@@ -343,8 +343,8 @@ UiRect model_rect(int32_t cat, int32_t m) {
 
 // The allocation columns (main interface coordinates): economy, psych, labs.
 UiRect alloc_rect(int32_t i) {
-    const UiRect& q = mi_rect(kMiPaneQueue);
-    const UiRect& b = mi_rect(kMiPaneBottom);
+    const UiRect& q = main_interface().pane_queue;
+    const UiRect& b = main_interface().pane_bottom;
     int32_t left = q.left + 7, top = b.top + 7, bottom = b.bottom - 7;
     int32_t r0 = ((b.right - left) - 4) / 3 - 3 + left;  // ((7af5d8 - left) - 4) / 3 - 3 + left
     int32_t step = r0 - left + 3;
@@ -415,7 +415,7 @@ void SocialWinState::redraw() {
     UiRect mall{0, 0, m->width, m->height};
     Buffer_set_clip(m, &mall);
     // Left pane top (FUN_004af8c0): the faction and its leader.
-    const UiRect& q = mi_rect(kMiPaneQueue);
+    const UiRect& q = main_interface().pane_queue;
     UiRect lead{q.left + 4, q.top + 4, q.right - 4, alloc_rect(0).top - 6};
     Buffer_box_sprite(m, &lead, box_def(3));
     sw_font(m, font_title, 0x9F);
@@ -427,7 +427,7 @@ void SocialWinState::redraw() {
     UiRect l3{lead.left, l2.bottom, lead.right, l2.bottom + 20};
     sw_text_cent(this, m, std::to_string(fac(faction).energy_credits) + " " + sw_label(0x57C), l3);
     // Centre pane (FUN_004afb60): net income, breakthroughs, the allocation's inefficiency, upheaval.
-    UiRect sp = inset(mi_rect(kMiPaneCenter), 4);
+    UiRect sp = inset(main_interface().pane_center, 4);
     UiRect st{sp.left, sp.top, sp.right, sp.top + 0x14};
     Buffer_box_sprite(m, &st, box_def(6));
     sw_font(m, font_title, 0x9C);
@@ -477,7 +477,7 @@ void SocialWinState::redraw() {
         }
     }
     // Right pane (FUN_004b0410): SOCIAL EFFECTS, the value and SOCIO's text for it.
-    UiRect ep = inset(mi_rect(kMiPaneRight), 4);
+    UiRect ep = inset(main_interface().pane_right, 4);
     UiRect et{ep.left + 3, ep.top + 3, ep.right - 3, ep.top + 0x17};
     Buffer_box_sprite(m, &ep, box_def(3));
     Buffer_box_sprite(m, &et, box_def(6));
@@ -673,14 +673,14 @@ void socialwin_point(int32_t which, int32_t* x, int32_t* y) {
     else if (which == 22) r = {0x1E4, 0x13A, 0x286, 0x14E};
     else if (which == 23) r = {0x13F, 0x13A, 0x1E1, 0x14E};
     else if (which == 24) r = {0x9A, 0x13A, 0x13C, 0x14E};
-    else if (which == 30) r = inset(mi_rect(kMiPaneRight), 4);
+    else if (which == 30) r = inset(main_interface().pane_right, 4);
     else if (which >= 31 && which <= 33) r = alloc_rect(which - 31);
-    else if (which == 34) r = inset(mi_rect(kMiPaneCenter), 4);
+    else if (which == 34) r = inset(main_interface().pane_center, 4);
     *x = (r.right - r.left) / 2 + r.left;
     *y = (r.bottom - r.top) / 2 + r.top;
     if (iface) {
-        *x += mi_rect(kMiPos).left;
-        *y += mi_rect(kMiPos).top;
+        *x += main_interface().pos.left;
+        *y += main_interface().pos.top;
     } else {
         *x += g_sw.x;
         *y += g_sw.y;

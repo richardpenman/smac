@@ -199,7 +199,7 @@ namespace {
 // (the viewer's or a faction spied on: credits less the hurry costs paid this turn) and the power
 // (Might by ranking).
 void draw_info(Buffer* s, int32_t ox, int32_t oy) {
-    UiRect c = mi_rect(kMiPaneCenter2);
+    UiRect c = main_interface().pane_center2;
     int32_t l = c.left + 7 + ox, t = c.top + 7 + oy, r = c.right - 7 + ox, b = c.bottom - 7 - 0x17 + oy;
     int32_t half = ((r - l) + 3) / 2 - 3 + l;
     bool w800 = ScreenWidth == 800;
@@ -335,12 +335,12 @@ bool g_btn_ready = false;
 int32_t g_hq = 0;  // +0x4208: HQINFO's state (BaseButton_set): the HQ pane shown
 
 UiRect btn_rect(int32_t id) {
-    UiRect c = mi_rect(kMiPaneCenter2);
+    UiRect c = main_interface().pane_center2;
     int32_t l = c.left + 7, r = c.right - 7, b = c.bottom - 7;
     int32_t half = ((r - l) + 3) / 2 - 3 + l, d = (half - l) + 3;
     if (id == 0) return {l, b - 0x14, half, b};
     if (id == 1) return {l + d, b - 0x14, half + d, b};
-    const UiRect R = mi_rect(kMiPaneRight), g1 = mi_rect(0xA8C), g2 = mi_rect(0xA9C);
+    const UiRect R = main_interface().pane_right, g1 = main_interface().globe2, g2 = main_interface().globe1;
     return {(R.right - g2.right) + R.left, g1.top, g1.left - 3, g1.bottom};
 }
 
@@ -373,7 +373,7 @@ void buttons_init() {
 // (NO HEADQUARTERS without one) and the faction's picture 30 (DiploPop +0x20C0) centred below.
 void draw_hq(Buffer* mi) {
     if (!g_hq) return;  // MainInterface_restore_back: the world map pane as usual
-    const UiRect R = mi_rect(kMiPaneRight);
+    const UiRect R = main_interface().pane_right;
     UiRect box{R.left + 4, R.top + 4, R.right - 4, btn_rect(2).top - 6 - 4};
     Buffer_box_sprite(mi, &box, box_def(0));
     UiRect t{box.left + 1, box.top + 1, box.right - 1, box.top + 0x15};
@@ -452,7 +452,7 @@ void diplowin_globe_clicked(int32_t id) {
 
 bool diplowin_iface_mouse(int32_t type, int32_t x, int32_t y) {
     if (g_faction < 0 || !g_btn_ready) return false;
-    const UiRect& pos = mi_rect(kMiPos);
+    const UiRect& pos = main_interface().pos;
     x -= pos.left;
     y -= pos.top;
     static int32_t pressed = -1;
@@ -475,7 +475,7 @@ bool diplowin_iface_mouse(int32_t type, int32_t x, int32_t y) {
     }
     if (type == UiInput::LUP) {
         for (int32_t i = 0; i < 2; i++) {
-            const UiRect& r = mi_rect(i ? 0xA9C : 0xA8C);
+            const UiRect& r = (i ? main_interface().globe1 : main_interface().globe2);
             if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) {
                 diplowin_globe_clicked(i ? 0x3EF : 0x3EE);
                 return true;

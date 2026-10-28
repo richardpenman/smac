@@ -8,6 +8,8 @@
 // by defining their functions in its own objects (src/headless/ui_headless_mapview.cpp explains the
 // mechanism). Keep declarations grouped by original class.
 #pragma once
+#include <cstddef>
+
 #include "engine/globals.h"
 
 // ---- map windows (MapWin, WorldWin) ----
@@ -27,10 +29,121 @@ void ui_mapwins_clear_terrain();
 // Marks every active map window for a full redraw and clears the altitude cache at (x, y)
 // (delete_landmark).
 void ui_mapwins_clear_alt(int32_t x, int32_t y);
-// Map window state stored in savegames (save module: game_io, load_daemon, load_map_daemon).
-// MapWin fields by byte offset of the original class (UI objects, opaque otherwise).
-inline int32_t& mapwin_field(uint8_t* win, uint32_t offset) { return *reinterpret_cast<int32_t*>(win + offset); }
-constexpr uint32_t kMapWinActive = 0x1DD74;  // non-zero while the window is in use
+// MapWin (vtable 0x669D48 .. ; ui 0x4626E0..0x4712D0): a map view, a UI object. The main view is
+// MainConsole (a Console, ui/console.h); the others are MapWins[1..7] and WorldMapWin. The objects
+// live in the memory image (or, for the windows smacx owns, in native buffers of the same
+// layout), so this is a view of their integer fields at the original's offsets; the GraphicWin
+// virtual base follows at +0x21A6C (a Console's at +0x23D94). Savegames hold six of the fields
+// (game_io). What the original keeps behind pointers (the canvas, the per-tile terrain cache at
+// +4) is native (ui/mapwin.h MapWinNative).
+struct MapWin {
+    int32_t vbtable;  // +0x0: the virtual base table (not used natively)
+    int32_t tile_cache;  // +0x4: per-tile terrain cache pointer (native: MapWinNative)
+    int32_t unk_8;  // +0x8: set to 99999 after a fixed-zoom terrain draw (MapWin_gen_terrain_poly)
+    uint8_t unk_c[0x1DD6C - 0xC];
+    int32_t elev_scale;  // +0x1DD6C: corner height step: 25 (8 with "flat terrain")
+    int32_t options;  // +0x1DD70: display option bits (MapWinOptions for the main view)
+    int32_t active;  // +0x1DD74: non-zero while the window is in use
+    int32_t index;  // +0x1DD78: index in MapWins (0: main view, 1: world map)
+    int32_t right_count;  // +0x1DD7C
+    int32_t tracking;  // +0x1DD80: mouse-over tracking active
+    int32_t group_drag;  // +0x1DD84: the drag moves the stack (Console_group)
+    int32_t ignore_click;  // +0x1DD88: the next click is ignored (set by go_reset)
+    int32_t edit_paint;  // +0x1DD8C: scenario editor: a drag paints (1 left, 2 right; 4: no redraw)
+    int32_t edit_x;  // +0x1DD90: scenario editor: the tile last painted
+    int32_t edit_y;  // +0x1DD94
+    int32_t zoom;  // +0x1DD98: zoom step (0: normal; < 0: smaller)
+    int32_t center_x;  // +0x1DD9C
+    int32_t center_y;  // +0x1DDA0
+    int32_t origin_x;  // +0x1DDA4: tile at the top-left of the view
+    int32_t origin_y;  // +0x1DDA8
+    int32_t pixel_x;  // +0x1DDAC: pixel offset of the view (map narrower than the window)
+    int32_t pixel_y;  // +0x1DDB0
+    int32_t tile_w;  // +0x1DDB4: 8q
+    int32_t tile_h;  // +0x1DDB8: 4q
+    int32_t half_w;  // +0x1DDBC: 4q
+    int32_t half_h;  // +0x1DDC0: 2q
+    int32_t quarter_w;  // +0x1DDC4: 2q
+    int32_t q;  // +0x1DDC8: the zoom unit
+    int32_t cols_odd;  // +0x1DDCC: tiles per odd row
+    int32_t rows_above;  // +0x1DDD0
+    int32_t cols_even;  // +0x1DDD4: tiles per even row
+    int32_t rows_below;  // +0x1DDD8
+    int32_t unit_lift;  // +0x1DDDC: unit/base height above the terrain (option 2)
+    int32_t unit_lift2;  // +0x1DDE0
+    int32_t dest_x[5];  // +0x1DDE4: the go-to drag's path preview: points of its segments
+    int32_t dest_y[5];  // +0x1DDF8
+    int32_t drag_x;  // +0x1DE0C: tile under the drag (-1: none)
+    int32_t drag_y;  // +0x1DE10
+    int32_t dest_unit;  // +0x1DE14: the preview's unit (MapWin_dest_line)
+    int32_t dest_triad;  // +0x1DE18
+    int32_t dest_patrol;  // +0x1DE1C
+    int32_t dest_count;  // +0x1DE20: segments drawn
+    int32_t drag_base;  // +0x1DE24: base whose rally point is dragged
+    uint8_t unk_1de28[0x1EEC0 - 0x1DE28];
+    int32_t last_zoom;  // +0x1EEC0: the zoom the label fonts were made for
+    int32_t last_elev;  // +0x1EEC4: the elevation step the unit lift was computed for
+    uint8_t fonts[3][0x2C];  // +0x1EEC8: Font objects of the map labels (ui/gfx.h Font)
+    int32_t cursor;  // +0x1EF4C: cursor sprite address (0: arrow)
+    int32_t cursor_id;  // +0x1EF50: standard cursor id (0x7F00: IDC_ARROW)
+    uint8_t unk_1ef54[0x21A44 - 0x1EF54];
+    int32_t scrolling;  // +0x21A44: incremental scroll redraw in progress
+    int32_t scroll_cols[4];  // +0x21A48: the columns a scrolled redraw draws
+    int32_t scroll_rows[4];  // +0x21A58: the rows
+    int32_t unk_21a68;  // +0x21A68: PlanWin: shown (ui/planwin.cpp)
+};
+SMAC_LAYOUT(MapWin, 0x21A6C);
+static_assert(offsetof(MapWin, vbtable) == 0x0, "MapWin layout");
+static_assert(offsetof(MapWin, tile_cache) == 0x4, "MapWin layout");
+static_assert(offsetof(MapWin, elev_scale) == 0x1DD6C, "MapWin layout");
+static_assert(offsetof(MapWin, options) == 0x1DD70, "MapWin layout");
+static_assert(offsetof(MapWin, active) == 0x1DD74, "MapWin layout");
+static_assert(offsetof(MapWin, index) == 0x1DD78, "MapWin layout");
+static_assert(offsetof(MapWin, right_count) == 0x1DD7C, "MapWin layout");
+static_assert(offsetof(MapWin, tracking) == 0x1DD80, "MapWin layout");
+static_assert(offsetof(MapWin, group_drag) == 0x1DD84, "MapWin layout");
+static_assert(offsetof(MapWin, ignore_click) == 0x1DD88, "MapWin layout");
+static_assert(offsetof(MapWin, edit_paint) == 0x1DD8C, "MapWin layout");
+static_assert(offsetof(MapWin, edit_x) == 0x1DD90, "MapWin layout");
+static_assert(offsetof(MapWin, edit_y) == 0x1DD94, "MapWin layout");
+static_assert(offsetof(MapWin, zoom) == 0x1DD98, "MapWin layout");
+static_assert(offsetof(MapWin, center_x) == 0x1DD9C, "MapWin layout");
+static_assert(offsetof(MapWin, center_y) == 0x1DDA0, "MapWin layout");
+static_assert(offsetof(MapWin, origin_x) == 0x1DDA4, "MapWin layout");
+static_assert(offsetof(MapWin, origin_y) == 0x1DDA8, "MapWin layout");
+static_assert(offsetof(MapWin, pixel_x) == 0x1DDAC, "MapWin layout");
+static_assert(offsetof(MapWin, pixel_y) == 0x1DDB0, "MapWin layout");
+static_assert(offsetof(MapWin, tile_w) == 0x1DDB4, "MapWin layout");
+static_assert(offsetof(MapWin, tile_h) == 0x1DDB8, "MapWin layout");
+static_assert(offsetof(MapWin, half_w) == 0x1DDBC, "MapWin layout");
+static_assert(offsetof(MapWin, half_h) == 0x1DDC0, "MapWin layout");
+static_assert(offsetof(MapWin, quarter_w) == 0x1DDC4, "MapWin layout");
+static_assert(offsetof(MapWin, q) == 0x1DDC8, "MapWin layout");
+static_assert(offsetof(MapWin, cols_odd) == 0x1DDCC, "MapWin layout");
+static_assert(offsetof(MapWin, rows_above) == 0x1DDD0, "MapWin layout");
+static_assert(offsetof(MapWin, cols_even) == 0x1DDD4, "MapWin layout");
+static_assert(offsetof(MapWin, rows_below) == 0x1DDD8, "MapWin layout");
+static_assert(offsetof(MapWin, unit_lift) == 0x1DDDC, "MapWin layout");
+static_assert(offsetof(MapWin, unit_lift2) == 0x1DDE0, "MapWin layout");
+static_assert(offsetof(MapWin, dest_x) == 0x1DDE4, "MapWin layout");
+static_assert(offsetof(MapWin, dest_y) == 0x1DDF8, "MapWin layout");
+static_assert(offsetof(MapWin, drag_x) == 0x1DE0C, "MapWin layout");
+static_assert(offsetof(MapWin, drag_y) == 0x1DE10, "MapWin layout");
+static_assert(offsetof(MapWin, dest_unit) == 0x1DE14, "MapWin layout");
+static_assert(offsetof(MapWin, dest_triad) == 0x1DE18, "MapWin layout");
+static_assert(offsetof(MapWin, dest_patrol) == 0x1DE1C, "MapWin layout");
+static_assert(offsetof(MapWin, dest_count) == 0x1DE20, "MapWin layout");
+static_assert(offsetof(MapWin, drag_base) == 0x1DE24, "MapWin layout");
+static_assert(offsetof(MapWin, last_zoom) == 0x1EEC0, "MapWin layout");
+static_assert(offsetof(MapWin, last_elev) == 0x1EEC4, "MapWin layout");
+static_assert(offsetof(MapWin, fonts) == 0x1EEC8, "MapWin layout");
+static_assert(offsetof(MapWin, cursor) == 0x1EF4C, "MapWin layout");
+static_assert(offsetof(MapWin, cursor_id) == 0x1EF50, "MapWin layout");
+static_assert(offsetof(MapWin, scrolling) == 0x21A44, "MapWin layout");
+static_assert(offsetof(MapWin, scroll_cols) == 0x21A48, "MapWin layout");
+static_assert(offsetof(MapWin, scroll_rows) == 0x21A58, "MapWin layout");
+// The MapWin fields of a map window object (any MapWin or Console).
+inline MapWin& map_win(uint8_t* win) { return *reinterpret_cast<MapWin*>(win); }
 GLOBAL(uint8_t, WorldMapWin, 0x8EB48C);  // the world window's map view (MapWin)
 // Fields of the main view (MainConsole's MapWin; CurrentPlayerFaction is its owner field).
 GLOBAL(int32_t, MapWinInVehMode, 0x939288);

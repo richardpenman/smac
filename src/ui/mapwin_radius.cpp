@@ -22,9 +22,7 @@ Buffer* canvas_of(uint8_t* win) {
     MapWinNative* n = ui_mapwin_native(win);
     return n ? n->canvas : nullptr;
 }
-UiRect* client_rect(uint8_t* win) {
-    return reinterpret_cast<UiRect*>(win + ui_mapwin_native(win)->vbase + kGwClientRect);
-}
+UiRect* client_rect(uint8_t* win) { return &graphic_win(win + ui_mapwin_native(win)->vbase).client; }
 int32_t wrap_tile_x(int32_t x) {
     if (MapToggleFlat & 1) return x;
     if (x < 0) return x + MapAreaX;
@@ -34,9 +32,9 @@ int32_t wrap_tile_x(int32_t x) {
 // Whether (x, y) (on the map) is in the window's tile range (the column brought next to the
 // origin across the map's wrap).
 bool in_view_range(uint8_t* win, int32_t x, int32_t y) {
-    const int32_t oy = mw(win, kMwOriginY), ox = mw(win, kMwOriginX);
-    if (y < oy || y >= mw(win, kMwRowsBelow) + mw(win, kMwRowsAbove) + oy) return false;
-    const int32_t right = mw(win, kMwColsEven) + mw(win, kMwColsOdd) + ox;
+    const int32_t oy = map_win(win).origin_y, ox = map_win(win).origin_x;
+    if (y < oy || y >= map_win(win).rows_below + map_win(win).rows_above + oy) return false;
+    const int32_t right = map_win(win).cols_even + map_win(win).cols_odd + ox;
     int32_t vx = x;
     if (!(MapToggleFlat & 1)) {
         if (x < ox) vx = MapAreaX + x;
@@ -97,14 +95,14 @@ int32_t THISCALL MapWin_compute_clip(uint8_t* win, int32_t x, int32_t y, int32_t
     }
     ty = y + 2 + radius * 2;
     if (ty < 0 || MapAreaY <= ty || x < 0 || MapAreaX <= x) {
-        r.bottom = -mw(win, ui_mapwin_native(win)->vbase + kGwHeight);
+        r.bottom = -graphic_win(win + ui_mapwin_native(win)->vbase).height;
     } else {
         for (int32_t i = 0, tx = x - radius * 2; i < radius * 2 + 1; i++, tx += 2) {
             pfncTileToPoint(win, tx, ty, &px, &py);
             if (r.bottom < py) r.bottom = py;
         }
     }
-    r.top -= mw(win, kMwHalfH);
+    r.top -= map_win(win).half_h;
     const UiRect& client = *client_rect(win);
     if (intersect(out, r, client) && radius == 0) {
         auto div4 = [](int32_t v) { return (v + ((v >> 31) & 3)) >> 2; };
@@ -130,7 +128,7 @@ void THISCALL MapWin_draw_vehicles_2(uint8_t* win, int32_t x, int32_t y, int32_t
         if (!on_map(tx, ty) || !in_view_range(win, tx, ty)) return;
         int32_t px, py;
         pfncTileToPoint(win, tx, ty, &px, &py);
-        MapWin_draw_vehicles(win, tx, ty, px, py - mw(win, kMwHalfH), faction_id);
+        MapWin_draw_vehicles(win, tx, ty, px, py - map_win(win).half_h, faction_id);
     });
 }
 
@@ -140,7 +138,7 @@ void THISCALL MapWin_gen_radius(uint8_t* win, int32_t x, int32_t y, int32_t radi
     UiRect clip;
     if (!MapWin_compute_clip(win, x, y, radius, &clip)) return;
     Buffer_set_clip(canvas, &clip);
-    const int32_t zoom = mw(win, kMwZoom);
+    const int32_t zoom = map_win(win).zoom;
     // The two tiles three rows up (their raised terrain can reach down into the tile).
     auto above = [&](auto&& fn) {
         for (int32_t dx : {-1, 1}) {
@@ -149,11 +147,11 @@ void THISCALL MapWin_gen_radius(uint8_t* win, int32_t x, int32_t y, int32_t radi
         }
     };
     if (radius == 0 && !no_terrain) {
-        if (!(mw(win, kMwOptions) & 0x10000000)) Buffer_fill_3(canvas, &clip, 0x41);  // GraphicWin_fill_2
+        if (!(map_win(win).options & 0x10000000)) Buffer_fill_3(canvas, &clip, 0x41);  // GraphicWin_fill_2
         above([&](int32_t tx, int32_t ty) {
             int32_t px, py;
             pfncTileToPoint(win, tx, ty, &px, &py);
-            MapWin_gen_terrain_poly(canvas, win, zoom, faction_id, -1, mw(win, kMwOptions), tx, ty, px, py);
+            MapWin_gen_terrain_poly(canvas, win, zoom, faction_id, -1, map_win(win).options, tx, ty, px, py);
         });
     }
     // Widened upwards until it reaches the row at the clip's top corners.
@@ -169,13 +167,13 @@ void THISCALL MapWin_gen_radius(uint8_t* win, int32_t x, int32_t y, int32_t radi
             if (!on_map(tx, ty) || !in_view_range(win, tx, ty)) return;
             int32_t px, py;
             pfncTileToPoint(win, tx, ty, &px, &py);
-            MapWin_gen_terrain_poly(canvas, win, zoom, faction_id, -1, mw(win, kMwOptions), tx, ty, px,
+            MapWin_gen_terrain_poly(canvas, win, zoom, faction_id, -1, map_win(win).options, tx, ty, px,
                                     py);  // mapwin_unk1
         });
     }
     MapWin_draw_vehicles_2(win, x, y, radius, faction_id);
     MapWin_draw_base_names(win);
-    if (mw(win, kMwOptions) & 0x2000) {
+    if (map_win(win).options & 0x2000) {
         if (radius == 0) above([&](int32_t tx, int32_t ty) { MapWin_gen_overlays(win, tx, ty); });
         int32_t h = half0, row = 32000;
         pfncPtToTile(win, clip.left, clip.top, &tmp, &row);
@@ -184,7 +182,7 @@ void THISCALL MapWin_gen_radius(uint8_t* win, int32_t x, int32_t y, int32_t radi
             if (on_map(tx, ty) && mapwin_tile_in_view(win, tx, ty, 0)) MapWin_gen_overlays(win, tx, ty);
         });
     }
-    if (mw(win, kMwOptions) & 0x20000) MapWin_draw_legend(win);
+    if (map_win(win).options & 0x20000) MapWin_draw_legend(win);
     Buffer_set_clip(canvas, client_rect(win));
 }
 
@@ -204,8 +202,9 @@ void THISCALL MapWin_draw_radius(uint8_t* win, int32_t x, int32_t y, int32_t rad
 }
 
 void THISCALL MapWin_draw_tile(uint8_t* win, int32_t x, int32_t y, int32_t mode) {
-    if (y < mw(win, kMwOriginY) || y >= mw(win, kMwRowsBelow) + mw(win, kMwRowsAbove) + mw(win, kMwOriginY)) return;
-    const int32_t ox = mw(win, kMwOriginX), right = mw(win, kMwColsEven) + mw(win, kMwColsOdd) + ox;
+    if (y < map_win(win).origin_y || y >= map_win(win).rows_below + map_win(win).rows_above + map_win(win).origin_y)
+        return;
+    const int32_t ox = map_win(win).origin_x, right = map_win(win).cols_even + map_win(win).cols_odd + ox;
     int32_t vx = x;
     if (!(MapToggleFlat & 1)) {
         if (x < ox) vx = MapAreaX + x;
@@ -218,9 +217,9 @@ void THISCALL MapWin_gen_tile(uint8_t* win, int32_t x, int32_t y, int32_t factio
     Buffer* canvas = canvas_of(win);
     int32_t px, py;
     pfncTileToPoint(win, x, y, &px, &py);
-    MapWin_gen_terrain_poly(canvas, win, mw(win, kMwZoom), faction_id, -1, mw(win, kMwOptions), x, y, px, py);
+    MapWin_gen_terrain_poly(canvas, win, map_win(win).zoom, faction_id, -1, map_win(win).options, x, y, px, py);
     if (on_map(x, y) && units) {
-        MapWin_draw_vehicles(win, x, y, px, py - mw(win, kMwHalfH), faction_id);
+        MapWin_draw_vehicles(win, x, y, px, py - map_win(win).half_h, faction_id);
         MapWin_gen_overlays(win, x, y);
     }
 }
@@ -228,7 +227,7 @@ void THISCALL MapWin_gen_tile(uint8_t* win, int32_t x, int32_t y, int32_t factio
 // ---- overlays ------------------------------------------------------------------------------------
 
 void THISCALL MapWin_gen_overlays(uint8_t* win, int32_t x, int32_t y) {
-    if (!(mw(win, kMwOptions) & 0x2000)) return;
+    if (!(map_win(win).options & 0x2000)) return;
     Buffer* canvas = canvas_of(win);
     int32_t px, py;
     pfncTileToPoint(win, x, y, &px, &py);
@@ -249,7 +248,7 @@ void THISCALL MapWin_gen_overlays(uint8_t* win, int32_t x, int32_t y) {
                     }
                 if (g.type < 0) continue;
             }
-            UiRect r{px, py, px + mw(win, kMwTileW), py + mw(win, kMwTileH)};
+            UiRect r{px, py, px + map_win(win).tile_w, py + map_win(win).tile_h};
             StrBuffer[0] = 0;
             if (omni) {
                 GenderDefault = MFactions[f].noun_gender;
@@ -271,7 +270,7 @@ void THISCALL MapWin_gen_overlays(uint8_t* win, int32_t x, int32_t y) {
             int32_t p = g.priority < 0 ? -g.priority : g.priority;
             std::snprintf(StrBuffer + std::strlen(StrBuffer), 32, "%d", p);
             Buffer_set_text_color(canvas, color, 0, 1, 1);
-            Buffer_set_font(canvas, reinterpret_cast<Font*>(win + kMwFont1), nullptr, nullptr, nullptr);
+            Buffer_set_font(canvas, mapwin_font(win, 1), nullptr, nullptr, nullptr);
             Buffer_write_cent_l_7(canvas, StrBuffer, &r, (int32_t)std::strlen(StrBuffer));
             break;
         }
@@ -289,7 +288,7 @@ void THISCALL MapWin_draw_legend(uint8_t* win) {
     Buffer* canvas = canvas_of(win);
     Font font;
     Font_ctor(&font);
-    Font_init(&font, "Arial", mw(win, kMwTileH) * 2 / 3, 1);
+    Font_init(&font, "Arial", map_win(win).tile_h * 2 / 3, 1);
     for (int32_t i = 0; i < 8; i++) {
         int32_t tx = wrap_tile_x(kLegendDx[i] + MapWinCursorX[MapWinCursorIndex]);
         int32_t ty = kLegendDy[i] + MapWinCursorY[MapWinCursorIndex];
@@ -306,7 +305,7 @@ void THISCALL MapWin_draw_legend(uint8_t* win) {
             canvas->fonts[0] = &font;
             canvas->fonts[1] = canvas->fonts[2] = nullptr;
         }
-        UiRect r{px, py, px + mw(win, kMwTileW), py + mw(win, kMwTileH)};
+        UiRect r{px, py, px + map_win(win).tile_w, py + map_win(win).tile_h};
         Buffer_write_cent_l_7(canvas, StrBuffer, &r, (int32_t)std::strlen(StrBuffer));
         canvas->fonts[0] = saved;
         canvas->fonts[1] = s1;
@@ -317,7 +316,7 @@ void THISCALL MapWin_draw_legend(uint8_t* win) {
 
 void THISCALL MapWin_draw_wars(uint8_t* win) {
     Buffer* canvas = canvas_of(win);
-    Font* font = reinterpret_cast<Font*>(win + kMwFont1);
+    Font* font = mapwin_font(win, 1);
     const int32_t cell = Font_width(font, "W");
     int32_t y = line_height(font);
     Buffer_set_font(canvas, font, nullptr, nullptr, nullptr);

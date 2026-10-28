@@ -7,6 +7,7 @@
 #include "engine/state_io.h"
 
 namespace state {
+CouncilSession council_session;
 int32_t council_session_pending;
 int32_t council_proposal[8];
 int32_t council_vote_state[8];
@@ -50,6 +51,7 @@ void load_record(const uint8_t* bytes) {
 // Sorted by address; constant-initialised, so the globals' bindings (mem::host, during static
 // initialisation) can use it in any order.
 constexpr StateRecord kRecords[] = {
+    RECORD("CouncilWinSession", 0x6FF69C, state::council_session),
     RECORD("CouncilSessionPending", 0x703DE8, state::council_session_pending),
     RECORD("CouncilProposal", 0x703DEC, state::council_proposal),
     RECORD("CouncilVoteState", 0x703E0C, state::council_vote_state),

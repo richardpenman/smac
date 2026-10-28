@@ -127,6 +127,25 @@ struct ScenarioRules {
     uint8_t unk_18[0x80];  // the scenario editor's objectives (not reconstructed)
 };
 
+// The council window's session (CouncilWin + 0xA1C = 0x6FF69C, 0x78 bytes; engine/council.h): the
+// session of the Planetary Council under way. PBEM saves hold proposal .. governor
+// (CouncilWinState) and the votes (CouncilWinVotes).
+struct CouncilSession {
+    int32_t proposal;
+    int32_t candidate;  // elections: the candidate, then the winner (0: none)
+    int32_t result;  // 0 not decided, 1 passed, -1 failed / no majority, -2 vetoed by the governor
+    int32_t governor;  // GovernorFaction when the session opened
+    int32_t unk_a2c[3];
+    uint32_t start_time;  // timeGetTime() when the session opened
+    int32_t time_limit;  // ms: 60 s per human player (multiplayer)
+    int32_t unk_a40;  // 1
+    uint32_t voter_mask;  // ~humans (PBEM: 0xFF)
+    uint8_t spot[0xC];  // Spot object of the window (UI; not used natively)
+    int32_t votes[8];  // vote per faction: candidate (elections), -1 YEA, -2 NAY, -3 abstain,
+    // -5 dead, 0 not voted yet
+    int32_t council_votes[8];  // council_votes() per faction
+};
+
 // PBEM tamper check (0x93A9AC, 0x4C bytes; saved in PBEM games).
 struct PbemState {
     int32_t game_id;  // PbemGameID
@@ -462,6 +481,7 @@ SMAC_LAYOUT(LegacyGamePrefs, 0x31C);
 SMAC_LAYOUT(MapHeader, 0xAA4);
 SMAC_LAYOUT(ScenarioRules, 0x98);
 SMAC_LAYOUT(PbemState, 0x4C);
+SMAC_LAYOUT(CouncilSession, 0x78);
 static_assert(offsetof(MapHeader, landmarks) == 0x24, "");
 static_assert(offsetof(MapHeader, abstract_x) == 0xA24, "");
 static_assert(offsetof(MapHeader, file_path) == 0xA4C, "");

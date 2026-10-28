@@ -89,10 +89,10 @@ void sw_restore_iface(ScreenWin* s) {
         int32_t x = p.left + dx, y = p.top + 1;
         Buffer_tile(&s->mi, tile, x, y, x, y, p.right - 1 - x, p.bottom - 1 - y);
     };
-    fill(mi_rect(kMiPaneQueue), 1);
-    fill(mi_rect(kMiPaneBottom), 0);
-    fill(mi_rect(kMiPaneCenter), 1);
-    fill(mi_rect(kMiPaneRight), 1);
+    fill(main_interface().pane_queue, 1);
+    fill(main_interface().pane_bottom, 0);
+    fill(main_interface().pane_center, 1);
+    fill(main_interface().pane_right, 1);
 }
 
 BaseButton* sw_button(ScreenWin* s, const char* text, int32_t id, int32_t x, int32_t y, int32_t w, int32_t h,
@@ -184,7 +184,7 @@ void sw_run(ScreenWin* s) {
         push(s);
         slide_show_window(&s->canvas, s->x, s->y, nullptr, false);
     }
-    const UiRect& mp = mi_rect(kMiPos);
+    const UiRect& mp = main_interface().pos;
     // Win_set_modal's callback (a network game's messages while the window waits); a message may
     // close the window (Win_release_modal), which ends the wait.
     int32_t old_cb = ui_set_modal_callback(s->modal_cb);
@@ -280,7 +280,7 @@ void sw_run(ScreenWin* s) {
 ScreenWin* screen_top() { return g_stack.empty() ? nullptr : g_stack.back(); }
 
 void screens_compose(Buffer* screen, uint32_t from, uint32_t to) {
-    const UiRect& mp = mi_rect(kMiPos);
+    const UiRect& mp = main_interface().pos;
     for (ScreenWin* s : g_stack) {
         if (s->seq < from || s->seq >= to) continue;
         blit_keyed(screen, &s->canvas, s->x, s->y);

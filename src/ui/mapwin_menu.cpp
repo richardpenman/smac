@@ -54,7 +54,7 @@ void THISCALL MapWin_right_menu(uint8_t* win, int32_t x, int32_t y, int32_t px, 
     int32_t veh_id = veh_at(x, y);
     int32_t active = MapWinVehA;
     PullDown_init(&pd);
-    if (mw(win, kMwIndex) == 1) {
+    if (map_win(win).index == 1) {
         // The world map window's menu.
         PullDown_add_item(&pd, 800, label_get(0xC04 / 4));
         PullDown_add_separator(&pd, 99);
@@ -69,7 +69,7 @@ void THISCALL MapWin_right_menu(uint8_t* win, int32_t x, int32_t y, int32_t px, 
         int32_t sel = PullDown_get_selected(&pd);
         int32_t id = sel < 0x40 ? pulldown_item_id(&pd, sel) : -1;
         if (base_id != base_at(x, y) || veh_id != veh_at(x, y) || active != MapWinVehA) return;
-        int32_t zoom = mw(win, kMwZoom);
+        int32_t zoom = map_win(win).zoom;
         switch (id) {
         case 800:  // WorldWin_set_center / set_world_map, button 0x3EE (the world map pane)
             ui_invalidate();
@@ -77,13 +77,13 @@ void THISCALL MapWin_right_menu(uint8_t* win, int32_t x, int32_t y, int32_t px, 
         case 0x321:
         case 0x322: pfncMoveMap(MapWins[0], x, y, 1); break;
         case 0x323:
-            if (zoom < 0) mw(win, kMwZoom) = zoom + 2, ui_invalidate_map();
+            if (zoom < 0) map_win(win).zoom = zoom + 2, ui_invalidate_map();
             break;
         case 0x324:
-            if (zoom >= -0xD) mw(win, kMwZoom) = zoom - 2, ui_invalidate_map();
+            if (zoom >= -0xD) map_win(win).zoom = zoom - 2, ui_invalidate_map();
             break;
         case 0x325:
-            if (zoom != -8) mw(win, kMwZoom) = -8, ui_invalidate_map();
+            if (zoom != -8) map_win(win).zoom = -8, ui_invalidate_map();
             break;
         default: break;
         }

@@ -211,14 +211,14 @@ void apply_observer_prefs() {
 // ---- observer mode (no human player): the turn pause of the first slice ----
 
 void zoom_step(int dir) {  // pfncProcZoomKey 0x5150D0: steps of 2 between -14 and 16
-    int32_t& z = mw(&MainConsole, kMwZoom);
+    int32_t& z = map_win(&MainConsole).zoom;
     if (dir > 0 && z < 0x10) z += 2;
     if (dir < 0 && -0xE < z) z -= 2;
     ui_invalidate_map();
 }
 
 void scroll(int dx, int dy) {
-    int32_t x = mw(&MainConsole, kMwCenterX) + dx, y = mw(&MainConsole, kMwCenterY) + dy;
+    int32_t x = map_win(&MainConsole).center_x + dx, y = map_win(&MainConsole).center_y + dy;
     if ((MapToggleFlat & 1) == 0) x = (x % MapAreaX + MapAreaX) % MapAreaX;
     y = std::max(0, std::min(MapAreaY - 1, y));
     if (((x ^ y) & 1) != 0) x = (MapToggleFlat & 1) == 0 ? (x + 1) % MapAreaX : x + 1;
@@ -418,16 +418,16 @@ void show_game() {
     // centred on the cursor; MapWin_init_2 then sets its display options (main view of a
     // single-player game: 0x60010EE3, see 0x470A90).
     if (ControlTurnMove == 0) MapWin_clear(&MainConsole, 0);
-    mw(&MainConsole, kMwOptions) = 0x60010EE3;
-    if (g_opt.zoom != 0x7FFF) mw(&MainConsole, kMwZoom) = g_opt.zoom;
+    map_win(&MainConsole).options = 0x60010EE3;
+    if (g_opt.zoom != 0x7FFF) map_win(&MainConsole).zoom = g_opt.zoom;
     if (g_opt.cx >= 0) {
-        mw(&MainConsole, kMwCenterX) = g_opt.cx;
-        mw(&MainConsole, kMwCenterY) = g_opt.cy;
+        map_win(&MainConsole).center_x = g_opt.cx;
+        map_win(&MainConsole).center_y = g_opt.cy;
     }
     ui_invalidate_map();
-    std::fprintf(stderr, "view: zoom %d centre %d,%d options %08X viewer %d\n", mw(&MainConsole, kMwZoom),
-                 mw(&MainConsole, kMwCenterX), mw(&MainConsole, kMwCenterY), (uint32_t)mw(&MainConsole, kMwOptions),
-                 CurrentPlayerFaction);
+    std::fprintf(stderr, "view: zoom %d centre %d,%d options %08X viewer %d\n", map_win(&MainConsole).zoom,
+                 map_win(&MainConsole).center_x, map_win(&MainConsole).center_y,
+                 (uint32_t)map_win(&MainConsole).options, CurrentPlayerFaction);
 }
 
 // No --new / --save: the original's main menu (top_menu, src/ui/topmenu.cpp). With --seed the

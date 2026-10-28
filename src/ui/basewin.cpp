@@ -121,25 +121,25 @@ void console_center() {
 bool mapwin_tile_in_view(uint8_t* win, int32_t x, int32_t y, int32_t margin) {
     if (margin && y >= 0 && y < MapAreaY && x >= 0 && x < MapAreaX) {
         uint8_t climate = map_tile(x, y)->climate;
-        if ((climate & 0xE0) > 0x60 && (int32_t)(y - (climate >> 5) + 3) < mw(win, kMwOriginY) + margin) return false;
+        if ((climate & 0xE0) > 0x60 && (int32_t)(y - (climate >> 5) + 3) < map_win(win).origin_y + margin) return false;
     }
-    if (y < mw(win, kMwOriginY) + margin) return false;
-    if (y >= mw(win, kMwRowsBelow) + mw(win, kMwRowsAbove) - margin + mw(win, kMwOriginY)) return false;
+    if (y < map_win(win).origin_y + margin) return false;
+    if (y >= map_win(win).rows_below + map_win(win).rows_above - margin + map_win(win).origin_y) return false;
     if (!(MapToggleFlat & 1)) {
-        if (x < mw(win, kMwOriginX) + margin) x += MapAreaX;
-        if (x >= mw(win, kMwColsEven) + mw(win, kMwColsOdd) - margin + mw(win, kMwOriginX)) x -= MapAreaX;
+        if (x < map_win(win).origin_x + margin) x += MapAreaX;
+        if (x >= map_win(win).cols_even + map_win(win).cols_odd - margin + map_win(win).origin_x) x -= MapAreaX;
     }
-    if (x < mw(win, kMwOriginX) + margin) return false;
-    return x < mw(win, kMwColsEven) + mw(win, kMwColsOdd) - margin + mw(win, kMwOriginX);
+    if (x < map_win(win).origin_x + margin) return false;
+    return x < map_win(win).cols_even + map_win(win).cols_odd - margin + map_win(win).origin_x;
 }
 
 // The base window's "set base" prologue of most functions: makes the shown base current and
 // recomputes it; in multiplayer, a base whose turn data changed is relocked.
 void bw_set_base() {
-    int32_t worked = Bases[bwf(kBwBase)].worked_tiles;
-    set_base(bwf(kBwBase));
+    int32_t worked = Bases[base_win().base].worked_tiles;
+    set_base(base_win().base);
     base_compute(0);
-    if (MultiplayerActive && !ControlTurnC && worked != Bases[bwf(kBwBase)].worked_tiles &&
+    if (MultiplayerActive && !ControlTurnC && worked != Bases[base_win().base].worked_tiles &&
         !bw_lock_base(CurrentBaseID))
         bw_unlock_base(CurrentBaseID);
 }
@@ -273,30 +273,30 @@ void mi_init() {
     if (g_bw.mi_ready) return;
     g_bw.mi_ready = true;
     int32_t sw = ScreenWidth, sh = ScreenHeight;
-    mif(kMiHeight) = 0xD5;
-    mif(kMiPaneQueue) = 4;
+    main_interface().height = 0xD5;
+    main_interface().pane_queue.left = 4;
     if (sw == 800) {
-        mif(kMiPos) = 0;
-        mif(kMiPos + 4) = 0x157;
-        mif(kMiPos + 8) = 800;
-        mif(kMiPos + 12) = 600;
+        main_interface().pos.left = 0;
+        main_interface().pos.top = 0x157;
+        main_interface().pos.right = 800;
+        main_interface().pos.bottom = 600;
         static const int32_t r800[] = {0x38, 0xF5, 0xFC, 0x22B, 0x39, 0x31C, 0xFD, 0x105, 0x42, 0x21C, 0xAC};
-        int32_t* f = &mif(kMiPaneQueue + 4);
+        int32_t* f = &main_interface().pane_queue.top;
         for (int32_t i = 0; i < 11; i++) f[i] = r800[i];
-        mi_rect(kMiPaneBottom) = {0xF4, 0xBC, 0x220, 0xFC};
+        main_interface().pane_bottom = {0xF4, 0xBC, 0x220, 0xFC};
     } else {
         // 1024 (the original's values; the window spans the screen width at its bottom).
-        mi_rect(kMiPos) = {0, sh - 0x101, sw, sh};
-        mi_rect(kMiPaneQueue) = {4, 0x38, 0xF5, 0xFC};
-        mi_rect(kMiPaneRight) = {0x30B, 0x38, 0x3FC, 0xFC};
-        mi_rect(kMiPaneCenter) = {0x106, 0x42, 0x2FB, 0xAC};
-        mi_rect(kMiPaneBottom) = {0xF4, 0xBC, 0x300, 0xFC};
+        main_interface().pos = {0, sh - 0x101, sw, sh};
+        main_interface().pane_queue = {4, 0x38, 0xF5, 0xFC};
+        main_interface().pane_right = {0x30B, 0x38, 0x3FC, 0xFC};
+        main_interface().pane_center = {0x106, 0x42, 0x2FB, 0xAC};
+        main_interface().pane_bottom = {0xF4, 0xBC, 0x300, 0xFC};
     }
-    mi_rect(kMiPaneCenter2) = mi_rect(kMiPaneCenter);
-    mif(kMiPaneCenter2 + 12) += 0x3E;
-    mi_rect(kMiPaneBottom2) = mi_rect(kMiPaneBottom);
-    mif(kMiPaneBottom2 + 4) += 0x3E;
-    const UiRect& pos = mi_rect(kMiPos);
+    main_interface().pane_center2 = main_interface().pane_center;
+    main_interface().pane_center2.bottom += 0x3E;
+    main_interface().pane_bottom2 = main_interface().pane_bottom;
+    main_interface().pane_bottom2.top += 0x3E;
+    const UiRect& pos = main_interface().pos;
     int32_t w = pos.right - pos.left, h = pos.bottom - pos.top;
     Buffer_ctor(&g_bw.mi_canvas);
     Buffer_init(&g_bw.mi_canvas, w, h, 8, 0);
@@ -324,10 +324,10 @@ void mi_restore_back(int32_t clip) {
         int32_t x = p.left + dx, y = p.top + 1;
         Buffer_tile(c, tile, x, y, x, y, p.right - 1 - x, p.bottom - 1 - y);
     };
-    fill(mi_rect(kMiPaneQueue), 1);
-    fill(mi_rect(MiSlideState ? kMiPaneBottom2 : kMiPaneBottom), 0);
-    fill(mi_rect(MiSlideState ? kMiPaneCenter2 : kMiPaneCenter), 1);
-    fill(mi_rect(kMiPaneRight), 1);
+    fill(main_interface().pane_queue, 1);
+    fill((MiSlideState ? main_interface().pane_bottom2 : main_interface().pane_bottom), 0);
+    fill((MiSlideState ? main_interface().pane_center2 : main_interface().pane_center), 1);
+    fill(main_interface().pane_right, 1);
 }
 
 // ==== BaseWin_init (0x41E8D0) ====================================================================
@@ -351,80 +351,82 @@ void THISCALL BaseWin_init(uint8_t* self) {
     Wave_set_pitch(mem::host(0x6EEE68), 300);
     textcolor_load();
     mi_init();
-    bwf(0x40B00) = -1;
-    bwf(0xA18) = 3;  // the SubInterface's mode
+    base_win().unk_40b00 = -1;
+    base_win().sub_mode = 3;  // the SubInterface's mode
     bool w1024 = ScreenWidth != 800;
     int32_t height;
-    auto set = [&](uint32_t off, int32_t l, int32_t t, int32_t r, int32_t b) { bw_rect(off) = {l, t, r, b}; };
-    set(kBwRectMap, 0xA6, 0x21, 0x230, 0x101);
-    set(kBwRectCommerce2, 0x1E, 0xAA, 0xA0, 0x125);
-    set(kBwRectCommerce, 0x1E, 0x95, 0xA0, 0xA9);
-    set(kBwRectCommercePane, 0x1B, 0x92, 0xA3, 0x128);
-    set(kBwRectFacList, 0x236, 0x39, 0x2B8, 0xFE);
-    set(kBwRectFacTitle, 0x236, 0x24, 0x2B8, 0x38);
-    set(kBwRectFacPane, 0x233, 0x21, 699, 0x101);
-    set(kBwRectNutrients, 0x1E, 0x39, 0xA0, 0x8C);
-    set(kBwRectNutTitle, 0x1E, 0x24, 0xA0, 0x38);
-    set(kBwRectNutPane, 0x1B, 0x21, 0xA3, 0x8F);
-    set(kBwRectExpenses, 0xA6, 0x104, 699, 0x15D);
-    bw_rect(kBwRectAlloc) = bw_rect(kBwRectExpenses);
+    auto set = [&](UiRect& rect, int32_t l, int32_t t, int32_t r, int32_t b) { rect = {l, t, r, b}; };
+    set(base_win().rect_map, 0xA6, 0x21, 0x230, 0x101);
+    set(base_win().rect_commerce2, 0x1E, 0xAA, 0xA0, 0x125);
+    set(base_win().rect_commerce, 0x1E, 0x95, 0xA0, 0xA9);
+    set(base_win().rect_commerce_pane, 0x1B, 0x92, 0xA3, 0x128);
+    set(base_win().rect_fac_list, 0x236, 0x39, 0x2B8, 0xFE);
+    set(base_win().rect_fac_title, 0x236, 0x24, 0x2B8, 0x38);
+    set(base_win().rect_fac_pane, 0x233, 0x21, 699, 0x101);
+    set(base_win().rect_nutrients, 0x1E, 0x39, 0xA0, 0x8C);
+    set(base_win().rect_nut_title, 0x1E, 0x24, 0xA0, 0x38);
+    set(base_win().rect_nut_pane, 0x1B, 0x21, 0xA3, 0x8F);
+    set(base_win().rect_expenses, 0xA6, 0x104, 699, 0x15D);
+    base_win().rect_alloc = base_win().rect_expenses;
     if (!w1024) {
-        set(kBwRectRename, 0xBF, 0x162, 0x171, 0x176);
-        set(kBwRectOk, 0x175, 0x162, 0x227, 0x176);
+        set(base_win().rect_rename, 0xBF, 0x162, 0x171, 0x176);
+        set(base_win().rect_ok, 0x175, 0x162, 0x227, 0x176);
         height = ScreenHeight - MiConsoleHeight;
         if (height > 0x18E) height = 0x18E;
     } else {
         // The energy allocation pane below the resource rows (as high as they are); the panes on
         // the left grow by half of it.
-        int32_t bottom = bwf(kBwRectAlloc + 12), top = bwf(kBwRectAlloc + 4);
+        int32_t bottom = base_win().rect_alloc.bottom, top = base_win().rect_alloc.top;
         int32_t d = bottom - top + 3;
-        bwf(kBwRectAlloc + 4) = top + d;
-        bwf(kBwRectAlloc + 12) = bottom + d;
-        int32_t h1 = (bottom - top) / 2, h2 = (bwf(kBwRectAlloc + 12) - bwf(kBwRectAlloc + 4)) / 2;
-        bwf(kBwRectCommerce2 + 4) += h2;
-        bwf(kBwRectCommerce2 + 12) += h2;
-        bwf(kBwRectCommercePane + 4) += h1;
-        bwf(kBwRectCommercePane + 12) += h1;
-        bwf(kBwRectCommerce + 4) += h1;
-        bwf(kBwRectCommerce + 12) += h1;
-        bwf(kBwRectCommerce2 + 12) += h1;
-        bwf(kBwRectCommercePane + 12) += h1;
-        bwf(kBwRectNutrients + 12) += h1;
-        bwf(kBwRectNutPane + 12) += h1;
-        int32_t ah = bwf(kBwRectAlloc + 12) - bwf(kBwRectAlloc + 4);
-        set(kBwRectOk, 0x17D, ah + 0x168, 0x26B, ah + 0x17C);
-        set(kBwRectRename, 0x83, ah + 0x168, 0x171, ah + 0x17C);
+        base_win().rect_alloc.top = top + d;
+        base_win().rect_alloc.bottom = bottom + d;
+        int32_t h1 = (bottom - top) / 2, h2 = (base_win().rect_alloc.bottom - base_win().rect_alloc.top) / 2;
+        base_win().rect_commerce2.top += h2;
+        base_win().rect_commerce2.bottom += h2;
+        base_win().rect_commerce_pane.top += h1;
+        base_win().rect_commerce_pane.bottom += h1;
+        base_win().rect_commerce.top += h1;
+        base_win().rect_commerce.bottom += h1;
+        base_win().rect_commerce2.bottom += h1;
+        base_win().rect_commerce_pane.bottom += h1;
+        base_win().rect_nutrients.bottom += h1;
+        base_win().rect_nut_pane.bottom += h1;
+        int32_t ah = base_win().rect_alloc.bottom - base_win().rect_alloc.top;
+        set(base_win().rect_ok, 0x17D, ah + 0x168, 0x26B, ah + 0x17C);
+        set(base_win().rect_rename, 0x83, ah + 0x168, 0x171, ah + 0x17C);
         height = ah + 0x191;
     }
-    set(kBwRectMisc, bwf(kBwRectCommercePane), bwf(kBwRectCommercePane + 12) + 3, bwf(kBwRectCommercePane + 8),
-        bwf(kBwRectOk + 4) - 6);
-    bwf(kBwQueueSel) = 0;
-    bwf(0x40B30) = 0;
+    set(base_win().rect_misc, base_win().rect_commerce_pane.left, base_win().rect_commerce_pane.bottom + 3,
+        base_win().rect_commerce_pane.right, base_win().rect_ok.top - 6);
+    base_win().queue_sel = 0;
+    base_win().queue_hilite = 0;
     // Rectangles in the main interface: its panes (MainInfc + 0xD80 queue, + 0xD90 right, + 0xDA0
     // centre, + 0xDB0 bottom) inset by 4 and divided.
-    const UiRect qp = mi_rect(kMiPaneQueue), rp = mi_rect(kMiPaneRight), cp = mi_rect(kMiPaneCenter),
-                 bp = mi_rect(kMiPaneBottom);
-    set(kBwRectGarrisonMI, bp.left, bp.top + 4, bp.right - 4, bp.bottom - 4);
-    set(kBwRectQueueMI, qp.left + 4, qp.top + 4, (qp.right - qp.left) * 7 / 12 - 4, qp.bottom - 4);
+    const UiRect qp = main_interface().pane_queue, rp = main_interface().pane_right, cp = main_interface().pane_center,
+                 bp = main_interface().pane_bottom;
+    set(base_win().rect_garrison_mi, bp.left, bp.top + 4, bp.right - 4, bp.bottom - 4);
+    set(base_win().rect_queue_mi, qp.left + 4, qp.top + 4, (qp.right - qp.left) * 7 / 12 - 4, qp.bottom - 4);
     {
-        int32_t qb = bwf(kBwRectQueueMI + 12), qr = bwf(kBwRectQueueMI + 8) + 3, pl = bwf(kBwRectGarrisonMI) - 7;
-        set(kBwRectHurryMI, qr, qb - 0x17, pl, qb - 3);
-        set(kBwRectChangeMI, qr, qb - 0x2D, pl, qb - 0x19);
-        int32_t cx = bwf(kBwRectQueueMI + 8);
-        set(kBwRectQueueBoxMI, cx + 4, qp.top + 4, qp.right - 4, bwf(kBwRectChangeMI + 4) - 7);
-        set(kBwRectQueueListMI, cx + 7, qp.top + 7, qp.right - 7, qp.top + 7 + 0x14);
-        set(kBwRectQueueList2MI, cx + 7, qp.top + 7 + 0x14 + 2, qp.right - 7, bwf(kBwRectChangeMI + 4) - 10);
-        bw_rect(kBwRectQueueBtnMI) = bw_rect(kBwRectQueueListMI);
+        int32_t qb = base_win().rect_queue_mi.bottom, qr = base_win().rect_queue_mi.right + 3,
+                pl = base_win().rect_garrison_mi.left - 7;
+        set(base_win().rect_hurry_mi, qr, qb - 0x17, pl, qb - 3);
+        set(base_win().rect_change_mi, qr, qb - 0x2D, pl, qb - 0x19);
+        int32_t cx = base_win().rect_queue_mi.right;
+        set(base_win().rect_queue_box_mi, cx + 4, qp.top + 4, qp.right - 4, base_win().rect_change_mi.top - 7);
+        set(base_win().rect_queue_list_mi, cx + 7, qp.top + 7, qp.right - 7, qp.top + 7 + 0x14);
+        set(base_win().rect_queue_list2_mi, cx + 7, qp.top + 7 + 0x14 + 2, qp.right - 7,
+            base_win().rect_change_mi.top - 10);
+        base_win().rect_queue_btn_mi = base_win().rect_queue_list_mi;
     }
-    set(kBwRectPopMI, cp.left + 4, cp.bottom - 0x3A, cp.right - 0x3E, cp.bottom - 4);
-    set(kBwRectNameMI, cp.left + 4, cp.top + 4, cp.right - 4, bwf(kBwRectPopMI + 4) - 4 + 1);
-    set(kBwRectStapleMI, bwf(kBwRectPopMI + 8) + 7, bwf(kBwRectPopMI + 4) + 3, cp.right - 7,
-        bwf(kBwRectPopMI + 12) - 3);
-    set(kBwRectProdPaneMI, rp.left + 4, rp.top + 4, rp.right - 4, rp.bottom - 4);
-    set(kBwRectProdMI, rp.left + 7, rp.top + 7, rp.right - 7, rp.top + 7 + 0x14);
-    set(kBwRectProd2MI, rp.left + 7, rp.top + 7 + 0x14 + 2, rp.right - 7, rp.bottom - 7);
-    set(kBwRectEditor, bwf(kBwRectFacPane) + 3, bwf(kBwRectFacPane + 12) - 0x17, bwf(kBwRectFacPane + 8) - 3,
-        bwf(kBwRectFacPane + 12) - 3);
+    set(base_win().rect_pop_mi, cp.left + 4, cp.bottom - 0x3A, cp.right - 0x3E, cp.bottom - 4);
+    set(base_win().rect_name_mi, cp.left + 4, cp.top + 4, cp.right - 4, base_win().rect_pop_mi.top - 4 + 1);
+    set(base_win().rect_staple_mi, base_win().rect_pop_mi.right + 7, base_win().rect_pop_mi.top + 3, cp.right - 7,
+        base_win().rect_pop_mi.bottom - 3);
+    set(base_win().rect_prod_pane_mi, rp.left + 4, rp.top + 4, rp.right - 4, rp.bottom - 4);
+    set(base_win().rect_prod_mi, rp.left + 7, rp.top + 7, rp.right - 7, rp.top + 7 + 0x14);
+    set(base_win().rect_prod2_mi, rp.left + 7, rp.top + 7 + 0x14 + 2, rp.right - 7, rp.bottom - 7);
+    set(base_win().rect_editor, base_win().rect_fac_pane.left + 3, base_win().rect_fac_pane.bottom - 0x17,
+        base_win().rect_fac_pane.right - 3, base_win().rect_fac_pane.bottom - 3);
     // Fonts.
     Font* font = reinterpret_cast<Font*>(&BaseWin + kBwFont);
     Font_ctor(font);
@@ -445,13 +447,13 @@ void THISCALL BaseWin_init(uint8_t* self) {
     Buffer_init(&g_bw.mask, 100, 0x32, 0, 0);
     Sprite* diamond = ArtSprite(0x7ACBB8);
     sprite_copy1(diamond, &g_bw.mask, diamond->key, 0, 0, 1, 1);
-    bwf(0x40B1C) = bwf(0x40B20) = bwf(0x40B24) = -1;
-    bwf(kBwDragState) = -1;
-    bwf(0x40B58) = 0xDF;
-    bwf(kBwPane) = 0;
-    bwf(0x40AF4) = 0;
-    bwf(0x40AF8) = 0;
-    bwf(0x40B40) = 0;
+    base_win().unk_40b1c = base_win().sup_bar = base_win().unk_40b24 = -1;
+    base_win().drag_state = -1;
+    base_win().unk_40b58 = 0xDF;
+    base_win().pane = 0;
+    base_win().unk_40af4 = 0;
+    base_win().unk_40af8 = 0;
+    base_win().unk_40b40 = 0;
     spot_init(&g_bw.spots_iface, 200);
     spot_init(&g_bw.spots_win, 200);
     // The window (GraphicWin_init): centred above the console.
@@ -459,7 +461,7 @@ void THISCALL BaseWin_init(uint8_t* self) {
     g_bw.y = ScreenHeight - MiConsoleHeight - height;
     Buffer_ctor(&g_bw.canvas);
     Buffer_init(&g_bw.canvas, 0x2F6, height, 8, 0);
-    bw_rect(kBwClient) = {0, 0, 0x2F6, height};
+    base_win().client = {0, 0, 0x2F6, height};
     Buffer* c = &g_bw.canvas;
     UiRect all{0, 0, c->width, c->height};
     Buffer_set_clip(c, &all);
@@ -469,7 +471,7 @@ void THISCALL BaseWin_init(uint8_t* self) {
     r = {0x1B, 4, 699, 0x1E};
     Buffer_box_sprite(c, &r, box_def(12));
     {
-        const UiRect &a = bw_rect(kBwRectOk), &b = bw_rect(kBwRectRename);
+        const UiRect &a = base_win().rect_ok, &b = base_win().rect_rename;
         r = {std::min(a.left, b.left) - 3, std::min(a.top, b.top) - 3, std::max(a.right, b.right) + 3,
              std::max(a.bottom, b.bottom) + 3};
         Buffer_box_sprite(c, &r, box_def(3));
@@ -498,8 +500,7 @@ void THISCALL BaseWin_init(uint8_t* self) {
     // Buttons.
     for (BaseButton& b : g_bw.buttons) button_ctor(&b);
     button_ctor(&g_bw.staple2);
-    auto btn = [&](int32_t id, const char* text, uint32_t rect, int32_t parent) {
-        const UiRect& rr = bw_rect(rect);
+    auto btn = [&](int32_t id, const char* text, const UiRect& rr, int32_t parent) {
         button_init(&g_bw.buttons[id], text, id, rr.left, rr.top, rr.right - rr.left, rr.bottom - rr.top, parent);
     };
     auto sprites = [&](BaseButton* b, uint32_t off) {
@@ -513,68 +514,68 @@ void THISCALL BaseWin_init(uint8_t* self) {
             b->text_color[s] = text_color(colors + (uint32_t)s * 4);
         }
     };
-    btn(0x14, label_upper(0x77C), kBwRectQueueBtnMI, 1);
+    btn(0x14, label_upper(0x77C), base_win().rect_queue_btn_mi, 1);
     {
         Sprite* s = bw_sprite(0xCAD4);
-        const UiRect& n = bw_rect(kBwRectNameMI);
-        set(kBwRectPrevMI, n.left + 3, n.top + 3, n.left + 3 + s->full_width, n.top + 3 + s->full_height);
-        btn(2, nullptr, kBwRectPrevMI, 1);
+        const UiRect& n = base_win().rect_name_mi;
+        set(base_win().rect_prev_mi, n.left + 3, n.top + 3, n.left + 3 + s->full_width, n.top + 3 + s->full_height);
+        btn(2, nullptr, base_win().rect_prev_mi, 1);
         sprites(&g_bw.buttons[2], 0xCAD4);
-        set(kBwRectNextMI, n.right - 3 - s->full_width, n.top + 3, n.right - 3, n.top + 3 + s->full_height);
-        btn(3, nullptr, kBwRectNextMI, 1);
+        set(base_win().rect_next_mi, n.right - 3 - s->full_width, n.top + 3, n.right - 3, n.top + 3 + s->full_height);
+        btn(3, nullptr, base_win().rect_next_mi, 1);
         sprites(&g_bw.buttons[3], 0xCB58);
     }
-    btn(0, label_upper(0x194), kBwRectOk, 0);
-    btn(1, label_upper(0x1F4), kBwRectRename, 0);
-    btn(0xC, label_upper(0x814), kBwRectChangeMI, 1);
-    btn(0xD, label_upper(0xAC), kBwRectHurryMI, 1);
-    set(0x40DCC, 0xA9, 0xEA, 0x129, 0xFE);
-    btn(10, label_upper(0x4FC), 0x40DCC, 0);
-    set(0x40DBC, 299, 0xEA, 0x1AB, 0xFE);
-    btn(9, label_upper(0xD4), 0x40DBC, 0);
-    set(0x40DDC, 0x1AD, 0xEA, 0x22D, 0xFE);
-    btn(0xB, label_upper(0x4F8), 0x40DDC, 0);
-    set(0x40D6C, 0x1E, 7, 0x8E, 0x1B);
-    btn(4, label_upper(0x824), 0x40D6C, 0);
+    btn(0, label_upper(0x194), base_win().rect_ok, 0);
+    btn(1, label_upper(0x1F4), base_win().rect_rename, 0);
+    btn(0xC, label_upper(0x814), base_win().rect_change_mi, 1);
+    btn(0xD, label_upper(0xAC), base_win().rect_hurry_mi, 1);
+    set(base_win().rect_resources, 0xA9, 0xEA, 0x129, 0xFE);
+    btn(10, label_upper(0x4FC), base_win().rect_resources, 0);
+    set(base_win().rect_support, 299, 0xEA, 0x1AB, 0xFE);
+    btn(9, label_upper(0xD4), base_win().rect_support, 0);
+    set(base_win().rect_psych, 0x1AD, 0xEA, 0x22D, 0xFE);
+    btn(0xB, label_upper(0x4F8), base_win().rect_psych, 0);
+    set(base_win().rect_explore, 0x1E, 7, 0x8E, 0x1B);
+    btn(4, label_upper(0x824), base_win().rect_explore, 0);
     gov(&g_bw.buttons[4], 3, 0x8C6C54);
-    set(0x40D7C, 0x90, 7, 0x100, 0x1B);
-    btn(5, label_upper(0x828), 0x40D7C, 0);
+    set(base_win().rect_discover, 0x90, 7, 0x100, 0x1B);
+    btn(5, label_upper(0x828), base_win().rect_discover, 0);
     gov(&g_bw.buttons[5], 3, 0x8C6C54);
     {
         Sprite* s = bw_sprite(0xC9CC);
-        set(0x40E4C, 0x102, 7, 0x102 + s->full_width, 7 + s->full_height);
-        btn(0x12, nullptr, 0x40E4C, 0);
+        set(base_win().rect_gov_advanced, 0x102, 7, 0x102 + s->full_width, 7 + s->full_height);
+        btn(0x12, nullptr, base_win().rect_gov_advanced, 0);
         sprites(&g_bw.buttons[0x12], 0xC9CC);
         for (int32_t st = 0; st < 3; st++) g_bw.buttons[0x12].text_color[st] = text_color(0x8C6C60 + (uint32_t)st * 4);
     }
-    set(0x40DAC, 0x118, 7, 0x1BE, 0x1B);
-    btn(8, label_upper(0x724), 0x40DAC, 0);
+    set(base_win().rect_governor, 0x118, 7, 0x1BE, 0x1B);
+    btn(8, label_upper(0x724), base_win().rect_governor, 0);
     gov(&g_bw.buttons[8], 0, 0x8C6C60);
     {
         Sprite* s = bw_sprite(0xC9CC);
-        set(0x40E5C, 0x1C0, 7, 0x1C0 + s->full_width, 7 + s->full_height);
-        btn(0x13, nullptr, 0x40E5C, 0);
+        set(base_win().rect_40e5c, 0x1C0, 7, 0x1C0 + s->full_width, 7 + s->full_height);
+        btn(0x13, nullptr, base_win().rect_40e5c, 0);
         sprites(&g_bw.buttons[0x13], 0xC9CC);
         for (int32_t st = 0; st < 3; st++) g_bw.buttons[0x13].text_color[st] = text_color(0x8C6C60 + (uint32_t)st * 4);
     }
-    set(0x40D8C, 0x1D6, 7, 0x246, 0x1B);
-    btn(6, label_upper(0x82C), 0x40D8C, 0);
+    set(base_win().rect_build, 0x1D6, 7, 0x246, 0x1B);
+    btn(6, label_upper(0x82C), base_win().rect_build, 0);
     gov(&g_bw.buttons[6], 3, 0x8C6C54);
-    set(0x40D9C, 0x248, 7, 0x2B8, 0x1B);
-    btn(7, label_upper(0x830), 0x40D9C, 0);
+    set(base_win().rect_conquer, 0x248, 7, 0x2B8, 0x1B);
+    btn(7, label_upper(0x830), base_win().rect_conquer, 0);
     gov(&g_bw.buttons[7], 3, 0x8C6C54);
-    btn(0x10, nullptr, kBwRectStapleMI, 1);
+    btn(0x10, nullptr, base_win().rect_staple_mi, 1);
     sprites(&g_bw.buttons[0x10], 0xCBDC);
     {
-        const UiRect& rr = bw_rect(kBwRectStapleMI);
+        const UiRect& rr = base_win().rect_staple_mi;
         button_init(&g_bw.staple2, nullptr, 0x10, rr.left, rr.top, rr.right - rr.left, rr.bottom - rr.top, 1);
         sprites(&g_bw.staple2, 0xBDFC);
     }
-    btn(0x15, label_upper(0xD38), kBwRectEditor, 0);
+    btn(0x15, label_upper(0xD38), base_win().rect_editor, 0);
     if (!w1024) {
         Sprite* s = bw_sprite(0xCA50);
-        set(0x40E3C, 0xA9, 0x107, 0xA9 + s->full_width, 0x107 + s->full_height);
-        btn(0x11, nullptr, 0x40E3C, 0);
+        set(base_win().rect_40e3c, 0xA9, 0x107, 0xA9 + s->full_width, 0x107 + s->full_height);
+        btn(0x11, nullptr, base_win().rect_40e3c, 0);
         sprites(&g_bw.buttons[0x11], 0xCA50);
     }
     for (BaseButton& b : g_bw.buttons) b.font = font;
@@ -599,14 +600,14 @@ void bw_status(int32_t on) {
         return;
     }
     for (int32_t i = 0; i < 22; i++) {
-        if (i == 0x10 && (MFactions[(uint8_t)Bases[bwf(kBwBase)].faction_id].rule_flags & 0x80)) {
+        if (i == 0x10 && (MFactions[(uint8_t)Bases[base_win().base].faction_id].rule_flags & 0x80)) {
             g_bw.staple2.shown = true;
             continue;
         }
         if (i == 0x15 && !(GameState & STATE_SCENARIO_EDITOR)) continue;
         if (g_bw.buttons[i].inited) g_bw.buttons[i].shown = true;
     }
-    bwf(kBwDragState) = -1;
+    base_win().drag_state = -1;
     if ((GamePreferences & PREF_AV_VOLUME_SFX_TOGGLE) && !Wave_is_playing(menu2)) Wave_play_2(menu2);
     ambience(0xCD);
     g_bw.visible = true;
@@ -650,23 +651,23 @@ void THISCALL BaseWin_close(uint8_t*) {}
 // BaseWin_zoom (0x41A920): shows base_id (wait: until the window is closed).
 void THISCALL BaseWin_zoom(uint8_t* self, int32_t base_id, int32_t wait) {
     if (!g_bw.ready) BaseWin_init(self);
-    bwf(0x40B00) = -1;
+    base_win().unk_40b00 = -1;
     TutWin_reset(&TutWin);
-    bwf(kBwBase) = base_id;
+    base_win().base = base_id;
     ComputeBaseID = -1;
     bw_set_base();
     cur_base().state_flags &= ~0x10;
-    bwf(kBwOpen) = 1;
-    bwf(kBwB10) = 0;
-    bwf(kBwB14) = 0;
-    bwf(kBwB18) = 1;
-    bwf(kBwProdAtOpen) = cur_base().queue_items[0];
+    base_win().open = 1;
+    base_win().fac_scroll = 0;
+    base_win().sup_scroll = 0;
+    base_win().unk_40b18 = 1;
+    base_win().prod_at_open = cur_base().queue_items[0];
     FX_play(&Sounds, 0xF);
     ambience(0x1E);
     if (!Win_is_visible(self)) bw_show();
     BaseWin_on_redraw(self);  // vtable + 0xF8 (when already visible), then GraphicWin_redraw
     ui_invalidate();
-    bwf(0x1E670) = 0;  // in_ECX[0x799C]
+    base_win().model_turn = 0;  // in_ECX[0x799C]
     // Tutorial hints (TutWin_tut_win / TutWin_do_base, tutwin.cpp): BASECONTROL, DRONERIOTS,
     // LOWNUTRIENT, SUPPORT, LOWMINERALS(2), INEFFICIENCY(HQ).
     BASE& b = cur_base();
@@ -675,13 +676,13 @@ void THISCALL BaseWin_zoom(uint8_t* self, int32_t base_id, int32_t wait) {
         TutorialArrowShown = 1;
         parse_says(0, b.name, -1, -1);
         int32_t x = 0, y = 0;
-        TutWin_base_rect(&bw_rect(0x40DAC), &x, &y);
+        TutWin_base_rect(&base_win().rect_governor, &x, &y);
         TutWin_tut_win(&TutWin, MapWins[0], "BASECONTROL", x, y, nullptr, 0x100, -1, -1);
     } else if ((b.state_flags & 2) && tut_check2(0x10) && (b.governor_flags & 0x80000040) != 0x80000040) {
         TutorialArrowShown = 6;
         parse_says(0, b.name, -1, -1);
         int32_t x = 0, y = 0;
-        TutWin_base_rect(&bw_rect(0x40DAC), &x, &y);
+        TutWin_base_rect(&base_win().rect_governor, &x, &y);
         TutWin_tut_win(&TutWin, MapWins[0], "DRONERIOTS", x, y, nullptr, 0x100, -1, -1);
     } else {
         const char* label = nullptr;
@@ -690,17 +691,17 @@ void THISCALL BaseWin_zoom(uint8_t* self, int32_t base_id, int32_t wait) {
             (b.governor_flags & 0x80000040) != 0x80000040) {
             parse_says(0, b.name, -1, -1);
             label = "LOWNUTRIENT";
-            rect = 0x40B8C;
+            rect = offsetof(BaseWindow, rect_map);
         } else if (b.mineral_surplus < (b.pop_size + 1) / 2 && BaseForcesMaintCost > 0 &&
                    (b.pop_size > 3 || b.mineral_surplus < 1) && tut_check2(0x200)) {
             parse_says(0, b.name, -1, -1);
             label = "SUPPORT";
-            rect = 0x40CDC;
+            rect = offsetof(BaseWindow, rect_exp[2]);
         } else if (b.mineral_surplus < 2 && BaseForcesMaintCost < b.pop_size / 2 && b.pop_size > 2 &&
                    tut_check2(0x40)) {
             parse_says(0, b.name, -1, -1);
             label = (map_tile(b.x, b.y)->climate & 0xE0) > 0x5F ? "LOWMINERALS" : "LOWMINERALS2";
-            rect = 0x40CDC;
+            rect = offsetof(BaseWindow, rect_exp[2]);
         } else if (b.energy_inefficiency > b.energy_surplus && !(b.governor_flags & 0x80000000)) {
             bool hq = false;
             for (int32_t i = 0; i < BaseCount; i++) {
@@ -713,18 +714,18 @@ void THISCALL BaseWin_zoom(uint8_t* self, int32_t base_id, int32_t wait) {
                 parse_says(0, b.name, -1, -1);
                 BaseWin_draw_expenses(self, 2);
                 label = "INEFFICIENCYHQ";
-                rect = 0x40CBC;
+                rect = offsetof(BaseWindow, rect_exp[0]);
             } else if (tut_check2(0x80)) {
                 parse_says(0, b.name, -1, -1);
                 BaseWin_draw_expenses(self, 2);
                 label = "INEFFICIENCY";
-                rect = 0x40CBC;
+                rect = offsetof(BaseWindow, rect_exp[0]);
             }
         }
         if (label) TutWin_do_base(&TutWin, &bw_rect(rect), label, 0);
     }
     if (wait) {
-        while (bwf(kBwOpen) && Win_is_visible(self) && !ControlTurnA) wait_task();
+        while (base_win().open && Win_is_visible(self) && !ControlTurnA) wait_task();
     }
 }
 
@@ -734,17 +735,17 @@ void THISCALL BaseWin_soft_zoom(uint8_t* self, int32_t base_id) {
         BaseWin_zoom(self, base_id, 0);
         return;
     }
-    bwf(kBwBase) = base_id;
+    base_win().base = base_id;
     ComputeBaseID = -1;
     bw_set_base();
-    bwf(kBwProdAtOpen) = Bases[base_id].queue_items[0];
+    base_win().prod_at_open = Bases[base_id].queue_items[0];
 }
 
 // The common tail of BaseWin_exit and BaseWin_base_killed: closes the window and recentres the
 // view on the selected unit when it is not well inside the view.
 void bw_close_window(uint8_t* self) {
     int32_t was = Win_is_visible(self);
-    bwf(kBwOpen) = 0;
+    base_win().open = 0;
     // Time_stop (the window's animation timer).
     if (Win_is_visible(self)) bw_hide();
     do_all_draws();
@@ -752,16 +753,18 @@ void bw_close_window(uint8_t* self) {
     int32_t y = Vehs[MapWinVehA].y, x = Vehs[MapWinVehA].x;
     uint8_t* win = MapWins[0];
     if (!(y < 0 || y >= MapAreaY || x < 0 || x >= MapAreaX || (map_tile(x, y)->climate & 0xE0) < 0x61 ||
-          mw(win, kMwOriginY) + 2 <= (int32_t)(y - (map_tile(x, y)->climate >> 5) + 3))) {
+          map_win(win).origin_y + 2 <= (int32_t)(y - (map_tile(x, y)->climate >> 5) + 3))) {
         console_center();
         return;
     }
-    if (mw(win, kMwOriginY) + 2 <= y && y < mw(win, kMwRowsAbove) + mw(win, kMwRowsBelow) - 2 + mw(win, kMwOriginY)) {
+    if (map_win(win).origin_y + 2 <= y &&
+        y < map_win(win).rows_above + map_win(win).rows_below - 2 + map_win(win).origin_y) {
         if (!(MapToggleFlat & 1)) {
-            if (x < mw(win, kMwOriginX) + 2) x += MapAreaX;
-            if (mw(win, kMwColsOdd) + mw(win, kMwColsEven) - 2 + mw(win, kMwOriginX) <= x) x -= MapAreaX;
+            if (x < map_win(win).origin_x + 2) x += MapAreaX;
+            if (map_win(win).cols_odd + map_win(win).cols_even - 2 + map_win(win).origin_x <= x) x -= MapAreaX;
         }
-        if (mw(win, kMwOriginX) + 2 <= x && x < mw(win, kMwColsOdd) + mw(win, kMwColsEven) - 2 + mw(win, kMwOriginX))
+        if (map_win(win).origin_x + 2 <= x &&
+            x < map_win(win).cols_odd + map_win(win).cols_even - 2 + map_win(win).origin_x)
             return;
     }
     console_center();
@@ -771,11 +774,11 @@ void THISCALL BaseWin_exit(uint8_t* self) { bw_close_window(self); }
 
 void THISCALL BaseWin_base_killed(uint8_t* self, int32_t base_id) {
     if (!Win_is_visible(self)) return;
-    if (base_id < bwf(kBwBase)) {
-        bwf(kBwBase)--;
+    if (base_id < base_win().base) {
+        base_win().base--;
         return;
     }
-    if (bwf(kBwBase) == base_id) bw_close_window(self);
+    if (base_win().base == base_id) bw_close_window(self);
 }
 
 // BaseWin_focus (0x415DD0): the shown base becomes the current base again.
@@ -783,13 +786,13 @@ void THISCALL BaseWin_focus(uint8_t*) { bw_set_base(); }
 
 void THISCALL BaseWin_recompute(uint8_t* self, int32_t) {
     if (!Win_is_visible(self)) return;
-    set_base(bwf(kBwBase));
+    set_base(base_win().base);
     base_compute(1);
     bw_redraw();
 }
 
 void THISCALL BaseWin_check_base(uint8_t* self, int32_t base_id) {
-    if (Win_is_visible(self) && base_id == bwf(kBwBase)) {
+    if (Win_is_visible(self) && base_id == base_win().base) {
         base_compute(1);
         bw_redraw();
     }
@@ -797,7 +800,7 @@ void THISCALL BaseWin_check_base(uint8_t* self, int32_t base_id) {
 
 void THISCALL BaseWin_check_loc(uint8_t* self, int32_t x, int32_t y, int32_t dist) {
     if (!Win_is_visible(self)) return;
-    const BASE& b = Bases[bwf(kBwBase)];
+    const BASE& b = Bases[base_win().base];
     int32_t dx = std::abs(x - b.x);
     if (!(MapToggleFlat & 1) && dx > MapHalfX) dx = MapAreaX - dx;
     int32_t dy = std::abs(y - b.y);
@@ -812,7 +815,7 @@ void THISCALL BaseWin_check_loc(uint8_t* self, int32_t x, int32_t y, int32_t dis
 
 void THISCALL BaseWin_check_veh(uint8_t* self, int32_t veh_id) {
     if (!Win_is_visible(self)) return;
-    int32_t base_id = bwf(kBwBase);
+    int32_t base_id = base_win().base;
     if ((Vehs[veh_id].x == Bases[base_id].x && Vehs[veh_id].y == Bases[base_id].y) ||
         Vehs[veh_id].home_base_id == base_id) {
         base_compute(1);
@@ -824,20 +827,20 @@ void THISCALL BaseWin_check_veh(uint8_t* self, int32_t veh_id) {
 // BaseWin_prev (0x41A010) / BaseWin_next (0x41A160): the faction's base before / after the shown
 // one in alphabetical order (wrapping around).
 static void bw_step(uint8_t* self, bool next) {
-    set_base(bwf(kBwBase));
+    set_base(base_win().base);
     if (cur_base().faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) return;
     if (ControlTurnC) {
         X_pop("ARROWUPKEEP", 0);
         return;
     }
-    int32_t shown = bwf(kBwBase);
+    int32_t shown = base_win().base;
     int32_t found = -1, wrap = shown;
     int32_t found_cmp = -1, wrap_cmp = shown;  // base whose name is compared
     for (int32_t i = 0; i < BaseCount; i++) {
-        if (i == bwf(kBwBase)) continue;
-        if (Bases[i].faction_id != Bases[bwf(kBwBase)].faction_id) continue;
+        if (i == base_win().base) continue;
+        if (Bases[i].faction_id != Bases[base_win().base].faction_id) continue;
         const char* name = Bases[i].name;
-        int32_t c = crt_stricmp(name, Bases[bwf(kBwBase)].name);
+        int32_t c = crt_stricmp(name, Bases[base_win().base].name);
         if (next ? c > 0 : c < 0) {
             if (found < 0 ||
                 (next ? crt_stricmp(name, Bases[found_cmp].name) < 0 : crt_stricmp(name, Bases[found_cmp].name) > 0)) {
@@ -852,7 +855,7 @@ static void bw_step(uint8_t* self, bool next) {
         }
     }
     int32_t target = found >= 0 ? found : wrap;
-    bwf(kBwBase) = target;
+    base_win().base = target;
     BaseWin_zoom(self, target, 0);
 }
 void THISCALL BaseWin_prev(uint8_t* self) { bw_step(self, false); }
@@ -891,9 +894,9 @@ void THISCALL BaseWin_on_redraw(uint8_t* self) {
     std::copy(g_bw.back.begin(), g_bw.back.end(), g_bw.canvas.data);
     mi_restore_back(1);
     BaseWin_update_gov_buttons(self);
-    bw_button_set(&g_bw.buttons[10], bwf(kBwPane) == 0);
-    bw_button_set(&g_bw.buttons[11], bwf(kBwPane) == 1);
-    bw_button_set(&g_bw.buttons[9], bwf(kBwPane) == 2);
+    bw_button_set(&g_bw.buttons[10], base_win().pane == 0);
+    bw_button_set(&g_bw.buttons[11], base_win().pane == 1);
+    bw_button_set(&g_bw.buttons[9], base_win().pane == 2);
     BaseWin_draw_production(self, 0);
     BaseWin_draw_expenses(self, 0);
     BaseWin_draw_queue(self, 0);
@@ -1025,7 +1028,7 @@ void basewin_compose(Buffer* screen) {
     if (!g_bw.visible) return;
     blit_keyed(screen, &g_bw.canvas, g_bw.x, g_bw.y);
     compose_buttons(screen, 0, g_bw.x, g_bw.y);
-    const UiRect& mp = mi_rect(kMiPos);
+    const UiRect& mp = main_interface().pos;
     blit_keyed(screen, &g_bw.mi_canvas, mp.left, mp.top);
     compose_buttons(screen, 1, mp.left, mp.top);
     prodwin_compose(screen);  // the production picker over the base window
@@ -1036,9 +1039,9 @@ void basewin_log_state() {
         std::fprintf(stderr, "basestate closed\n");
         return;
     }
-    const BASE& b = Bases[bwf(kBwBase)];
+    const BASE& b = Bases[base_win().base];
     std::fprintf(stderr, "basestate base %d %s f%d pop %d tiles %08X spec %d minerals %d/%d credits %d queue",
-                 bwf(kBwBase), b.name, b.faction_id, b.pop_size, b.worked_tiles, b.specialist_total,
+                 base_win().base, b.name, b.faction_id, b.pop_size, b.worked_tiles, b.specialist_total,
                  b.minerals_accumulated, b.minerals_accumulated_2, Factions[b.faction_id].energy_credits);
     for (int32_t i = 0; i <= b.queue_size && i < 10; i++) std::fprintf(stderr, " %d", b.queue_items[i]);
     std::fprintf(stderr, " state %08X gov %08X\n", b.state_flags, b.governor_flags);
@@ -1055,7 +1058,7 @@ bool basewin_dump(const char* path) {
         for (int32_t y = 0; y < wh[1]; y++) std::fwrite(c->data + (size_t)y * c->stride, 1, (size_t)wh[0], f);
     }
     std::fclose(f);
-    std::fprintf(stderr, "basedump %s (base %d)\n", path, bwf(kBwBase));
+    std::fprintf(stderr, "basedump %s (base %d)\n", path, base_win().base);
     return true;
 }
 
@@ -1071,7 +1074,7 @@ static BaseButton* button_at(int32_t parent, int32_t x, int32_t y) {
 bool basewin_mouse(int32_t type, int32_t x, int32_t y, bool double_click, bool right) {
     if (!g_bw.visible) return false;
     uint8_t* self = &BaseWin;
-    const UiRect& mp = mi_rect(kMiPos);
+    const UiRect& mp = main_interface().pos;
     // Which window: the main interface lies over the base window (its pixels of colour 9 are
     // holes, as the window regions of the original).
     int32_t parent = -1, lx = 0, ly = 0;
@@ -1114,19 +1117,19 @@ bool basewin_mouse(int32_t type, int32_t x, int32_t y, bool double_click, bool r
         // BaseWin_on_left_down / on_iface_left_down: the spot under the press (drag source).
         uint32_t base = parent ? 0x40130 + 0xA14 - 0x40130 + 0x40130 : 0;
         (void)base;
-        if (bwf(kBwDragState) > 0) {}
-        bwf(kBwDragState) = -1;
-        bwf(kBwDragType) = -1;
-        bwf(kBwDragIndex) = -1;
-        bwf(kBwDownX) = lx;
-        bwf(kBwDownY) = ly;
+        if (base_win().drag_state > 0) {}
+        base_win().drag_state = -1;
+        base_win().drag_type = -1;
+        base_win().drag_index = -1;
+        base_win().down_x = lx;
+        base_win().down_y = ly;
         g_bw.down_parent = parent;
         if (!MultiplayerActive || !NetInputPending) {
             int32_t index, t;
             if (spot_check(parent ? &g_bw.spots_iface : &g_bw.spots_win, lx, ly, &index, &t) >= 0) {
-                bwf(kBwDragType) = t;
-                bwf(kBwDragIndex) = index;
-                bwf(kBwDragState) = 0;
+                base_win().drag_type = t;
+                base_win().drag_index = index;
+                base_win().drag_state = 0;
             }
         }
         return true;
@@ -1157,29 +1160,30 @@ bool basewin_mouse(int32_t type, int32_t x, int32_t y, bool double_click, bool r
     }
     if (type == UiInput::LUP) {
         // A click: BaseWin_on_left_click / on_iface_left_click (right: the right button's click).
-        bool moved = std::abs(lx - bwf(kBwDownX)) > 2 || std::abs(ly - bwf(kBwDownY)) > 2 || g_bw.down_parent != parent;
-        if (moved && bwf(kBwDragState) >= 0) {
+        bool moved =
+            std::abs(lx - base_win().down_x) > 2 || std::abs(ly - base_win().down_y) > 2 || g_bw.down_parent != parent;
+        if (moved && base_win().drag_state >= 0) {
             // A drag (worker dragged to another tile): the release's click with the drag kept.
-            bwf(kBwDragState) = 1;
+            base_win().drag_state = 1;
         }
         // The panes' scroll bars (Scroll: a button moves a line, the track a page; BaseWin_on_scrolled
         // / on_iface_scrolled redraw the pane).
         const ScrollBar* bar = parent == 0 ? (g_fac_bar_shown ? &g_fac_bar : nullptr)
-                                           : (g_sup_bar_shown && bwf(0x40B20) ? &g_sup_bar : nullptr);
+                                           : (g_sup_bar_shown && base_win().sup_bar ? &g_sup_bar : nullptr);
         if (!right && bar && lx >= bar->r.left && lx < bar->r.right && ly >= bar->r.top && ly < bar->r.bottom) {
             int32_t d = scroll_click(*bar, lx, ly, parent == 0 ? g_fac_bar_page : 1);
-            int32_t& pos = bwf(parent == 0 ? kBwB10 : kBwB14);
+            int32_t& pos = (parent == 0 ? base_win().fac_scroll : base_win().sup_scroll);
             pos = std::max(bar->min, std::min(pos + d, bar->max));
             if (parent == 0) BaseWin_draw_facilities(self, 0);
             else BaseWin_draw_supported(self, 0);
-            bwf(kBwDragState) = -1;
+            base_win().drag_state = -1;
             return true;
         }
         if (parent == 0) BaseWin_click(self, lx, ly, right ? 1 : 0, 0);
         else BaseWin_iface_click(self, lx, ly, right ? 1 : 0, 0);
-        bwf(kBwDragState) = -1;
-        bwf(kBwDragType) = -1;
-        bwf(kBwDragIndex) = -1;
+        base_win().drag_state = -1;
+        base_win().drag_type = -1;
+        base_win().drag_index = -1;
         (void)double_click;
         return true;
     }

@@ -834,7 +834,7 @@ void fame_add() {
     }
     // The world map pane (WorldWin's canvas) as the entry's picture.
     Buffer* mi = basewin_mi_canvas();
-    UiRect pane = mi_rect(0xCFC);
+    UiRect pane = main_interface().world_map;
     Buffer pic;
     Buffer_ctor(&pic);
     int32_t w = pane.right - pane.left, h = pane.bottom - pane.top;

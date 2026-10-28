@@ -44,9 +44,9 @@ const UiRect kResult = {0xF5, 0x163, 0x21A, 0x17A};
 
 bool is_human(int32_t f) { return (FactionStatus[0] & (1 << f)) != 0; }
 bool is_alive(int32_t f) { return (FactionStatus[1] & (1 << f)) != 0; }
-CouncilSession& session(uint8_t* win) { return *reinterpret_cast<CouncilSession*>(win + kCouncilWinSession); }
+CouncilSession& session(uint8_t*) { return CouncilWinSession; }
 
-struct CouncilWinState : ScreenWin {
+struct CouncilWindow : ScreenWin {
     uint8_t* win = nullptr;
     Font *f_title = nullptr, *f_text = nullptr, *f_bold = nullptr;
     Sprite portraits[8];
@@ -58,7 +58,7 @@ struct CouncilWinState : ScreenWin {
     void log_state() override;
     void buttons();
 };
-CouncilWinState g_cw;
+CouncilWindow g_cw;
 
 std::string vote_text(const CouncilSession& s, int32_t v) {
     switch (v) {
@@ -74,7 +74,7 @@ std::string vote_text(const CouncilSession& s, int32_t v) {
     return "";
 }
 
-void load_portrait(CouncilWinState* w, int32_t f) {
+void load_portrait(CouncilWindow* w, int32_t f) {
     if (w->loaded[f]) return;
     w->loaded[f] = true;
     Buffer b;
@@ -85,7 +85,7 @@ void load_portrait(CouncilWinState* w, int32_t f) {
     pfncSpriteFromCanvasRectTrans(&w->portraits[f], &b, 9, 0x58, 0x1C9, 0x60, 0x73, 0);
 }
 
-void CouncilWinState::redraw() {
+void CouncilWindow::redraw() {
     Buffer* c = &canvas;
     const CouncilSession& s = session(win);
     UiRect all{0, 0, c->width, c->height};
@@ -146,7 +146,7 @@ void CouncilWinState::redraw() {
 }
 
 // The buttons on the main interface (the info pane's bottom row, as the original's layout).
-void CouncilWinState::buttons() {
+void CouncilWindow::buttons() {
     sw_clear_buttons(this);
     const CouncilSession& s = session(win);
     const UiRect frame = {0x106 + 4, 0x42 + 4, 0x2FB - 4, 0xAC - 4};
@@ -167,7 +167,7 @@ void CouncilWinState::buttons() {
 }
 
 // FUN_00424870 (the window's button handler).
-void CouncilWinState::on_button(int32_t id) {
+void CouncilWindow::on_button(int32_t id) {
     CouncilSession& s = session(win);
     if (id >= 1 && id <= 3) {
         if (!s.result) CouncilWin_vote(win, CurrentPlayerFaction, -id);
@@ -197,7 +197,7 @@ void CouncilWinState::on_button(int32_t id) {
     if (open) buttons();
 }
 
-void CouncilWinState::on_key(int32_t key) {
+void CouncilWindow::on_key(int32_t key) {
     int32_t vk = key & 0xFFFF;
     if (vk == 0x0D || vk == 0x1B) {
         CouncilWin_key(win, 0, vk);
@@ -205,7 +205,7 @@ void CouncilWinState::on_key(int32_t key) {
     }
 }
 
-void CouncilWinState::log_state() {
+void CouncilWindow::log_state() {
     const CouncilSession& s = session(win);
     std::fprintf(stderr, "councilstate proposal %d candidate %d result %d governor %d votes", s.proposal, s.candidate,
                  s.result, GovernorFaction);
@@ -224,7 +224,7 @@ void ui_councilwin_open(uint8_t* win) { g_cw.win = win; }
 void ui_councilwin_build(uint8_t* win) {
     g_cw.win = win;
     if (!viewer_plays()) return;
-    CouncilWinState* s = &g_cw;
+    CouncilWindow* s = &g_cw;
     s->name = "council";
     basewin_mi_init();
     int32_t avail = ScreenHeight - MiConsoleHeight;

@@ -5,27 +5,11 @@
 #include "engine/globals.h"
 
 // ---- the council window --------------------------------------------------------------------------
-// CouncilWin (vtable 0x66AAE8), a UI object in the image. Its session fields (the methods below
-// reach them through `self`, which is always CouncilWin): see CouncilSession.
+// CouncilWin (vtable 0x66AAE8), a UI object in the image. The methods below take it as `self`, as
+// the original's do (it is always CouncilWin). Its session fields (+0xA1C .. +0xA93) are game
+// state (PBEM saves hold them): a record of their own (engine/state.h), CouncilWinSession.
 GLOBAL(uint8_t, CouncilWin, 0x6FEC80);
-constexpr uint32_t kCouncilWinSession = 0xA1C;  // offset of CouncilSession in CouncilWin
-// Session fields of CouncilWin (+0xA1C .. +0xA93).
-struct CouncilSession {
-    int32_t proposal;
-    int32_t candidate;  // elections: the candidate, then the winner (0: none)
-    int32_t result;  // 0 not decided, 1 passed, -1 failed / no majority, -2 vetoed by the governor
-    int32_t governor;  // GovernorFaction when the session opened
-    int32_t unk_a2c[3];
-    uint32_t start_time;  // timeGetTime() when the session opened
-    int32_t time_limit;  // ms: 60 s per human player (multiplayer)
-    int32_t unk_a40;  // 1
-    uint32_t voter_mask;  // ~humans (PBEM: 0xFF)
-    uint8_t spot[0xC];  // Spot object (UI)
-    int32_t votes[8];  // vote per faction: candidate (elections), -1 YEA, -2 NAY, -3 abstain,
-    // -5 dead, 0 not voted yet
-    int32_t council_votes[8];  // council_votes() per faction
-};
-SMAC_LAYOUT(CouncilSession, 0x78);
+GLOBAL(CouncilSession, CouncilWinSession, 0x6FF69C);  // CouncilWin + 0xA1C (types/data.h)
 // Non-zero while the council window is open (0x703DE4).
 GLOBAL(int32_t, CouncilWinActive, 0x703DE4);
 

@@ -76,9 +76,9 @@ struct StackPop {
 void set_map_cursor(int32_t index) {
     uint32_t sprite = 0x93AA70u + (uint32_t)index * 0x2C;
     for_each_mapwin([&](int32_t, uint8_t* w) {
-        if ((uint32_t)mw(w, 0x1EF4C) != sprite) {
+        if ((uint32_t)map_win(w).cursor != sprite) {
             ui_set_map_cursor(index);
-            mw(w, 0x1EF4C) = (int32_t)sprite;
+            map_win(w).cursor = (int32_t)sprite;
         }
     });
     do_non_input();
@@ -88,13 +88,13 @@ void set_map_cursor(int32_t index) {
 // highlights of the modes (options 0xC40000) off.
 void arrow_cursors() {
     for_each_mapwin([&](int32_t, uint8_t* w) {
-        if (mw(w, 0x1EF4C) || mw(w, 0x1EF50) != 0x7F00) {
+        if (map_win(w).cursor || map_win(w).cursor_id != 0x7F00) {
             ui_set_map_cursor(-1);
-            mw(w, 0x1EF50) = 0x7F00;
-            mw(w, 0x1EF4C) = 0;
+            map_win(w).cursor_id = 0x7F00;
+            map_win(w).cursor = 0;
         }
-        if (mw(w, kMwOptions) & 0xC40000) {
-            mw(w, kMwOptions) &= 0xFF3BFFFF;
+        if (map_win(w).options & 0xC40000) {
+            map_win(w).options &= 0xFF3BFFFF;
             pfncRedrawMap(w, 1);
         }
         do_non_input();
@@ -108,44 +108,44 @@ void arrow_cursors() {
 void THISCALL Console_cursor_on(uint8_t*, int32_t index) { set_map_cursor(index); }
 
 void THISCALL Console_cursor_on_2(uint8_t* self, int32_t mode, int32_t range) {
-    mw(self, kConModeRange) = range;
-    mw(self, kConMode) = mode;
+    console_win(self).mode_range = range;
+    console_win(self).mode = mode;
     set_map_cursor(mode);
 }
 
 void THISCALL Console_cursor_off(uint8_t* self) {
-    mw(self, kConMode) = 0;
+    console_win(self).mode = 0;
     arrow_cursors();
 }
 
 int32_t THISCALL Console_selected(uint8_t* self) {
-    int32_t mode = mw(self, kConMode);
+    int32_t mode = console_win(self).mode;
     if (mode) {
-        mw(self, kConMode) = 0;
+        console_win(self).mode = 0;
         arrow_cursors();
     }
     return mode;
 }
 
 int32_t THISCALL Console_selecting(uint8_t* self, int32_t x, int32_t y) {
-    int32_t mode = mw(self, kConMode);
+    int32_t mode = console_win(self).mode;
     if (mode == 1) return 1;
     if (!mode) return 0;
-    if (mw(self, kConModeRange) >= 0) {
+    if (console_win(self).mode_range >= 0) {
         // Out of range: the "no" cursor (index 3).
-        int32_t v = mw(self, kConVeh);
+        int32_t v = console_win(self).veh;
         int32_t dx = wrap_dx(x - Vehs[v].x);
         int32_t dy = std::abs(y - Vehs[v].y);
-        if (mw(self, kConModeRange) < (dy + dx) >> 1) {
+        if (console_win(self).mode_range < (dy + dx) >> 1) {
             set_map_cursor(3);
             return 1;
         }
     }
-    if (mw(self, kConMode) == 8 && !valid_patrol(mw(self, kConVeh), x, y)) {
+    if (console_win(self).mode == 8 && !valid_patrol(console_win(self).veh, x, y)) {
         set_map_cursor(3);
         return 1;
     }
-    set_map_cursor(mw(self, kConMode));
+    set_map_cursor(console_win(self).mode);
     return 1;
 }
 
@@ -231,12 +231,12 @@ void THISCALL Console_explore(uint8_t*, int32_t veh_id) {
 
 void THISCALL Console_set_patrol(uint8_t* self, int32_t veh_id) {
     veh(veh_id).waypoint_count = 0;
-    if (mw(self, kConMode) == 8) {
+    if (console_win(self).mode == 8) {
         Console_cursor_off(self);
         return;
     }
     for_each_mapwin([&](int32_t, uint8_t* w) {
-        mw(w, kMwOptions) |= 0x400000;
+        map_win(w).options |= 0x400000;
         MapWin_draw_base_dest(w, 1);
     });
     Console_cursor_on_2(self, 8, -1);
@@ -292,7 +292,7 @@ void THISCALL Console_unload(uint8_t* self, int32_t veh_id) {
         if (triad_of(veh_id) == triad) {
             found |= 1;
             if (veh_unmoved(veh_id) && !veh(veh_id).order) {
-                mw(self, kConVeh) = veh_id;
+                console_win(self).veh = veh_id;
                 found |= 2;
             }
         }
@@ -306,7 +306,7 @@ void THISCALL Console_unload(uint8_t* self, int32_t veh_id) {
         pop_msg("UNLOADNEXT");
         return;
     }
-    mw(self, kConWaiting) = 0;
+    console_win(self).waiting = 0;
     Console_set_move(self, 1);
 }
 
@@ -402,7 +402,7 @@ void THISCALL Console_convoy(uint8_t* self, int32_t veh_id) {
         // What the tile would yield to the home base, by resource (nutrients, minerals, energy).
         for (int32_t i = 0; i < 3; i++) {
             int32_t n =
-                resource_yield(i, mw(self, kConFaction), veh(veh_id).home_base_id, veh(veh_id).x, veh(veh_id).y);
+                resource_yield(i, console_win(self).faction, veh(veh_id).home_base_id, veh(veh_id).x, veh(veh_id).y);
             parse_num(i, n);
             parse_say(i, n == 1 ? ResName[i].name_singular : ResName[i].name_plural, -1, -1);
         }
@@ -470,24 +470,24 @@ void THISCALL Console_activate(uint8_t* self, int32_t x, int32_t y, int32_t sele
         v = veh_at(x, y);
         if (stack_check(v, 1, -1, -1, -1) != 1) v = veh_pick(v, "PICKUNIT", 1);
         if (v >= 0) {
-            mw(self, kConVeh) = v;
-            mw(self, kConNextVeh) = v;
+            console_win(self).veh = v;
+            console_win(self).next_veh = v;
         }
         pop_msg((NetTurnDoneMask & (1 << (CurrentPlayerFaction & 31))) && veh_ready(v) ? "ALREADYDONE" : "FIRSTMOVE");
         return;
     }
     if (MapWinInVehMode && select) {
-        v = mw(self, kConVeh);
-        mw(self, kConWaiting) = 0;
+        v = console_win(self).veh;
+        console_win(self).waiting = 0;
         if (stack_check(v, 1, CurrentPlayerFaction, -1, -1) == 1 && veh_selectable(v)) {
-            mw(self, kConAnySelect) = 1;
+            console_win(self).any_select = 1;
             return;
         }
         goto pick;
     }
     v = veh_at(x, y);
     if (v < 0 || !stack_check(v, 1, CurrentPlayerFaction, -1, -1)) {
-        mw(self, kConWaiting) = 0;
+        console_win(self).waiting = 0;
         return;
     }
     if (stack_check(v, 1, -1, -1, -1) != 1) goto pick;
@@ -516,12 +516,12 @@ void THISCALL Console_activate(uint8_t* self, int32_t x, int32_t y, int32_t sele
     }
     goto pick_v;
 pick:
-    v = mw(self, kConVeh);  // [ebp+0xc] at L4d329e: the unit tested above
+    v = console_win(self).veh;  // [ebp+0xc] at L4d329e: the unit tested above
 pick_v:
     v = veh_pick(v, "PICKUNIT", 1);
     if (v < 0) return;
 activate:
-    if (veh(v).faction_id != (uint32_t)mw(self, kConFaction)) return;
+    if (veh(v).faction_id != (uint32_t)console_win(self).faction) return;
     log_say_values("Activate AWAKEN", v, veh(v).x, veh(v).y);
     if (veh_jail(v)) {
         pop_msg("INJAIL");
@@ -538,14 +538,14 @@ activate:
             popv(ScriptFileName, "ALREADYMOVED", v, 0);
         }
     } else {
-        mw(self, kConWaiting) = 0;
+        console_win(self).waiting = 0;
     }
-    mw(self, kConVeh) = v;
+    console_win(self).veh = v;
     ui_synch_veh(v);
     net_await_synch();
     net_unlock_veh();
     Console_set_move(self, 1);
-    mw(self, kConAnySelect) = 1;
+    console_win(self).any_select = 1;
 }
 
 void THISCALL Console_disband(uint8_t* self, int32_t veh_id) {
@@ -554,12 +554,12 @@ void THISCALL Console_disband(uint8_t* self, int32_t veh_id) {
         return;
     }
     if (net_lock_veh(&veh_id, 4)) return;
-    if (veh(veh_id).faction_id != (uint32_t)mw(self, kConFaction) &&
+    if (veh(veh_id).faction_id != (uint32_t)console_win(self).faction &&
         (MultiplayerActive || !(GameState & STATE_OMNISCIENT_VIEW))) {
         net_unlock_veh();
         return;
     }
-    mw(self, kConWaiting) = 0;
+    console_win(self).waiting = 0;
     int32_t base_id = base_at(veh(veh_id).x, veh(veh_id).y);
     parse_says(0, Units[veh(veh_id).unit_id].name, -1, -1);
     StrBuffer[0] = 0;
@@ -567,7 +567,7 @@ void THISCALL Console_disband(uint8_t* self, int32_t veh_id) {
     if (base_id < 0) crt_strcat(StrBuffer, "2");
     const char* pcx;
     int32_t triad = triad_of(veh_id);
-    if (MFactions[mw(self, kConFaction)].rule_flags & 0x80)
+    if (MFactions[console_win(self).faction].rule_flags & 0x80)
         pcx = triad == TRIAD_AIR ? "alair_sm.pcx" : (triad == TRIAD_SEA ? "navun_sm.pcx" : "alunit_sm.pcx");
     else pcx = triad == TRIAD_AIR ? "air_sm.pcx" : (triad == TRIAD_SEA ? "navun_sm.pcx" : "unit_sm.pcx");
     int32_t r = popp(ScriptFileName, StrBuffer, 0, pcx, 0);
@@ -630,7 +630,7 @@ void THISCALL Console_give_veh(uint8_t* self, int32_t veh_id) {
     }
     int32_t x = veh(veh_id).x, y = veh(veh_id).y;
     int32_t to = whose_territory(CurrentPlayerFaction, x, y, nullptr, 0);
-    int32_t me = mw(self, kConFaction);
+    int32_t me = console_win(self).faction;
     auto is_native = [](int32_t unit_id) {
         return unit_id < 0x40 && (Weapon[Units[unit_id].weapon_id].offense_value < 0 || unit_id == 0xF);
     };
@@ -672,7 +672,7 @@ void THISCALL Console_give_veh(uint8_t* self, int32_t veh_id) {
     } else {
         int32_t triad = triad_of(veh_id);
         const char* pcx;
-        if (MFactions[mw(self, kConFaction)].rule_flags & 0x80)
+        if (MFactions[console_win(self).faction].rule_flags & 0x80)
             pcx = triad == TRIAD_AIR ? "alair_sm.pcx" : (triad == TRIAD_SEA ? "navun_sm.pcx" : "alunit_sm.pcx");
         else pcx = triad == TRIAD_AIR ? "air_sm.pcx" : (triad == TRIAD_SEA ? "navun_sm.pcx" : "unit_sm.pcx");
         r = popp(ScriptFileName, "CANGIVE", 0, pcx, 0);
@@ -892,7 +892,7 @@ void THISCALL Console_destroy(uint8_t* self, int32_t veh_id) {
             }
         }
     }
-    mw(self, kConWaiting) = 0;
+    console_win(self).waiting = 0;
     if (MultiplayerActive) {
         message_veh(0x2406, veh_id, choice, 0);
         NetDaemon_await_exec(&NetState, 1);
@@ -914,7 +914,7 @@ void THISCALL Console_group(uint8_t* self, int32_t veh_id) {
         VEH& v = veh(i);
         if (v.faction_id != (uint32_t)faction_id) continue;
         // The marked group (after a first group order), else the units of the leader's tile.
-        if (mw(self, kCon23D1C)) {
+        if (console_win(self).unk_23d1c) {
             if (!(v.state & 0x8000000)) continue;
         } else if (v.x != x || v.y != y) {
             continue;
@@ -944,7 +944,7 @@ void THISCALL Console_group(uint8_t* self, int32_t veh_id) {
     }
     // The destination lines of the group (MapWin_dest_line per unit, option +0x1DD84) are drawn
     // by the map window; here the map is redrawn.
-    mw(self, kCon23D1C) = 1;
+    console_win(self).unk_23d1c = 1;
     draw_map(1);
 }
 
@@ -1008,7 +1008,7 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
     // id: the unit (a base for mode -1); mode: ORDER_MOVE_TO / ROAD_TO / MAGTUBE_TO, 0x80 bombing
     // run, -1 the base's rally point of a triad, -2 find a base (centre the view), -3 psi gate.
     StackPop pop;
-    int32_t saved_options = mw(main_view(), kMwOptions);  // [ebp-0x58]
+    int32_t saved_options = map_win(main_view()).options;  // [ebp-0x58]
     int32_t sort = prefs_get_int("Base Sort", 0, 0);  // [ebp-0x34]
     int32_t artifact = 0;  // [ebp-0x40]: carries an artifact
     int32_t faction_id, x, y;  // [ebp-0x28], [ebp-0x20], [ebp-0x1c]
@@ -1018,8 +1018,8 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
     bool base_locked = false;
     GotoToBase = 1;
     auto restore_view = [&]() {
-        if (mw(main_view(), kMwOptions) != saved_options) {
-            mw(main_view(), kMwOptions) = saved_options;
+        if (map_win(main_view()).options != saved_options) {
+            map_win(main_view()).options = saved_options;
             draw_map(1);
         }
     };
@@ -1047,8 +1047,8 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
         base_locked = true;
         if (!(saved_options & 0x40000)) {
             // The rally points of every base are shown while choosing.
-            mw(main_view(), kMwOptions) &= ~0x40;
-            mw(main_view(), kMwOptions) |= 0x40000;
+            map_win(main_view()).options &= ~0x40;
+            map_win(main_view()).options |= 0x40000;
             draw_map(1);
         }
         parse_says(0, b.name, -1, -1);
@@ -1421,14 +1421,14 @@ shown:
         GameState |= (STATE_SCENARIO_CHEATED_FLAG | STATE_SCENARIO_EDITOR | STATE_OMNISCIENT_VIEW);
         draw_map(1);
     }
-    pfncMainMenuUpdateVisible(self + 0x22A2C, mw(self, kConVeh));
+    pfncMainMenuUpdateVisible(self + 0x22A2C, console_win(self).veh);
 }
 
 // ---- Console_assemble (0x4D95F0) ---------------------------------------------------------------
 
 // Console_clear_group (0x50F650): no unit in the group.
 static void console_clear_group(uint8_t* self) {
-    mw(self, kCon23D1C) = 0;
+    console_win(self).unk_23d1c = 0;
     for (int32_t i = 0; i < VehCount; i++) Vehs[i].state &= ~0x8000000u;
 }
 
@@ -1448,12 +1448,12 @@ void THISCALL Console_assemble(uint8_t* self) {
     uint32_t kinds = 0;
     for (int32_t i = 0; i < 0xC; i++)
         if (DialogChoices & (1 << i)) kinds |= 1u << i;
-    mw(self, kCon23D1C) = 1;
+    console_win(self).unk_23d1c = 1;
     int32_t last = -1;
     int32_t cx = MapWinCursorX[MapWinCursorIndex], cy = MapWinCursorY[MapWinCursorIndex];
     for (int32_t i = 0; i < VehCount; i++) {
         VEH& v = Vehs[i];
-        if ((uint32_t)v.faction_id != (uint32_t)mw(self, kConFaction)) continue;
+        if ((uint32_t)v.faction_id != (uint32_t)console_win(self).faction) continue;
         if (kinds & 1) {  // near the cursor
             int32_t dx = std::abs(v.x - cx);
             if (!(MapToggleFlat & 1) && MapHalfX < dx) dx = MapAreaX - dx;
@@ -1487,7 +1487,7 @@ void THISCALL Console_assemble(uint8_t* self) {
     if (DialogToggle == 2) {
         for (int32_t i = 0; i < VehCount; i++) {
             VEH& v = Vehs[i];
-            if ((uint32_t)v.faction_id == (uint32_t)mw(self, kConFaction) && (v.state & 0x8000000)) {
+            if ((uint32_t)v.faction_id == (uint32_t)console_win(self).faction && (v.state & 0x8000000)) {
                 v.order = 0;
                 v.state &= 0xFCFFBDFF;
             }

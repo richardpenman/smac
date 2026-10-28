@@ -57,9 +57,9 @@ uint8_t* main_menu(uint8_t* self) { return self + 0x22A2C; }  // the console's m
 // Inlined in several places of the original: the cursor is hidden before it moves, after a
 // pending full redraw.
 void hide_cursor(uint8_t* self) {
-    mw(self, kConCursorShown) = 0;
-    if (mw(self, kConRedraw)) {
-        mw(self, kConRedraw) = 0;
+    console_win(self).cursor_shown = 0;
+    if (console_win(self).redraw) {
+        console_win(self).redraw = 0;
         pfncRedrawMap(main_view(), 1);
     }
     MapWin_draw_cursor(main_view());
@@ -83,16 +83,16 @@ int32_t triad_of(int32_t veh_id) { return Chassis[Units[Vehs[veh_id].unit_id].ch
 void THISCALL Console_set_view(uint8_t* self, int32_t force) {
     if (!MapWinInVehMode && !force) return;
     ambience(0x1E);
-    mw(self, kConVehMode) = 0;
-    mw(self, kConCursorShown) = 1;
-    mw(self, kConCursorOn) = 1;
-    if (mw(self, kConRedraw)) {
-        mw(self, kConRedraw) = 0;
+    console_win(self).veh_mode = 0;
+    console_win(self).cursor_shown = 1;
+    console_win(self).cursor_on = 1;
+    if (console_win(self).redraw) {
+        console_win(self).redraw = 0;
         pfncRedrawMap(main_view(), 1);
     }
     draw_cursor();
     update_panes(self);
-    pfncMainMenuUpdateVisible(main_menu(self), mw(self, kConVeh));
+    pfncMainMenuUpdateVisible(main_menu(self), console_win(self).veh);
 }
 
 // ---- net layer, single-player paths --------------------------------------------------------------
@@ -107,8 +107,8 @@ void net_unlock_veh() {
         return;
     }
     // NetDaemon_unlock_veh (0x5310F0) without multiplayer: the lock fields are cleared.
-    mapwin_field(&NetState, 0x1B78) = 0;
-    mapwin_field(&NetState, 0x1BC4) = 0;
+    *reinterpret_cast<int32_t*>(&NetState + 0x1B78) = 0;
+    *reinterpret_cast<int32_t*>(&NetState + 0x1BC4) = 0;
 }
 void net_synch_veh(int32_t veh_id) {
     if (!MultiplayerActive) return;  // synch_veh -> NetDaemon_synch, NetDaemon_await_synch: nothing
@@ -157,11 +157,11 @@ void THISCALL Console_cursor_next(uint8_t* self, int32_t x, int32_t y) {
     }
     StatusWin_set_loc(&InfoWin, x, y);
     if (x != MapWinCursorX[MapWinCursorIndex] || y != MapWinCursorY[MapWinCursorIndex]) {
-        int32_t i = (mw(self, kConCursorHead) + 1) & 0x1F;  // the original's signed modulo of a positive value
-        mw(self, kConCursorHead) = i;
-        mw(self, kConCursorIdx) = i;
-        mw(self, kConCursorX + i * 4) = x;
-        mw(self, kConCursorY + mw(self, kConCursorHead) * 4) = y;
+        int32_t i = (console_win(self).cursor_head + 1) & 0x1F;  // the original's signed modulo of a positive value
+        console_win(self).cursor_head = i;
+        console_win(self).cursor_idx = i;
+        console_win(self).cursor_x[i] = x;
+        console_win(self).cursor_y[console_win(self).cursor_head] = y;
     }
 }
 
@@ -170,9 +170,9 @@ int32_t THISCALL Console_focus(uint8_t* self, int32_t x, int32_t y, int32_t fact
     uint32_t bits = faction_id < 0 ? 0x60000000u : (faction_id != CurrentPlayerFaction ? 0x40000000u : 0x20000000u);
     for (int32_t i = 0; i < 8; i++) {
         uint8_t* w = MapWins[i];
-        if (!w || (i && !mw(w, kMwActive))) continue;
+        if (!w || (i && !map_win(w).active)) continue;
         bool follow;  // the main view follows the cursor
-        if (!(bits & (uint32_t)mw(w, kMwOptions))) {
+        if (!(bits & (uint32_t)map_win(w).options)) {
             if (i || !ControlTurnC) continue;
             follow = true;
         } else {
@@ -180,8 +180,8 @@ int32_t THISCALL Console_focus(uint8_t* self, int32_t x, int32_t y, int32_t fact
         }
         if (follow) {
             Console_cursor_next(&MainConsole, x, y);
-            if (mw(self, kConRedraw)) {
-                mw(self, kConRedraw) = 0;
+            if (console_win(self).redraw) {
+                console_win(self).redraw = 0;
                 if (MapWin_focus(main_view(), x, y)) changed = 1;
                 else pfncRedrawMap(main_view(), 1);
                 continue;
@@ -207,10 +207,10 @@ int32_t THISCALL Console_ready_search(uint8_t* self, int32_t veh_id) {
     int32_t pass = MultiplayerActive ? -1 : 0;
     for (; pass <= 2; pass++) {
         if (MultiplayerActive && pass == 0) {
-            int32_t next = mw(self, kConNextVeh);
+            int32_t next = console_win(self).next_veh;
             if (next >= 0 && next < VehCount && Vehs[next].faction_id == CurrentPlayerFaction && veh_ready(next)) {
-                found = mw(self, kConNextVeh);
-                mw(self, kConNextVeh) = -1;
+                found = console_win(self).next_veh;
+                console_win(self).next_veh = -1;
                 break;
             }
         }
@@ -228,7 +228,7 @@ int32_t THISCALL Console_ready_search(uint8_t* self, int32_t veh_id) {
             int32_t hi = ax <= ay ? ay : ax;
             int32_t lo = ay <= ax ? ay : ax;
             int32_t dist = hi - ((((ax + ay) >> 1) - lo + 1) >> 1);
-            if (dist < best || (dist == best && i == mw(self, kConVeh))) {
+            if (dist < best || (dist == best && i == console_win(self).veh)) {
                 best = dist;
                 found = i;
             }
@@ -237,24 +237,24 @@ int32_t THISCALL Console_ready_search(uint8_t* self, int32_t veh_id) {
         if (pass >= 0) {
             // Nothing ready: the units told to wait come back.
             for (int32_t i = 0; i < VehCount; i++) {
-                if (pass != 0 || i != mw(self, kConVeh) || veh_id < 0) Vehs[i].state &= ~2u;
+                if (pass != 0 || i != console_win(self).veh || veh_id < 0) Vehs[i].state &= ~2u;
             }
         }
     }
     if (MultiplayerActive && pass < 0) {
-        mw(self, kConMpSearch) = 1;
+        console_win(self).mp_search = 1;
         return found;
     }
-    mw(self, kConMpSearch) = 0;
+    console_win(self).mp_search = 0;
     return found;
 }
 
 void THISCALL Console_ready(uint8_t* self) {
-    mw(self, kConCursorShown) = 0;
+    console_win(self).cursor_shown = 0;
     draw_cursor();
-    int32_t veh_id = Console_ready_search(self, mw(self, kConSearchReset) ? -1 : mw(self, kConVeh));
-    mw(self, kConVeh) = veh_id;
-    mw(self, kConSearchReset) = 0;
+    int32_t veh_id = Console_ready_search(self, console_win(self).search_reset ? -1 : console_win(self).veh);
+    console_win(self).veh = veh_id;
+    console_win(self).search_reset = 0;
     if (veh_id < 0) return;
     if (!MapWinInVehMode) return;
     if (!Vehs[veh_id].order || (int8_t)Vehs[veh_id].order > 0x17) {
@@ -262,24 +262,24 @@ void THISCALL Console_ready(uint8_t* self) {
         hide_cursor(self);
         Console_cursor_next(self, x, y);
         update_panes(self);
-        veh_id = mw(self, kConVeh);
+        veh_id = console_win(self).veh;
         uint32_t state = Vehs[veh_id].state;
         if (!(GamePreferences & PREF_ADV_NO_CENTER_VEH_ORDERS) ||
             (!Vehs[veh_id].order && !(state & 0x200) && (state & 0x1000200) != 0x1000200)) {
             if (!Console_focus(self, Vehs[veh_id].x, Vehs[veh_id].y, Vehs[veh_id].faction_id)) {
                 // Recentre unless the unit is at least 3 tiles inside the view (and high
                 // terrain does not hide it at the top).
-                y = Vehs[mw(self, kConVeh)].y;
-                x = Vehs[mw(self, kConVeh)].x;
-                int32_t oy = mw(self, kMwOriginY), ox = mw(self, kMwOriginX);
+                y = Vehs[console_win(self).veh].y;
+                x = Vehs[console_win(self).veh].x;
+                int32_t oy = map_win(self).origin_y, ox = map_win(self).origin_x;
                 bool inside = false;
                 uint8_t climate = 0;
                 bool off_map = y < 0 || MapAreaY <= y || x < 0 || MapAreaX <= x;
                 if (!off_map) climate = map_tile(x, y)->climate;
                 if ((off_map || (climate & 0xE0) < 0x61 || oy + 3 <= (y - (climate >> 5)) + 3) && oy + 3 <= y &&
-                    y < mw(self, kMwRowsBelow) + mw(self, kMwRowsAbove) - 3 + oy) {
+                    y < map_win(self).rows_below + map_win(self).rows_above - 3 + oy) {
                     int32_t wx = x;
-                    int32_t right = mw(self, kMwColsEven) + mw(self, kMwColsOdd) - 3 + ox;
+                    int32_t right = map_win(self).cols_even + map_win(self).cols_odd - 3 + ox;
                     if (!(MapToggleFlat & 1)) {
                         if (x < ox + 3) wx = x + MapAreaX;
                         if (right <= wx) wx -= MapAreaX;
@@ -289,13 +289,13 @@ void THISCALL Console_ready(uint8_t* self) {
                 if (!inside) pfncMoveMap(main_view(), x, y, 1);
             }
         }
-        pfncMainMenuUpdateVisible(main_menu(self), mw(self, kConVeh));
+        pfncMainMenuUpdateVisible(main_menu(self), console_win(self).veh);
         flush_input();
-        Vehs[mw(self, kConVeh)].iter_count = 0;
+        Vehs[console_win(self).veh].iter_count = 0;
     }
-    veh_id = mw(self, kConVeh);
+    veh_id = console_win(self).veh;
     int32_t base_id = base_at(Vehs[veh_id].x, Vehs[veh_id].y);
-    veh_id = mw(self, kConVeh);
+    veh_id = console_win(self).veh;
     VEH& v = Vehs[veh_id];
     if (!v.order && !(v.state & 0x200) && (v.state & 0x1000200) != 0x1000200 && !(v.state & 0x4000) && base_id >= 0) {
         // A unit in a base with a rally point for its triad goes there.
@@ -307,7 +307,7 @@ void THISCALL Console_ready(uint8_t* self) {
             v.waypoint_y[0] = Bases[target].y;
         }
     }
-    veh_id = mw(self, kConVeh);
+    veh_id = console_win(self).veh;
     VEH& u = Vehs[veh_id];
     if (u.faction_id == CurrentPlayerFaction && (u.flags & 0x1000) && !u.order && !(u.state & 0x200)) {
         // First selection of a new unit: its sound.
@@ -328,7 +328,7 @@ void THISCALL Console_ready(uint8_t* self) {
         }
         if (sound >= 0) FX_play_loc(&Sounds, sound, u.x, u.y);
     }
-    ambience_veh(mw(self, kConVeh));
+    ambience_veh(console_win(self).veh);
     flush_input();
 }
 
@@ -339,49 +339,49 @@ void THISCALL Console_set_move(uint8_t* self, int32_t force) {
         int32_t busy;
         if (!(GameMoreRules & 0x10)) {
             busy = NetSimultaneous;
-            if (NetTurnDoneMask & (1 << (mw(self, kConFaction) & 31))) return;
+            if (NetTurnDoneMask & (1 << (console_win(self).faction & 31))) return;
         } else {
             busy = not_my_turn();
         }
         if (busy) return;
     }
     if (!MapWinInVehMode || force) {
-        mw(self, kConVehMode) = 0;
-        mw(self, kConCursorShown) = 0;
-        mw(self, kConCursorOn) = 1;
+        console_win(self).veh_mode = 0;
+        console_win(self).cursor_shown = 0;
+        console_win(self).cursor_on = 1;
         shown = true;
-        if (mw(self, kConRedraw)) {
-            mw(self, kConRedraw) = 0;
+        if (console_win(self).redraw) {
+            console_win(self).redraw = 0;
             pfncRedrawMap(main_view(), 1);
         }
         draw_cursor();
-        mw(self, kConVehMode) = 1;
-        mw(self, kConWaiting) = 0;
+        console_win(self).veh_mode = 1;
+        console_win(self).waiting = 0;
     }
-    if (!veh_selectable(mw(self, kConVeh))) {
+    if (!veh_selectable(console_win(self).veh)) {
         Console_ready(self);
         shown = false;
     } else {
-        ambience_veh(mw(self, kConVeh));
+        ambience_veh(console_win(self).veh);
     }
-    if (mw(self, kConVeh) >= 0 && veh_selectable(mw(self, kConVeh))) {
-        if (!Vehs[mw(self, kConVeh)].moves_spent && !MultiplayerActive) spot_all(mw(self, kConVeh), 0);
-        int32_t y = Vehs[mw(self, kConVeh)].y, x = Vehs[mw(self, kConVeh)].x;
+    if (console_win(self).veh >= 0 && veh_selectable(console_win(self).veh)) {
+        if (!Vehs[console_win(self).veh].moves_spent && !MultiplayerActive) spot_all(console_win(self).veh, 0);
+        int32_t y = Vehs[console_win(self).veh].y, x = Vehs[console_win(self).veh].x;
         hide_cursor(self);
         Console_cursor_next(self, x, y);
         if (shown) {
             update_panes(self);
             Console_focus(self, MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex],
-                          Vehs[mw(self, kConVeh)].faction_id);
-            pfncMainMenuUpdateVisible(main_menu(self), mw(self, kConVeh));
+                          Vehs[console_win(self).veh].faction_id);
+            pfncMainMenuUpdateVisible(main_menu(self), console_win(self).veh);
         }
-        mw(self, kConMoveSet) = 1;
+        console_win(self).move_set = 1;
         return;
     }
-    mw(self, kConWaiting) = 0;
+    console_win(self).waiting = 0;
     if (MapWinInVehMode) Console_set_view(self, 1);  // inlined
     StatusWin_set_loc(&InfoWin, MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
-    Console_focus(self, MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex], mw(self, kConFaction));
+    Console_focus(self, MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex], console_win(self).faction);
 }
 
 void THISCALL Console_update_data(uint8_t*, int32_t a1) {
@@ -393,12 +393,12 @@ void THISCALL Console_update_data(uint8_t*, int32_t a1) {
 // ---- the human turn ---------------------------------------------------------------------------------
 
 int32_t THISCALL Console_veh_turn(uint8_t* self) {
-    mw(self, kConWaiting) = 1;
+    console_win(self).waiting = 1;
     int32_t waited = 0;  // [ebp-0x8]
     bool looped = false;  // [ebp-0x10]
     int32_t auto_moves = 0;  // [ebp-0x4]: moves of an automated unit / order steps this turn
-    if ((GamePreferences & PREF_BSC_TUTORIAL_MSGS) && !Vehs[mw(self, kConVeh)].order) Console_give_hints(self);
-    int32_t& veh = mw(self, kConVeh);
+    if ((GamePreferences & PREF_BSC_TUTORIAL_MSGS) && !Vehs[console_win(self).veh].order) Console_give_hints(self);
+    int32_t& veh = console_win(self).veh;
     int32_t ready = veh_ready(veh);
     for (;;) {
         // Leave when the unit changed state, the player is done or the game ends.
@@ -406,14 +406,14 @@ int32_t THISCALL Console_veh_turn(uint8_t* self) {
         int32_t sel = veh_selectable(veh);
         if ((!sel || veh_ready(veh) != ready || (!ready && Vehs[veh].order)) && MapWinInVehMode) stop = true;
         else
-            stop = (!mw(self, kConWaiting) && mw(self, kConNoFocus) != 2) || !mw(self, kConTurnActive) ||
+            stop = (!console_win(self).waiting && console_win(self).no_focus != 2) || !console_win(self).turn_active ||
                    ControlTurnA || end_of_game(0) || (MultiplayerActive && (GameState & 0x800));
         if (stop) break;
         looped = true;
-        if (mw(self, kConNoFocus) == 2) {
+        if (console_win(self).no_focus == 2) {
             uint8_t order = Vehs[veh].order;
-            mw(self, kConNoFocus) = 0;
-            mw(self, kConWaiting) = order == ORDER_MOVE_TO;
+            console_win(self).no_focus = 0;
+            console_win(self).waiting = order == ORDER_MOVE_TO;
         }
         if (NetSimultaneous) {
             if (!MapWinInVehMode) {
@@ -424,10 +424,10 @@ int32_t THISCALL Console_veh_turn(uint8_t* self) {
             }
             continue;
         }
-        if (mw(self, kConMpSearch)) {
+        if (console_win(self).mp_search) {
             uint32_t state = Vehs[veh].state;
             if (!(state & 0x200) && (state & 0x1000200) != 0x1000200 && !(state & 0x4000) && !Vehs[veh].order) {
-                mw(self, kConMpSearch) = 0;
+                console_win(self).mp_search = 0;
                 veh = -1;
                 break;
             }
@@ -495,7 +495,7 @@ int32_t THISCALL Console_veh_turn(uint8_t* self) {
             TutWin_tour(&TutWin);
         }
     }
-    mw(self, kConWaiting) = 0;
+    console_win(self).waiting = 0;
     if (!looped) veh = -1;
     return waited;
 }
@@ -507,24 +507,24 @@ int32_t THISCALL Console_human_turn(uint8_t* self) {
     WorldWin_set_world_map(&WorldWin);
     GameState &= ~0x400;
     ControlTurnStarted = 1;
-    mw(self, kCon23D1C) = 0;
+    console_win(self).unk_23d1c = 0;
     for (int32_t i = 0; i < VehCount; i++) Vehs[i].state &= ~0x8000000u;
     if (!ControlTurnMove) {
-        mw(self, kConVeh) = -1;
+        console_win(self).veh = -1;
         Console_set_move(self, 0);
     } else if (!MapWinInVehMode) {
         Console_set_view(self, 1);  // inlined
-        pfncMainMenuUpdateVisible(main_menu(self), mw(self, kConVeh));
+        pfncMainMenuUpdateVisible(main_menu(self), console_win(self).veh);
     } else {
         Console_set_move(self, 1);
     }
-    pfncMainMenuUpdateVisible(main_menu(self), mw(self, kConVeh));
+    pfncMainMenuUpdateVisible(main_menu(self), console_win(self).veh);
     StatusWin_reset(&InfoWin);
     InfoWin_reset(&InfoWindow);
-    mw(self, kConTurnActive) = 1;
-    mw(self, kConMpSearch) = 0;
+    console_win(self).turn_active = 1;
+    console_win(self).mp_search = 0;
     if (ControlTurnMove) {
-        int32_t v = mw(self, kConVeh);
+        int32_t v = console_win(self).veh;
         if ((v < 0 || !veh_ready(v) || (Vehs[v].state & 0x4200) || Vehs[v].order) && MapWinInVehMode)
             Console_set_view(self, 1);  // inlined
     }
@@ -547,73 +547,75 @@ int32_t THISCALL Console_human_turn(uint8_t* self) {
             X_pop("CONQUERPLANET", 0);
             GameState |= STATE_GAME_DONE;
         }
-        int32_t v = mw(self, kConVeh);
+        int32_t v = console_win(self).veh;
         bool keep = false;  // the selected unit can go on
-        if (v >= 0 && VehCount == veh_count) keep = (mw(self, kConAnySelect) ? veh_selectable(v) : veh_ready(v)) != 0;
+        if (v >= 0 && VehCount == veh_count)
+            keep = (console_win(self).any_select ? veh_selectable(v) : veh_ready(v)) != 0;
         if (!keep) {
             Console_ready(self);
-        } else if (MapWinInVehMode && !mw(self, kConMoveSet)) {
-            int32_t y = Vehs[mw(self, kConVeh)].y, x = Vehs[mw(self, kConVeh)].x;
+        } else if (MapWinInVehMode && !console_win(self).move_set) {
+            int32_t y = Vehs[console_win(self).veh].y, x = Vehs[console_win(self).veh].x;
             hide_cursor(self);
             Console_cursor_next(self, x, y);
-            if (!mw(self, kConNoFocus) || Vehs[mw(self, kConVeh)].order != ORDER_MOVE_TO) {
-                VEH& u = Vehs[mw(self, kConVeh)];
+            if (!console_win(self).no_focus || Vehs[console_win(self).veh].order != ORDER_MOVE_TO) {
+                VEH& u = Vehs[console_win(self).veh];
                 Console_focus(self, u.x, u.y, u.faction_id);
                 update_panes(self);
-                pfncMainMenuUpdateVisible(main_menu(self), mw(self, kConVeh));
+                pfncMainMenuUpdateVisible(main_menu(self), console_win(self).veh);
             }
         }
         veh_count = VehCount;
-        mw(self, kConMoveSet) = 0;
-        mw(self, kConNoFocus) = 0;
-        mw(self, kConAnySelect) = 0;
-        if (mw(self, kConVeh) < 0) {
+        console_win(self).move_set = 0;
+        console_win(self).no_focus = 0;
+        console_win(self).any_select = 0;
+        if (console_win(self).veh < 0) {
             // No unit needs orders: the turn can end.
             GameState |= 2;
             if (Win_is_visible(&BaseWin) || Win_is_visible(&ReportWindow)) GameState |= 4;
-            mw(self, kConTurnActive) = 1;
+            console_win(self).turn_active = 1;
             if (!Console_edit_lock(self)) {
                 if (!(GamePreferences & PREF_BSC_PAUSE_END_TURN) && !MultiplayerActive && !PbemActive && waited &&
                     !(GameState & 4)) {
-                    mw(self, kConTurnActive) = 0;  // automatic end of turn
+                    console_win(self).turn_active = 0;  // automatic end of turn
                 } else if (!(GamePreferences & PREF_BSC_PAUSE_END_TURN) || MultiplayerActive) {
                     parse_num(0, game_year(CurrentTurn));
                     NetMsg_pop(&NetMsg, waited ? "ENDOFTURN" : "ENDOFTURN1", 5000, 0, nullptr);
                 }
             }
-            if (!mw(self, kConTurnActive)) break;
+            if (!console_win(self).turn_active) break;
             Console_set_view(self, 1);  // inlined
             Console_focus(self, MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex],
-                          mw(self, kConFaction));
+                          console_win(self).faction);
         }
         Console_turn_hints(self);
-        if (mw(self, kConVeh) < 0) {
+        if (console_win(self).veh < 0) {
             GameState &= ~4;
             sound_turn_complete();  // the "turn complete" voice (FX slot 57) unless it is playing
             ambience(0xCB);
-            mw(self, kConWaiting) = 1;
+            console_win(self).waiting = 1;
             int32_t count = VehCount;
-            while (!MapWinInVehMode && mw(self, kConWaiting) && mw(self, kConTurnActive) && !ControlTurnA &&
+            while (!MapWinInVehMode && console_win(self).waiting && console_win(self).turn_active && !ControlTurnA &&
                    !end_of_game(0) && count == VehCount && (!MultiplayerActive || !(GameState & 0x800))) {
                 wait_loop();
                 bool tour = TutorialTourPending != 0;
                 TutorialTourPending = 0;
                 if (tour) TutWin_tour(&TutWin);
             }
-            mw(self, kConWaiting) = 0;
+            console_win(self).waiting = 0;
         } else {
             GameState &= ~6;
             waited |= Console_veh_turn(self);
         }
         if (ControlTurnA) return 0;
         if (GameState & 4) waited = 0;
-        if (mw(self, kConCursorShown)) draw_cursor();
-        if (!mw(self, kConTurnActive) || ControlTurnA || (MultiplayerActive && (GameState & 0x800)) || end_of_game(0))
+        if (console_win(self).cursor_shown) draw_cursor();
+        if (!console_win(self).turn_active || ControlTurnA || (MultiplayerActive && (GameState & 0x800)) ||
+            end_of_game(0))
             break;
     }
     ambience(0x1E);
     flush_input();
-    mw(self, kConTurnActive) = 0;
+    console_win(self).turn_active = 0;
     go_reset();
     return 0;
 }
@@ -625,14 +627,14 @@ void THISCALL Console_skip(uint8_t* self, int32_t veh_id) {
         net_order_veh(veh_id, -1, 0);
         return;
     }
-    mw(self, kConWaiting) = 0;
+    console_win(self).waiting = 0;
 }
 
 void THISCALL Console_wait(uint8_t* self, int32_t veh_id) {
-    mw(self, kConSearchReset) = 0;
+    console_win(self).search_reset = 0;
     Vehs[veh_id].state |= 2;
     Console_ready(self);
-    mw(self, kConWaiting) = 0;
+    console_win(self).waiting = 0;
 }
 
 void THISCALL Console_sentry(uint8_t* self, int32_t veh_id, int32_t turns) {
@@ -663,7 +665,7 @@ void THISCALL Console_sentry(uint8_t* self, int32_t veh_id, int32_t turns) {
     if (turns) Vehs[veh_id].waypoint_y[0] = (int16_t)turns;
     net_synch_veh(veh_id);
     net_unlock_veh();
-    mw(self, kConWaiting) = 0;
+    console_win(self).waiting = 0;
     draw_tile(Vehs[veh_id].x, Vehs[veh_id].y, 1);
 }
 
@@ -979,7 +981,7 @@ void THISCALL Console_terraform(uint8_t* self, int32_t veh_id, int32_t type) {
     } else if (type == FORMER_MAGTUBE && !(map_tile(x, y)->items & 4)) {
         return;
     }
-    if (!terrain_avail(type, is_sea, mw(self, kConFaction)) &&
+    if (!terrain_avail(type, is_sea, console_win(self).faction) &&
         !(type == FORMER_REMOVE_FUNGUS && has_abil(Vehs[veh_id].unit_id, 0x2000))) {
         say_missing_tech(terraform_preq(type, is_sea));
         const char* label = type == FORMER_MAGTUBE ? "HASROAD" : (type == FORMER_SOIL_ENR ? "HASFARM" : "NOTUNTILTECH");
@@ -1002,11 +1004,11 @@ void THISCALL Console_terraform(uint8_t* self, int32_t veh_id, int32_t type) {
         return;
     }
     if (is_sea && (sq->climate & 0xE0) < 0x40 && type != FORMER_RAISE_LAND && type != FORMER_LOWER_LAND) {
-        if (!(MFactions[mw(self, kConFaction)].rule_flags & 0x100)) {
+        if (!(MFactions[console_win(self).faction].rule_flags & 0x100)) {
             NetMsg_pop(&NetMsg, "LOWTIDAL", 5000, 0, nullptr);
             return;
         }
-        if (!has_tech(TECH_EcoEng2, mw(self, kConFaction))) {
+        if (!has_tech(TECH_EcoEng2, console_win(self).faction)) {
             NetMsg_pop(&NetMsg, "NEEDADVECOENG", 5000, 0, nullptr);
             return;
         }
@@ -1027,7 +1029,7 @@ void THISCALL Console_terraform(uint8_t* self, int32_t veh_id, int32_t type) {
         int32_t tech = -2;
         if (bit & 4) tech = Rules.tech_preq_build_road_fungus;
         else if (bit) tech = Rules.tech_preq_improv_fungus;
-        if (tech != -2 && !has_tech(tech, mw(self, kConFaction))) {
+        if (tech != -2 && !has_tech(tech, console_win(self).faction)) {
             if (tech < 0) {
                 NetMsg_pop(&NetMsg, "NOTINFUNGUS", 5000, 0, nullptr);
             } else {
@@ -1037,7 +1039,7 @@ void THISCALL Console_terraform(uint8_t* self, int32_t veh_id, int32_t type) {
             return;
         }
     }
-    const int32_t faction_id = mw(self, kConFaction);
+    const int32_t faction_id = console_win(self).faction;
     switch (type) {
     case FORMER_SOLAR:
         if (!energy_yield(faction_id, -1, x, y, 1)) {
@@ -1062,7 +1064,8 @@ void THISCALL Console_terraform(uint8_t* self, int32_t veh_id, int32_t type) {
                 return;
             }
             for (int32_t v = veh_at(nx, ny); v >= 0; v = Vehs[v].next_veh_id_stack) {
-                if (Vehs[v].faction_id == (uint32_t)mw(self, kConFaction) && Vehs[v].order == ORDER_THERMAL_BOREHOLE) {
+                if (Vehs[v].faction_id == (uint32_t)console_win(self).faction &&
+                    Vehs[v].order == ORDER_THERMAL_BOREHOLE) {
                     X_pop("TWOBOREHOLES", 0);
                     return;
                 }
@@ -1210,12 +1213,12 @@ void THISCALL Console_terraform(uint8_t* self, int32_t veh_id, int32_t type) {
         net_unlock_veh();
     }
     log_say_values("Finished issuing orders", veh_id, type + 4, 0);
-    mw(self, kConWaiting) = 0;
+    console_win(self).waiting = 0;
 }
 
 void THISCALL Console_end_my_turn(uint8_t* self) {
     BaseWinMultiplayerRefresh = 0;
-    mapwin_field(&InfoWindow, 0xA8) = 0;
+    *reinterpret_cast<int32_t*>(&InfoWindow + 0xA8) = 0;
     TutWin_reset(&TutWin);
     StatusWin_reset(&InfoWin);
     FX_play(&Sounds, 0xF);
@@ -1248,25 +1251,25 @@ void THISCALL Console_end_my_turn(uint8_t* self) {
             return;
         }
     }
-    if (!mw(self, kConTurnActive)) return;
+    if (!console_win(self).turn_active) return;
     if (!(GameState & 2)) {
         Console_set_move(self, 1);
-        int32_t v = mw(self, kConVeh);
+        int32_t v = console_win(self).veh;
         if (MapWinInVehMode && v >= 0 && (veh_ready(v) || Console_ready_search(self, v) >= 0) &&
             !X_pop("REALLYOVER", 0))
             return;
     }
     GameState |= 2;
-    mw(self, kConWaiting) = 0;
-    mw(self, kConTurnActive) = 0;
-    mw(self, kConNextVeh) = mw(self, kConVeh);
+    console_win(self).waiting = 0;
+    console_win(self).turn_active = 0;
+    console_win(self).next_veh = console_win(self).veh;
 }
 
 void THISCALL Console_veh_key(uint8_t* self, int32_t ch, int32_t key, int32_t vk) {
     if (MultiplayerActive && key != 'a') {
         if (ControlTurnC || NetLocked || (NetTurnDoneMask & (1 << (CurrentPlayerFaction & 31)))) return;
     }
-    int32_t& veh = mw(self, kConVeh);
+    int32_t& veh = console_win(self).veh;
     switch (ch) {
     case 'B': Console_terraform(self, veh, FORMER_THERMAL_BORE); break;
     case 'E': Console_terraform(self, veh, FORMER_ECH_MIRROR); break;
@@ -1278,11 +1281,11 @@ void THISCALL Console_veh_key(uint8_t* self, int32_t ch, int32_t key, int32_t vk
     case 'P':
         // Base destinations display (option 0x400000 of every map window).
         for_each_mapwin([&](int32_t, uint8_t* w) {
-            if (!(mw(main_view(), kMwOptions) & 0x400000)) {
-                mw(w, kMwOptions) |= 0x400000;
+            if (!(map_win(main_view()).options & 0x400000)) {
+                map_win(w).options |= 0x400000;
                 MapWin_draw_base_dest(w, 1);
             } else {
-                mw(w, kMwOptions) &= ~0x400000;
+                map_win(w).options &= ~0x400000;
                 pfncRedrawMap(w, 1);
             }
         });
@@ -1390,11 +1393,11 @@ void THISCALL Console_cursor_key(uint8_t* self, int32_t, int32_t key, int32_t) {
         break;
     case 'p':
         for_each_mapwin([&](int32_t, uint8_t* w) {
-            if (!(mw(main_view(), kMwOptions) & 0x400000)) {
-                mw(w, kMwOptions) |= 0x400000;
+            if (!(map_win(main_view()).options & 0x400000)) {
+                map_win(w).options |= 0x400000;
                 MapWin_draw_base_dest(w, 1);
             } else {
-                mw(w, kMwOptions) &= ~0x400000;
+                map_win(w).options &= ~0x400000;
                 pfncRedrawMap(w, 1);
             }
         });
@@ -1416,24 +1419,27 @@ void THISCALL pfncProcZoomKey(uint8_t*, int32_t command, int32_t index) {
                     (map_tile(x, y)->visibility & (1 << CurrentPlayerFaction)) || (GameState & STATE_OMNISCIENT_VIEW));
         };
         if (worldwin_screen_tile(mx, my, &tx, &ty) == 0 && seen(tx, ty)) {
-            mw(main_view(), kMwCenterX) = tx;
-            mw(main_view(), kMwCenterX + 4) = ty;
+            map_win(main_view()).center_x = tx;
+            map_win(main_view()).center_y = ty;
             index = 0;
         } else {
             for_each_mapwin([&](int32_t i, uint8_t* w) {
-                if (index >= 0 || mw(w, kMwZoom) >= 0) return;
-                int32_t cw = mw(w, kGwWidth), ch = -mw(w, kGwWidth + 4);
+                if (index >= 0 || map_win(w).zoom >= 0) return;
+                // BUG(reconstruction): the original (0x515229) reads the GraphicWin's width and
+                // height at the window's virtual base; this reads +0x4C4 / +0x4C8 of the MapWin
+                // itself (kept as it is: the cleanup changes no behaviour).
+                int32_t cw = *reinterpret_cast<int32_t*>(w + 0x4C4), ch = -*reinterpret_cast<int32_t*>(w + 0x4C8);
                 if (mx < 0 || my < 0 || mx >= cw || my >= ch) return;
                 if (pfncPtToTile(w, mx, my, &tx, &ty) != 0 || !seen(tx, ty)) return;
-                mw(w, kMwCenterX) = tx;
-                mw(w, kMwCenterX + 4) = ty;
+                map_win(w).center_x = tx;
+                map_win(w).center_y = ty;
                 index = i;
             });
         }
     }
     for_each_mapwin([&](int32_t i, uint8_t* w) {
         if (index >= 0 && i != index) return;
-        int32_t& zoom = mw(w, kMwZoom);
+        int32_t& zoom = map_win(w).zoom;
         switch (command) {
         case 0x203:
             if (zoom < 0x10) zoom += 2;
@@ -1460,8 +1466,8 @@ void THISCALL Console_turn_hints(uint8_t* self) {
         int32_t base_id = base_find_faction(cx, cy, f);
         if (base_id >= 0) {
             parse_says(0, Bases[base_id].name, -1, -1);
-            if (mw(self, kConVeh) >= 0) {
-                parse_says(1, Units[Vehs[mw(self, kConVeh)].unit_id].name, -1, -1);
+            if (console_win(self).veh >= 0) {
+                parse_says(1, Units[Vehs[console_win(self).veh].unit_id].name, -1, -1);
                 TutorialArrowShown = 0;
                 TutWin_tut_map(&TutWin, "LANDFALL", MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex],
                                -1, nullptr, 0x100, -1, -1);
@@ -1555,7 +1561,7 @@ void console_function_keys(uint8_t* self, int32_t vk, bool in_base) {
         if (in_base) break;
         hide_cursor(self);
         if (MapWinInVehMode) Console_set_view(self, 1);  // inlined
-        if (--mw(self, kConCursorIdx) < 0) mw(self, kConCursorIdx) = 0x1F;
+        if (--console_win(self).cursor_idx < 0) console_win(self).cursor_idx = 0x1F;
         StatusWin_set_loc(&InfoWin, MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
         MapWin_focus(main_view(), MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
         break;
@@ -1573,8 +1579,8 @@ void console_function_keys(uint8_t* self, int32_t vk, bool in_base) {
                     BaseWin_zoom(&BaseWin, base_id, 0);
             }
         } else {
-            mw(self, kConWaiting) = 0;
-            mw(self, kConTurnActive) = 0;
+            console_win(self).waiting = 0;
+            console_win(self).turn_active = 0;
         }
         break;
     }
@@ -1607,7 +1613,7 @@ void console_function_keys(uint8_t* self, int32_t vk, bool in_base) {
     case 0x79: hall_of_fame(0); break;  // F10
     case 0x7A:  // F11: menu detail
         GameMorePreferences ^= MPREF_ADV_DETAIL_MAIN_MENUS;
-        pfncMainMenuUpdateVisible(main_menu(self), mw(self, kConVeh));
+        pfncMainMenuUpdateVisible(main_menu(self), console_win(self).veh);
         X_pop((GameMorePreferences & MPREF_ADV_DETAIL_MAIN_MENUS) ? "MENUDETAIL" : "MENUSIMPLE", 0);
         break;
     case 0x7B: MultiWin_show(nullptr); break;  // F12: MainInterface_on_iface_button_clicked(0x3EC)
@@ -1699,7 +1705,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     // The scenario editor's keys (editor.cpp); the others as usual.
     if ((GameState & STATE_SCENARIO_EDITOR) && editor_key(self, vk, ch)) return 1;
     if (vk >= 0x60 && vk <= 0x69) ch = 0;  // keypad digits
-    if (vk == 0xD && (GameState & STATE_OMNISCIENT_VIEW) && (mw(main_view(), kMwOptions) & 0x4000)) {
+    if (vk == 0xD && (GameState & STATE_OMNISCIENT_VIEW) && (map_win(main_view()).options & 0x4000)) {
         // Path display (omniscient debug view): the go-to unit at the cursor moves.
         int32_t v = veh_at(MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
         for (; v >= 0; v = Vehs[v].next_veh_id_stack) {
@@ -1719,15 +1725,15 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         net_busy = 1;
         if (ControlTurnC) return 1;
     }
-    int32_t mode = mw(self, kConMode);
-    if (mode == 1 && MapWinMouseIndex >= 0 && mw(self, kConVeh) >= 0 && MapWinInVehMode) {
+    int32_t mode = console_win(self).mode;
+    if (mode == 1 && MapWinMouseIndex >= 0 && console_win(self).veh >= 0 && MapWinInVehMode) {
         // Keys of the go-to drag: j toggles the group move, g / space add a waypoint (patrol
         // or group waypoints), other keys end the patrol and the unit's orders.
         uint8_t* w = MapWins[MapWinMouseIndex];
-        VEH& v = Vehs[mw(self, kConVeh)];
+        VEH& v = Vehs[console_win(self).veh];
         int32_t mx, my;
         if (key == 'j') {
-            mw(w, 0x1DD84) = !mw(w, 0x1DD84);
+            map_win(w).group_drag = !map_win(w).group_drag;
             ui_mouse_pos(&mx, &my);
             MapWin_on_mouse_move(w, mx, my);
             return 1;
@@ -1744,36 +1750,37 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
                 v.waypoint_count = 0;
             }
             ui_mouse_pos(&mx, &my);
-            mw(w, 0x1DE10) = -1;
-            mw(w, 0x1DE0C) = -1;
+            map_win(w).drag_y = -1;
+            map_win(w).drag_x = -1;
             MapWin_on_mouse_move(w, mx, my);
             return 1;
         }
         v.state &= 0xFDFFFDFF;
         v.order = 0;
     }
-    if (mode == 8 && mw(self, kMwTracking) && mw(self, kConVeh) >= 0 && MapWinInVehMode && (key == ' ' || key == 'g')) {
-        VEH& v = Vehs[mw(self, kConVeh)];
+    if (mode == 8 && map_win(self).tracking && console_win(self).veh >= 0 && MapWinInVehMode &&
+        (key == ' ' || key == 'g')) {
+        VEH& v = Vehs[console_win(self).veh];
         v.waypoint_count = v.waypoint_count < 3 ? v.waypoint_count + 1 : 0;
         int32_t mx, my;
         ui_mouse_pos(&mx, &my);
-        mw(main_view(), 0x1DE0C) = -1;
+        map_win(main_view()).drag_x = -1;
         MapWin_on_mouse_move(main_view(), mx, my);
         return 1;
     }
     for_each_mapwin([&](int32_t, uint8_t* w) {
-        if ((mw(w, kMwOptions) & 0x400000) && (key == 'g' || key == 'p')) vk = ch = key = 0;
+        if ((map_win(w).options & 0x400000) && (key == 'g' || key == 'p')) vk = ch = key = 0;
     });
     if (mode && (key == 'g' || key == 'p')) vk = ch = key = 0;
     go_reset();
-    mw(self, kConMode) = 0;
+    console_win(self).mode = 0;
     for_each_mapwin([&](int32_t, uint8_t* w) {
-        if (mw(w, 0x1EF4C) || mw(w, 0x1EF50) != 0x7F00) {  // Win_set_cursor_3(IDC_ARROW)
-            mw(w, 0x1EF50) = 0x7F00;
-            mw(w, 0x1EF4C) = 0;
+        if (map_win(w).cursor || map_win(w).cursor_id != 0x7F00) {  // Win_set_cursor_3(IDC_ARROW)
+            map_win(w).cursor_id = 0x7F00;
+            map_win(w).cursor = 0;
         }
-        if (mw(w, kMwOptions) & 0xC40000) {
-            mw(w, kMwOptions) &= 0xFF3BFFFF;
+        if (map_win(w).options & 0xC40000) {
+            map_win(w).options &= 0xFF3BFFFF;
             pfncRedrawMap(w, 1);
         }
         do_non_input();
@@ -1816,15 +1823,15 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         return 1;
     case 't': Console_survey(self); return 1;
     case 'e':
-        if (!net_busy) social_select(mw(self, kConFaction));
+        if (!net_busy) social_select(console_win(self).faction);
         return 1;
     case 'u':
-        if (!net_busy) design_new_veh(mw(self, kConFaction), -1);
+        if (!net_busy) design_new_veh(console_win(self).faction, -1);
         return 1;
     case 'c': pfncMoveMap(main_view(), MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex], 1); return 1;
     case 'D':
         if (net_busy) return 1;
-        if (MapWinInVehMode && mw(self, kConVeh) >= 0) Console_disband(self, mw(self, kConVeh));
+        if (MapWinInVehMode && console_win(self).veh >= 0) Console_disband(self, console_win(self).veh);
         else Console_disband_2(self, MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
         return 1;
     case ',':
@@ -1841,7 +1848,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     if (!Console_edit_lock(self)) {
         switch (ch) {
         case 'A':
-            if (!net_busy) Console_automate(self, mw(self, kConVeh), 0);
+            if (!net_busy) Console_automate(self, console_win(self).veh, 0);
             break;
         case 'P':
             if (MultiplayerActive) MultiWin_on_button_clicked(&MultiWinObj, 2);  // (id 2: nothing)
@@ -1849,10 +1856,10 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         case 'T': Console_time_controls(self); break;
         case '^': Console_use_time_bonus(self); break;
         case 'J': Console_assemble(self); break;
-        case 'j': Console_go_to(self, mw(self, kConVeh), ORDER_MOVE_TO, 1); break;
+        case 'j': Console_go_to(self, console_win(self).veh, ORDER_MOVE_TO, 1); break;
         case 'R':
-            if (GameRules & RULES_BLIND_RESEARCH) Console_set_ai(self, mw(self, kConFaction));
-            else Console_set_tech(self, mw(self, kConFaction));
+            if (GameRules & RULES_BLIND_RESEARCH) Console_set_ai(self, console_win(self).faction);
+            else Console_set_tech(self, console_win(self).faction);
             break;
         case 'v':
             if (net_busy) break;
@@ -1861,7 +1868,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
             } else {
                 Console_set_view(self, 1);  // inlined
                 Console_focus(self, MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex],
-                              mw(self, kConFaction));
+                              console_win(self).faction);
             }
             break;
         default: break;
@@ -1902,7 +1909,7 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     if (key == 'w' || vk == 9) {  // wait / Tab
         if (!net_busy && !Console_edit_lock(self)) {
             if (!MapWinInVehMode) Console_set_move(self, 0);
-            else Console_wait(self, mw(self, kConVeh));
+            else Console_wait(self, console_win(self).veh);
         } else if (Console_edit_lock(self)) {
             NetMsg_pop(&NetMsg, "PROTECTED", 5000, 0, nullptr);
         }
@@ -1939,14 +1946,14 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
         }
         if (MapWinInVehMode) {
             if (!Console_edit_lock(self)) {
-                int32_t v = mw(self, kConVeh);
+                int32_t v = console_win(self).veh;
                 if (!net_busy && v >= 0) {
                     if (!ctrl) {
                         if (not_my_turn()) {
                             NetMsg_pop(&NetMsg, "SIMULNO", 5000, 0, nullptr);
                         } else if (!veh_ready(v)) {
                             NetMsg_pop(&NetMsg, "UNITMOVED", 5000, 0, nullptr);
-                            mw(self, kConWaiting) = 0;
+                            console_win(self).waiting = 0;
                         } else {
                             net_order_veh(v, dir, 0);
                         }
@@ -1973,8 +1980,8 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
             hide_cursor(self);
             Console_cursor_next(self, nx, ny);
             StatusWin_redraw(&InfoWin);
-            mw(self, kConCursorShown) = 1;
-            mw(self, kConCursorOn) = 1;
+            console_win(self).cursor_shown = 1;
+            console_win(self).cursor_on = 1;
             MapWin_draw_cursor(main_view());
             MapWin_focus(main_view(), nx, ny);
         }
@@ -1991,21 +1998,21 @@ int32_t THISCALL Console_on_key_click(uint8_t* self, int32_t ch, int32_t vk) {
     case 0x10025:
     case 0x10064: {
         // shift+direction: scroll the main view by a third of its size.
-        int32_t cx = mw(w, kMwCenterX), cy = mw(w, kMwCenterY);
+        int32_t cx = map_win(w).center_x, cy = map_win(w).center_y;
         int32_t x = cx, y = cy;
         if (k == 0x10026 || k == 0x10068) {
-            int32_t step = (mw(w, kMwRowsAbove) + 2) / 3, room = mw(w, kMwOriginY);
+            int32_t step = (map_win(w).rows_above + 2) / 3, room = map_win(w).origin_y;
             if (step < 0 || room < 0) step = 0;
             else if (room < step) step = room;
             y = cy - step;
         } else if (k == 0x10028 || k == 0x10062) {
-            int32_t step = (mw(w, kMwRowsAbove) + 2) / 3;
-            int32_t room = MapAreaY - mw(w, kMwRowsBelow) * 2 - mw(w, kMwOriginY) + 1;
+            int32_t step = (map_win(w).rows_above + 2) / 3;
+            int32_t room = MapAreaY - map_win(w).rows_below * 2 - map_win(w).origin_y + 1;
             if (step < 0 || room < 0) room = 0;
             else if (step <= room) room = step;
             y = cy + room;
         } else {
-            int32_t step = (mw(w, kMwColsOdd) + 2) / 3;
+            int32_t step = (map_win(w).cols_odd + 2) / 3;
             x = (k == 0x10027 || k == 0x10066) ? cx + step : cx - step;
             if (!(MapToggleFlat & 1)) {
                 if (x < 0) x += MapAreaX;

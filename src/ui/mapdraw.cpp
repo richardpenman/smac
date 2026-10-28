@@ -229,7 +229,7 @@ void GAMEAPI base_draw(Buffer* dest, int32_t base_id, int32_t px, int32_t py, in
 }
 
 void THISCALL MapWin_draw_bases(uint8_t* win, int32_t x, int32_t y, int32_t px, int32_t py, int32_t faction_id) {
-    uint32_t opts = (uint32_t)mw(win, kMwOptions);
+    uint32_t opts = (uint32_t)map_win(win).options;
     if (!(opts & 0x200080)) return;
     if (!ControlTurnStarted && !ControlTurnMove && !(GameRules & RULES_TIME_WARP)) return;
     int32_t b = base_at(x, y);
@@ -242,7 +242,7 @@ void THISCALL MapWin_draw_bases(uint8_t* win, int32_t x, int32_t y, int32_t px, 
             return;
     }
     if ((opts & 0x200000) && b != BaseUpkeepDrawID) return;
-    base_draw(ui_mapwin_native(win)->canvas, b, px, py, mw(win, kMwZoom), (opts >> 0x12) & 8);
+    base_draw(ui_mapwin_native(win)->canvas, b, px, py, map_win(win).zoom, (opts >> 0x12) & 8);
 }
 
 void THISCALL MapWin_draw_base_names(uint8_t* win) {
@@ -250,22 +250,22 @@ void THISCALL MapWin_draw_base_names(uint8_t* win) {
     MapWinNative* n = ui_mapwin_native(win);
     Buffer* canvas = n->canvas;
     UiRect saved = canvas->clip;
-    Buffer_set_clip(canvas, reinterpret_cast<UiRect*>(win + n->vbase + kGwClientRect));
+    Buffer_set_clip(canvas, &graphic_win(win + n->vbase).client);
     MapWin_draw_base_dest(win, 0);
-    if (!(mw(win, kMwOptions) & 0x800) || !(GameMorePreferences & MPREF_MAP_SHOW_BASE_NAMES)) {
+    if (!(map_win(win).options & 0x800) || !(GameMorePreferences & MPREF_MAP_SHOW_BASE_NAMES)) {
         Buffer_set_clip(canvas, &saved);
         return;
     }
-    if (mw(win, kMwZoom) < -10) {
+    if (map_win(win).zoom < -10) {
         Buffer_set_clip(canvas, &saved);
         return;
     }
-    Font* font = reinterpret_cast<Font*>(win + kMwFont0);
+    Font* font = mapwin_font(win, 0);
     const int32_t viewer = CurrentPlayerFaction;
     auto in_view = [&](int32_t bx, int32_t by) {
-        int32_t oy = mw(win, kMwOriginY), ox = mw(win, kMwOriginX);
-        if (by < oy || by >= mw(win, kMwRowsBelow) + mw(win, kMwRowsAbove) + oy) return false;
-        int32_t cols = mw(win, kMwColsEven) + mw(win, kMwColsOdd), x1 = bx;
+        int32_t oy = map_win(win).origin_y, ox = map_win(win).origin_x;
+        if (by < oy || by >= map_win(win).rows_below + map_win(win).rows_above + oy) return false;
+        int32_t cols = map_win(win).cols_even + map_win(win).cols_odd, x1 = bx;
         if ((MapToggleFlat & 1) == 0) {
             if (bx < ox) x1 = bx + MapAreaX;
             if (cols + ox <= x1) x1 -= MapAreaX;
@@ -275,7 +275,7 @@ void THISCALL MapWin_draw_base_names(uint8_t* win) {
     // The second line below the name: a line of the font lower.
     auto second_line_y = [&](int32_t py) {
         int32_t dy = font->field_0 < 0 ? font->height : font->ascent_above + font->field_0;
-        return (mw(win, kMwQ) * 7) / 2 + dy + py;
+        return (map_win(win).q * 7) / 2 + dy + py;
     };
     auto str = [](uint32_t addr) { return reinterpret_cast<const char*>(mem::host(addr)); };
     for (int32_t i = 0; i < BaseCount; i++) {
@@ -298,8 +298,8 @@ void THISCALL MapWin_draw_base_names(uint8_t* win) {
                     ty = *reinterpret_cast<const int32_t*>(fac + 0x3F4);
             if (tx >= 0 && b.x == tx && b.y == ty) Buffer_set_text_color(canvas, 0xFF, 0, 1, 1);
         }
-        int32_t cx = px + mw(win, kMwHalfW);
-        Buffer_write_cent_l_8(canvas, line, cx, (mw(win, kMwQ) * 7) / 2 + py, (int32_t)std::strlen(line));
+        int32_t cx = px + map_win(win).half_w;
+        Buffer_write_cent_l_8(canvas, line, cx, (map_win(win).q * 7) / 2 + py, (int32_t)std::strlen(line));
         bool objective = is_objective(i) && !(GameRules & RULES_SCN_VICT_ALL_BASE_COUNT_OBJ);
         auto objective_line = [&]() {
             if (!objective) return;
@@ -311,13 +311,14 @@ void THISCALL MapWin_draw_base_names(uint8_t* win) {
             int32_t id = b.queue_items[0];
             return id < 0 ? Facility[-id].name : Units[id].name;
         };
-        if ((GameState & STATE_DEBUG_MODE) && (GameState & STATE_OMNISCIENT_VIEW) && mw(win, kMwZoom) >= -3) {
+        if ((GameState & STATE_DEBUG_MODE) && (GameState & STATE_OMNISCIENT_VIEW) && map_win(win).zoom >= -3) {
             uint8_t region = MapTiles[MapHalfX * b.y + (b.x >> 1)].region;
             uint8_t plan = Factions[f].region_base_plan[region];
             std::snprintf(line, sizeof(line), "%s%s%s%s%s", str(0x682E9C), PlansShortName[plan], str(0x682E94),
                           production(), str(0x682E98));
             Buffer_write_cent_l_8(canvas, line, cx, second_line_y(py), (int32_t)std::strlen(line));
-        } else if (!(GameMorePreferences & MPREF_MAP_SHOW_PROD_WITH_BASE_NAMES) && !(mw(win, kMwOptions) & 0x8000000)) {
+        } else if (!(GameMorePreferences & MPREF_MAP_SHOW_PROD_WITH_BASE_NAMES) &&
+                   !(map_win(win).options & 0x8000000)) {
             objective_line();
         } else if (f == (uint32_t)viewer || spying(f)) {
             std::snprintf(line, sizeof(line), "%s", str(0x682E9C));
@@ -345,9 +346,10 @@ void THISCALL MapWin_draw_base_names(uint8_t* win) {
         }
     }
     // Landmark names (italic font), white with a black shadow offset by the zoom.
-    int32_t off = mw(win, kMwZoom) < 1 ? 1 : (ZoomNum < 1 ? trunc_div16(mw(win, kMwZoom) + 0x10) : ZoomNum / ZoomDenom);
+    int32_t off =
+        map_win(win).zoom < 1 ? 1 : (ZoomNum < 1 ? trunc_div16(map_win(win).zoom + 0x10) : ZoomNum / ZoomDenom);
     Buffer_set_text_color(canvas, 0xFF, 0, off, off);
-    Buffer_set_font(canvas, reinterpret_cast<Font*>(win + kMwFont2), nullptr, nullptr, nullptr);
+    Buffer_set_font(canvas, mapwin_font(win, 2), nullptr, nullptr, nullptr);
     for (int32_t i = 0; i < MapLandmarkCount; i++) {
         const uint8_t* lmk = mem::host(0x949894 + i * 0x28);
         int32_t lx = *reinterpret_cast<const int32_t*>(lmk), ly = *reinterpret_cast<const int32_t*>(lmk + 4);
@@ -360,7 +362,7 @@ void THISCALL MapWin_draw_base_names(uint8_t* win) {
         if ((sq->items & 1) && (sq->val2 & 0xF) <= 7) continue;  // a base is named instead
         int32_t px, py;
         pfncTileToPoint(win, lx, ly, &px, &py);
-        Buffer_write_cent_l_8(canvas, name, mw(win, kMwHalfW) + px, (mw(win, kMwQ) * 7) / 2 + py,
+        Buffer_write_cent_l_8(canvas, name, map_win(win).half_w + px, (map_win(win).q * 7) / 2 + py,
                               (int32_t)std::strlen(name));
     }
     Buffer_set_clip(canvas, &saved);

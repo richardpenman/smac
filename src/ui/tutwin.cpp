@@ -71,7 +71,6 @@ constexpr uint32_t kTileX = 0x537C, kTileY = 0x5380, kPtX = 0x5384, kPtY = 0x538
                    kVeh = 0x53AC, kResult = 0x53B4, kKind = 0x53B8, kTour = 0x53BC, kKeyPending = 0x53C4,
                    kKeyCh = 0x53C8, kKeyVk = 0x53CC, kBits = 0x53D0, kParent = 0x53D4;
 
-int32_t& mwi(uint8_t* win, uint32_t off) { return *reinterpret_cast<int32_t*>(win + off); }
 
 void clear_state() {
     tf(kShown) = 0;
@@ -86,14 +85,14 @@ void clear_state() {
 }
 
 bool in_view(uint8_t* win, int32_t x, int32_t y, int32_t margin) {
-    int32_t oy = mwi(win, kMwOriginY), ox = mwi(win, kMwOriginX);
-    if (y < oy + margin || y >= mwi(win, kMwRowsBelow) + mwi(win, kMwRowsAbove) - margin + oy) return false;
+    int32_t oy = map_win(win).origin_y, ox = map_win(win).origin_x;
+    if (y < oy + margin || y >= map_win(win).rows_below + map_win(win).rows_above - margin + oy) return false;
     int32_t tx = x;
     if (!(MapToggleFlat & 1)) {
         if (x < ox + margin) tx = MapAreaX + x;
-        if (mwi(win, kMwColsEven) + mwi(win, kMwColsOdd) - margin + ox <= tx) tx -= MapAreaX;
+        if (map_win(win).cols_even + map_win(win).cols_odd - margin + ox <= tx) tx -= MapAreaX;
     }
-    return tx >= ox + margin && tx < mwi(win, kMwColsEven) + mwi(win, kMwColsOdd) - margin + ox;
+    return tx >= ox + margin && tx < map_win(win).cols_even + map_win(win).cols_odd - margin + ox;
 }
 
 // The picture of the window: a given sprite, else the unit (TutWin_veh_draw), the base
@@ -259,13 +258,13 @@ int32_t tut_map(uint8_t* self, const char* label, int32_t x, int32_t y, int32_t 
     MapWin_focus(win, x, y);
     int32_t px = 0, py = 0;
     pfncTileToPoint(win, x, y, &px, &py);
-    px += mwi(win, kMwHalfW);
-    py += mwi(win, kMwHalfH);
+    px += map_win(win).half_w;
+    py += map_win(win).half_h;
     int32_t px2 = -1, py2 = -1;
     if (x2 >= 0 && in_view(win, x2, y2, 0)) {
         pfncTileToPoint(win, x2, y2, &px2, &py2);
-        px2 += mwi(win, kMwHalfW);
-        py2 += mwi(win, kMwHalfH);
+        px2 += map_win(win).half_w;
+        py2 += map_win(win).half_h;
     }
     return TutWin_tut_win(self, win, label, px, py, sprite, flags, px2, py2);
 }
@@ -321,7 +320,7 @@ namespace {
 // The centre of the main interface's rectangle +off on the screen.
 void mi_point(uint32_t off, int32_t* x, int32_t* y) {
     const UiRect& r = mi_rect(off);
-    const UiRect& pos = mi_rect(kMiPos);
+    const UiRect& pos = main_interface().pos;
     *x = (r.right - r.left) / 2 + r.left + pos.left;
     *y = (r.bottom - r.top) / 2 + r.top + pos.top;
 }
@@ -386,8 +385,8 @@ int32_t base_step(uint8_t* self, const char* label, uint32_t rect, PtKind k) {
     if (k == kBase) {
         basewin_client_to_screen(&x, &y);
     } else {
-        x += mi_rect(kMiPos).left;
-        y += mi_rect(kMiPos).top;
+        x += main_interface().pos.left;
+        y += main_interface().pos.top;
         if (k == kPop) x = r.left + 5;
     }
     return TutWin_tut_win(self, MapWins[0], label, x, y, nullptr, 2, -1, -1);
@@ -415,15 +414,28 @@ void tour1(uint8_t* self) {
         const char* label;
         uint32_t rect;
         PtKind kind;
-    } kA[] = {
-        {"TOUR1GOVERNOR", 0x40DAC, kBase},    {"TOUR1EXPLORE", 0x40D6C, kBase},   {"TOUR1DISCOVER", 0x40D7C, kBase},
-        {"TOUR1BUILD", 0x40D8C, kBase},       {"TOUR1CONQUER", 0x40D9C, kBase},   {"TOUR1GOVERNOR2", 0x40DAC, kBase},
-        {"TOUR1ADVANCED", 0x40E4C, kBase},    {"TOUR1CAPTION", 0x40CAC, kIface},  {"TOUR1ECO", 0x40D1C, kBase},
-        {"TOUR1POP", 0x40C5C, kIface},        {"TOUR1POP2", 0x40C5C, kIface},     {"TOUR1STAPLE", 0x40E2C, kIface},
-        {"TOUR1PRODUCTION", 0x40C6C, kIface}, {"TOUR1QUEUE", 0x40C8C, kIface},    {"TOUR1CHANGE", 0x40DEC, kIface},
-        {"TOUR1HURRY", 0x40DFC, kIface},      {"TOUR1GARRISON", 0x40C2C, kIface}, {"TOUR1SUPPORTED", 0x40B6C, kIface},
-        {"TOUR1FACILITIES", 0x40BAC, kBase},  {"TOUR1COMMERCE", 0x40BDC, kBase},  {"TOUR1NUTRIENTS", 0x40BFC, kBase},
-        {"TOUR1AREA", 0x40B8C, kBase}};
+    } kA[] = {{"TOUR1GOVERNOR", offsetof(BaseWindow, rect_governor), kBase},
+              {"TOUR1EXPLORE", offsetof(BaseWindow, rect_explore), kBase},
+              {"TOUR1DISCOVER", offsetof(BaseWindow, rect_discover), kBase},
+              {"TOUR1BUILD", offsetof(BaseWindow, rect_build), kBase},
+              {"TOUR1CONQUER", offsetof(BaseWindow, rect_conquer), kBase},
+              {"TOUR1GOVERNOR2", offsetof(BaseWindow, rect_governor), kBase},
+              {"TOUR1ADVANCED", offsetof(BaseWindow, rect_gov_advanced), kBase},
+              {"TOUR1CAPTION", offsetof(BaseWindow, rect_name_mi), kIface},
+              {"TOUR1ECO", offsetof(BaseWindow, rect_misc), kBase},
+              {"TOUR1POP", offsetof(BaseWindow, rect_pop_mi), kIface},
+              {"TOUR1POP2", offsetof(BaseWindow, rect_pop_mi), kIface},
+              {"TOUR1STAPLE", offsetof(BaseWindow, rect_staple_mi), kIface},
+              {"TOUR1PRODUCTION", offsetof(BaseWindow, rect_queue_mi), kIface},
+              {"TOUR1QUEUE", offsetof(BaseWindow, rect_queue_list2_mi), kIface},
+              {"TOUR1CHANGE", offsetof(BaseWindow, rect_change_mi), kIface},
+              {"TOUR1HURRY", offsetof(BaseWindow, rect_hurry_mi), kIface},
+              {"TOUR1GARRISON", offsetof(BaseWindow, rect_garrison_mi), kIface},
+              {"TOUR1SUPPORTED", offsetof(BaseWindow, rect_prod2_mi), kIface},
+              {"TOUR1FACILITIES", offsetof(BaseWindow, rect_fac_list), kBase},
+              {"TOUR1COMMERCE", offsetof(BaseWindow, rect_commerce2), kBase},
+              {"TOUR1NUTRIENTS", offsetof(BaseWindow, rect_nutrients), kBase},
+              {"TOUR1AREA", offsetof(BaseWindow, rect_map), kBase}};
     for (const auto& st : kA)
         if (!base_step(self, st.label, st.rect, st.kind)) return;
     BaseWin_draw_expenses(&BaseWin, 2);
@@ -515,7 +527,7 @@ void THISCALL TutWin_tour(uint8_t* self) {
         if (ty < 0 || ty >= MapAreaY || tx < 0 || tx >= MapAreaX) continue;
         MAP* sq = map_tile(tx, ty);
         uint8_t alt = sq->climate & 0xE0;
-        if (!(alt < 0x61 || mwi(win, kMwOriginY) + 2 <= (int32_t)((ty - (uint32_t)(sq->climate >> 5)) + 3))) continue;
+        if (!(alt < 0x61 || map_win(win).origin_y + 2 <= (int32_t)((ty - (uint32_t)(sq->climate >> 5)) + 3))) continue;
         if (!in_view(win, tx, ty, 2) || alt <= 0x5F) continue;
         int32_t score = ((sq->items & 0x20) && alt > 0x3F) ? 4 : 8;
         if (NearOffsetX[d] == 0 || NearOffsetY[d] == 0) score++;
@@ -534,7 +546,7 @@ void THISCALL TutWin_tour(uint8_t* self) {
             label += "A";
         }
         if (!tut_map(self, label.c_str(), cx, cy, veh, nullptr, 2, -1, -1)) return end();
-        mw(win, kMwOptions) |= 0x20000;
+        map_win(win).options |= 0x20000;
         ui_invalidate_map();
         static const int32_t kDirNumber[9] = {9, 6, 3, 2, 1, 4, 7, 8, 5};
         parse_num(0, kDirNumber[best_dir]);
@@ -544,14 +556,14 @@ void THISCALL TutWin_tour(uint8_t* self) {
             parse_says(0, TextBufferGetPtr, -1, -1);
         }
         if (!tut_map(self, "TOUR2", cx, cy, veh, nullptr, 2, -1, -1)) {
-            mw(win, kMwOptions) &= ~0x20000;
+            map_win(win).options &= ~0x20000;
             ui_invalidate_map();
             return end();
         }
     } else if (kind == 3 && veh >= 0 && Vehs[veh].unit_id == 1) {
         if (!tut_map(self, "TERRAFORMER", cx, cy, veh, nullptr, 2, -1, -1)) return end();
     }
-    mw(win, kMwOptions) &= ~0x20000;
+    map_win(win).options &= ~0x20000;
     ui_invalidate_map();
     // The tiles around the cursor (rings 1..20, twice): the best ocean tile, a fungus tile, and the
     // land tiles' scores of the terraforming lessons (the original's locals named by what they
@@ -578,7 +590,7 @@ void THISCALL TutWin_tour(uint8_t* self) {
             if (ty < 0 || ty >= MapAreaY || tx < 0 || tx >= MapAreaX) continue;
             MAP* sq = map_tile(tx, ty);
             uint8_t alt = sq->climate & 0xE0;
-            if (!(alt < 0x61 || mwi(win, kMwOriginY) + 2 <= (int32_t)((ty - (uint32_t)(sq->climate >> 5)) + 3)))
+            if (!(alt < 0x61 || map_win(win).origin_y + 2 <= (int32_t)((ty - (uint32_t)(sq->climate >> 5)) + 3)))
                 continue;
             if (!in_view(win, tx, ty, 2)) continue;
             if (!((Factions[CurrentPlayerFaction].player_flags & 0x200) ||
@@ -763,8 +775,8 @@ void THISCALL TutWin_tour(uint8_t* self) {
 // ---- Console_give_hints (0x511BB0) ----------------------------------------------------------------
 
 void THISCALL Console_give_hints(uint8_t* self) {
-    int32_t v = mw(self, kConVeh);
-    int32_t F = mw(self, kConFaction);
+    int32_t v = console_win(self).veh;
+    int32_t F = console_win(self).faction;
     if (Vehs[v].state & 0x4200) return;
     if (MultiplayerActive) return;
     if (Win_is_visible(&BaseWin) || Win_is_visible(&SocialWin)) return;
@@ -804,16 +816,16 @@ void THISCALL Console_give_hints(uint8_t* self) {
     };
     // A tile well inside the view (2 tiles from its edges; the rolling / rocky tiles' height).
     auto well_in_view = [&](int32_t tx, int32_t ty) {
-        int32_t oy = mwi(win, kMwOriginY);
+        int32_t oy = map_win(win).origin_y;
         uint8_t c = tile(tx, ty)->climate;
         if (!((c & 0xE0) < 0x61 || oy + 2 <= (int32_t)((ty - (uint32_t)(c >> 5)) + 3))) return false;
-        if (!(oy + 2 <= ty && ty < mwi(win, kMwRowsBelow) + mwi(win, kMwRowsAbove) - 2 + oy)) return false;
-        int32_t ox = mwi(win, kMwOriginX), t = tx;
+        if (!(oy + 2 <= ty && ty < map_win(win).rows_below + map_win(win).rows_above - 2 + oy)) return false;
+        int32_t ox = map_win(win).origin_x, t = tx;
         if (!(MapToggleFlat & 1)) {
             if (tx < ox + 2) t = MapAreaX + tx;
-            if (mwi(win, kMwColsEven) + mwi(win, kMwColsOdd) - 2 + ox <= t) t -= MapAreaX;
+            if (map_win(win).cols_even + map_win(win).cols_odd - 2 + ox <= t) t -= MapAreaX;
         }
-        return ox + 2 <= t && t < mwi(win, kMwColsEven) + mwi(win, kMwColsOdd) - 2 + ox;
+        return ox + 2 <= t && t < map_win(win).cols_even + map_win(win).cols_odd - 2 + ox;
     };
     uint32_t sea = 0;  // uVar8: the unit is a ship
     if (Vehs[v].state & 0x2000) {
@@ -944,19 +956,19 @@ void THISCALL Console_give_hints(uint8_t* self) {
                 bool ok = true;
                 if (on_map(bx, by)) {
                     uint8_t c = tile(bx, by)->climate;
-                    if (!((c & 0xE0) < 0x61 || mwi(win, kMwOriginY) + 2 <= (int32_t)((by - (uint32_t)(c >> 5)) + 3)))
+                    if (!((c & 0xE0) < 0x61 || map_win(win).origin_y + 2 <= (int32_t)((by - (uint32_t)(c >> 5)) + 3)))
                         ok = false;
                 }
                 if (!ok) continue;
-                if (!(mwi(win, kMwOriginY) + 2 <= by &&
-                      by < mwi(win, kMwRowsBelow) + mwi(win, kMwRowsAbove) - 2 + mwi(win, kMwOriginY)))
+                if (!(map_win(win).origin_y + 2 <= by &&
+                      by < map_win(win).rows_below + map_win(win).rows_above - 2 + map_win(win).origin_y))
                     continue;
-                int32_t t = bx, ox = mwi(win, kMwOriginX);
+                int32_t t = bx, ox = map_win(win).origin_x;
                 if (!(MapToggleFlat & 1)) {
                     if (bx < ox + 2) t += MapAreaX;
-                    if (mwi(win, kMwColsEven) + mwi(win, kMwColsOdd) - 2 + ox <= t) t -= MapAreaX;
+                    if (map_win(win).cols_even + map_win(win).cols_odd - 2 + ox <= t) t -= MapAreaX;
                 }
-                if (!(ox + 2 <= t && t < mwi(win, kMwColsEven) + mwi(win, kMwColsOdd) - 2 + ox)) continue;
+                if (!(ox + 2 <= t && t < map_win(win).cols_even + map_win(win).cols_odd - 2 + ox)) continue;
                 if (tut_check2(0x100) || CurrentTurn % 0x14 == 0) {
                     parse_says(0, bs.name, -1, -1);
                     tut_map(&TutWin, "EMPTYBASE", bs.x, bs.y, -1, nullptr, 0x4000000, -1, -1);

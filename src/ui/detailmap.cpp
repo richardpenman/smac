@@ -65,17 +65,17 @@ void worldpane_draw(Buffer* mi) {
         worldwin_draw();
         return;
     }
-    UiRect pane = mi_rect(0xCFC);
+    UiRect pane = main_interface().world_map;
     int32_t w = std::max(1, pane.right - pane.left), h = std::max(1, pane.bottom - pane.top);
     if (!ui_mapwin_native(dm()) || g_canvas.width != w || g_canvas.height != h) {
         Buffer_ctor(&g_canvas);
         Buffer_init(&g_canvas, w, h, 8, 0);
         ui_mapwin_attach(dm(), kMapWinVBase, &g_canvas);
         MapWin_clear(dm(), 1);
-        mw(dm(), 0x1DD74) = 1;
-        mw(dm(), kMwZoom) = -8;
+        map_win(dm()).active = 1;
+        map_win(dm()).zoom = -8;
     }
-    if (MapWins[0]) mw(dm(), kMwOptions) = mw(MapWins[0], kMwOptions);
+    if (MapWins[0]) map_win(dm()).options = map_win(MapWins[0]).options;
     int32_t cx = MapWinCursorX[MapWinCursorIndex], cy = MapWinCursorY[MapWinCursorIndex];
     if (g_cx >= 0 && cx == g_cur_x && cy == g_cur_y) {
         cx = g_cx;
@@ -83,8 +83,8 @@ void worldpane_draw(Buffer* mi) {
     } else {
         g_cx = -1;
     }
-    mw(dm(), kMwCenterX) = cx;
-    mw(dm(), kMwCenterY) = cy;
+    map_win(dm()).center_x = cx;
+    map_win(dm()).center_y = cy;
     pfncZoomProcessing(dm());
     pfncRedrawMap(dm(), 0);
     Buffer_copy_4(&g_canvas, mi, 0, 0, pane.left, pane.top, w, h);

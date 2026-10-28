@@ -30,8 +30,6 @@ GLOBAL(int32_t, EditorBrush2, 0x945AE4);  // the brush
 namespace {
 
 constexpr int32_t kKey = 9;
-constexpr uint32_t kPaintRects = 0xADC;  // 25 rectangles, then the six brushes' (0xC6C)
-constexpr uint32_t kPaintBox = 0xD4C, kBrushBox = 0xD5C, kTextBox = 0xD6C;
 
 bool g_loaded = false;
 Sprite g_paint[25][3];  // MainInfc +0x21E00 (interface.pcx, 0x2B x 0x12)
@@ -68,7 +66,6 @@ void load() {
                                           0);
 }
 
-UiRect& rect(uint32_t off) { return mi_rect(off); }
 
 void union_rect(UiRect& u, const UiRect& r) {
     if (u.left >= u.right || u.top >= u.bottom) {
@@ -91,7 +88,7 @@ int32_t terraform_of(int32_t k) {
 // MainInterface_init's layout of the buttons (the pane rectangle +0xDA0) and their bubbles.
 void layout() {
     load();
-    const UiRect c = rect(kMiPaneCenter);
+    const UiRect c = main_interface().pane_center;
     // The paints: columns of five, centred vertically.
     {
         int32_t w = g_paint[0][0].full_width, h = g_paint[0][0].full_height;
@@ -113,13 +110,13 @@ void layout() {
                 b = prev + d;
                 prev = b;
             }
-            rect(kPaintRects + 16 * i) = {l, t, r, b};
+            main_interface().paint[i] = {l, t, r, b};
         }
     }
     // The brushes: right of the paints, columns of three.
     {
         int32_t w = g_brush[0][0].full_width, h = g_brush[0][0].full_height;
-        int32_t l = rect(kPaintRects + 16 * 24).right + 9, t = c.top + 7;
+        int32_t l = main_interface().paint[24].right + 9, t = c.top + 7;
         t = t + (((c.bottom - 7) - (h * 3 + 2)) - t) / 2;
         int32_t r = w + l, b = h + t, prev = b;
         for (int32_t i = 0; i < 6; i++) {
@@ -137,13 +134,13 @@ void layout() {
                 b = prev + d;
                 prev = b;
             }
-            rect(kPaintRects + 16 * (25 + i)) = {l, t, r, b};
+            main_interface().paint[25 + i] = {l, t, r, b};
         }
     }
-    UiRect& pb = rect(kPaintBox);
+    UiRect& pb = main_interface().paint_box;
     pb = {};
     for (int32_t i = 0; i < 25; i++) {
-        const UiRect& r = rect(kPaintRects + 16 * i);
+        const UiRect& r = main_interface().paint[i];
         union_rect(pb, r);
         BaseButton& bt = g_btn[i];
         bw_button_ctor(&bt);
@@ -158,11 +155,11 @@ void layout() {
         }
     }
     pb = {pb.left - 3, pb.top - 3, pb.right + 3, pb.bottom + 3};
-    UiRect& bb = rect(kBrushBox);
+    UiRect& bb = main_interface().brush_box;
     bb = {};
     if (ScreenWidth != 800) {
         for (int32_t i = 0; i < 6; i++) {
-            const UiRect& r = rect(kPaintRects + 16 * (25 + i));
+            const UiRect& r = main_interface().paint[25 + i];
             union_rect(bb, r);
             BaseButton& bt = g_btn[25 + i];
             bw_button_ctor(&bt);
@@ -173,13 +170,13 @@ void layout() {
         }
         bb = {bb.left - 3, bb.top - 3, bb.right + 3, bb.bottom + 3};
     }
-    UiRect& tb = rect(kTextBox);
-    tb = {bb.right + 3, bb.top, rect(0xA3C).left - 3, bb.bottom};
+    UiRect& tb = main_interface().text_box;
+    tb = {bb.right + 3, bb.top, main_interface().info_buttons[1].left - 3, bb.bottom};
 }
 
 bool g_laid = false;
 void ensure_layout() {
-    if (g_laid || !rect(kMiPaneCenter).right) return;
+    if (g_laid || !main_interface().pane_center.right) return;
     g_laid = true;
     layout();
 }
@@ -188,7 +185,7 @@ int32_t button_count() { return ScreenWidth == 800 ? 25 : 31; }
 
 void draw_text(Buffer* c) {
     if (ScreenWidth < 0x400 || mi_mode() != 0x3EA) return;
-    UiRect r = rect(kTextBox);
+    UiRect r = main_interface().text_box;
     Buffer_set_text_color(c, mem_i(0x8C6BB4), mem_i(0x8C6BB8), 1, 1);
     // The "{...}" parts: the original's second text colour is the info pane's (InfoWin_draw_text's
     // Buffer_set_text_color2, the global text state it leaves).
@@ -260,8 +257,8 @@ void editpane_compose(Buffer* mi) {
     if (mi_mode() != 0x3EA) return;
     ensure_layout();
     if (!g_laid) return;
-    Buffer_box_sprite(mi, &rect(kPaintBox), box_def(3));
-    if (ScreenWidth != 800) Buffer_box_sprite(mi, &rect(kBrushBox), box_def(3));
+    Buffer_box_sprite(mi, &main_interface().paint_box, box_def(3));
+    if (ScreenWidth != 800) Buffer_box_sprite(mi, &main_interface().brush_box, box_def(3));
     for (int32_t i = 0; i < button_count(); i++) {
         BaseButton& b = g_btn[i];
         bw_button_set(&b, b.id == g_group[i >= 25]);
@@ -287,7 +284,7 @@ bool editpane_mouse(int32_t type, int32_t x, int32_t y) {
         BaseButton& b = g_btn[i];
         if (x < b.r.left || x >= b.r.right || y < b.r.top || y >= b.r.bottom) continue;
         if (type == UiInput::RUP) {
-            const UiRect& pos = mi_rect(kMiPos);
+            const UiRect& pos = main_interface().pos;
             ui_bubble_set(b.bubble.c_str(), pos.left + x, pos.top + y);
             return true;
         }

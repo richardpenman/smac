@@ -2,7 +2,8 @@
 //
 // The window objects live in the engine memory image (the main view is MainConsole at 0x9156B0,
 // a Console derived from MapWin; ui_bridge.h MapWins[]), so their integer fields are read and
-// written at the original byte offsets (mapwin_field). What the original keeps behind pointers
+// written at the original byte offsets, through the typed view MapWin (engine/ui_bridge.h,
+// map_win(win).zoom) and GraphicWin (ui/gfx.h) at the virtual base. What the original keeps behind pointers
 // (the GraphicWin canvas, the per-tile terrain cache at +4) is native: MapWinNative.
 //
 // Functions declared in engine/ui_bridge.h (pfncRedrawMap, pfncMoveMap) are defined here under
@@ -13,53 +14,19 @@
 #include <vector>
 
 #include "engine/memmap.h"
+#include "engine/ui_bridge.h"
 #include "ui/gfx.h"
 
-// ---- MapWin fields (byte offsets of the original object) ----
-constexpr uint32_t kMwTileCache = 0x4;  // per-tile terrain cache pointer (native: MapWinNative)
-constexpr uint32_t kMwElevScale = 0x1DD6C;  // corner height step: 25 (8 with "flat terrain")
-constexpr uint32_t kMwOptions = 0x1DD70;  // display option bits (MapWinOptions for the main view)
-constexpr uint32_t kMwActive = 0x1DD74;
-constexpr uint32_t kMwIndex = 0x1DD78;  // index in MapWins (0: main view, 1: world map)
-constexpr uint32_t kMwTracking = 0x1DD80;  // mouse-over tracking active
-constexpr uint32_t kMwZoom = 0x1DD98;  // zoom step (0: normal; < 0: smaller)
-constexpr uint32_t kMwCenterX = 0x1DD9C;
-constexpr uint32_t kMwCenterY = 0x1DDA0;
-constexpr uint32_t kMwOriginX = 0x1DDA4;  // tile at the top-left of the view
-constexpr uint32_t kMwOriginY = 0x1DDA8;
-constexpr uint32_t kMwPixelX = 0x1DDAC;  // pixel offset of the view (map narrower than the window)
-constexpr uint32_t kMwPixelY = 0x1DDB0;
-constexpr uint32_t kMwTileW = 0x1DDB4;  // 8q
-constexpr uint32_t kMwTileH = 0x1DDB8;  // 4q
-constexpr uint32_t kMwHalfW = 0x1DDBC;  // 4q
-constexpr uint32_t kMwHalfH = 0x1DDC0;  // 2q
-constexpr uint32_t kMwQuarterW = 0x1DDC4;  // 2q
-constexpr uint32_t kMwQ = 0x1DDC8;  // q: zoom unit
-constexpr uint32_t kMwColsOdd = 0x1DDCC;  // tiles per odd row
-constexpr uint32_t kMwRowsAbove = 0x1DDD0;
-constexpr uint32_t kMwColsEven = 0x1DDD4;  // tiles per even row
-constexpr uint32_t kMwRowsBelow = 0x1DDD8;
-constexpr uint32_t kMwUnitLift = 0x1DDDC;  // unit/base height above the terrain (option 2)
-constexpr uint32_t kMwUnitLift2 = 0x1DDE0;
-constexpr uint32_t kMwLastZoom = 0x1EEC0;
-constexpr uint32_t kMwLastElev = 0x1EEC4;
-constexpr uint32_t kMwFont0 = 0x1EEC8;  // Font objects (map labels)
-constexpr uint32_t kMwFont1 = 0x1EEF4;
-constexpr uint32_t kMwFont2 = 0x1EF20;
-constexpr uint32_t kMwScrolling = 0x21A44;  // incremental scroll redraw in progress
 // Byte offset of the GraphicWin virtual base: MapWin 0x21A6C, Console (the main view) 0x23D94.
 constexpr uint32_t kMapWinVBase = 0x21A6C;
 constexpr uint32_t kConsoleVBase = 0x23D94;
-// GraphicWin fields (offsets from the virtual base).
-constexpr uint32_t kGwClientRect = 0x474;  // RECT: the drawable client area
-constexpr uint32_t kGwWidth = 0x4C4;
-constexpr uint32_t kGwHeight = 0x4C8;  // negative (top-down DIB)
 
 // Fixed zoom factor (piZoomNum / piZoomDenom; used when ZoomNum > 0, else the window's zoom step).
 GLOBAL(int32_t, ZoomNum, 0x691E6C);
 GLOBAL(int32_t, ZoomDenom, 0x691E70);
 
-inline int32_t& mw(uint8_t* win, uint32_t off) { return *reinterpret_cast<int32_t*>(win + off); }
+// The label fonts of a map window (MapWin fonts, ui/gfx.h Font).
+inline Font* mapwin_font(uint8_t* win, int32_t i) { return reinterpret_cast<Font*>(map_win(win).fonts[i]); }
 
 // ---- original globals of the map drawing ----
 GLOBAL(UiRect, VisibleTiles, 0x7D3C28);  // prVisibleTiles: main view tile range

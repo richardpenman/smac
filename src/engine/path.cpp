@@ -552,7 +552,7 @@ int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y
                 }
             }
         } while (self->index2 != 0 && self->index1 != self->index2);
-        if (mapwin_field(MapWins[0], 0x1DD70) & 0x4000) pfncRedrawMap(MapWins[0], 1);
+        if (map_win(MapWins[0]).options & 0x4000) pfncRedrawMap(MapWins[0], 1);
         if (best_cost == 2000000000) return -1;
     }
     // Pick the cheapest step from the start.

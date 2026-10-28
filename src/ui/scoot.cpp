@@ -39,17 +39,16 @@
 
 namespace {
 
-int32_t& mwi(uint8_t* win, uint32_t off) { return *reinterpret_cast<int32_t*>(win + off); }
 
 bool tile_in_window(uint8_t* win, int32_t x, int32_t y) {
-    int32_t oy = mwi(win, kMwOriginY), ox = mwi(win, kMwOriginX);
-    if (y < oy || y >= mwi(win, kMwRowsBelow) + mwi(win, kMwRowsAbove) + oy) return false;
+    int32_t oy = map_win(win).origin_y, ox = map_win(win).origin_x;
+    if (y < oy || y >= map_win(win).rows_below + map_win(win).rows_above + oy) return false;
     int32_t tx = x;
     if (!(MapToggleFlat & 1)) {
         if (x < ox) tx = MapAreaX + x;
-        if (mwi(win, kMwColsEven) + mwi(win, kMwColsOdd) + ox <= tx) tx -= MapAreaX;
+        if (map_win(win).cols_even + map_win(win).cols_odd + ox <= tx) tx -= MapAreaX;
     }
-    return tx >= ox && tx < mwi(win, kMwColsEven) + mwi(win, kMwColsOdd) + ox;
+    return tx >= ox && tx < map_win(win).cols_even + map_win(win).cols_odd + ox;
 }
 
 UiRect union_rect(const UiRect& a, const UiRect& b) {  // UnionRect
@@ -124,7 +123,7 @@ void GAMEAPI veh_scoot(int32_t veh_id, int32_t x, int32_t y, int32_t dir, int32_
             if (ui_map_dirty()) ui_present();
             for (int32_t i = 0; i < 8; i++) {
                 uint8_t* win = MapWins[i];
-                if (!win || (i != 0 && !mwi(win, kMwActive))) continue;
+                if (!win || (i != 0 && !map_win(win).active)) continue;
                 if (!tile_in_window(win, x, y) && !tile_in_window(win, x2, y2)) continue;
                 MapWinNative* nat = ui_mapwin_native(win);
                 if (!nat || !nat->canvas || !nat->canvas->data) continue;
@@ -132,8 +131,8 @@ void GAMEAPI veh_scoot(int32_t veh_id, int32_t x, int32_t y, int32_t dir, int32_
                 m.on = true;
                 pfncTileToPoint(win, x, y, &m.sx, &m.sy);
                 pfncTileToPoint(win, x2, y2, &m.dx, &m.dy);
-                m.sy -= mwi(win, kMwHalfH);
-                m.dy -= mwi(win, kMwHalfH);
+                m.sy -= map_win(win).half_h;
+                m.dy -= map_win(win).half_h;
                 // The slide: from the source point, (next - source) / frames a frame.
                 m.pos[0] = (float)m.sx;
                 m.pos[1] = (float)m.sy;
@@ -179,7 +178,7 @@ void GAMEAPI veh_scoot(int32_t veh_id, int32_t x, int32_t y, int32_t dir, int32_
                 int32_t w = m.r.right - m.r.left, h = m.r.bottom - m.r.top;
                 UiRect at{px, py, px + w, py + h};
                 if (intersects(at, m.r)) {
-                    veh_draw(c, veh_id, px, py, mwi(win, kMwZoom), mode, f);
+                    veh_draw(c, veh_id, px, py, map_win(win).zoom, mode, f);
                     ui_present();  // GraphicWin_update_2 of the rectangle
                     Buffer_copy_4(&m.bg, c, px - m.qw - m.r.left, py - m.qh - m.r.top, px - m.qw, py - m.qh, w, h);
                 }
@@ -200,7 +199,7 @@ void GAMEAPI veh_scoot(int32_t veh_id, int32_t x, int32_t y, int32_t dir, int32_
                         for (int32_t i = 0; i < 8; i++)
                             if (mv[i].on)
                                 veh_draw(ui_mapwin_native(MapWins[i])->canvas, veh_id, (int32_t)mv[i].pos[0],
-                                         (int32_t)mv[i].pos[1], mwi(MapWins[i], kMwZoom), 0x22, f);
+                                         (int32_t)mv[i].pos[1], map_win(MapWins[i]).zoom, 0x22, f);
                         ui_screenshot(g_ui_outdir + "/" + shot);
                         for (int32_t i = 0; i < 8; i++)
                             if (mv[i].on)
@@ -231,7 +230,7 @@ void GAMEAPI veh_scoot(int32_t veh_id, int32_t x, int32_t y, int32_t dir, int32_
             for (int32_t i = 0; i < 8; i++) {
                 if (!mv[i].on) continue;
                 uint8_t* win = MapWins[i];
-                veh_draw(ui_mapwin_native(win)->canvas, veh_id, mv[i].dx, mv[i].dy, mwi(win, kMwZoom), 2, 0);
+                veh_draw(ui_mapwin_native(win)->canvas, veh_id, mv[i].dx, mv[i].dy, map_win(win).zoom, 2, 0);
                 ui_present();
             }
     }

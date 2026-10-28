@@ -176,7 +176,7 @@ Font g_msg_font;
 bool g_msg_font_ok = false;
 int32_t g_msg_first = 0;  // first row shown
 
-UiRect msg_rect() { return mi_rect(0xD1C); }
+UiRect msg_rect() { return main_interface().text; }
 
 // MessageWin_init's ListBox (Dialog_init_6 on MainInfc +0xD1C): rows a fifth of the box high
 // (+0x48) less the items' spacing (6, the Dialog default), 3 pixels above and below (+0x38 /
@@ -254,7 +254,7 @@ void THISCALL InfoWin_init(uint8_t*) {
     fld(0x80) = 1;
     Font_init(font(), "Arial", ScreenWidth == 800 ? 10 : 12, 0);
     font()->field_0 = 4;
-    const UiRect& c = mi_rect(kMiPaneCenter);
+    const UiRect& c = main_interface().pane_center;
     int32_t l = c.left + 7, t = c.top + 7, r = c.right - 0x27, b = c.bottom - 7;
     if (ScreenWidth == 800) {
         prect(1) = {l, t, r, b};
@@ -731,7 +731,7 @@ void THISCALL InfoWin_timer_proc(uint8_t* self, int32_t a1) {
     if (prog(p) > nchars(p) + 0x32) {
         int32_t mx = -1, my = -1;
         ui_mouse_pos(&mx, &my);
-        const UiRect& pos = mi_rect(kMiPos);
+        const UiRect& pos = main_interface().pos;
         mx -= pos.left;
         my -= pos.top;
         const UiRect& u = prect(0);
@@ -787,7 +787,7 @@ void THISCALL InfoWin_on_left_click(uint8_t* self, int32_t, int32_t) {
 // InfoWin_right_menu (0x4589C0): the valid displays and Help.
 void THISCALL InfoWin_right_menu(uint8_t* self, int32_t x, int32_t y) {
     PullDown pd;
-    const UiRect& pos = mi_rect(kMiPos);
+    const UiRect& pos = main_interface().pos;
     x += pos.left;  // Win_client_to_screen_2
     y += pos.top;
     PullDown_init(&pd);
@@ -941,13 +941,12 @@ void infowin_setup() {
     Font_ctor(&g_btn_font);
     Font_init(&g_btn_font, "Arial", 14, 1);  // MainInterface +0x2166C
     static const int32_t kId[3] = {1000, 0x3E9, 0x3EA};
-    static const uint32_t kRect[3] = {0xA2C, 0xA3C, 0xA4C};
     static const int32_t kLabel[3] = {0xAC0 / 4, 0xABC / 4, 0xDBC / 4};
     for (int32_t i = 0; i < 3; i++) {
         BaseButton& b = g_btn[i];
         bw_button_ctor(&b);
         char name[2] = {label_get(kLabel[i])[0], 0};
-        const UiRect& r = mi_rect(kRect[i]);
+        const UiRect& r = main_interface().info_buttons[i];
         bw_button_init(&b, name, kId[i], r.left, r.top, r.right - r.left, r.bottom - r.top, 1);
         b.font = &g_btn_font;
         b.shown = i < 2 || g_editor_button;

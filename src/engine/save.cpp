@@ -147,9 +147,10 @@ static uint32_t save_record(T& record, CrtFile* file) {
 }
 
 int32_t GAMEAPI game_io(uint8_t* win, CrtFile* file) {
-    static const uint32_t kFields[6] = {0x1DD78, 0x1DD74, 0x1DD70, 0x1DD98, 0x1DD9C, 0x1DDA0};
-    for (uint32_t offset : kFields) {
-        if (!save_io(&mapwin_field(win, offset), 4, file)) return 1;
+    MapWin& m = map_win(win);
+    int32_t* const fields[6] = {&m.index, &m.active, &m.options, &m.zoom, &m.center_x, &m.center_y};
+    for (int32_t* field : fields) {
+        if (!save_io(field, 4, file)) return 1;
     }
     return 0;
 }
@@ -544,7 +545,7 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
         if (!crt_fread(&height, 4, 1, file)) return 1;
         if (width != CanvasWidth || height != CanvasHeight) {
             for (int32_t i = 1; i < 8; i++) {
-                if (MapWins[i]) mapwin_field(MapWins[i], kMapWinActive) = 0;
+                if (MapWins[i]) map_win(MapWins[i]).active = 0;
             }
         }
     } else {
@@ -671,8 +672,8 @@ int32_t GAMEAPI load_daemon(const char* filename, int32_t relinearize) {
         int32_t magic;
         if (crt_fread(&magic, 4, 1, file) && magic >= 0x56) {
             for (int32_t i = 2; i < 8; i++) {
-                if (MapWins[i] && mapwin_field(MapWins[i], kMapWinActive)) {
-                    mapwin_field(MapWins[i], kMapWinActive) = 0;
+                if (MapWins[i] && map_win(MapWins[i]).active) {
+                    map_win(MapWins[i]).active = 0;
                     MapWin_close(MapWins[i]);
                 }
             }
@@ -684,7 +685,7 @@ int32_t GAMEAPI load_daemon(const char* filename, int32_t relinearize) {
                 if ((GameRules & RULES_IRONMAN) && crt_fread(&seed, 4, 1, file)) game_srand(seed);
                 if (!MultiplayerActive) {
                     for (int32_t i = 2; i < 8; i++) {
-                        if (MapWins[i]) mapwin_field(MapWins[i], kMapWinActive) = 0;
+                        if (MapWins[i]) map_win(MapWins[i]).active = 0;
                     }
                 }
                 ComputeBaseID = -1;
@@ -794,8 +795,8 @@ int32_t GAMEAPI load_map_daemon(const char* filename) {
         int32_t magic;
         if (crt_fread(&magic, 4, 1, file) && magic >= (is_save ? 0x56 : 5)) {
             for (int32_t i = 1; i < 8; i++) {
-                if (MapWins[i] && mapwin_field(MapWins[i], kMapWinActive)) {
-                    mapwin_field(MapWins[i], kMapWinActive) = 0;
+                if (MapWins[i] && map_win(MapWins[i]).active) {
+                    map_win(MapWins[i]).active = 0;
                     MapWin_close(MapWins[i]);
                 }
             }

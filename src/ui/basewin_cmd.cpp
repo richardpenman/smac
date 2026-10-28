@@ -46,7 +46,7 @@ bool alien(int32_t faction_id) { return (MFactions[faction_id].rule_flags & 0x80
 // "set base, recompute (1), redraw, redraw the main interface" of the commands' ends.
 void recompute_redraw(uint8_t* self) {
     if (Win_is_visible(self)) {
-        set_base(bwf(kBwBase));
+        set_base(base_win().base);
         base_compute(1);
         bw_redraw();
         GraphicWin_redraw(&MainInterfaceWin);
@@ -70,7 +70,7 @@ void set_specialist_type(int32_t i, int32_t type) {
 // ==== resource map ================================================================================
 
 int32_t THISCALL BaseWin_farm_get(uint8_t* self, int32_t x, int32_t y) {
-    const UiRect& m = bw_rect(kBwRectMap);
+    const UiRect& m = base_win().rect_map;
     x += (0xC0 - (m.right - m.left) / 2) - m.left;
     if (x < 0 || x >= 0x180) return -1;
     y -= m.top;
@@ -89,8 +89,8 @@ void THISCALL BaseWin_farm_click(uint8_t* self, int32_t x, int32_t y, int32_t) {
     bw_set_base();
     int32_t faction_id = (uint8_t)cur_base().faction_id;
     if (faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) return;
-    if (bwf(kBwPane) != 0) return;
-    if (bwf(kBwDragType) == 0) from = BaseWin_farm_get(self, bwf(kBwDownX), bwf(kBwDownY));
+    if (base_win().pane != 0) return;
+    if (base_win().drag_type == 0) from = BaseWin_farm_get(self, base_win().down_x, base_win().down_y);
     int32_t tile = BaseWin_farm_get(self, x, y);
     if (from == tile) from = -1;
     else if (from == 0) return;
@@ -101,13 +101,13 @@ void THISCALL BaseWin_farm_click(uint8_t* self, int32_t x, int32_t y, int32_t) {
     if (b->governor_flags & 0x40) b->governor_flags &= ~0x40;
     uint32_t bit = 1u << tile;
     bool changed = true;
-    if (bwf(kBwDragType) == 1) {
+    if (base_win().drag_type == 1) {
         // A citizen dragged onto the tile: the specialist becomes a worker.
         if (b->worked_tiles & bit) {
             changed = false;
         } else {
             b->worked_tiles |= bit;
-            int32_t i = bwf(kBwDragIndex);
+            int32_t i = base_win().drag_index;
             for (int32_t j = i + 1; i < cur_base().specialist_total; i++, j++) {
                 int32_t t =
                     j < 0x10 ? (cur_base().specialist_types[j >> 3] >> ((j & 7) << 2)) & 0xF : best_specialist();
@@ -257,7 +257,7 @@ void THISCALL BaseWin_pop_click(uint8_t* self, int32_t index, int32_t, int32_t, 
         if (current == 999) {
             // A worker becomes a specialist: the dragged-from tile, else the last worked tile.
             int32_t t = -1;
-            if (bwf(kBwDragType) == 0) t = BaseWin_farm_get(self, bwf(kBwDownX), bwf(kBwDownY));
+            if (base_win().drag_type == 0) t = BaseWin_farm_get(self, base_win().down_x, base_win().down_y);
             else
                 for (t = 0x14; t > 0 && !(cur_base().worked_tiles & (1u << t)); t--) {}
             if (t > 0) cur_base().worked_tiles &= ~(1u << t);
@@ -267,7 +267,7 @@ void THISCALL BaseWin_pop_click(uint8_t* self, int32_t index, int32_t, int32_t, 
     }
     log_say_values("BASE: changed citizen professions", CurrentBaseID, 0, 0);
     if (Win_is_visible(self)) {
-        set_base(bwf(kBwBase));
+        set_base(base_win().base);
         base_compute(1);
         bw_redraw();
         GraphicWin_redraw(&MainInterfaceWin);
@@ -405,7 +405,8 @@ int32_t GAMEAPI X_pop_ask_number(const char* label, int32_t value, int32_t a3) {
 void THISCALL BaseWin_hurry(uint8_t* self) {
     bool locked = false;
     bw_set_base();
-    if ((uint8_t)Bases[bwf(kBwBase)].faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) return;
+    if ((uint8_t)Bases[base_win().base].faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW))
+        return;
     BASE* b = &cur_base();
     int32_t faction_id = (uint8_t)b->faction_id;
     int32_t item = b->queue_items[0];
@@ -496,7 +497,7 @@ void THISCALL BaseWin_hurry(uint8_t* self) {
         EnergyCredits -= pay;
         if (MultiplayerActive) synch_energy(faction_id);
     }
-    bwf(kBwHurried) = result;
+    base_win().hurried = result;
     cur_base().minerals_accumulated_2 = result;
     cur_base().minerals_accumulated = result;
     cur_base().production_id_last = cur_base().queue_items[0];
@@ -569,7 +570,7 @@ static const uint32_t kGovBits[19] = {0x80000000, 0x200000, 0x80,    0x40,    1,
 
 int32_t THISCALL BaseWin_governor(uint8_t* self, int32_t a1) {
     bw_set_base();
-    if ((uint8_t)Bases[bwf(kBwBase)].faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW))
+    if ((uint8_t)Bases[base_win().base].faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW))
         return 1;
     int32_t faction_id = (uint8_t)cur_base().faction_id;
     uint32_t g = (uint32_t)cur_base().governor_flags;
@@ -639,7 +640,8 @@ void THISCALL BaseWin_update_gov_buttons(uint8_t* self) {
 
 void THISCALL BaseWin_nerve_staple(uint8_t* self) {
     bw_set_base();
-    if ((uint8_t)Bases[bwf(kBwBase)].faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) return;
+    if ((uint8_t)Bases[base_win().base].faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW))
+        return;
     int32_t faction_id = (uint8_t)cur_base().faction_id;
     bool al = alien(faction_id);
     parse_says(0, cur_base().name, -1, -1);
@@ -670,7 +672,7 @@ void THISCALL BaseWin_nerve_staple(uint8_t* self) {
 // ==== the queue ===================================================================================
 
 void THISCALL BaseWin_add_queue(uint8_t* self, int32_t item, int32_t insert) {
-    int32_t sel = bwf(kBwQueueSel);
+    int32_t sel = base_win().queue_sel;
     BASE* b = &cur_base();
     if (sel == 0 || sel == 9) return;
     if (!insert && b->queue_items[sel] == item && sel <= b->queue_size) return;
@@ -678,28 +680,28 @@ void THISCALL BaseWin_add_queue(uint8_t* self, int32_t item, int32_t insert) {
     if (item < 0 && (-item < 0x41 || (item != -0x44 && -item > 0x43))) {
         for (int32_t i = 1; i < 9; i++) {
             if (b->queue_items[i] != item) continue;
-            if (i < sel) bwf(kBwQueueSel) = sel - 1;
+            if (i < sel) base_win().queue_sel = sel - 1;
             b->queue_size--;
             for (int32_t j = i; j < 8; j++) b->queue_items[j] = b->queue_items[j + 1];
             break;
         }
     }
     if (insert) {
-        for (int32_t j = 9; bwf(kBwQueueSel) < j; j--) b->queue_items[j] = b->queue_items[j - 1];
+        for (int32_t j = 9; base_win().queue_sel < j; j--) b->queue_items[j] = b->queue_items[j - 1];
         if (b->queue_size < 9) b->queue_size++;
     }
-    b->queue_items[bwf(kBwQueueSel)] = item;
-    if (b->queue_size < bwf(kBwQueueSel)) b->queue_size++;
+    b->queue_items[base_win().queue_sel] = item;
+    if (b->queue_size < base_win().queue_sel) b->queue_size++;
     if (insert) {
-        bwf(0x40B30) = 0;
-        bwf(kBwQueueSel) = b->queue_size + 1;
+        base_win().queue_hilite = 0;
+        base_win().queue_sel = b->queue_size + 1;
     }
     // Stockpile energy only as the last item.
     for (int32_t i = 0; i < b->queue_size + 1; i++) {
         if (b->queue_items[i] == -0x45 && i < b->queue_size) {
             for (int32_t j = i; j < 9; j++) b->queue_items[j] = b->queue_items[j + 1];
             b->queue_size--;
-            if (b->queue_size < bwf(kBwQueueSel)) bwf(kBwQueueSel) = b->queue_size < 2 ? 1 : b->queue_size;
+            if (b->queue_size < base_win().queue_sel) base_win().queue_sel = b->queue_size < 2 ? 1 : b->queue_size;
             BaseWin_draw_queue(self, 1);
         }
         BaseWin_draw_production(self, 1);
@@ -710,13 +712,13 @@ void THISCALL BaseWin_add_queue(uint8_t* self, int32_t item, int32_t insert) {
 void THISCALL BaseWin_delete_queue(uint8_t* self, int32_t slot) {
     BASE* b = &cur_base();
     if (b->queue_size < slot) {
-        int32_t s = bwf(kBwQueueSel) - 1;
-        bwf(kBwQueueSel) = s < 2 ? 1 : s;
+        int32_t s = base_win().queue_sel - 1;
+        base_win().queue_sel = s < 2 ? 1 : s;
         return;
     }
     for (int32_t j = slot; j < 9; j++) b->queue_items[j] = b->queue_items[j + 1];
     b->queue_size--;
-    if (b->queue_size < bwf(kBwQueueSel)) bwf(kBwQueueSel) = b->queue_size < 2 ? 1 : b->queue_size;
+    if (b->queue_size < base_win().queue_sel) base_win().queue_sel = b->queue_size < 2 ? 1 : b->queue_size;
     BaseWin_draw_queue(self, 1);
 }
 
@@ -724,34 +726,34 @@ void THISCALL BaseWin_delete_queue(uint8_t* self, int32_t slot) {
 
 void THISCALL BaseWin_click(uint8_t* self, int32_t x, int32_t y, int32_t right, int32_t a4) {
     TutWin_reset(&TutWin);
-    bwf(kBwDragState) = -1;
+    base_win().drag_state = -1;
     if (!Win_is_visible(self) || (MultiplayerActive && NetInputPending)) return;
     // Right clicks on the panes: their help bubbles (Win_set_bubble_text at the click).
     if (right) {
         uint32_t label = 0;
-        bool alt_mode = ScreenWidth == 0x400 || bwf(0x1A1E4);  // (the energy pane's two layouts)
-        bool alt_mode2 = ScreenWidth == 0x400 || !bwf(0x1A1E4);
-        if (in_box(x, y, bw_rect(0x40B8C))) {
-            int32_t pane = bwf(kBwPane);
+        bool alt_mode = ScreenWidth == 0x400 || base_win().energy_layout;  // (the energy pane's two layouts)
+        bool alt_mode2 = ScreenWidth == 0x400 || !base_win().energy_layout;
+        if (in_box(x, y, base_win().rect_map)) {
+            int32_t pane = base_win().pane;
             label = pane == 0 ? 0xC98 : pane == 2 ? 0xC20 : pane == 1 ? 0xC24 : 0;
             if (!label) return;
-        } else if (in_box(x, y, bw_rect(0x40BEC))) {
-            label = (MFactions[(uint8_t)Bases[bwf(kBwBase)].faction_id].rule_flags & 0x80) ? 0x1190 : 0xC74;
-        } else if (in_box(x, y, bw_rect(0x40BBC))) {
+        } else if (in_box(x, y, base_win().rect_commerce_pane)) {
+            label = (MFactions[(uint8_t)Bases[base_win().base].faction_id].rule_flags & 0x80) ? 0x1190 : 0xC74;
+        } else if (in_box(x, y, base_win().rect_fac_pane)) {
             label = 0xC78;
-        } else if (in_box(x, y, bw_rect(0x40C1C))) {
+        } else if (in_box(x, y, base_win().rect_nut_pane)) {
             label = 0xC7C;
-        } else if (in_box(x, y, bw_rect(0x40CBC)) && alt_mode2) {
+        } else if (in_box(x, y, base_win().rect_exp[0]) && alt_mode2) {
             label = 0xC80;
-        } else if (in_box(x, y, bw_rect(0x40CDC)) && alt_mode2) {
+        } else if (in_box(x, y, base_win().rect_exp[2]) && alt_mode2) {
             label = 0xC84;
-        } else if (in_box(x, y, bw_rect(0x40CCC)) && alt_mode2) {
+        } else if (in_box(x, y, base_win().rect_exp[1]) && alt_mode2) {
             label = 0xC88;
-        } else if (in_box(x, y, bw_rect(0x40CEC)) && alt_mode) {
+        } else if (in_box(x, y, base_win().rect_exp[3]) && alt_mode) {
             label = 0xC8C;
-        } else if (in_box(x, y, bw_rect(0x40CFC)) && alt_mode) {
+        } else if (in_box(x, y, base_win().rect_exp[4]) && alt_mode) {
             label = 0xC90;
-        } else if (in_box(x, y, bw_rect(0x40D0C)) && alt_mode) {
+        } else if (in_box(x, y, base_win().rect_exp[5]) && alt_mode) {
             label = 0xC94;
         }
         if (label) {
@@ -775,7 +777,7 @@ void THISCALL BaseWin_click(uint8_t* self, int32_t x, int32_t y, int32_t right, 
 
 void THISCALL BaseWin_iface_click(uint8_t* self, int32_t x, int32_t y, int32_t right, int32_t a4) {
     TutWin_reset(&TutWin);
-    bwf(kBwDragState) = -1;
+    base_win().drag_state = -1;
     if (!Win_is_visible(self) || (MultiplayerActive && NetInputPending)) return;
     int32_t index = -1, type = -1;
     if (spot_check(&g_bw.spots_iface, x, y, &index, &type) < 0) {
@@ -784,16 +786,16 @@ void THISCALL BaseWin_iface_click(uint8_t* self, int32_t x, int32_t y, int32_t r
         // original passes an uninitialised local there).
         if (right) {
             uint32_t label = 0;
-            if (in_box(x, y, bw_rect(kBwRectPopMI))) label = 0xCA4;
-            else if (in_box(x, y, bw_rect(0x40B7C))) label = 0xC9C;
-            else if (in_box(x, y, bw_rect(kBwRectGarrisonMI))) label = 0xCA0;
+            if (in_box(x, y, base_win().rect_pop_mi)) label = 0xCA4;
+            else if (in_box(x, y, base_win().rect_prod_pane_mi)) label = 0xC9C;
+            else if (in_box(x, y, base_win().rect_garrison_mi)) label = 0xCA0;
             if (label) {
-                ui_bubble_set(label_get(label / 4), x + mi_rect(kMiPos).left, y + mi_rect(kMiPos).top);
+                ui_bubble_set(label_get(label / 4), x + main_interface().pos.left, y + main_interface().pos.top);
                 return;
             }
         }
         // The citizens row outside a citizen: a worker.
-        if (!in_box(x, y, bw_rect(kBwRectPopMI))) return;
+        if (!in_box(x, y, base_win().rect_pop_mi)) return;
         type = 1;
     }
     if (Win_is_visible(self) && type != 8) {
@@ -806,7 +808,7 @@ void THISCALL BaseWin_iface_click(uint8_t* self, int32_t x, int32_t y, int32_t r
           (Factions[CurrentPlayerFaction].diplo_status[owner] & 1) || type == 6) ||
         a4 != 0)
         return;
-    if (bwf(kBwDragType) == 0 && type == 1) index = -1;
+    if (base_win().drag_type == 0 && type == 1) index = -1;
     switch (type) {
     case 1: BaseWin_pop_click(self, index, x, y, right); return;
     case 5: BaseWin_production(self, 0, 0); return;
@@ -849,20 +851,20 @@ void THISCALL BaseWin_on_button_clicked(uint8_t* self, int32_t id) {
         GraphicWin_redraw(&MainInterfaceWin);
         return;
     case 9:
-        if (bwf(kBwPane) != 2) {
-            bwf(kBwPane) = 2;
+        if (base_win().pane != 2) {
+            base_win().pane = 2;
             bw_redraw();
         }
         return;
     case 10:
-        if (bwf(kBwPane) != 0) {
-            bwf(kBwPane) = 0;
+        if (base_win().pane != 0) {
+            base_win().pane = 0;
             bw_redraw();
         }
         return;
     case 0xB:
-        if (bwf(kBwPane) != 1) {
-            bwf(kBwPane) = 1;
+        if (base_win().pane != 1) {
+            base_win().pane = 1;
             bw_redraw();
         }
         return;
@@ -877,9 +879,9 @@ void THISCALL BaseWin_on_button_clicked(uint8_t* self, int32_t id) {
         return;
     case 0x14: {
         int32_t s = cur_base().queue_size + 1;
-        bwf(kBwQueueSel) = s > 9 ? 9 : s;
+        base_win().queue_sel = s > 9 ? 9 : s;
         BaseWin_draw_queue(self, 1);
-        if (!Win_is_visible(self)) BaseWin_production(self, bwf(kBwQueueSel), 0);
+        if (!Win_is_visible(self)) BaseWin_production(self, base_win().queue_sel, 0);
         return;
     }
     case 0x15:

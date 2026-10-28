@@ -53,9 +53,9 @@ int32_t x_dist(int32_t dx) {
 
 // The tile is inside the view (rows origin .. origin + rows; columns with the round map's wrap).
 bool in_view(uint8_t* win, int32_t x, int32_t y) {
-    int32_t oy = mw(win, kMwOriginY), ox = mw(win, kMwOriginX);
-    if (y < oy || y >= mw(win, kMwRowsBelow) + mw(win, kMwRowsAbove) + oy) return false;
-    int32_t w = mw(win, kMwColsEven) + mw(win, kMwColsOdd) + ox;
+    int32_t oy = map_win(win).origin_y, ox = map_win(win).origin_x;
+    if (y < oy || y >= map_win(win).rows_below + map_win(win).rows_above + oy) return false;
+    int32_t w = map_win(win).cols_even + map_win(win).cols_odd + ox;
     if (!(MapToggleFlat & 1)) {
         if (x < ox) x += MapAreaX;
         if (w <= x) x -= MapAreaX;
@@ -115,10 +115,10 @@ void THISCALL MapWin_direct_dest_line(uint8_t* win, int32_t x1, int32_t y1, int3
     int32_t px1, py1, px2, py2, color = 0;
     pfncTileToPoint(win, x1, y1, &px1, &py1);
     pfncTileToPoint(win, x2, y2, &px2, &py2);
-    px1 += mw(win, kMwHalfW);
-    py1 += mw(win, kMwHalfH);
-    px2 += mw(win, kMwHalfW);
-    py2 += mw(win, kMwHalfH);
+    px1 += map_win(win).half_w;
+    py1 += map_win(win).half_h;
+    px2 += map_win(win).half_w;
+    py2 += map_win(win).half_h;
     if (triad == 0) {
         color = 0xFA;
     } else if (triad == 1) {
@@ -128,7 +128,7 @@ void THISCALL MapWin_direct_dest_line(uint8_t* win, int32_t x1, int32_t y1, int3
         color = 0xF9;
         if (!solid) py1--, py2--;
     }
-    if (mw(win, 0x1DD84)) color = 0xFB;
+    if (map_win(win).group_drag) color = 0xFB;
     if (!solid) {
         MapWinNative* n = ui_mapwin_native(win);
         if (n) buffer_dashed_line(n->canvas, px1, py1, px2, py2, 0, color, on, off, (on - 1 + off) & DashPhase);
@@ -218,7 +218,7 @@ void THISCALL MapWin_dest_line(uint8_t* win, int32_t x1, int32_t y1, int32_t x2,
 // player's bases' rally points (dashed 3/5), 0x400000 patrol routes, 0x800000 go-to orders (2/2);
 // `redraw`: the view is updated when a line was drawn.
 void THISCALL MapWin_draw_base_dest(uint8_t* win, int32_t redraw) {
-    uint32_t opts = (uint32_t)mw(win, kMwOptions);
+    uint32_t opts = (uint32_t)map_win(win).options;
     bool drawn = false;
     if (opts & 0x40000) {
         for (int32_t b = 0; b < BaseCount; b++) {

@@ -148,13 +148,13 @@ bool console_frame_hit(int32_t x, int32_t y) {
 void console_frame_mouse(int32_t type, int32_t x, int32_t y) {
     int32_t fx = x - g_ox, fy = y - g_oy;
     auto in = [&](const UiRect& r) { return fx >= r.left && fx < r.right && fy >= r.top && fy < r.bottom; };
-    const UiRect& pos = mi_rect(kMiPos);
+    const UiRect& pos = main_interface().pos;
     if (infowin_mouse(type, x - pos.left, y - pos.top)) return;
     // MainInterface_on_iface_group_clicked: the globe buttons (1000 + 6 the world map, else the
     // detail map).
     if (type == UiInput::LUP && InfcList[InfcUsed] == 0) {
         for (int32_t i = 0; i < 2; i++) {
-            const UiRect& r = mi_rect(i ? 0xA9C : 0xA8C);
+            const UiRect& r = (i ? main_interface().globe1 : main_interface().globe2);
             int32_t mx = x - pos.left, my = y - pos.top;
             if (mx >= r.left && mx < r.right && my >= r.top && my < r.bottom) {
                 if (i) WorldWin_set_detail_map(&WorldWin);
@@ -189,7 +189,7 @@ void console_frame_draw(Buffer* s) {
     g_oy = 0;
     // The info pane's frame and text (InfoWin; approximated, see the file's header).
     {
-        UiRect c = mi_rect(kMiPaneCenter);
+        UiRect c = main_interface().pane_center;
         UiRect r{c.left + 4, c.top + 4, c.right - 4, c.bottom - 4};
         Buffer_box_sprite(mi, &r, box_def(3));  // MainInterface_on_redraw's box (button 0x3E9: info)
     }
@@ -213,7 +213,7 @@ void console_frame_draw(Buffer* s) {
     // DiploPop's HQ pane, ButtonGroup_set(-1)): their sprite centred.
     int32_t pressed = diplowin_hq_shown() ? -1 : (worldwin_detail_shown() ? 1 : 0);
     for (int32_t i = 0; i < 2; i++) {
-        const UiRect& r = mi_rect(i ? 0xA9C : 0xA8C);
+        const UiRect& r = (i ? main_interface().globe1 : main_interface().globe2);
         Sprite* sp = &g_art.globe[i][i == pressed ? 2 : 0];
         if (!sp->width) continue;
         BlitDestScale = BlitSourceScale = 1;
@@ -226,7 +226,7 @@ void console_frame_draw(Buffer* s) {
     // world map pane (above DiploPop's HQ pane).
     if (planwin_shown()) planwin_compose(mi);
     // The window onto the screen (colour 9: the screen behind).
-    const UiRect& pos = mi_rect(kMiPos);
+    const UiRect& pos = main_interface().pos;
     g_ox = pos.left;
     g_oy = pos.top;
     for (int32_t y = 0; y < mi->height; y++) {

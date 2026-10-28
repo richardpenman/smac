@@ -1137,7 +1137,7 @@ void DesignWinState::draw_vehicle(Buffer* c) {
 // DesignWin_draw_info (0x4346A0): the info pane; also chooses the slot a modified design would
 // take (as the original does while drawing).
 void DesignWinState::draw_info(Buffer* c) {
-    UiRect p = mi_rect(kMiPaneCenter);
+    UiRect p = main_interface().pane_center;
     UiRect r{p.left + 4, p.top + 4, p.right - 4, p.bottom - 4};
     Buffer_set_clip(c, &r);
     Buffer_box_sprite(c, &r, box_def(3));
@@ -1190,7 +1190,7 @@ void DesignWinState::draw_info(Buffer* c) {
 
 // The component list beside the info pane (DesignWin_draw_flash's labels).
 void DesignWinState::draw_flash(Buffer* c) {
-    UiRect q = mi_rect(kMiPaneQueue);
+    UiRect q = main_interface().pane_queue;
     UiRect r{q.left + 3, q.top + 3, q.right - 3, q.bottom - 3};
     Buffer_box_sprite(c, &r, box_def(0));
     sw_font(c, &f10, 0xE0);
@@ -1209,7 +1209,7 @@ void DesignWinState::draw_flash(Buffer* c) {
 
 // DesignWin_draw_stack (0x43D510): ten prototypes of the sorted list from stack_pos.
 void DesignWinState::draw_stack(Buffer* c) {
-    UiRect p = mi_rect(kMiPaneBottom);
+    UiRect p = main_interface().pane_bottom;
     UiRect area{p.left + 0x1A, p.top + 3, p.right - 0x1A, p.bottom - 3};
     spot_init(&spots[1], 0x40);
     proto_sort_design(faction);
@@ -1362,7 +1362,7 @@ int32_t THISCALL DesignWin_exec(uint8_t*, int32_t f, int32_t unit_id) {
     w.win_buttons.push_back(
         sw_button(&w, sw_upper(label_get(1037)).c_str(), 3, l0 + 3 * step, top + up, r0 - l0, bottom - top, 0, bf));
     // The presets (DESIGNAUTO) in the right pane, two columns of seven; the list's arrows.
-    UiRect pr = mi_rect(kMiPaneRight);
+    UiRect pr = main_interface().pane_right;
     int32_t px = pr.left + 7, py = pr.top + 7 + 0x18;
     int32_t pw = ((pr.right - 7 - px) + 3) / 2 - 3;
     if (!text_open(ScriptFileName, "DESIGNAUTO")) {
@@ -1376,7 +1376,7 @@ int32_t THISCALL DesignWin_exec(uint8_t*, int32_t f, int32_t unit_id) {
             }
         text_close();
     }
-    UiRect pb = mi_rect(kMiPaneBottom);
+    UiRect pb = main_interface().pane_bottom;
     sw_button(&w, "<", 0x17, pb.left + 3, pb.top + 3, 0x14, pb.bottom - pb.top - 6, 1, bf);
     sw_button(&w, ">", 0x18, pb.right - 0x17, pb.top + 3, 0x14, pb.bottom - pb.top - 6, 1, bf);
     g_dw = &w;
@@ -1421,19 +1421,19 @@ bool designwin_open() { return g_dw != nullptr; }
 void designwin_point(int32_t which, int32_t* x, int32_t* y) {
     UiRect r{};
     bool iface = which >= 20 && which < 30;
-    const UiRect& q = mi_rect(kMiPaneQueue);
+    const UiRect& q = main_interface().pane_queue;
     if (which >= 0 && which < 6) r = kBoxes[which];
     else if (which == 10) r = {kVehicle.left, kVehicle.bottom - 36, kVehicle.right, kVehicle.bottom - 20};
     else if (which == 11) r = {kVehicle.left, kVehicle.bottom - 54, kVehicle.right, kVehicle.bottom - 38};
     else if (which == 20) {
-        r = mi_rect(0xCEC);
+        r = main_interface().stack_pane;
         r.left = q.left + 4;
     } else if (which == 21) {
-        const UiRect& a = mi_rect(0xAAC);
+        const UiRect& a = main_interface().arrow_left;
         int32_t d = (q.left - a.left) + 8;
         r = {a.left + d, a.top, a.right + d, a.bottom};
     } else if (which == 22) {
-        const UiRect& p = mi_rect(kMiPaneRight);
+        const UiRect& p = main_interface().pane_right;
         r = {p.left + 7, p.top + 7, p.right - 7, p.top + 7 + 0x15};
     } else if (which >= 30 && g_dw) {
         for (BaseButton* b : g_dw->buttons)
@@ -1442,8 +1442,8 @@ void designwin_point(int32_t which, int32_t* x, int32_t* y) {
     *x = (r.right - r.left) / 2 + r.left;
     *y = (r.bottom - r.top) / 2 + r.top;
     if (iface) {
-        *x += mi_rect(kMiPos).left;
-        *y += mi_rect(kMiPos).top;
+        *x += main_interface().pos.left;
+        *y += main_interface().pos.top;
     } else if (g_dw) {
         *x += g_dw->x;
         *y += g_dw->y;

@@ -58,8 +58,6 @@ GLOBAL(int32_t[20][8], EditorPaintBits, 0x691888);
 
 namespace {
 
-constexpr uint32_t kMwEditPaint = 0x1DD8C;  // a drag paints (1 left, 2 right; 4: no redraw)
-constexpr uint32_t kMwEditX = 0x1DD90, kMwEditY = 0x1DD94;
 
 int32_t cur_x() { return MapWinCursorX[MapWinCursorIndex]; }
 int32_t cur_y() { return MapWinCursorY[MapWinCursorIndex]; }
@@ -109,7 +107,7 @@ void THISCALL Console_editor_on(uint8_t* self) {
     // EditorPanelWin (the info pane's 0x3EA button) shown with the omniscient view.
     ui_editor_panel_show((GameState & STATE_OMNISCIENT_VIEW) && (GameState & STATE_SCENARIO_EDITOR) &&
                          InfcList[InfcUsed] == 0);
-    pfncMainMenuUpdateVisible(nullptr, mw(self, 0x23BDC));
+    pfncMainMenuUpdateVisible(nullptr, console_win(self).veh);
     mi_set_mode((GameState & STATE_SCENARIO_EDITOR) && (GameState & STATE_OMNISCIENT_VIEW) ? 0x3EA : 0x3E9);
     set_dirty();
     draw_map(1);
@@ -178,12 +176,12 @@ void GAMEAPI Console_editor_terrain() {
 // every other offset): `right` removes. With the one-tile brush and no change on the tile, the
 // next ring is tried (up to 8). A drag (+0x1DD8C) paints each tile once.
 void THISCALL MapWin_editor(uint8_t* win, int32_t x, int32_t y, int32_t right) {
-    if (mw(win, kMwEditPaint)) {
-        if (x == mw(win, kMwEditX) && y == mw(win, kMwEditY)) return;
-        mw(win, kMwEditX) = x;
-        mw(win, kMwEditY) = y;
+    if (map_win(win).edit_paint) {
+        if (x == map_win(win).edit_x && y == map_win(win).edit_y) return;
+        map_win(win).edit_x = x;
+        map_win(win).edit_y = y;
     }
-    const bool drag = mw(win, kMwEditPaint) != 0;
+    const bool drag = map_win(win).edit_paint != 0;
     int32_t step = EditorBrush == 1 ? 2 : 1;
     int32_t brush = EditorBrush > 1 ? EditorBrush - 1 : EditorBrush;
     int32_t end = TableRange[brush], start = 0;
@@ -332,7 +330,7 @@ void THISCALL MapWin_editor(uint8_t* win, int32_t x, int32_t y, int32_t right) {
         }
         if (change) break;
     }
-    if (drag && !(mw(win, kMwEditPaint) & 4)) {
+    if (drag && !(map_win(win).edit_paint & 4)) {
         MapWin_draw_radius(win, x, y, brush, 2);
         return;
     }
@@ -507,7 +505,7 @@ void GAMEAPI Console_editor_generate() {
         *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(&MapTiles[i]) + 8) &= 0xFFFFFFFC;
     *reinterpret_cast<int32_t*>(mem::host(0x9392A8)) = 0;
     GameState |= 4;
-    mw(MapWins[0], kMwZoom) = -0xE;
+    map_win(MapWins[0]).zoom = -0xE;
     pfncRedrawMap(MapWins[0], 1);
     uint32_t omni = GameState & STATE_OMNISCIENT_VIEW;
     GameState |= STATE_OMNISCIENT_VIEW;

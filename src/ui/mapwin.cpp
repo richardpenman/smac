@@ -60,8 +60,8 @@ namespace {
 
 uint8_t* cache_entry(uint8_t* win, int32_t x, int32_t y) { return ui_mapwin_cache_entry(win, x, y); }
 
-int32_t gw_width(uint8_t* win) { return mw(win, ui_mapwin_native(win)->vbase + kGwWidth); }
-int32_t gw_height(uint8_t* win) { return mw(win, ui_mapwin_native(win)->vbase + kGwHeight); }
+int32_t gw_width(uint8_t* win) { return graphic_win(win + ui_mapwin_native(win)->vbase).width; }
+int32_t gw_height(uint8_t* win) { return graphic_win(win + ui_mapwin_native(win)->vbase).height; }
 
 // Landmark detail value of corner `corner` from one of the landmark overlay tables. Removed
 // landmarks have a negative code: the original then reads before the index table.
@@ -79,16 +79,16 @@ MapWinNative* ui_mapwin_attach(uint8_t* win, uint32_t vbase, Buffer* canvas) {
     n.win = win;
     n.vbase = vbase;
     n.canvas = canvas;
-    mw(win, vbase + kGwWidth) = canvas->width;
-    mw(win, vbase + kGwHeight) = -canvas->height;
-    *reinterpret_cast<UiRect*>(win + vbase + kGwClientRect) = {0, 0, canvas->width, canvas->height};
+    graphic_win(win + vbase).width = canvas->width;
+    graphic_win(win + vbase).height = -canvas->height;
+    graphic_win(win + vbase).client = {0, 0, canvas->width, canvas->height};
     // What MapWin_ctor (0x4626E0) initialises (native builds never run the original's
     // constructors): the zoom/height caches and the label fonts.
-    mw(win, kMwLastZoom) = -9999;
-    mw(win, kMwLastElev) = -1;
-    Font_ctor(reinterpret_cast<Font*>(win + kMwFont0));
-    Font_ctor(reinterpret_cast<Font*>(win + kMwFont1));
-    Font_ctor(reinterpret_cast<Font*>(win + kMwFont2));
+    map_win(win).last_zoom = -9999;
+    map_win(win).last_elev = -1;
+    Font_ctor(mapwin_font(win, 0));
+    Font_ctor(mapwin_font(win, 1));
+    Font_ctor(mapwin_font(win, 2));
     ui_mapwin_clear_cache(win);
     return &n;
 }
@@ -123,9 +123,9 @@ bool ui_mapdump_write(uint8_t* win, const char* path, int32_t viewer) {
     h.width = c->width;
     h.height = c->height;
     h.viewer = viewer;
-    h.zoom = mw(win, kMwZoom);
-    h.cx = mw(win, kMwCenterX);
-    h.cy = mw(win, kMwCenterY);
+    h.zoom = map_win(win).zoom;
+    h.cx = map_win(win).center_x;
+    h.cy = map_win(win).center_y;
     h.turn = CurrentTurn;
     FILE* f = std::fopen(path, "wb");
     if (!f) return false;
@@ -145,9 +145,9 @@ bool ui_mapdump_like(uint8_t* win, const char* path, const char* like, int32_t s
     if (like && *like && ui_mapdump_read_header(like, &ref)) {
         if (ref.width != n->canvas->width || ref.height != n->canvas->height) {
             Buffer_init(n->canvas, ref.width, ref.height, 8, 0);
-            mw(win, n->vbase + kGwWidth) = ref.width;
-            mw(win, n->vbase + kGwHeight) = -ref.height;
-            *reinterpret_cast<UiRect*>(win + n->vbase + kGwClientRect) = {0, 0, ref.width, ref.height};
+            graphic_win(win + n->vbase).width = ref.width;
+            graphic_win(win + n->vbase).height = -ref.height;
+            graphic_win(win + n->vbase).client = {0, 0, ref.width, ref.height};
         }
         TileVariantBase = (uint32_t)ref.reserved;
         // The oracle dumps after control_turn's redraw of the current view: the terrain cache
@@ -156,21 +156,21 @@ bool ui_mapdump_like(uint8_t* win, const char* path, const char* like, int32_t s
         ui_mapwin_clear_cache(win);
         pfncRedrawMap(win, 1);
         CurrentPlayerFaction = ref.viewer;
-        mw(win, kMwZoom) = ref.zoom;
-        mw(win, kMwCenterX) = ref.cx;
-        mw(win, kMwCenterY) = ref.cy;
+        map_win(win).zoom = ref.zoom;
+        map_win(win).center_x = ref.cx;
+        map_win(win).center_y = ref.cy;
     }
     if (scroll_from_x >= 0) {
-        int32_t tx = mw(win, kMwCenterX), ty = mw(win, kMwCenterY);
-        mw(win, kMwCenterX) = scroll_from_x;
-        mw(win, kMwCenterY) = scroll_from_y;
+        int32_t tx = map_win(win).center_x, ty = map_win(win).center_y;
+        map_win(win).center_x = scroll_from_x;
+        map_win(win).center_y = scroll_from_y;
         pfncRedrawMap(win, 0);
-        mw(win, kMwScrolling) = 1;
+        map_win(win).scrolling = 1;
         pfncMoveMap(win, tx, ty, 0);
-        mw(win, kMwScrolling) = 0;
+        map_win(win).scrolling = 0;
     } else {
-        uint32_t old_options = (uint32_t)mw(win, kMwOptions);
-        mw(win, kMwOptions) = (int32_t)(old_options | options);
+        uint32_t old_options = (uint32_t)map_win(win).options;
+        map_win(win).options = (int32_t)(old_options | options);
         pfncRedrawMap(win, 1);
         if (radius_r >= 0) {  // on the canvas cleared to 0, as the oracle
             Buffer_fill_2(n->canvas, 0);
@@ -178,7 +178,7 @@ bool ui_mapdump_like(uint8_t* win, const char* path, const char* like, int32_t s
             MapWin_gen_radius(win, radius_x, radius_y, radius_r,
                               (GameState & STATE_OMNISCIENT_VIEW) ? -1 : CurrentPlayerFaction, 0);
         }
-        mw(win, kMwOptions) = (int32_t)old_options;
+        map_win(win).options = (int32_t)old_options;
     }
     bool ok = ui_mapdump_write(win, path, CurrentPlayerFaction);
     // <path>.pt: pfncPtToTile for every 4th pixel (int32 result, x, y), as the oracle writes it.
@@ -205,118 +205,118 @@ bool ui_mapdump_like(uint8_t* win, const char* path, const char* like, int32_t s
 }
 
 void THISCALL MapWin_clear(uint8_t* win, int32_t index) {
-    mw(win, 0x1DD78) = index;
-    mw(win, kMwOptions) = 0;
-    mw(win, kMwZoom) = CanvasWidth < 1000 ? -6 : 0;
-    mw(win, kMwActive) = index == 0;
+    map_win(win).index = index;
+    map_win(win).options = 0;
+    map_win(win).zoom = CanvasWidth < 1000 ? -6 : 0;
+    map_win(win).active = index == 0;
     int32_t cy = MapAreaY / 2, cx = MapAreaX / 2;
-    mw(win, kMwCenterY) = cy;
-    mw(win, kMwCenterX) = ((cx ^ cy) & 1) ^ cx;
+    map_win(win).center_y = cy;
+    map_win(win).center_x = ((cx ^ cy) & 1) ^ cx;
     if (index == 0) {
         int32_t x = MapWinCursorX[MapWinCursorIndex], y = MapWinCursorY[MapWinCursorIndex];
         if (y >= 0 && y < MapAreaY && x >= 0 && x < MapAreaX) {
-            mw(win, kMwCenterX) = x;
-            mw(win, kMwCenterY) = y;
+            map_win(win).center_x = x;
+            map_win(win).center_y = y;
         }
     }
-    mw(win, 0x1EF50) = 0x7F00;
-    mw(win, 0x1EF4C) = 0;
+    map_win(win).cursor_id = 0x7F00;
+    map_win(win).cursor = 0;
     ui_mapwin_clear_cache(win);  // the original frees the cache; it is rebuilt on demand
 }
 
 // ---- geometry -----------------------------------------------------------------------------------
 
 void THISCALL pfncZoomProcessing(uint8_t* win) {
-    mw(win, kMwPixelX) = 0;
-    mw(win, kMwPixelY) = 0;
-    int32_t q = trunc_div4(zoom_scale(mw(win, kMwZoom), 0x32) + 1);
-    mw(win, kMwQ) = q;
-    if (q < 1) mw(win, kMwQ) = 1;
-    q = mw(win, kMwQ);
+    map_win(win).pixel_x = 0;
+    map_win(win).pixel_y = 0;
+    int32_t q = trunc_div4(zoom_scale(map_win(win).zoom, 0x32) + 1);
+    map_win(win).q = q;
+    if (q < 1) map_win(win).q = 1;
+    q = map_win(win).q;
     int32_t tile_h = q * 4, tile_w = q * 8;
-    mw(win, kMwQuarterW) = q * 2;
-    mw(win, kMwHalfW) = q * 4;
-    mw(win, kMwHalfH) = q * 2;
-    mw(win, kMwTileW) = tile_w;
-    mw(win, kMwTileH) = tile_h;
+    map_win(win).quarter_w = q * 2;
+    map_win(win).half_w = q * 4;
+    map_win(win).half_h = q * 2;
+    map_win(win).tile_w = tile_w;
+    map_win(win).tile_h = tile_h;
     int32_t width = gw_width(win), height = gw_height(win);  // height is negative
-    mw(win, kMwColsOdd) = (width - 1 + tile_w) / tile_w;
-    mw(win, kMwRowsAbove) = (q * 6 - height - 1) / tile_h;
-    mw(win, kMwColsEven) = (width + q * 4 - 1 + tile_w) / tile_w;
-    mw(win, kMwRowsBelow) = (q * 6 - height - 1) / tile_h;
+    map_win(win).cols_odd = (width - 1 + tile_w) / tile_w;
+    map_win(win).rows_above = (q * 6 - height - 1) / tile_h;
+    map_win(win).cols_even = (width + q * 4 - 1 + tile_w) / tile_w;
+    map_win(win).rows_below = (q * 6 - height - 1) / tile_h;
     if (win == &MainConsole) {
-        VisibleTiles.left = mw(win, kMwCenterX) - mw(win, kMwColsOdd) + 4;
-        VisibleTiles.right = mw(win, kMwColsOdd) + mw(win, kMwCenterX) - 4;
-        VisibleTiles.top = mw(win, kMwCenterY) - mw(win, kMwRowsAbove) + 4;
-        VisibleTiles.bottom = mw(win, kMwCenterY) + mw(win, kMwRowsAbove) - 6;
+        VisibleTiles.left = map_win(win).center_x - map_win(win).cols_odd + 4;
+        VisibleTiles.right = map_win(win).cols_odd + map_win(win).center_x - 4;
+        VisibleTiles.top = map_win(win).center_y - map_win(win).rows_above + 4;
+        VisibleTiles.bottom = map_win(win).center_y + map_win(win).rows_above - 6;
     }
     int32_t half = MapAreaX / 2;
-    if (half < mw(win, kMwColsOdd)) {
-        mw(win, kMwColsOdd) = half;
-        mw(win, kMwColsEven) = half + 1;
-        mw(win, kMwPixelX) = (width - mw(win, kMwColsOdd) * mw(win, kMwTileW)) / 2;
+    if (half < map_win(win).cols_odd) {
+        map_win(win).cols_odd = half;
+        map_win(win).cols_even = half + 1;
+        map_win(win).pixel_x = (width - map_win(win).cols_odd * map_win(win).tile_w) / 2;
     }
     int32_t half_y = MapAreaY / 2;
-    if (half_y < mw(win, kMwRowsAbove)) {
-        mw(win, kMwRowsAbove) = half_y;
-        mw(win, kMwRowsBelow) = half_y + 1;
-        mw(win, kMwPixelY) = -((height + mw(win, kMwRowsAbove) * mw(win, kMwTileH)) / 2);
+    if (half_y < map_win(win).rows_above) {
+        map_win(win).rows_above = half_y;
+        map_win(win).rows_below = half_y + 1;
+        map_win(win).pixel_y = -((height + map_win(win).rows_above * map_win(win).tile_h) / 2);
     }
-    mw(win, kMwColsOdd) = std::min(mw(win, kMwColsOdd), MapAreaX / 2);
-    mw(win, kMwColsEven) = std::min(mw(win, kMwColsEven), MapAreaX / 2);
-    int32_t oy = mw(win, kMwCenterY) - mw(win, kMwRowsAbove);
-    int32_t max_y = MapAreaY + (2 - mw(win, kMwRowsAbove)) * 2;
+    map_win(win).cols_odd = std::min(map_win(win).cols_odd, MapAreaX / 2);
+    map_win(win).cols_even = std::min(map_win(win).cols_even, MapAreaX / 2);
+    int32_t oy = map_win(win).center_y - map_win(win).rows_above;
+    int32_t max_y = MapAreaY + (2 - map_win(win).rows_above) * 2;
     if (oy < -2 || max_y < -2) oy = -2;
     else if (max_y < oy) oy = max_y;
-    mw(win, kMwOriginY) = oy;
-    int32_t ox = mw(win, kMwCenterX) - mw(win, kMwColsOdd);
+    map_win(win).origin_y = oy;
+    int32_t ox = map_win(win).center_x - map_win(win).cols_odd;
     if ((MapToggleFlat & 1) == 0) ox = wrap_x(ox);
-    mw(win, kMwOriginX) = ox;
+    map_win(win).origin_x = ox;
     if (MapToggleFlat & 1) {
-        int32_t max_x = MapAreaX + (2 - mw(win, kMwColsOdd)) * 2;
+        int32_t max_x = MapAreaX + (2 - map_win(win).cols_odd) * 2;
         if (ox < -4 || max_x < -4) ox = -4;
         else if (max_x < ox) ox = max_x;
-        mw(win, kMwOriginX) = ox;
+        map_win(win).origin_x = ox;
     }
     // The left column has the parity of the top row.
-    mw(win, kMwOriginX) = ((mw(win, kMwOriginX) ^ mw(win, kMwOriginY)) & 1) ^ mw(win, kMwOriginX);
-    int32_t zoom = mw(win, kMwZoom);
-    bool lifted = (mw(win, kMwOptions) & 2) && zoom >= -10;
+    map_win(win).origin_x = ((map_win(win).origin_x ^ map_win(win).origin_y) & 1) ^ map_win(win).origin_x;
+    int32_t zoom = map_win(win).zoom;
+    bool lifted = (map_win(win).options & 2) && zoom >= -10;
     int32_t lift = lifted ? (ZoomNum < 1 ? trunc_div16((zoom * 3 + 0x30) * 4) : ZoomNum * 0xC / ZoomDenom) : 0;
     int32_t lift2 = lifted ? (ZoomNum < 1 ? trunc_div16(zoom * 4 + 0x40) : ZoomNum * 4 / ZoomDenom) : 0;
-    mw(win, kMwUnitLift) = lift;
-    mw(win, kMwUnitLift2) = lift2;
-    mw(win, kMwElevScale) = 0x19;
+    map_win(win).unit_lift = lift;
+    map_win(win).unit_lift2 = lift2;
+    map_win(win).elev_scale = 0x19;
     if (GameMorePreferences & MPREF_MAP_SHOW_FLAT_TERRAIN) {  // flat terrain
-        mw(win, kMwElevScale) = 8;
-        mw(win, kMwUnitLift) = lift / 3;
-        mw(win, kMwUnitLift2) = lift2 / 3;
+        map_win(win).elev_scale = 8;
+        map_win(win).unit_lift = lift / 3;
+        map_win(win).unit_lift2 = lift2 / 3;
     }
     MapWinNative* n = ui_mapwin_native(win);
     bool cache = n && !n->tile_cache.empty();
-    if (mw(win, kMwElevScale) != mw(win, kMwLastElev)) {
-        mw(win, kMwLastElev) = mw(win, kMwElevScale);
+    if (map_win(win).elev_scale != map_win(win).last_elev) {
+        map_win(win).last_elev = map_win(win).elev_scale;
         if (cache)
             for (size_t i = 0; i < n->tile_cache.size(); i += 0xC) std::memset(&n->tile_cache[i + 4], 0xFF, 5);
     }
-    if (zoom != mw(win, kMwLastZoom)) {
+    if (zoom != map_win(win).last_zoom) {
         if (cache)
             for (size_t i = 0; i < n->tile_cache.size(); i += 0xC) std::memset(&n->tile_cache[i], 0xFF, 9);
-        mw(win, kMwLastZoom) = zoom;
-        Font* f0 = reinterpret_cast<Font*>(win + kMwFont0);
-        Font* f1 = reinterpret_cast<Font*>(win + kMwFont1);
-        Font* f2 = reinterpret_cast<Font*>(win + kMwFont2);
-        int32_t s = std::min(trunc_div16(mw(win, kMwTileH) * 5), 0xC);
+        map_win(win).last_zoom = zoom;
+        Font* f0 = mapwin_font(win, 0);
+        Font* f1 = mapwin_font(win, 1);
+        Font* f2 = mapwin_font(win, 2);
+        int32_t s = std::min(trunc_div16(map_win(win).tile_h * 5), 0xC);
         if (f0->size != s) {
             f0->size = s;
             Font_init(f0, "Arial", s, 0);
         }
-        s = std::min(trunc_div16(mw(win, kMwTileH) * 5), 0xC);
+        s = std::min(trunc_div16(map_win(win).tile_h * 5), 0xC);
         if (f2->size != s) {
             f2->size = s;
             Font_init(f2, "Arial", s, 2);
         }
-        s = std::min((mw(win, kMwTileH) << 1) / 5, 0xC);
+        s = std::min((map_win(win).tile_h << 1) / 5, 0xC);
         if (f1->size != s) {
             f1->size = s;
             Font_init(f1, "Arial", s, 1);
@@ -326,15 +326,15 @@ void THISCALL pfncZoomProcessing(uint8_t* win) {
 
 int32_t THISCALL pfncPtToTile(uint8_t* win, int32_t px, int32_t py, int32_t* out_x, int32_t* out_y) {
     MapWinNative* n = ui_mapwin_native(win);
-    if (!n || px >= mw(win, n->vbase + kGwWidth) || py >= -mw(win, n->vbase + kGwHeight)) return 1;
-    px -= mw(win, kMwPixelX);
-    py -= mw(win, kMwPixelY);
+    if (!n || px >= graphic_win(win + n->vbase).width || py >= -graphic_win(win + n->vbase).height) return 1;
+    px -= map_win(win).pixel_x;
+    py -= map_win(win).pixel_y;
     if (px < 0 || py < 0) return 1;
     const bool flat = (MapToggleFlat & 1) != 0;
     auto wrap = [&](int32_t v) { return flat ? v : wrap_x(v); };
-    int32_t ox = mw(win, kMwOriginX), tw = mw(win, kMwTileW), hw = mw(win, kMwHalfW);
+    int32_t ox = map_win(win).origin_x, tw = map_win(win).tile_w, hw = map_win(win).half_w;
     int32_t a = wrap(ox + (px / tw) * 2 + 1);
-    int32_t y = mw(win, kMwOriginY) + (py / mw(win, kMwTileH)) * 2 + 1;
+    int32_t y = map_win(win).origin_y + (py / map_win(win).tile_h) * 2 + 1;
     int32_t b = wrap(ox + ((px - hw) / tw) * 2 + 1);
     int32_t cur;
     bool left_edge;
@@ -351,7 +351,7 @@ int32_t THISCALL pfncPtToTile(uint8_t* win, int32_t px, int32_t py, int32_t* out
     int32_t l = wrap(base - ox - 1), r = wrap(base - ox);
     px -= hw * l;
     int32_t span = hw * r - hw * l;
-    const int32_t oy = mw(win, kMwOriginY), hh = mw(win, kMwHalfH);
+    const int32_t oy = map_win(win).origin_y, hh = map_win(win).half_h;
     int32_t lhs, rhs;
     do {
         int32_t e1, e2;
@@ -378,11 +378,11 @@ int32_t THISCALL pfncPtToTile(uint8_t* win, int32_t px, int32_t py, int32_t* out
 }
 
 void THISCALL pfncTileToPoint(uint8_t* win, int32_t x, int32_t y, int32_t* px, int32_t* py) {
-    int32_t ox = mw(win, kMwOriginX), oy = mw(win, kMwOriginY);
-    int32_t cols = mw(win, kMwColsEven) + mw(win, kMwColsOdd);
+    int32_t ox = map_win(win).origin_x, oy = map_win(win).origin_y;
+    int32_t cols = map_win(win).cols_even + map_win(win).cols_odd;
     int32_t d;
     bool in_view = false;
-    if (y >= oy && y < mw(win, kMwRowsBelow) + mw(win, kMwRowsAbove) + oy) {
+    if (y >= oy && y < map_win(win).rows_below + map_win(win).rows_above + oy) {
         int32_t x1 = x;
         if ((MapToggleFlat & 1) == 0) {
             if (x < ox) x1 = MapAreaX + x;
@@ -405,10 +405,10 @@ void THISCALL pfncTileToPoint(uint8_t* win, int32_t x, int32_t y, int32_t* px, i
         if (MapAreaX / 2 < d) d -= MapAreaX;
         if (d < -(MapAreaX / 2)) d += MapAreaX;
     }
-    *px = mw(win, kMwHalfW) * (d - 1) + mw(win, kMwPixelX);
+    *px = map_win(win).half_w * (d - 1) + map_win(win).pixel_x;
     int32_t c4 = pfncMapGetCornerYOffset(win, x, y, 4), c3 = pfncMapGetCornerYOffset(win, x, y, 3);
     int32_t c2 = pfncMapGetCornerYOffset(win, x, y, 2), c1 = pfncMapGetCornerYOffset(win, x, y, 1);
-    *py = ((y - oy) - 1) * mw(win, kMwHalfH) + mw(win, kMwPixelY) - ((c4 + c3 + c2 + c1) >> 2);
+    *py = ((y - oy) - 1) * map_win(win).half_h + map_win(win).pixel_y - ((c4 + c3 + c2 + c1) >> 2);
 }
 
 // ---- terrain heights and light ------------------------------------------------------------------
@@ -429,7 +429,7 @@ int32_t THISCALL pfncMapGetCornerYOffset(uint8_t* win, int32_t x, int32_t y, int
     else if (lm & 0x200) off = landmark_detail(0x7F655C, lm, corner, true);  // canyon
     else if (lm & 0x100) off = landmark_detail(0x7D3A78, lm, corner, true);  // mesa
     else if (lm & 0x800) off = landmark_detail(0x7F64E8, lm, corner, true);  // ridge
-    int32_t scale = mw(win, kMwElevScale), zoom = mw(win, kMwZoom);
+    int32_t scale = map_win(win).elev_scale, zoom = map_win(win).zoom;
     if (corner == 0) {
         int32_t v = ((climate >> 5) - 3) * zoom_scale(zoom, scale);
         if (off >= 1) {
@@ -640,8 +640,8 @@ clamp:
 namespace {
 // The tile ranges a scrolled redraw draws (MapWin +0x21A48 the columns uncovered horizontally,
 // +0x21A58 the rows uncovered vertically): x0, y0, x1, y1.
-int32_t* scroll_cols(uint8_t* win) { return &mw(win, 0x21A48); }
-int32_t* scroll_rows(uint8_t* win) { return &mw(win, 0x21A58); }
+int32_t* scroll_cols(uint8_t* win) { return &map_win(win).scroll_cols[0]; }
+int32_t* scroll_rows(uint8_t* win) { return &map_win(win).scroll_rows[0]; }
 // Whether a scrolled redraw draws tile (x, y), with the ranges widened by `margin`.
 bool in_scroll_range(uint8_t* win, int32_t x, int32_t y, int32_t margin) {
     for (int32_t* r : {scroll_rows(win), scroll_cols(win)}) {
@@ -660,14 +660,14 @@ bool in_scroll_range(uint8_t* win, int32_t x, int32_t y, int32_t margin) {
 void THISCALL pfncDrawMap(uint8_t* win, int32_t faction_id, int32_t terrain_only) {
     MapWinNative* n = ui_mapwin_native(win);
     Buffer* canvas = n->canvas;
-    int32_t rows = mw(win, kMwRowsAbove) + 1 + mw(win, kMwRowsBelow);
-    const bool scrolling = mw(win, kMwScrolling) != 0;
+    int32_t rows = map_win(win).rows_above + 1 + map_win(win).rows_below;
+    const bool scrolling = map_win(win).scrolling != 0;
     // Every tile of the view, row by row, odd rows shifted by one column.
     auto for_each_tile = [&](int32_t margin, auto&& fn) {
         for (int32_t r = 0; r < rows; r++) {
-            int32_t ty = mw(win, kMwOriginY) + r;
-            int32_t tx = mw(win, kMwOriginX) + (r & 1);
-            int32_t count = (r & 1) ? mw(win, kMwColsOdd) : mw(win, kMwColsEven);
+            int32_t ty = map_win(win).origin_y + r;
+            int32_t tx = map_win(win).origin_x + (r & 1);
+            int32_t count = (r & 1) ? map_win(win).cols_odd : map_win(win).cols_even;
             for (int32_t c = 0; c < count; c++, tx += 2) {
                 int32_t wx = tx;
                 if ((MapToggleFlat & 1) == 0) wx = wrap_x(tx);
@@ -678,25 +678,25 @@ void THISCALL pfncDrawMap(uint8_t* win, int32_t faction_id, int32_t terrain_only
         }
     };
     if (!terrain_only) {
-        if (!(mw(win, kMwOptions) & 0x82000000) && !scrolling) Buffer_fill_2(canvas, 0x41);  // GraphicWin_fill
+        if (!(map_win(win).options & 0x82000000) && !scrolling) Buffer_fill_2(canvas, 0x41);  // GraphicWin_fill
         for_each_tile(0, [&](int32_t tx, int32_t ty) {
             int32_t tpx, tpy;
             pfncTileToPoint(win, tx, ty, &tpx, &tpy);
-            MapWin_gen_terrain_poly(canvas, win, mw(win, kMwZoom), faction_id, -1, mw(win, kMwOptions), tx, ty, tpx,
+            MapWin_gen_terrain_poly(canvas, win, map_win(win).zoom, faction_id, -1, map_win(win).options, tx, ty, tpx,
                                     tpy);
         });
     }
     for_each_tile(2, [&](int32_t tx, int32_t ty) {
         int32_t tpx, tpy;
         pfncTileToPoint(win, tx, ty, &tpx, &tpy);
-        MapWin_draw_vehicles(win, tx, ty, tpx, tpy - mw(win, kMwHalfH), faction_id);
+        MapWin_draw_vehicles(win, tx, ty, tpx, tpy - map_win(win).half_h, faction_id);
     });
     MapWin_draw_base_names(win);
-    if (mw(win, kMwOptions) & 0x2000) {
+    if (map_win(win).options & 0x2000) {
         for_each_tile(2, [&](int32_t tx, int32_t ty) { MapWin_gen_overlays(win, tx, ty); });
     }
-    if (mw(win, kMwOptions) & 0x20000) MapWin_draw_legend(win);
-    if (mw(win, kMwOptions) & 0x100000) MapWin_draw_wars(win);
+    if (map_win(win).options & 0x20000) MapWin_draw_legend(win);
+    if (map_win(win).options & 0x100000) MapWin_draw_wars(win);
 }
 
 void THISCALL pfncRedrawMap(uint8_t* win, int32_t flag) {
@@ -704,26 +704,26 @@ void THISCALL pfncRedrawMap(uint8_t* win, int32_t flag) {
     if (!n) return;
     Buffer* canvas = n->canvas;
     UiRect rows_rect{0, 0, 0, 0}, cols_rect{0, 0, 0, 0};  // local_64, local_44
-    if (mw(win, kMwPixelX) || mw(win, kMwPixelY)) mw(win, kMwScrolling) = 0;
+    if (map_win(win).pixel_x || map_win(win).pixel_y) map_win(win).scrolling = 0;
     int32_t ox0 = 0, oy0 = 0;
-    if (mw(win, kMwScrolling)) {
-        ox0 = mw(win, kMwOriginX);
-        oy0 = mw(win, kMwOriginY);
+    if (map_win(win).scrolling) {
+        ox0 = map_win(win).origin_x;
+        oy0 = map_win(win).origin_y;
     }
     pfncZoomProcessing(win);
     const int32_t viewer = (GameState & STATE_OMNISCIENT_VIEW) ? -1 : CurrentPlayerFaction;
-    if (!mw(win, kMwScrolling)) {
+    if (!map_win(win).scrolling) {
         pfncDrawMap(win, viewer, flag < 0);
         return;  // (flag: GraphicWin_redraw shows the canvas; the platform presents it)
     }
     // Scrolled redraw: the canvas content moves with the view and only the uncovered tiles are
     // drawn.
-    const int32_t ox = mw(win, kMwOriginX), oy = mw(win, kMwOriginY);
+    const int32_t ox = map_win(win).origin_x, oy = map_win(win).origin_y;
     if (ox0 == ox && oy0 == oy) return;
     const bool flat = (MapToggleFlat & 1) != 0;
     auto wrap = [&](int32_t v) { return flat ? v : wrap_x(v); };
-    const int32_t cols = mw(win, kMwColsEven) + mw(win, kMwColsOdd);
-    const int32_t nrows = mw(win, kMwRowsBelow) + mw(win, kMwRowsAbove);
+    const int32_t cols = map_win(win).cols_even + map_win(win).cols_odd;
+    const int32_t nrows = map_win(win).rows_below + map_win(win).rows_above;
     int32_t* cr = scroll_cols(win);
     int32_t* rr = scroll_rows(win);
     if (ox0 == ox) {
@@ -821,7 +821,7 @@ void THISCALL pfncRedrawMap(uint8_t* win, int32_t flag) {
         pfncDrawMap(win, viewer, flag < 0);
     }
     // (mouse tracking: the window's mouse-move handler runs again here; not reconstructed)
-    Buffer_set_clip(canvas, reinterpret_cast<UiRect*>(win + n->vbase + kGwClientRect));
+    Buffer_set_clip(canvas, &graphic_win(win + n->vbase).client);
 }
 
 void THISCALL pfncMoveMap(uint8_t* win, int32_t x, int32_t y, int32_t redraw) {
@@ -829,10 +829,10 @@ void THISCALL pfncMoveMap(uint8_t* win, int32_t x, int32_t y, int32_t redraw) {
         if (x & 1) x--;
         if (y & 1) x++;
     }
-    int32_t cy0 = mw(win, kMwCenterY), cx0 = mw(win, kMwCenterX);
-    mw(win, kMwCenterX) = (MapToggleFlat & 1) ? x : wrap_x(x);
-    mw(win, kMwCenterY) = y;
+    int32_t cy0 = map_win(win).center_y, cx0 = map_win(win).center_x;
+    map_win(win).center_x = (MapToggleFlat & 1) ? x : wrap_x(x);
+    map_win(win).center_y = y;
     // (the main view's destination marker, TutWin_reset and the world window's follow-up are
     // not reconstructed)
-    if (cx0 != mw(win, kMwCenterX) || cy0 != mw(win, kMwCenterY)) pfncRedrawMap(win, redraw);
+    if (cx0 != map_win(win).center_x || cy0 != map_win(win).center_y) pfncRedrawMap(win, redraw);
 }

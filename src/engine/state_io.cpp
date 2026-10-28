@@ -581,6 +581,22 @@ void record_io(Io& io, ScenarioRules& r) {
 }
 
 template <class Io>
+void record_io(Io& io, CouncilSession& r) {
+    io(r.proposal);
+    io(r.candidate);
+    io(r.result);
+    io(r.governor);
+    io(r.unk_a2c);
+    io(r.start_time);
+    io(r.time_limit);
+    io(r.unk_a40);
+    io(r.voter_mask);
+    io(r.spot);
+    io(r.votes);
+    io(r.council_votes);
+}
+
+template <class Io>
 void record_io(Io& io, PbemState& r) {
     io(r.game_id);
     io(r.game_date);
@@ -610,6 +626,7 @@ SMAC_RECORD(MonumentEvent)
 SMAC_RECORD(Monument)
 SMAC_RECORD(ScenarioRules)
 SMAC_RECORD(PbemState)
+SMAC_RECORD(CouncilSession)
 #undef SMAC_RECORD
 
 // ---- .state snapshots ----

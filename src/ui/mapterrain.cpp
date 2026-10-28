@@ -283,7 +283,7 @@ int32_t GAMEAPI MapWin_gen_terrain_poly(Buffer* dest, uint8_t* win, int32_t zoom
     py += q2;
     px += q2 * 2;
     auto restore_and_return = [&](int32_t result) {
-        if (0 < ZoomNum && win) mw(win, 8) = 99999;
+        if (0 < ZoomNum && win) map_win(win).unk_8 = 99999;
         BlitDestScale = 1;
         BlitSourceScale = 1;
         TextureLightMin = -0x100;

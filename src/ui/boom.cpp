@@ -43,7 +43,6 @@ GLOBAL(int32_t, BoomActive, 0x915620);  // DAT_00915620: set while boom draws
 
 namespace {
 
-int32_t& mwi(uint8_t* win, uint32_t off) { return *reinterpret_cast<int32_t*>(win + off); }
 // The unit of a vehicle; the original also reads Vehs[-1] here (no unit on the target tile): it
 // lies in the Reactor table (rules_orig_byte), as in veh.cpp's veh_unit_raw.
 // Fixed (compat out_of_range_reads): no vehicle has no unit (-1), read as an empty design.
@@ -78,7 +77,7 @@ bool g_buster_ok = false;
 int32_t g_buster_frame = 0;
 
 int32_t zoom_scale(uint8_t* win, int32_t v) {
-    return ZoomNum < 1 ? ((mwi(win, kMwZoom) + 0x10) * v) / 16 : (v * ZoomNum) / ZoomDenom;
+    return ZoomNum < 1 ? ((map_win(win).zoom + 0x10) * v) / 16 : (v * ZoomNum) / ZoomDenom;
 }
 
 void save_rect(Buffer* to, Buffer* from, int32_t x, int32_t y, int32_t w, int32_t h) {
@@ -149,21 +148,21 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
     bool on[8] = {};
     for (int32_t i = 0; i < 8; i++) {
         uint8_t* win = MapWins[i];
-        if (!win || (i != 0 && !mwi(win, kMwActive))) continue;
-        int32_t oy = mwi(win, kMwOriginY), ox = mwi(win, kMwOriginX);
-        if (y < oy || y >= mwi(win, kMwRowsBelow) + mwi(win, kMwRowsAbove) + oy) continue;
+        if (!win || (i != 0 && !map_win(win).active)) continue;
+        int32_t oy = map_win(win).origin_y, ox = map_win(win).origin_x;
+        if (y < oy || y >= map_win(win).rows_below + map_win(win).rows_above + oy) continue;
         int32_t tx = x;
         if (!(MapToggleFlat & 1)) {
             if (x < ox) tx = MapAreaX + x;
-            if (mwi(win, kMwColsEven) + mwi(win, kMwColsOdd) + ox <= tx) tx -= MapAreaX;
+            if (map_win(win).cols_even + map_win(win).cols_odd + ox <= tx) tx -= MapAreaX;
         }
-        if (tx < ox || tx >= mwi(win, kMwColsEven) + mwi(win, kMwColsOdd) + ox) continue;
+        if (tx < ox || tx >= map_win(win).cols_even + map_win(win).cols_odd + ox) continue;
         shown = true;
         on[i] = true;
         int32_t px = 0, py = 0;
         pfncTileToPoint(win, x, y, &px, &py);
-        px += mwi(win, kMwTileW) / 2;
-        py += mwi(win, kMwTileH);
+        px += map_win(win).tile_w / 2;
+        py += map_win(win).tile_h;
         UiRect& r = rect[i];
         if (!anim) {
             Sprite* ref = (flags & 1) ? shot_sprite(0, 0) : boom_sprite(0, 0);
@@ -239,7 +238,7 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
                 MapWinNative* nat = ui_mapwin_native(win);
                 if (!nat || !nat->canvas || !nat->canvas->data) continue;
                 if (ZoomNum < 1) {
-                    BlitDestScale = mwi(win, kMwZoom) + 0x10;
+                    BlitDestScale = map_win(win).zoom + 0x10;
                     BlitSourceScale = 0x10;
                 } else {
                     BlitDestScale = ZoomNum;
@@ -272,7 +271,7 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
                     g_buster_frame++;
                     int32_t fac = first >= 0 ? Vehs[first].faction_id : 0;
                     Buffer_draw_multi_table_dest_2(&fb, nat->canvas, 0xFF, rect[i].left, rect[i].top,
-                                                   (mwi(win, kMwZoom) + 0x10) * psi_or_num, row_or_den << 4,
+                                                   (map_win(win).zoom + 0x10) * psi_or_num, row_or_den << 4,
                                                    xtable(kFactionTable[fac & 7]));
                 }
                 ui_present();  // GraphicWin_update_2

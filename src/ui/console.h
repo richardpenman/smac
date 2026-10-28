@@ -1,8 +1,8 @@
 // Console (timers/console modules 0x4CF7C0..0x4E2240, 0x50F460..0x51DF70): the main view's game
 // controller. MainConsole (0x9156B0, engine/ui_bridge.h) is a Console: a MapWin (the main map view)
 // whose fields from +0x23BD4 hold the human turn's state. The object lives in the memory image, so
-// its fields are used in place (mw(console, offset)); several of them are also engine globals
-// (MapWinInVehMode, MapWinVehA, MapWinCursorX, ...).
+// its fields are used in place through the typed view Console (console_win(self).veh); several of
+// them are also engine globals (MapWinInVehMode, MapWinVehA, MapWinCursorX, ...).
 //
 // Reconstructed: the human turn (Console_human_turn, Console_veh_turn, Console_ready...), unit
 // selection, the key dispatcher (Console_on_key_click: the main view's keys; menu commands, the
@@ -17,28 +17,61 @@
 #include "engine/ui_bridge.h"
 #include "ui/mapwin.h"
 
-// ---- Console fields (byte offsets from MainConsole) ----
-constexpr uint32_t kConFaction = 0x23BD4;  // faction whose console this is (the viewer)
-constexpr uint32_t kConVehMode = 0x23BD8;  // MapWinInVehMode: unit mode (1) or view mode (0)
-constexpr uint32_t kConVeh = 0x23BDC;  // MapWinVehA: selected vehicle (-1: none)
-constexpr uint32_t kConNextVeh = 0x23BE0;  // MapWinVehB: vehicle to select next (multiplayer)
-constexpr uint32_t kConWaiting = 0x23BE4;  // waiting for orders for the selected unit
-constexpr uint32_t kConTurnActive = 0x23BE8;  // the human turn goes on (0: end the turn)
-constexpr uint32_t kConAnySelect = 0x23BEC;  // keep the selection if selectable (not only ready)
-constexpr uint32_t kConNoFocus = 0x23BF0;  // a go-to order is under way (no recentring)
-constexpr uint32_t kConMoveSet = 0x23BF4;  // the unit was just selected by Console_set_move
-constexpr uint32_t kConCursorShown = 0x23BF8;  // the cursor is drawn
-constexpr uint32_t kConCursorOn = 0x23BFC;
-constexpr uint32_t kConRedraw = 0x23C00;  // the view needs a full redraw before the cursor
-constexpr uint32_t kConCursorIdx = 0x23C08;  // MapWinCursorIndex: current cursor history slot
-constexpr uint32_t kConCursorHead = 0x23C0C;  // newest cursor history slot
-constexpr uint32_t kConCursorX = 0x23C10;  // MapWinCursorX[32]
-constexpr uint32_t kConCursorY = 0x23C90;  // MapWinCursorY[32]
-constexpr uint32_t kConMode = 0x23D10;  // mouse interaction mode (go to, ...; 0: none)
-constexpr uint32_t kConModeRange = 0x23D14;  // range of the mode's target (-1: any tile)
-constexpr uint32_t kConSearchReset = 0x23D18;  // Console_ready searches from the start
-constexpr uint32_t kCon23D1C = 0x23D1C;
-constexpr uint32_t kConMpSearch = 0x23D24;  // multiplayer: units of others' turns searched too
+// ---- the Console object (MainConsole): its MapWin, then the human turn's fields ----
+// A view of the object at its original offsets (GraphicWin virtual base at +0x23D94).
+struct Console {
+    MapWin map;  // +0x0: the main view (engine/ui_bridge.h)
+    uint8_t unk_21a6c[0x22A2C - 0x21A6C];
+    uint8_t menu_bar[0x23BD4 - 0x22A2C];  // +0x22A2C: the console's menu bar object (main_menu)
+    int32_t faction;  // +0x23BD4: faction whose console this is (the viewer)
+    int32_t veh_mode;  // +0x23BD8: MapWinInVehMode: unit mode (1) or view mode (0)
+    int32_t veh;  // +0x23BDC: MapWinVehA: selected vehicle (-1: none)
+    int32_t next_veh;  // +0x23BE0: MapWinVehB: vehicle to select next (multiplayer)
+    int32_t waiting;  // +0x23BE4: waiting for orders for the selected unit
+    int32_t turn_active;  // +0x23BE8: the human turn goes on (0: end the turn)
+    int32_t any_select;  // +0x23BEC: keep the selection if selectable (not only ready)
+    int32_t no_focus;  // +0x23BF0: a go-to order is under way (no recentring)
+    int32_t move_set;  // +0x23BF4: the unit was just selected by Console_set_move
+    int32_t cursor_shown;  // +0x23BF8: the cursor is drawn
+    int32_t cursor_on;  // +0x23BFC
+    int32_t redraw;  // +0x23C00: the view needs a full redraw before the cursor
+    int32_t unk_23c04;
+    int32_t cursor_idx;  // +0x23C08: MapWinCursorIndex: current cursor history slot
+    int32_t cursor_head;  // +0x23C0C: newest cursor history slot
+    int32_t cursor_x[32];  // +0x23C10: MapWinCursorX
+    int32_t cursor_y[32];  // +0x23C90: MapWinCursorY
+    int32_t mode;  // +0x23D10: mouse interaction mode (go to, ...; 0: none)
+    int32_t mode_range;  // +0x23D14: range of the mode's target (-1: any tile)
+    int32_t search_reset;  // +0x23D18: Console_ready searches from the start
+    int32_t unk_23d1c;  // +0x23D1C
+    int32_t unk_23d20;  // +0x23D20: MapWinField23D20
+    int32_t mp_search;  // +0x23D24: multiplayer: units of others' turns searched too
+    uint8_t unk_23d28[0x23D94 - 0x23D28];
+};
+SMAC_LAYOUT(Console, 0x23D94);
+static_assert(offsetof(Console, map) == 0x0, "Console layout");
+static_assert(offsetof(Console, menu_bar) == 0x22A2C, "Console layout");
+static_assert(offsetof(Console, faction) == 0x23BD4, "Console layout");
+static_assert(offsetof(Console, veh_mode) == 0x23BD8, "Console layout");
+static_assert(offsetof(Console, veh) == 0x23BDC, "Console layout");
+static_assert(offsetof(Console, next_veh) == 0x23BE0, "Console layout");
+static_assert(offsetof(Console, waiting) == 0x23BE4, "Console layout");
+static_assert(offsetof(Console, turn_active) == 0x23BE8, "Console layout");
+static_assert(offsetof(Console, any_select) == 0x23BEC, "Console layout");
+static_assert(offsetof(Console, no_focus) == 0x23BF0, "Console layout");
+static_assert(offsetof(Console, move_set) == 0x23BF4, "Console layout");
+static_assert(offsetof(Console, cursor_shown) == 0x23BF8, "Console layout");
+static_assert(offsetof(Console, cursor_on) == 0x23BFC, "Console layout");
+static_assert(offsetof(Console, redraw) == 0x23C00, "Console layout");
+static_assert(offsetof(Console, cursor_idx) == 0x23C08, "Console layout");
+static_assert(offsetof(Console, cursor_head) == 0x23C0C, "Console layout");
+static_assert(offsetof(Console, cursor_x) == 0x23C10, "Console layout");
+static_assert(offsetof(Console, cursor_y) == 0x23C90, "Console layout");
+static_assert(offsetof(Console, mode) == 0x23D10, "Console layout");
+static_assert(offsetof(Console, mode_range) == 0x23D14, "Console layout");
+static_assert(offsetof(Console, search_reset) == 0x23D18, "Console layout");
+static_assert(offsetof(Console, mp_search) == 0x23D24, "Console layout");
+inline Console& console_win(uint8_t* console) { return *reinterpret_cast<Console*>(console); }
 
 // ---- globals used by the console ----
 GLOBAL(int32_t, ConsoleTurnFlag, 0x90D930);  // cleared at the start of a human turn
@@ -98,7 +131,7 @@ ADDR_NATIVE(0x511800) void THISCALL Console_turn_hints(uint8_t* console);
 ADDR_NATIVE(0x52DC70) int32_t GAMEAPI not_my_turn();
 
 // ---- unit orders and mouse modes (console_orders.cpp) ----
-// Mouse interaction modes (kConMode, the cursor of CURSOR.PCX with the same index): 1 go to,
+// Mouse interaction modes (Console::mode, the cursor of CURSOR.PCX with the same index): 1 go to,
 // 2 road to, 3 mag tube to, 4 drop, 8 patrol, 10 artillery, 11 bombing run / air patrol target.
 ADDR_NATIVE(0x510400) void THISCALL Console_cursor_on(uint8_t* console, int32_t index);
 ADDR_NATIVE(0x510490) void THISCALL Console_cursor_on_2(uint8_t* console, int32_t mode, int32_t range);
@@ -305,11 +338,11 @@ int32_t net_add_global();  // NetDaemon_add_global: 0 without multiplayer
 // arrow) and the mouse position in screen coordinates (Win_get_mouse_pos).
 void ui_set_map_cursor(int32_t index);
 void ui_mouse_pos(int32_t* x, int32_t* y);
-// Every open map window: index 0 is the main view; others count when active (kMwActive).
+// Every open map window: index 0 is the main view; others count when active (MapWin::active).
 template <typename F>
 inline void for_each_mapwin(F&& fn) {
     for (int32_t i = 0; i < 8; i++) {
         uint8_t* w = MapWins[i];
-        if (w && (i == 0 || mw(w, kMwActive))) fn(i, w);
+        if (w && (i == 0 || map_win(w).active)) fn(i, w);
     }
 }

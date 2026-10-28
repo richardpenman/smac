@@ -60,6 +60,7 @@ TEST_CASE("serialize: every record writes and reads the original's byte layout")
     check_record<Monument>("Monument", 0x4F4);
     check_record<ScenarioRules>("ScenarioRules", 0x98);
     check_record<PbemState>("PbemState", 0x4C);
+    check_record<CouncilSession>("CouncilSession", 0x78);
 }
 
 TEST_CASE("serialize: integers are little-endian in their own width") {

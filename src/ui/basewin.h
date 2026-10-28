@@ -7,13 +7,13 @@
 //
 // The object lives in the engine memory image (BaseWin 0x6A7628, a GraphicWin with a SubInterface
 // at +0xA14 that receives the main interface's messages), so its integer fields are used in place
-// (bwf(offset)). Its canvas (+0x444), the buttons (+0xD7C0, 0xB4C bytes each), the sprites, the
-// clickable spots (+0x40EB4, +0x40EC0) and the hit mask (+0x40ECC) are native (BaseWinNative).
-// The window draws into two canvases: its own (758 x 490 at 1024 x 768, above the console) and
-// the main interface's (MainInfc 0x7AE820, the console at the bottom: base name, citizens, queue,
-// production, units). smacx keeps a native main interface canvas for it (basewin_mi_canvas): the
-// main interface itself (MainInterface_init / on_redraw) is not reconstructed, only the frame
-// art and the pane rectangles the base window uses.
+// through the typed view BaseWindow (base_win().base). Its canvas (+0x444), the buttons (+0xD7C0,
+// 0xB4C bytes each), the sprites, the clickable spots (+0x40EB4, +0x40EC0) and the hit mask
+// (+0x40ECC) are native (BaseWinNative). The window draws into two canvases: its own (758 x 490 at
+// 1024 x 768, above the console) and the main interface's (MainInfc 0x7AE820, the console at the
+// bottom: base name, citizens, queue, production, units). smacx keeps a native main interface
+// canvas for it (basewin_mi_canvas): the main interface itself (MainInterface_init / on_redraw) is
+// not reconstructed, only the frame art and the pane rectangles the base window uses.
 //
 // smacx replaces the headless "basewin" area (src/headless/ui_headless_basewin.cpp: the BaseWin
 // functions of engine/ui_bridge.h, Win_is_visible and GraphicWin_redraw) with these files.
@@ -24,57 +24,164 @@
 #include "engine/ui_bridge.h"
 #include "ui/gfx.h"
 
-// ---- BaseWin fields (byte offsets of the original object) ----
-constexpr uint32_t kBwClient = 0x474;  // GraphicWin client rect
-constexpr uint32_t kBwPane = 0x40AFC;  // lower pane: 0 resources, 1 psych, 2 support (buttons 10, 11, 9)
-constexpr uint32_t kBwBase = 0x40B0C;  // base shown
-constexpr uint32_t kBwB10 = 0x40B10;
-constexpr uint32_t kBwB14 = 0x40B14;
-constexpr uint32_t kBwB18 = 0x40B18;
-constexpr uint32_t kBwOpen = 0x40B28;  // set while the window is open (BaseWin_zoom's wait loop)
-constexpr uint32_t kBwQueueSel = 0x40B2C;  // queue slot picked for the build menu (0: production)
-constexpr uint32_t kBwProdAtOpen = 0x40B34;  // production when the window was opened (retooling)
-constexpr uint32_t kBwHurried = 0x40B38;  // minerals after the last hurry
-constexpr uint32_t kBwDownX = 0x40B44;  // left button press position
-constexpr uint32_t kBwDownY = 0x40B48;
-constexpr uint32_t kBwDragType = 0x40B4C;  // spot type under the press (-1 none)
-constexpr uint32_t kBwDragIndex = 0x40B50;  // spot index under the press
-constexpr uint32_t kBwDragState = 0x40B54;  // 0 pressed on a spot, > 0 dragging, -1 none
-// Rectangles (left, top, right, bottom) set by BaseWin_init; window coordinates unless noted (MI:
-// main interface coordinates).
-constexpr uint32_t kBwRectProdMI = 0x40B5C;  // production name
-constexpr uint32_t kBwRectProd2MI = 0x40B6C;  // production picture
-constexpr uint32_t kBwRectProdPaneMI = 0x40B7C;  // production pane (MainInfc pane at 0xDB0 + 4)
-constexpr uint32_t kBwRectMap = 0x40B8C;  // resource map
-constexpr uint32_t kBwRectFacTitle = 0x40B9C;
-constexpr uint32_t kBwRectFacList = 0x40BAC;
-constexpr uint32_t kBwRectFacPane = 0x40BBC;
-constexpr uint32_t kBwRectCommerce = 0x40BCC;
-constexpr uint32_t kBwRectCommerce2 = 0x40BDC;
-constexpr uint32_t kBwRectCommercePane = 0x40BEC;
-constexpr uint32_t kBwRectNutrients = 0x40BFC;
-constexpr uint32_t kBwRectNutTitle = 0x40C0C;
-constexpr uint32_t kBwRectNutPane = 0x40C1C;
-constexpr uint32_t kBwRectGarrisonMI = 0x40C2C;  // units in the base (the bottom pane)
-constexpr uint32_t kBwRectAlloc = 0x40C3C;  // energy allocation (the lower pane)
-constexpr uint32_t kBwRectExpenses = 0x40C4C;  // resource rows
-constexpr uint32_t kBwRectPopMI = 0x40C5C;  // citizens row
-constexpr uint32_t kBwRectQueueMI = 0x40C6C;  // queue pane
-constexpr uint32_t kBwRectQueueListMI = 0x40C7C;
-constexpr uint32_t kBwRectQueueList2MI = 0x40C8C;
-constexpr uint32_t kBwRectQueueBoxMI = 0x40C9C;
-constexpr uint32_t kBwRectNameMI = 0x40CAC;  // base name box
-constexpr uint32_t kBwRectExp1 = 0x40CBC;  // resource row rectangles (draw_expenses)
-constexpr uint32_t kBwRectMisc = 0x40D1C;  // M.Y., energy, eco-damage
-constexpr uint32_t kBwRectOk = 0x40D2C;
-constexpr uint32_t kBwRectRename = 0x40D3C;
-constexpr uint32_t kBwRectPrevMI = 0x40D4C;
-constexpr uint32_t kBwRectNextMI = 0x40D5C;
-constexpr uint32_t kBwRectChangeMI = 0x40DEC;
-constexpr uint32_t kBwRectHurryMI = 0x40DFC;
-constexpr uint32_t kBwRectStapleMI = 0x40E2C;
-constexpr uint32_t kBwRectQueueBtnMI = 0x40E6C;
-constexpr uint32_t kBwRectEditor = 0x40E7C;
+// ---- the BaseWin object (0x6A7628): a view of its fields at the original's offsets ----
+// A GraphicWin (its client rectangle at +0x474) with a SubInterface at +0xA14 and the resource
+// map's MapWin at +0x1E674. The parts behind pointers (canvas, buttons, spots, the hit mask, the
+// font's handle) are native (BaseWinNative); the Font object at +0x40E8C, the spot lists
+// (+0x40EB4, +0x40EC0), the mask (+0x40ECC) and the buttons (+0xD7C0) are reached by offset.
+struct BaseWindow {
+    uint8_t unk_0[0x474];
+    UiRect client;  // +0x474: the GraphicWin's client rectangle
+    uint8_t unk_484[0xA18 - 0x484];
+    int32_t sub_mode;  // +0xA18: the SubInterface's mode (3)
+    uint8_t unk_a1c[0x1A1E4 - 0xA1C];
+    int32_t energy_layout;  // +0x1A1E4: the energy pane's alternative layout
+    uint8_t unk_1a1e8[0x1E670 - 0x1A1E8];
+    int32_t model_turn;  // +0x1E670: the production model's rotation (degrees - 0x1E; in_ECX[0x799C])
+    uint8_t map[0x40AF4 - 0x1E674];  // +0x1E674: the resource map (a MapWin, GraphicWin at +0x21A6C)
+    int32_t unk_40af4;  // +0x40AF4
+    int32_t unk_40af8;  // +0x40AF8
+    int32_t pane;  // +0x40AFC: lower pane: 0 resources, 1 psych, 2 support (buttons 10, 11, 9)
+    int32_t unk_40b00;  // +0x40B00: -1 at init and open
+    int32_t unk_40b04;
+    int32_t unk_40b08;
+    int32_t base;  // +0x40B0C: base shown
+    int32_t fac_scroll;  // +0x40B10: first row of the facilities list
+    int32_t sup_scroll;  // +0x40B14: first row of the units supported pane
+    int32_t unk_40b18;  // +0x40B18: 1 when the window opens
+    int32_t unk_40b1c;  // +0x40B1C: -1 at init
+    int32_t sup_bar;  // +0x40B20: the units supported pane scrolls (its bar is shown)
+    int32_t unk_40b24;  // +0x40B24: -1 at init
+    int32_t open;  // +0x40B28: set while the window is open (BaseWin_zoom's wait loop)
+    int32_t queue_sel;  // +0x40B2C: queue slot picked for the build menu (0: production)
+    int32_t queue_hilite;  // +0x40B30: queue slot drawn highlighted (0: none)
+    int32_t prod_at_open;  // +0x40B34: production when the window was opened (retooling)
+    int32_t hurried;  // +0x40B38: minerals after the last hurry
+    int32_t unk_40b3c;
+    int32_t unk_40b40;  // +0x40B40: 0 at init
+    int32_t down_x;  // +0x40B44: left button press position
+    int32_t down_y;  // +0x40B48
+    int32_t drag_type;  // +0x40B4C: spot type under the press (-1 none)
+    int32_t drag_index;  // +0x40B50: spot index under the press
+    int32_t drag_state;  // +0x40B54: 0 pressed on a spot, > 0 dragging, -1 none
+    int32_t unk_40b58;  // +0x40B58: 0xDF at init
+    // Rectangles; MI: in the main interface's canvas, else in the window's.
+    UiRect rect_prod_mi;  // +0x40B5C: production name
+    UiRect rect_prod2_mi;  // +0x40B6C: production picture
+    UiRect rect_prod_pane_mi;  // +0x40B7C: production pane (MainInfc pane at 0xDB0 + 4)
+    UiRect rect_map;  // +0x40B8C: resource map
+    UiRect rect_fac_title;  // +0x40B9C
+    UiRect rect_fac_list;  // +0x40BAC
+    UiRect rect_fac_pane;  // +0x40BBC
+    UiRect rect_commerce;  // +0x40BCC
+    UiRect rect_commerce2;  // +0x40BDC
+    UiRect rect_commerce_pane;  // +0x40BEC
+    UiRect rect_nutrients;  // +0x40BFC
+    UiRect rect_nut_title;  // +0x40C0C
+    UiRect rect_nut_pane;  // +0x40C1C
+    UiRect rect_garrison_mi;  // +0x40C2C: units in the base (the bottom pane)
+    UiRect rect_alloc;  // +0x40C3C: energy allocation (the lower pane)
+    UiRect rect_expenses;  // +0x40C4C: resource rows
+    UiRect rect_pop_mi;  // +0x40C5C: citizens row
+    UiRect rect_queue_mi;  // +0x40C6C: queue pane
+    UiRect rect_queue_list_mi;  // +0x40C7C
+    UiRect rect_queue_list2_mi;  // +0x40C8C
+    UiRect rect_queue_box_mi;  // +0x40C9C
+    UiRect rect_name_mi;  // +0x40CAC: base name box
+    UiRect rect_exp[6];  // +0x40CBC: resource row rectangles (draw_expenses)
+    UiRect rect_misc;  // +0x40D1C: M.Y., energy, eco-damage
+    UiRect rect_ok;  // +0x40D2C
+    UiRect rect_rename;  // +0x40D3C
+    UiRect rect_prev_mi;  // +0x40D4C
+    UiRect rect_next_mi;  // +0x40D5C
+    UiRect rect_explore;  // +0x40D6C: governor modes (buttons 4..7)
+    UiRect rect_discover;  // +0x40D7C
+    UiRect rect_build;  // +0x40D8C
+    UiRect rect_conquer;  // +0x40D9C
+    UiRect rect_governor;  // +0x40DAC: the governor (button 8)
+    UiRect rect_support;  // +0x40DBC: the lower pane's buttons (9 support, 10 resources, 11 psych)
+    UiRect rect_resources;  // +0x40DCC
+    UiRect rect_psych;  // +0x40DDC
+    UiRect rect_change_mi;  // +0x40DEC
+    UiRect rect_hurry_mi;  // +0x40DFC
+    UiRect rect_40e0c[2];  // +0x40E0C
+    UiRect rect_staple_mi;  // +0x40E2C
+    UiRect rect_40e3c;  // +0x40E3C: button 0x11 (800 x 600 only)
+    UiRect rect_gov_advanced;  // +0x40E4C: button 0x12 (the governor's advanced settings)
+    UiRect rect_40e5c;  // +0x40E5C: button 0x13
+    UiRect rect_queue_btn_mi;  // +0x40E6C
+    UiRect rect_editor;  // +0x40E7C
+};
+SMAC_LAYOUT(BaseWindow, 0x40E8C);
+static_assert(offsetof(BaseWindow, client) == 0x474, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, sub_mode) == 0xA18, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, energy_layout) == 0x1A1E4, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, model_turn) == 0x1E670, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, map) == 0x1E674, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, pane) == 0x40AFC, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, base) == 0x40B0C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, fac_scroll) == 0x40B10, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, sup_scroll) == 0x40B14, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, sup_bar) == 0x40B20, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, open) == 0x40B28, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, queue_sel) == 0x40B2C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, queue_hilite) == 0x40B30, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, prod_at_open) == 0x40B34, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, hurried) == 0x40B38, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, down_x) == 0x40B44, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, down_y) == 0x40B48, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, drag_type) == 0x40B4C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, drag_index) == 0x40B50, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, drag_state) == 0x40B54, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_prod_mi) == 0x40B5C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_prod2_mi) == 0x40B6C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_prod_pane_mi) == 0x40B7C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_map) == 0x40B8C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_fac_title) == 0x40B9C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_fac_list) == 0x40BAC, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_fac_pane) == 0x40BBC, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_commerce) == 0x40BCC, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_commerce2) == 0x40BDC, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_commerce_pane) == 0x40BEC, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_nutrients) == 0x40BFC, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_nut_title) == 0x40C0C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_nut_pane) == 0x40C1C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_garrison_mi) == 0x40C2C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_alloc) == 0x40C3C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_expenses) == 0x40C4C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_pop_mi) == 0x40C5C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_queue_mi) == 0x40C6C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_queue_list_mi) == 0x40C7C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_queue_list2_mi) == 0x40C8C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_queue_box_mi) == 0x40C9C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_name_mi) == 0x40CAC, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_exp) == 0x40CBC, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_misc) == 0x40D1C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_ok) == 0x40D2C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_rename) == 0x40D3C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_prev_mi) == 0x40D4C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_next_mi) == 0x40D5C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_explore) == 0x40D6C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_discover) == 0x40D7C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_build) == 0x40D8C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_conquer) == 0x40D9C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_governor) == 0x40DAC, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_support) == 0x40DBC, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_resources) == 0x40DCC, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_psych) == 0x40DDC, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_change_mi) == 0x40DEC, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_hurry_mi) == 0x40DFC, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_40e0c) == 0x40E0C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_staple_mi) == 0x40E2C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_40e3c) == 0x40E3C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_gov_advanced) == 0x40E4C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_40e5c) == 0x40E5C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_queue_btn_mi) == 0x40E6C, "BaseWindow layout");
+static_assert(offsetof(BaseWindow, rect_editor) == 0x40E7C, "BaseWindow layout");
+inline BaseWindow& base_win(uint8_t* win) { return *reinterpret_cast<BaseWindow*>(win); }
+inline BaseWindow& base_win() { return base_win(&BaseWin); }
+
+// ---- BaseWin parts reached by offset (objects of other classes, mostly native) ----
 constexpr uint32_t kBwFont = 0x40E8C;  // Font (Arial 14 bold): the buttons' font
 constexpr uint32_t kBwSpotsIface = 0x40EB4;  // Spot list of the main interface panes
 constexpr uint32_t kBwSpotsWin = 0x40EC0;  // Spot list of the window
@@ -83,19 +190,73 @@ constexpr uint32_t kBwButtons = 0xD7C0;  // BaseButton[22], 0xB4C bytes each
 constexpr uint32_t kBwButtonSize = 0xB4C;
 constexpr uint32_t kBwButtonStaple2 = 0xBE80;  // a second button 0x10 (ter1wreck.pcx art)
 
-inline int32_t& bwf(uint32_t off) { return *reinterpret_cast<int32_t*>(&BaseWin + off); }
+// A rectangle of BaseWindow by its offset (the tables of rectangles: tours, expense rows).
 inline UiRect& bw_rect(uint32_t off) { return *reinterpret_cast<UiRect*>(&BaseWin + off); }
 
-// ---- the main interface (MainInfc 0x7AE820) fields the base window uses ----
-constexpr uint32_t kMiPos = 0xA1C;  // window rectangle (screen)
-constexpr uint32_t kMiPaneQueue = 0xD80;  // pane rectangles (MainInfc coordinates)
-constexpr uint32_t kMiPaneRight = 0xD90;
-constexpr uint32_t kMiPaneCenter = 0xDA0;
-constexpr uint32_t kMiPaneBottom = 0xDB0;
-constexpr uint32_t kMiPaneCenter2 = 0xDC0;
-constexpr uint32_t kMiPaneBottom2 = 0xDD0;
-constexpr uint32_t kMiHeight = 0xD7C;  // console height (0xD5)
-inline int32_t& mif(uint32_t off) { return *reinterpret_cast<int32_t*>(&MainInterfaceWin + off); }
+// ---- the main interface (MainInfc 0x7AE820): a view of its rectangles at the original's offsets ----
+// Rectangles in the main interface's canvas (the console at the bottom of the screen) unless noted.
+struct MainInterface {
+    uint8_t unk_0[0xA1C];
+    UiRect pos;  // +0xA1C: the window rectangle (screen)
+    UiRect info_buttons[3];  // +0xA2C: the info pane's buttons (1000, 0x3E9, 0x3EA)
+    UiRect rect_a5c[2];  // +0xA5C
+    UiRect turn_complete;  // +0xA7C: spot 5 ("TURN COMPLETE")
+    UiRect globe2;  // +0xA8C: the globe buttons
+    UiRect globe1;  // +0xA9C
+    UiRect arrow_left;  // +0xAAC: the stack row's scroll arrows
+    UiRect rect_abc;  // +0xABC
+    UiRect arrow_right;  // +0xACC
+    UiRect paint[31];  // +0xADC: the scenario editor's 25 paint and 6 brush buttons (editpane.cpp)
+    UiRect tile_pane;  // +0xCCC: StatusWin's panes: the tile
+    UiRect unit_pane;  // +0xCDC: the unit (7/12 of the left pane)
+    UiRect stack_pane;  // +0xCEC: the stack
+    UiRect world_map;  // +0xCFC: the world map pane
+    UiRect date;  // +0xD0C: the date box
+    UiRect text;  // +0xD1C: the info pane's text
+    UiRect rect_d2c;  // +0xD2C
+    UiRect battle;  // +0xD3C: the battle report (BattleWin)
+    UiRect paint_box;  // +0xD4C: the scenario editor's boxes (editpane.cpp)
+    UiRect brush_box;  // +0xD5C
+    UiRect text_box;  // +0xD6C
+    int32_t height;  // +0xD7C: the console's height (0xD5; MiConsoleHeight)
+    UiRect pane_queue;  // +0xD80: the panes (MainInfc coordinates)
+    UiRect pane_right;  // +0xD90
+    UiRect pane_center;  // +0xDA0
+    UiRect pane_bottom;  // +0xDB0
+    UiRect pane_center2;  // +0xDC0: the panes while the console is slid down
+    UiRect pane_bottom2;  // +0xDD0
+};
+SMAC_LAYOUT(MainInterface, 0xDE0);
+static_assert(offsetof(MainInterface, pos) == 0xA1C, "MainInterface layout");
+static_assert(offsetof(MainInterface, info_buttons) == 0xA2C, "MainInterface layout");
+static_assert(offsetof(MainInterface, rect_a5c) == 0xA5C, "MainInterface layout");
+static_assert(offsetof(MainInterface, turn_complete) == 0xA7C, "MainInterface layout");
+static_assert(offsetof(MainInterface, globe2) == 0xA8C, "MainInterface layout");
+static_assert(offsetof(MainInterface, globe1) == 0xA9C, "MainInterface layout");
+static_assert(offsetof(MainInterface, arrow_left) == 0xAAC, "MainInterface layout");
+static_assert(offsetof(MainInterface, rect_abc) == 0xABC, "MainInterface layout");
+static_assert(offsetof(MainInterface, arrow_right) == 0xACC, "MainInterface layout");
+static_assert(offsetof(MainInterface, paint) == 0xADC, "MainInterface layout");
+static_assert(offsetof(MainInterface, tile_pane) == 0xCCC, "MainInterface layout");
+static_assert(offsetof(MainInterface, unit_pane) == 0xCDC, "MainInterface layout");
+static_assert(offsetof(MainInterface, stack_pane) == 0xCEC, "MainInterface layout");
+static_assert(offsetof(MainInterface, world_map) == 0xCFC, "MainInterface layout");
+static_assert(offsetof(MainInterface, date) == 0xD0C, "MainInterface layout");
+static_assert(offsetof(MainInterface, text) == 0xD1C, "MainInterface layout");
+static_assert(offsetof(MainInterface, rect_d2c) == 0xD2C, "MainInterface layout");
+static_assert(offsetof(MainInterface, battle) == 0xD3C, "MainInterface layout");
+static_assert(offsetof(MainInterface, paint_box) == 0xD4C, "MainInterface layout");
+static_assert(offsetof(MainInterface, brush_box) == 0xD5C, "MainInterface layout");
+static_assert(offsetof(MainInterface, text_box) == 0xD6C, "MainInterface layout");
+static_assert(offsetof(MainInterface, height) == 0xD7C, "MainInterface layout");
+static_assert(offsetof(MainInterface, pane_queue) == 0xD80, "MainInterface layout");
+static_assert(offsetof(MainInterface, pane_right) == 0xD90, "MainInterface layout");
+static_assert(offsetof(MainInterface, pane_center) == 0xDA0, "MainInterface layout");
+static_assert(offsetof(MainInterface, pane_bottom) == 0xDB0, "MainInterface layout");
+static_assert(offsetof(MainInterface, pane_center2) == 0xDC0, "MainInterface layout");
+static_assert(offsetof(MainInterface, pane_bottom2) == 0xDD0, "MainInterface layout");
+inline MainInterface& main_interface() { return *reinterpret_cast<MainInterface*>(&MainInterfaceWin); }
+// A rectangle of MainInterface by its offset (tables of rectangles).
 inline UiRect& mi_rect(uint32_t off) { return *reinterpret_cast<UiRect*>(&MainInterfaceWin + off); }
 GLOBAL(int32_t, MiConsoleHeight, 0x7AF59C);  // DAT_007AF59C (MainInfc + 0xD7C)
 GLOBAL(int32_t, MiSlideState, 0x7D3930);  // DAT_007D3930: the console slid down (restore_back)
@@ -137,7 +298,7 @@ ADDR_NATIVE(0x40B140)
 void THISCALL BaseWin_garrison_click(uint8_t* self, int32_t index, int32_t x, int32_t y, int32_t right);
 // The build menu (queue slot `slot`, 0: the production; `a2`: no network lock).
 ADDR_NATIVE(0x417040) void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t a2);
-// Puts item into the queue slot picked (kBwQueueSel); insert: before it.
+// Puts item into the queue slot picked (BaseWindow::queue_sel); insert: before it.
 ADDR_NATIVE(0x416DE0) void THISCALL BaseWin_add_queue(uint8_t* self, int32_t item, int32_t insert);
 ADDR_NATIVE(0x416FB0) void THISCALL BaseWin_delete_queue(uint8_t* self, int32_t slot);
 // Hurry production (HURRY / HURRYPAY...): the cost formula of the original UI.

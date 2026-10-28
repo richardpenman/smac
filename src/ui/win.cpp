@@ -353,7 +353,7 @@ bool pump_platform(int32_t timeout_ms) {
 // ---- drawing ----
 
 // The map cursor as MapWin_draw_radius (0x46A2A0) draws it over the cursor tile: in view mode,
-// while the human gives orders (kConWaiting), when shown (the blink's kConCursorShown, or 0x23C00),
+// while the human gives orders (Console::waiting), when shown (the blink's Console::cursor_shown, or Console::redraw),
 // the cursor texture (0x787FB8; 0x75B858 zoomed out below -7) over the tile's corners as the last
 // redraw of the tile computed them (CursorTileCorners).
 void draw_map_cursor() {
@@ -361,16 +361,18 @@ void draw_map_cursor() {
     uint8_t* con = &MainConsole;
     if (!win || !ui_mapwin_native(win) || MapWinInVehMode) return;
     if (MultiplayerActive && ControlTurnC) return;
-    if (!mw(con, kConCursorShown) && !mw(con, kConRedraw)) return;
-    if (!mw(con, kConWaiting) && !(MultiplayerActive && (GameState & 2))) return;
+    if (!console_win(con).cursor_shown && !console_win(con).redraw) return;
+    if (!console_win(con).waiting && !(MultiplayerActive && (GameState & 2))) return;
     int32_t x = MapWinCursorX[MapWinCursorIndex], y = MapWinCursorY[MapWinCursorIndex];
-    if (y < mw(win, kMwOriginY) || y >= mw(win, kMwRowsBelow) + mw(win, kMwRowsAbove) + mw(win, kMwOriginY)) return;
+    if (y < map_win(win).origin_y || y >= map_win(win).rows_below + map_win(win).rows_above + map_win(win).origin_y)
+        return;
     if (!(MapToggleFlat & 1)) {
-        if (x < mw(win, kMwOriginX)) x += MapAreaX;
-        if (mw(win, kMwColsEven) + mw(win, kMwColsOdd) + mw(win, kMwOriginX) <= x) x -= MapAreaX;
+        if (x < map_win(win).origin_x) x += MapAreaX;
+        if (map_win(win).cols_even + map_win(win).cols_odd + map_win(win).origin_x <= x) x -= MapAreaX;
     }
-    if (x < mw(win, kMwOriginX) || x >= mw(win, kMwColsEven) + mw(win, kMwColsOdd) + mw(win, kMwOriginX)) return;
-    Texture* t = ArtTexture(mw(win, kMwZoom) < -7 ? 0x75B858 : 0x787FB8);
+    if (x < map_win(win).origin_x || x >= map_win(win).cols_even + map_win(win).cols_odd + map_win(win).origin_x)
+        return;
+    Texture* t = ArtTexture(map_win(win).zoom < -7 ? 0x75B858 : 0x787FB8);
     UiRect clip = {0, 0, g_view.width, g_view.height};
     Buffer_set_clip(&g_canvas, &clip);
     Texture_draw_trans_3(t, &g_canvas, &CursorTileCorners[0][0], 0);

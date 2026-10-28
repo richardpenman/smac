@@ -44,22 +44,23 @@ void queue_count(int32_t faction, int32_t delta) {
 
 void refresh_base(uint8_t* self) {
     int32_t was = cur_base().worked_tiles;
-    set_base(bwf(kBwBase));
+    set_base(base_win().base);
     base_compute(0);
-    if (MultiplayerActive && !ControlTurnC && was != Bases[bwf(kBwBase)].worked_tiles && !bw_lock_base(CurrentBaseID))
+    if (MultiplayerActive && !ControlTurnC && was != Bases[base_win().base].worked_tiles &&
+        !bw_lock_base(CurrentBaseID))
         bw_unlock_base(CurrentBaseID);
 }
 
 }  // namespace
 
 void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
-    set_base(bwf(kBwBase));
+    set_base(base_win().base);
     base_compute(0);
-    if (Bases[bwf(kBwBase)].faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) return;
+    if (Bases[base_win().base].faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) return;
     BASE& b = cur_base();
     int32_t saved_size = b.queue_size, saved[10];
     for (int32_t i = 0; i < 10; i++) saved[i] = b.queue_items[i];
-    bwf(kBwProdAtOpen) = b.production_id_last;
+    base_win().prod_at_open = b.production_id_last;
     int32_t faction = b.faction_id;
     if (slot == 0) b.state_flags &= ~0x800000;
     if (!no_lock && bw_lock_base(CurrentBaseID)) return;
@@ -68,7 +69,7 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
         refresh_base(self);
         // FUN_00494700: the picker (BaseWin's member at +0xA1C) for the selected queue slot.
         int32_t mode = 0;
-        int32_t item = prodwin_pick(faction, bwf(kBwQueueSel), &mode);
+        int32_t item = prodwin_pick(faction, base_win().queue_sel, &mode);
         if (slot != 0 && item == -9999) {
             for (int32_t i = 0; i < 10; i++) cur_base().queue_items[i] = saved[i];
             cur_base().queue_size = saved_size;
@@ -78,7 +79,7 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
         FX_play(&Sounds, 0xF);
         BASE& cb = cur_base();
         if (item < -0x270E || (GameState & 0x800)) {
-            bwf(kBwQueueSel) = 0;
+            base_win().queue_sel = 0;
             BaseWin_draw_queue(self, 1);
             if (!no_lock) bw_unlock_base(CurrentBaseID);
             queue_count(faction, 1);
@@ -115,13 +116,13 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
                 prodwin_hide();
                 return;
             }
-            if (cb.queue_size < bwf(kBwQueueSel)) {
-                bwf(kBwQueueSel) = std::max(bwf(kBwQueueSel) - 1, 1);
+            if (cb.queue_size < base_win().queue_sel) {
+                base_win().queue_sel = std::max(base_win().queue_sel - 1, 1);
                 BaseWin_draw_queue(self, 1);
             } else {
-                for (int32_t i = bwf(kBwQueueSel); i < 9; i++) cb.queue_items[i] = cb.queue_items[i + 1];
+                for (int32_t i = base_win().queue_sel; i < 9; i++) cb.queue_items[i] = cb.queue_items[i + 1];
                 cb.queue_size--;
-                if (cb.queue_size < bwf(kBwQueueSel)) bwf(kBwQueueSel) = std::max(cb.queue_size, 1);
+                if (cb.queue_size < base_win().queue_sel) base_win().queue_sel = std::max(cb.queue_size, 1);
                 BaseWin_draw_queue(self, 1);
                 BaseWin_draw_queue(self, 1);
             }
@@ -151,7 +152,7 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
             retool = slot == 0;
         }
         if (retool && cb.minerals_accumulated_2 != 0) {
-            int32_t open = bwf(kBwProdAtOpen);
+            int32_t open = base_win().prod_at_open;
             if (base_making(item, CurrentBaseID) == base_making(open, CurrentBaseID) ||
                 Factions[faction].diff_level < 2 || Rules.retool_penalty_prod_change == 0 ||
                 cb.minerals_accumulated_2 <= Rules.retool_exemption || open == -0x45) {
@@ -226,7 +227,7 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
         if (!no_lock) bw_unlock_base(CurrentBaseID);
         queue_count(faction, 1);
         // (Multiplayer: message_data for a project started or dropped, not reconstructed.)
-        bwf(kBwQueueSel) = 0;
+        base_win().queue_sel = 0;
         base_compute(1);
         BaseWin_on_redraw(self);
         GraphicWin_redraw(self);
@@ -246,7 +247,7 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
 void THISCALL BaseWin_queue_click(uint8_t* self, int32_t index, int32_t, int32_t, int32_t right) {
     int32_t s = index - 2;
     BASE& b = cur_base();
-    if (Bases[bwf(kBwBase)].faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) return;
+    if (Bases[base_win().base].faction_id != CurrentPlayerFaction && !(GameState & STATE_OMNISCIENT_VIEW)) return;
     if (s < 1) s = 1;
     if (s > b.queue_size + 1) s = b.queue_size + 1;
     if (s > 9) return;
@@ -254,7 +255,7 @@ void THISCALL BaseWin_queue_click(uint8_t* self, int32_t index, int32_t, int32_t
         if (s <= b.queue_size) BaseWin_delete_queue(self, s);
         return;
     }
-    bwf(kBwQueueSel) = s;
+    base_win().queue_sel = s;
     BaseWin_draw_queue(self, 1);
     BaseWin_production(self, s, 0);
 }
@@ -279,7 +280,7 @@ void THISCALL BaseWin_garrison_click(uint8_t* self, int32_t veh_id, int32_t x, i
             net_await_synch();
         }
         Console_set_move(&MainConsole, 1);
-        mw(&MainConsole, kConAnySelect) = 1;
+        console_win(&MainConsole).any_select = 1;
         if (Win_is_visible(&BaseWin)) bw_close_window(self);
         else if (Win_is_visible(&ReportWindow)) ReportIf_done(&ReportIfObj);
     };
@@ -318,7 +319,7 @@ void THISCALL BaseWin_garrison_click(uint8_t* self, int32_t veh_id, int32_t x, i
     }
     int32_t shown = veh_id;
     // Win_client_to_screen_2: the panes' coordinates are the main interface's.
-    const UiRect& mp = mi_rect(kMiPos);
+    const UiRect& mp = main_interface().pos;
     PullDown_show(&pd, x + mp.left, y + mp.top);
     if (GameState & 0x800) return;
     int32_t sel = PullDown_get_selected(&pd);
@@ -367,8 +368,8 @@ void THISCALL BaseWin_garrison_click(uint8_t* self, int32_t veh_id, int32_t x, i
         }
         return;
     case 0x14:
-        if (Bases[bwf(kBwBase)].faction_id == u.faction_id) {
-            u.home_base_id = (int16_t)bwf(kBwBase);
+        if (Bases[base_win().base].faction_id == u.faction_id) {
+            u.home_base_id = (int16_t)base_win().base;
             ui_synch_veh(veh_id);
             net_await_synch();
         }

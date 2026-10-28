@@ -8,6 +8,7 @@
 // are free functions taking the object first. Drawing semantics follow the asm; where a routine is
 // approximated (not bit-exact yet) its comment says so.
 #pragma once
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -16,6 +17,21 @@
 struct UiRect {  // RECT; right and bottom are exclusive
     int32_t left, top, right, bottom;
 };
+
+// The GraphicWin fields of a window at its GraphicWin (virtual) base: a MapWin's at +0x21A6C, a
+// Console's at +0x23D94 (ui/mapwin.h kMapWinVBase / kConsoleVBase). A partial view: the canvas
+// (+0x444) is native.
+struct GraphicWin {
+    uint8_t unk_0[0x474];
+    UiRect client;  // +0x474: the drawable client area
+    uint8_t unk_484[0x4C4 - 0x484];
+    int32_t width;  // +0x4C4
+    int32_t height;  // +0x4C8: negative (top-down DIB)
+};
+static_assert(offsetof(GraphicWin, client) == 0x474, "GraphicWin layout");
+static_assert(offsetof(GraphicWin, width) == 0x4C4, "GraphicWin layout");
+static_assert(offsetof(GraphicWin, height) == 0x4C8, "GraphicWin layout");
+inline GraphicWin& graphic_win(uint8_t* base) { return *reinterpret_cast<GraphicWin*>(base); }
 
 // ---- Palette (0x5FE2A0..; global game palette object at 0x94C590) ----
 struct Palette {

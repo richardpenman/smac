@@ -1438,7 +1438,7 @@ int32_t GAMEAPI veh_draw(Buffer* dest, int32_t veh_id, int32_t px, int32_t py, i
 void THISCALL MapWin_draw_vehicles(uint8_t* win, int32_t x, int32_t y, int32_t px, int32_t py, int32_t faction_id) {
     int32_t mode = 2;
     if (!ControlTurnStarted && !ControlTurnMove && !(GameRules & RULES_TIME_WARP)) return;
-    uint32_t opts = (uint32_t)mw(win, kMwOptions);
+    uint32_t opts = (uint32_t)map_win(win).options;
     if ((opts & 0x1000000) || !(opts & 0x802000C0) || (opts & 0x1000)) return;
     MAP* sq = &MapTiles[MapHalfX * y + (x >> 1)];
     auto known = [&]() {
@@ -1446,7 +1446,7 @@ void THISCALL MapWin_draw_vehicles(uint8_t* win, int32_t x, int32_t y, int32_t p
                (sq->visibility & (1 << faction_id));
     };
     if ((!(opts & 0x80000000u) || (opts & 0x80)) && known()) MapWin_draw_bases(win, x, y, px, py, faction_id);
-    if (mw(win, kMwOptions) & 0x80000000u) return;
+    if (map_win(win).options & 0x80000000u) return;
     int32_t v;
     if (VehMovingID != -1 && Vehs[VehMovingID].x == x && Vehs[VehMovingID].y == y) {
         mode = 3;
@@ -1476,10 +1476,10 @@ void THISCALL MapWin_draw_vehicles(uint8_t* win, int32_t x, int32_t y, int32_t p
                 mode = 0x403;
             }
         } else {
-            if (!(mw(win, kMwOptions) & 0x200040)) return;
+            if (!(map_win(win).options & 0x200040)) return;
             v = veh_at(x, y);
         }
-        if (mw(win, kMwOptions) & 0x200000) {
+        if (map_win(win).options & 0x200000) {
             v = veh_at(x, y);
             if (v < 0) return;
             while (Vehs[v].home_base_id != BaseUpkeepDrawID) {
@@ -1498,5 +1498,5 @@ void THISCALL MapWin_draw_vehicles(uint8_t* win, int32_t x, int32_t y, int32_t p
                 return;
         }
     }
-    veh_draw(ui_mapwin_native(win)->canvas, v, px, py, mw(win, kMwZoom), mode, 1);
+    veh_draw(ui_mapwin_native(win)->canvas, v, px, py, map_win(win).zoom, mode, 1);
 }

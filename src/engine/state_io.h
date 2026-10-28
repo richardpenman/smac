@@ -28,6 +28,7 @@ SMAC_RECORD(MonumentEvent)
 SMAC_RECORD(Monument)
 SMAC_RECORD(ScenarioRules)
 SMAC_RECORD(PbemState)
+SMAC_RECORD(CouncilSession)
 #undef SMAC_RECORD
 
 // ---- .state snapshots (harness/state_regions.h, harness/README.md "Snapshot files") ----

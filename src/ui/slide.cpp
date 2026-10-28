@@ -100,7 +100,7 @@ void frame(const std::vector<uint8_t>& screen, Buffer* scr, const Buffer* win, i
     }
     UiRect all{0, 0, scr->width, scr->height};
     Buffer_set_clip(scr, &all);
-    const UiRect& mi = mi_rect(kMiPos);
+    const UiRect& mi = main_interface().pos;
     int32_t lx0 = std::max({0, sx, mi.left}), lx1 = std::min({scr->width, sx + w, mi.right});
     for (int32_t dy = std::max(0, mi.top); dy < std::min(scr->height, mi.top + 0x39) && lx0 < lx1; dy++)
         std::memcpy(scr->data + (size_t)dy * scr->stride + lx0, screen.data() + (size_t)dy * scr->stride + lx0,
@@ -263,7 +263,7 @@ void scroll_show_window(Buffer* win, int32_t sx, int32_t sy) {
         const int32_t step = (top0 - S) / n;
         *reinterpret_cast<int32_t*>(mem::host(0x7D3924)) = step;
         if (step > 1 && (GameMorePreferences & MPREF_AV_SLIDING_SCROLLBARS)) {
-            UiRect clip{armx, 0, R, mi_rect(kMiPos).top + 0x39};
+            UiRect clip{armx, 0, R, main_interface().pos.top + 0x39};
             int32_t y = top0 - step;
             for (int32_t f = 0; f < n; f++) {
                 uint32_t t = platform::ticks_ms();

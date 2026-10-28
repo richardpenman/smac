@@ -13,9 +13,8 @@
 // blocks). That arithmetic needs the record's type to keep the original's layout, which the
 // SMAC_LAYOUT assertions pin; a record whose type changes must first lose its address users.
 //
-// Not here although saved: CouncilWinState and CouncilWinVotes (0x6FF69C, 0x6FF6D4) are fields of
-// the council window object (CouncilWin + 0xA1C, engine/council.h), a UI object of the image that
-// the council code reaches through its `self` pointer; they move with the UI windows.
+// One record lies inside a UI object: the council window's session (CouncilWin + 0xA1C,
+// engine/council.h), whose fields PBEM saves hold (CouncilWinState, CouncilWinVotes).
 #pragma once
 #include <cstdint>
 #include <vector>
@@ -26,6 +25,7 @@ namespace state {
 // By original address (defined in state.cpp). Each is its own object, so a read past one record's
 // end cannot silently land in the next (ASan sees it; the original's reads past an end go through
 // mem::read_bytes).
+extern CouncilSession council_session;  // 0x6FF69C CouncilWinSession (CouncilWinState, CouncilWinVotes)
 extern int32_t council_session_pending;  // 0x703DE8 CouncilSessionPending
 extern int32_t council_proposal[8];  // 0x703DEC CouncilProposal
 extern int32_t council_vote_state[8];  // 0x703E0C CouncilVoteState

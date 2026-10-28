@@ -515,9 +515,9 @@ void DiploWin::redraw() {
     // The chat (StringBox, EditBox) in the main interface's lower centre pane.
     if (mi.data) {
         sw_restore_iface(this);
-        Buffer_box_sprite(&mi, &mi_rect(kMiPaneQueue), box_def(3));
-        Buffer_box_sprite(&mi, &mi_rect(kMiPaneRight), box_def(3));
-        const UiRect& p = mi_rect(kMiPaneCenter2);
+        Buffer_box_sprite(&mi, &main_interface().pane_queue, box_def(3));
+        Buffer_box_sprite(&mi, &main_interface().pane_right, box_def(3));
+        const UiRect& p = main_interface().pane_center2;
         UiRect box{p.left + 7, p.top + 7, p.right - 7, p.bottom - 0x1B - 3};
         int32_t lh = f12->height ? f12->height : 14;
         int32_t rows = std::max(1, (box.bottom - box.top) / lh);

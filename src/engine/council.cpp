@@ -18,7 +18,8 @@ namespace {
 inline bool is_human(int32_t faction_id) { return (FactionStatus[0] & (uint8_t)(1u << (faction_id & 31))) != 0; }
 inline bool is_alive(int32_t faction_id) { return (FactionStatus[1] & (uint8_t)(1u << (faction_id & 31))) != 0; }
 inline bool is_alien(int32_t faction_id) { return (game().mfactions[faction_id].rule_flags & RFLAG_ALIEN) != 0; }
-inline CouncilSession& session(uint8_t* self) { return *reinterpret_cast<CouncilSession*>(self + kCouncilWinSession); }
+// The session the window runs (the original reaches it as self + 0xA1C; self is always CouncilWin).
+inline CouncilSession& session(uint8_t*) { return CouncilWinSession; }
 
 // parse_says of faction_id's leader title (n) and name (n + 1).
 void say_leader(int32_t n, int32_t faction_id) {

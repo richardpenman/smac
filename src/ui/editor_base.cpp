@@ -90,7 +90,7 @@ void THISCALL BaseWin_base_editor_fac(uint8_t* win) {
         int32_t r = BasePop_exec_3(pop.p, 0, 0);
         PopupDialogState = 0;
         if (r < 0) return;
-        const int32_t base = *reinterpret_cast<int32_t*>(win + kBwBase);
+        const int32_t base = base_win(win).base;
         bool built = r < 0x41 && (base_raw(base)[0x8C + r / 8] & (1 << (r & 7)));
         set_fac(r, base, built ? 0 : 1);
         std::fprintf(stderr, "base editor: base %d facility %d %s\n", base, r, built ? "removed" : "built");
@@ -208,7 +208,7 @@ void THISCALL BaseWin_base_editor(uint8_t* win) {
     case 2:
         if (cmd == 1 ? (int8_t)b[6] < 99 : (int8_t)b[6] > 1) b[6] = (uint8_t)(b[6] + (cmd == 1 ? 1 : -1));
         if (Win_is_visible(win)) {
-            set_base(*reinterpret_cast<int32_t*>(win + kBwBase));
+            set_base(base_win(win).base);
             base_compute(1);
             redraw(win);
             GraphicWin_redraw(win);

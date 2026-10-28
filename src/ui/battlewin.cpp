@@ -57,7 +57,7 @@ void battlewin_init() {
     if (g_init) return;
     g_init = true;
     maininfc_geometry();
-    const UiRect L = mi_rect(kMiPaneQueue), C = mi_rect(kMiPaneCenter2);
+    const UiRect L = main_interface().pane_queue, C = main_interface().pane_center2;
     br(0x70) = L;
     br(0x90) = C;
     int32_t l = C.left + 4, t = C.top + 4, b = C.bottom - 4;
@@ -72,9 +72,9 @@ void battlewin_init() {
     br(0x50) = {l, t, m, L.bottom - 4};
     br(0x60) = {m + 3, t, L.right - 4, L.bottom - 4};
     // MainInterface_init's +0xD3C: where slide_show / slide_hide put the console's piece.
-    const UiRect& pos = mi_rect(kMiPos);
+    const UiRect& pos = main_interface().pos;
     int32_t h = pos.bottom - pos.top;
-    mi_rect(0xD3C) = {0xF4, h - 0x60, 0x30B, h};
+    main_interface().battle = {0xF4, h - 0x60, 0x30B, h};
 }
 
 void load_slide() {
@@ -127,7 +127,7 @@ void mi_slide_draw(Buffer* mi) {
     load_slide();
     Sprite* s = &g_slide[1];
     if (!s->width) return;
-    const UiRect& r = mi_rect(0xD3C);
+    const UiRect& r = main_interface().battle;
     BlitDestScale = BlitSourceScale = 1;
     pfncSpriteStretchCopyToCanvas(s, mi, s->key, r.left, r.top);
 }

@@ -51,7 +51,7 @@ void view_mode(uint8_t* self) {
     if (MapWinInVehMode) Console_set_view(self, 1);
 }
 
-int32_t veh(uint8_t* self) { return mw(self, kConVeh); }
+int32_t veh(uint8_t* self) { return console_win(self).veh; }
 
 void quit_question(bool wimp_test_mp) {
     const char* label = "REALLYQUIT";
@@ -91,7 +91,7 @@ void console_toggle_pref(int32_t id) {
         break;
     }
     case 0x20C:
-        mw(main_win(), kMwOptions) ^= 0x40000;
+        map_win(main_win()).options ^= 0x40000;
         draw_map(1);
         return;
     case 0x210:
@@ -114,24 +114,24 @@ void console_toggle_pref(int32_t id) {
 void THISCALL Console_survey(uint8_t* self) {
     static const int32_t kViews[3] = {0x623, 0x603, 0x402};
     uint8_t* w = main_win();
-    int32_t step = mw(self, kConRedraw);
+    int32_t step = console_win(self).redraw;
     if (step > 2) {
-        mw(self, kConRedraw) = 0;
+        console_win(self).redraw = 0;
         pfncRedrawMap(w, 1);
         return;
     }
-    mw(self, kConRedraw) = step + 1;
-    int32_t saved = mw(w, kMwOptions);
-    mw(w, kMwOptions) = kViews[step];
+    console_win(self).redraw = step + 1;
+    int32_t saved = map_win(w).options;
+    map_win(w).options = kViews[step];
     pfncRedrawMap(w, 1);
-    mw(w, kMwOptions) = saved;
+    map_win(w).options = saved;
 }
 
 // Console_zoom_to_upkeep_base (0x5165B0, '*'): the base window of the player's base nearest to
 // the view's centre among those with event flag 0x10.
 void THISCALL Console_zoom_to_upkeep_base(uint8_t* self) {
     uint8_t* w = main_win();
-    int32_t cx = mw(w, kMwCenterX), cy = mw(w, kMwCenterY), best = 99999, found = -1;
+    int32_t cx = map_win(w).center_x, cy = map_win(w).center_y, best = 99999, found = -1;
     for (int32_t b = 0; b < BaseCount; b++) {
         if (Bases[b].faction_id != CurrentPlayerFaction || !(Bases[b].event_flags & 0x10)) continue;
         int32_t dx = std::abs(cx - Bases[b].x);
@@ -230,7 +230,7 @@ void THISCALL Console_use_time_bonus(uint8_t* self) {
         NetMsg_pop(&NetMsg, "NOBONUSATEND", 5000, 0, nullptr);
         return;
     }
-    if ((GameState & 2) && (NetTurnDoneMask & (1 << (mw(self, kConFaction) & 31)))) {
+    if ((GameState & 2) && (NetTurnDoneMask & (1 << (console_win(self).faction & 31)))) {
         NetMsg_pop(&NetMsg, "NOBONUSDONE", 5000, 0, nullptr);
         return;
     }
@@ -238,15 +238,15 @@ void THISCALL Console_use_time_bonus(uint8_t* self) {
 }
 
 void THISCALL Console_next_cursor(uint8_t* self) {
-    mw(self, kConCursorShown) = 0;
-    if (mw(self, kConRedraw)) {
-        mw(self, kConRedraw) = 0;
+    console_win(self).cursor_shown = 0;
+    if (console_win(self).redraw) {
+        console_win(self).redraw = 0;
         pfncRedrawMap(main_win(), 1);
     }
     MapWin_draw_cursor(main_win());
     view_mode(self);
-    if (mw(self, kConCursorIdx) != mw(self, kConCursorHead)) {
-        mw(self, kConCursorIdx) = (mw(self, kConCursorIdx) + 1) & 0x1F;
+    if (console_win(self).cursor_idx != console_win(self).cursor_head) {
+        console_win(self).cursor_idx = (console_win(self).cursor_idx + 1) & 0x1F;
         StatusWin_set_loc(&InfoWin, MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
         MapWin_focus(main_win(), MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
     }
@@ -261,18 +261,18 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
     if (ControlTurnA) return;
     TutWin_reset(&TutWin);
     go_reset();
-    mw(self, kConMode) = 0;
+    console_win(self).mode = 0;
     for (int32_t i = 0; i < 8; i++) {
         uint8_t* w = MapWins[i];
-        if (!w || (i && !mw(w, kMwActive))) continue;
-        if (mw(w, 0x1EF4C) || mw(w, 0x1EF50) != 0x7F00) {
+        if (!w || (i && !map_win(w).active)) continue;
+        if (map_win(w).cursor || map_win(w).cursor_id != 0x7F00) {
             ui_set_map_cursor(-1);
-            mw(w, 0x1EF50) = 0x7F00;
-            mw(w, 0x1EF4C) = 0;
+            map_win(w).cursor_id = 0x7F00;
+            map_win(w).cursor = 0;
         }
-        uint32_t o = (uint32_t)mw(w, kMwOptions);
+        uint32_t o = (uint32_t)map_win(w).options;
         if (o & 0xC40000) {
-            mw(w, kMwOptions) = (int32_t)(o & 0xFF3BFFFF);
+            map_win(w).options = (int32_t)(o & 0xFF3BFFFF);
             pfncRedrawMap(w, 1);
         }
         do_non_input();
@@ -384,29 +384,29 @@ void THISCALL Console_menu_proc(uint8_t* self, int32_t id) {
     case 0x213: Console_go_to(self, -1, -2, 0); break;
     case 0x214: pfncMoveMap(main_win(), MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex], 1); break;
     case 0x215: {  // the patrol routes
-        uint32_t on = (uint32_t)mw(main_win(), kMwOptions) & 0x400000;
+        uint32_t on = (uint32_t)map_win(main_win()).options & 0x400000;
         for (int32_t i = 0; i < 8; i++) {
             uint8_t* w = MapWins[i];
-            if (!w || (i && !mw(w, kMwActive))) continue;
+            if (!w || (i && !map_win(w).active)) continue;
             if (!on) {
-                mw(w, kMwOptions) |= 0x400000;
+                map_win(w).options |= 0x400000;
                 MapWin_draw_base_dest(w, 1);
             } else {
-                mw(w, kMwOptions) &= ~0x400000;
+                map_win(w).options &= ~0x400000;
                 pfncRedrawMap(w, 1);
             }
         }
         break;
     }
     case 0x216: {  // the previous cursor position
-        mw(self, kConCursorShown) = 0;
-        if (mw(self, kConRedraw)) {
-            mw(self, kConRedraw) = 0;
+        console_win(self).cursor_shown = 0;
+        if (console_win(self).redraw) {
+            console_win(self).redraw = 0;
             pfncRedrawMap(main_win(), 1);
         }
         MapWin_draw_cursor(main_win());
         view_mode(self);
-        if (--mw(self, kConCursorIdx) < 0) mw(self, kConCursorIdx) = 0x1F;
+        if (--console_win(self).cursor_idx < 0) console_win(self).cursor_idx = 0x1F;
         StatusWin_set_loc(&InfoWin, MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
         MapWin_focus(main_win(), MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex]);
         break;

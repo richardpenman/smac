@@ -73,7 +73,6 @@ namespace {
 int32_t& sw(uint32_t off) { return *reinterpret_cast<int32_t*>(&InfoWin + off); }
 Buffer* canvas() { return basewin_mi_canvas(); }
 int32_t tc(uint32_t addr) { return text_color(addr); }
-UiRect rect(uint32_t off) { return mi_rect(off); }
 int32_t zoom_or(int32_t base, int32_t mul) { return ZoomNum < 1 ? base : ZoomNum * mul / ZoomDenom; }
 
 Spots g_spots;  // StatusWin's spots (+0x15E0): the panes and the stack row's units
@@ -365,7 +364,7 @@ void THISCALL StatusWin_draw_active(uint8_t* self, int32_t veh_id, int32_t base_
     status_fonts();
     int32_t lh = line_h(&g_font[0]);
     Buffer_set_font(c, &g_font[0], &g_font[2], &g_font[1], nullptr);
-    UiRect r = rect(0xCDC);
+    UiRect r = main_interface().unit_pane;
     Buffer_box_sprite(c, &r, box_def(21));
     r.left += 3, r.top += 3, r.right -= 3, r.bottom -= 3;
     Buffer_box_sprite(c, &r, box_def(18));
@@ -654,7 +653,7 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
         sw(0x15C0) = -1;
     }
     // The tile pane.
-    UiRect r = rect(0xCCC);
+    UiRect r = main_interface().tile_pane;
     Buffer_box_sprite(c, &r, box_def(21));
     r.left += 3, r.top += 3, r.right -= 3, r.bottom -= 3;
     Buffer_box_sprite(c, &r, box_def(18));
@@ -694,7 +693,7 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
     UiRect all{0, 0, c->width, c->height};
     Buffer_set_clip(c, &all);
     {
-        const UiRect& t = rect(0xCCC);
+        const UiRect t = main_interface().tile_pane;
         spot_add(&g_spots, 0, 3, t.left, t.top, t.right - t.left, t.bottom - t.top);
     }
     sw(0x15C8) = -1;
@@ -703,7 +702,7 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
     sw(0x15D0) = sel_base;
     StatusWin_draw_active(self, shown, sel_base, 1);
     // The stack row.
-    r = rect(0xCEC);
+    r = main_interface().stack_pane;
     Buffer_box_sprite(c, &r, box_def(21));
     r.left += 3, r.top += 3, r.right -= 3, r.bottom -= 3;
     Buffer_box_sprite(c, &r, box_def(18));
@@ -714,7 +713,7 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
     }
     int32_t cw = zoom_or(0x32, 100);
     int32_t cell = cw + 0xB;
-    int32_t rh = (rect(0xCEC).bottom - rect(0xCEC).top) - 0xC;
+    int32_t rh = (main_interface().stack_pane.bottom - main_interface().stack_pane.top) - 0xC;
     int32_t b = base_at(x, y);
     int32_t count = 0;
     if (b >= 0) {
@@ -731,8 +730,8 @@ void THISCALL StatusWin_draw_status(uint8_t* self, int32_t atk, int32_t def, int
     int32_t fit = (r.right - r.left) / (cw + 0x10);
     // More than fit: the row between the scroll arrows (buttons 0x3F0 / 0x3F2 shown; 0x3F1 never).
     if (fit < count) {
-        r.left = mi_rect(0xAAC).right + 1;
-        r.right = mi_rect(0xACC).left - 1;
+        r.left = main_interface().arrow_left.right + 1;
+        r.right = main_interface().arrow_right.left - 1;
         cell = (r.right - r.left) / fit - 5;
         stack_arrows_show(true);
     } else {
@@ -813,12 +812,12 @@ void maininfc_set_date() {
     Font* f = find_font(12, 0);  // MainInterface + 0x21694 (Arial 12)
     Buffer_set_font(c, f, nullptr, nullptr, nullptr);
     Buffer_set_text_color(c, g_iface_color(1), g_iface_color(4), 1, 1);
-    UiRect d = rect(0xD0C), g = rect(0xA9C);
+    UiRect d = main_interface().date, g = main_interface().globe1;
     UiRect u{std::min(d.left, g.left) - 3, std::min(d.top, g.top) - 3, std::max(d.right, g.right) + 3,
              std::max(d.bottom, g.bottom) + 3};
     Buffer_box_sprite(c, &u, box_def(21));
     Buffer_box_sprite(c, &d, box_def(18));
-    int32_t x = d.left + 3, y = rect(0xD0C).top + 3;
+    int32_t x = d.left + 3, y = main_interface().date.top + 3;
     char year[64] = "";
     say_year(year);
     write(c, std::string(label_get(0)) + " " + year, x, y);
@@ -831,7 +830,7 @@ void maininfc_set_date() {
 void maininfc_redraw_complete() {
     if (InfcList[InfcUsed] != 0) return;
     Buffer* c = canvas();
-    UiRect r = rect(0xA7C);
+    UiRect r = main_interface().turn_complete;
     uint32_t label = 0x68;
     if (MultiplayerActive && (GameState & 2) && !(GameMoreRules & 0x10) && NetTurnDoneMask != 0xFF &&
         (NetTurnDoneMask & (1 << (CurrentPlayerFaction & 31))))
@@ -866,7 +865,7 @@ int32_t worldwin_tile_to_pixel(int32_t x, int32_t y, int32_t* px, int32_t* py) {
     if (y < 0 || maxy < 0) y = 0;
     else if (maxy < y) y = maxy;
     if (y < 0 || y >= MapAreaY || x < 0 || x >= MapAreaX) return 1;
-    UiRect pane = rect(0xCFC);
+    UiRect pane = main_interface().world_map;
     int32_t w = pane.right - pane.left, h = pane.bottom - pane.top;
     if (!g_world_ox && !g_world_oy) {
         *px = w * x / MapAreaX;
@@ -894,24 +893,24 @@ void worldwin_draw_to(Buffer* c) {
         Buffer_ctor(&g_world_final);
         Buffer_init(&g_world_final, w, h, 8, 0);
         ui_mapwin_attach(map, kMapWinVBase, &g_world_map);
-        mw(map, kMwIndex) = 1;
-        mw(map, kMwActive) = 1;
+        map_win(map).index = 1;
+        map_win(map).active = 1;
     }
-    mw(map, kMwPixelX) = 0;
-    mw(map, kMwPixelY) = 0;
-    mw(map, kMwCenterX) = MapAreaX / 2;
-    mw(map, kMwZoom) = -0xE;
-    mw(map, kMwCenterY) = MapAreaY / 2;
-    mw(map, kMwOptions) = (int32_t)0x80000000;
+    map_win(map).pixel_x = 0;
+    map_win(map).pixel_y = 0;
+    map_win(map).center_x = MapAreaX / 2;
+    map_win(map).zoom = -0xE;
+    map_win(map).center_y = MapAreaY / 2;
+    map_win(map).options = (int32_t)0x80000000;
     pfncRedrawMap(map, 0);
     Buffer_copy_4(&g_world_map, &g_world_terr, 0, 0, 0, 0, w, h);
     // MapWin_gen_bases_only: the bases over the terrain image.
-    mw(map, kMwOptions) = (int32_t)0x80000080;
-    int32_t rows = mw(map, kMwRowsAbove) + 1 + mw(map, kMwRowsBelow);
+    map_win(map).options = (int32_t)0x80000080;
+    int32_t rows = map_win(map).rows_above + 1 + map_win(map).rows_below;
     for (int32_t r = 0; r < rows; r++) {
-        int32_t ty = mw(map, kMwOriginY) + r;
-        int32_t tx = mw(map, kMwOriginX) + (r & 1);
-        int32_t cols = (r & 1) ? mw(map, kMwColsOdd) : mw(map, kMwColsEven);
+        int32_t ty = map_win(map).origin_y + r;
+        int32_t tx = map_win(map).origin_x + (r & 1);
+        int32_t cols = (r & 1) ? map_win(map).cols_odd : map_win(map).cols_even;
         for (int32_t k = 0; k < cols; k++, tx += 2) {
             int32_t wx = tx;
             if (!(MapToggleFlat & 1)) wx = (wx % MapAreaX + MapAreaX) % MapAreaX;
@@ -920,13 +919,13 @@ void worldwin_draw_to(Buffer* c) {
             if (!(sq->items & 1) || (sq->val2 & 0xF) >= 8) continue;
             int32_t px, py;
             pfncTileToPoint(map, wx, ty, &px, &py);
-            MapWin_draw_bases(map, wx, ty, px, py - mw(map, kMwHalfH),
+            MapWin_draw_bases(map, wx, ty, px, py - map_win(map).half_h,
                               (GameState & STATE_OMNISCIENT_VIEW) ? -1 : CurrentPlayerFaction);
         }
     }
     Buffer_copy_4(&g_world_map, &g_world_final, 0, 0, 0, 0, w, h);
     // Into the pane: centred when it fits, else stretched.
-    UiRect pane = rect(0xCFC);
+    UiRect pane = main_interface().world_map;
     int32_t pw = pane.right - pane.left, ph = pane.bottom - pane.top;
     UiRect all{0, 0, c->width, c->height};
     Buffer_set_clip(c, &all);
@@ -945,11 +944,11 @@ void worldwin_draw_to(Buffer* c) {
     }
     // WorldWin_draw_box: the main view's tiles.
     uint8_t* main = MapWins[0];
-    if (!main || !mw(main, kMwColsOdd) || mw(main, kMwPixelX) || mw(main, kMwPixelY)) return;
+    if (!main || !map_win(main).cols_odd || map_win(main).pixel_x || map_win(main).pixel_y) return;
     int32_t x1, y1, x2, y2;
-    if (worldwin_tile_to_pixel(mw(main, kMwOriginX), mw(main, kMwOriginY), &x1, &y1)) return;
-    if (worldwin_tile_to_pixel(mw(main, kMwColsEven) + mw(main, kMwOriginX) + mw(main, kMwColsOdd),
-                               mw(main, kMwRowsBelow) + mw(main, kMwRowsAbove) + mw(main, kMwOriginY), &x2, &y2))
+    if (worldwin_tile_to_pixel(map_win(main).origin_x, map_win(main).origin_y, &x1, &y1)) return;
+    if (worldwin_tile_to_pixel(map_win(main).cols_even + map_win(main).origin_x + map_win(main).cols_odd,
+                               map_win(main).rows_below + map_win(main).rows_above + map_win(main).origin_y, &x2, &y2))
         return;
     int32_t ox = pane.left, oy = pane.top;
     int32_t bottom = y2 - 1;
@@ -975,30 +974,30 @@ void maininfc_geometry() {
     popup_art_init();
     textcolor_load();
     basewin_mi_init();
-    auto set = [](uint32_t off, int32_t l, int32_t t, int32_t r, int32_t b) { mi_rect(off) = {l, t, r, b}; };
-    const UiRect q = rect(kMiPaneQueue), right = rect(kMiPaneRight), center = rect(kMiPaneCenter),
-                 bottom = rect(kMiPaneBottom);
+    auto set = [](UiRect& rect, int32_t l, int32_t t, int32_t r, int32_t b) { rect = {l, t, r, b}; };
+    const UiRect q = main_interface().pane_queue, right = main_interface().pane_right,
+                 center = main_interface().pane_center, bottom = main_interface().pane_bottom;
     // StatusWin's panes: the unit (+0xCDC: 7/12 of the left pane), the tile (+0xCCC), the stack (+0xCEC).
     int32_t ur = (q.right - q.left) * 7 / 12;
-    set(0xCDC, q.left + 4, q.top + 4, ur - 4, q.bottom - 4);
+    set(main_interface().unit_pane, q.left + 4, q.top + 4, ur - 4, q.bottom - 4);
     int32_t ucr = ur - 4;
-    set(0xCEC, ucr + 3, bottom.top + 4, bottom.right - 4, bottom.bottom - 4);
-    set(0xCCC, ucr + 4, q.top + 4, q.right - 4, (bottom.top + 4) - 3);
+    set(main_interface().stack_pane, ucr + 3, bottom.top + 4, bottom.right - 4, bottom.bottom - 4);
+    set(main_interface().tile_pane, ucr + 4, q.top + 4, q.right - 4, (bottom.top + 4) - 3);
     // Spot 5 ("TURN COMPLETE"), the world map (+0xCFC), the date box (+0xD0C) and the globe buttons.
-    set(0xA7C, right.left + 4, right.top + 5, right.left + 0xED, right.top + 0x1C);
+    set(main_interface().turn_complete, right.left + 4, right.top + 5, right.left + 0xED, right.top + 0x1C);
     int32_t wtop = right.top + 0x1C + 4, wleft = right.left + 1, wright = right.right - 1;
-    set(0xCFC, wleft, wtop, wright, (wright - wleft) / 2 + wtop);
+    set(main_interface().world_map, wleft, wtop, wright, (wright - wleft) / 2 + wtop);
     int32_t gl = right.right - 0x3C, gt = right.bottom - 0x26, gr = right.right - 6, gb = right.bottom - 6;
-    set(0xA9C, gl, gt, gr, gb);
+    set(main_interface().globe1, gl, gt, gr, gb);
     int32_t gw = (gl - gr) - 2;
-    set(0xA8C, gl + gw, gt, gr + gw, gb);
-    set(0xD0C, right.left + 6, right.bottom - 0x26, mi_rect(0xA8C).left - 3, right.bottom - 6);
+    set(main_interface().globe2, gl + gw, gt, gr + gw, gb);
+    set(main_interface().date, right.left + 6, right.bottom - 0x26, main_interface().globe2.left - 3, right.bottom - 6);
     // The info pane's buttons (+0xA2C 1000, +0xA3C 0x3E9, +0xA4C 0x3EA) and text rectangle (+0xD1C).
     int32_t b1 = center.right - 0x1D, b2 = center.right - 9;
-    set(0xA2C, b1, center.top + 9, b2, center.top + 0x1D);
-    set(0xA3C, b1, center.bottom - 0x1D, b2, center.bottom - 9);
-    set(0xA4C, b1, center.top + 0x1D + 5, b2, center.bottom - 0x1D - 5);
-    set(0xD1C, center.left + 7, center.top + 7, b1 - 10, center.bottom - 7);
+    set(main_interface().info_buttons[0], b1, center.top + 9, b2, center.top + 0x1D);
+    set(main_interface().info_buttons[1], b1, center.bottom - 0x1D, b2, center.bottom - 9);
+    set(main_interface().info_buttons[2], b1, center.top + 0x1D + 5, b2, center.bottom - 0x1D - 5);
+    set(main_interface().text, center.left + 7, center.top + 7, b1 - 10, center.bottom - 7);
 }
 
 // ==== the panes' mouse input ====================================================================
@@ -1025,14 +1024,14 @@ void load_arrows() {
     for (int32_t j = 0; j < 2; j++)
         for (int32_t k = 0; k < 3; k++)
             pfncSpriteFromCanvasRectTrans(&g_arrow[j].spr[k], &ifc, 9, 0x18D + 0xD * k, 0x99 + 0x2B * j, 0xC, 0x2A, 0);
-    const UiRect& s = rect(0xCEC);
+    const UiRect s = main_interface().stack_pane;
     int32_t w = g_arrow[0].spr[0].width, h = g_arrow[0].spr[0].height;
     int32_t top = s.top + (s.bottom - h - s.top) / 2;
-    mi_rect(0xAAC) = {s.left + 4, top, s.left + 4 + w, top + h};
-    mi_rect(0xACC) = {s.right - w - 4, top, s.right - 4, top + h};
-    g_arrow[0].rect_off = 0xAAC;
+    main_interface().arrow_left = {s.left + 4, top, s.left + 4 + w, top + h};
+    main_interface().arrow_right = {s.right - w - 4, top, s.right - 4, top + h};
+    g_arrow[0].rect_off = offsetof(MainInterface, arrow_left);
     g_arrow[0].id = 0x3F0;
-    g_arrow[1].rect_off = 0xACC;
+    g_arrow[1].rect_off = offsetof(MainInterface, arrow_right);
     g_arrow[1].id = 0x3F2;
 }
 
@@ -1125,7 +1124,7 @@ void THISCALL StatusWin_on_left_double_click(uint8_t* self, int32_t x, int32_t y
 // datalinks on terrain); a unit's menu (activate it, show it; the editor's unit edit); a base's
 // menu (show it, its window, production, hurry, the governor's modes); Help.
 void THISCALL StatusWin_on_right_click(uint8_t* self, int32_t x, int32_t y, int32_t) {
-    const UiRect& pos = mi_rect(kMiPos);
+    const UiRect& pos = main_interface().pos;
     int32_t index = 0, type = -1;
     bool hit = spot_check(&g_spots, x, y, &index, &type) >= 0;
     if (hit && type == 3) {
@@ -1275,7 +1274,7 @@ void THISCALL StatusWin_arrow_right(uint8_t*) {
 
 // WorldWin_pixel_to_tile (0x4C43F0): the tile under a point of the world map pane; 1 when none.
 int32_t worldwin_pixel_to_tile(int32_t px, int32_t py, int32_t* tx, int32_t* ty) {
-    UiRect pane = rect(0xCFC);
+    UiRect pane = main_interface().world_map;
     int32_t w, h;
     if (!g_world_ox && !g_world_oy) {
         w = pane.right - pane.left;
@@ -1317,7 +1316,7 @@ static void worldwin_right_menu(int32_t px, int32_t py, int32_t sx, int32_t sy) 
     switch (id) {
     case 1: pfncMoveMap(&MainConsole, tx, ty, 1); break;
     case 2: ui_invalidate(); break;  // WorldWin's redraw
-    case 4: worldwin_show_detail_at(mw(MapWins[0], kMwCenterX), mw(MapWins[0], kMwCenterY)); break;
+    case 4: worldwin_show_detail_at(map_win(MapWins[0]).center_x, map_win(MapWins[0]).center_y); break;
     case 0x14: help_any(); break;
     default: break;
     }
@@ -1327,7 +1326,7 @@ static void worldwin_right_menu(int32_t px, int32_t py, int32_t sx, int32_t sy) 
 // at the main view's centre, shown in the pane); the right button's menu.
 static void worldwin_click(int32_t px, int32_t py, int32_t sx, int32_t sy, bool right) {
     BaseWinMultiplayerRefresh = 0;
-    const UiRect& pane = rect(0xCFC);
+    const UiRect pane = main_interface().world_map;
     if (right) {
         worldwin_right_menu(px - pane.left, py - pane.top, sx, sy);
         return;
@@ -1335,7 +1334,7 @@ static void worldwin_click(int32_t px, int32_t py, int32_t sx, int32_t sy, bool 
     int32_t tx = 0, ty = 0;
     if (worldwin_pixel_to_tile(px - pane.left, py - pane.top, &tx, &ty)) return;
     if (!(ui_key_state(VKEY_SHIFT) & 0x8000)) pfncMoveMap(&MainConsole, tx, ty, 1);
-    else worldwin_show_detail_at(mw(MapWins[0], kMwCenterX), mw(MapWins[0], kMwCenterY));
+    else worldwin_show_detail_at(map_win(MapWins[0]).center_x, map_win(MapWins[0]).center_y);
 }
 
 // The stack arrows in the base window's copy of the main interface (BaseWin_draw_garrison shows
@@ -1381,11 +1380,12 @@ bool statuswin_mouse(int32_t type, int32_t x, int32_t y, int32_t sx, int32_t sy)
         return true;
     }
     for (Arrow& a : g_arrow) a.pressed = false;
-    if (in_rect(x, y, mi_rect(0xA7C))) {  // spot 5
+    if (in_rect(x, y, main_interface().turn_complete)) {  // spot 5
         if (type == UiInput::LDOWN) Console_end_my_turn(&MainConsole);
         return true;
     }
-    bool panes = in_rect(x, y, rect(0xCDC)) || in_rect(x, y, rect(0xCEC)) || in_rect(x, y, rect(0xCCC));
+    bool panes = in_rect(x, y, main_interface().unit_pane) || in_rect(x, y, main_interface().stack_pane) ||
+                 in_rect(x, y, main_interface().tile_pane);
     if (type == UiInput::MOVE) {
         // MainInterface_on_iface_mouse_move: the stack row's unit / base under the mouse in the
         // unit pane.
@@ -1407,14 +1407,14 @@ bool statuswin_mouse(int32_t type, int32_t x, int32_t y, int32_t sx, int32_t sy)
         }
         return panes;
     }
-    if (in_rect(x, y, rect(0xCFC))) {
+    if (in_rect(x, y, main_interface().world_map)) {
         if (type == UiInput::LUP) worldwin_click(x, y, sx, sy, false);
         else if (type == UiInput::RUP) worldwin_click(x, y, sx, sy, true);
         return true;
     }
     if (!panes) return false;
     if (type == UiInput::LUP) StatusWin_on_left_click(&InfoWin, x, y);
-    else if (type == UiInput::RUP) StatusWin_on_right_click(&InfoWin, x, y, in_rect(x, y, rect(0xCEC)));
+    else if (type == UiInput::RUP) StatusWin_on_right_click(&InfoWin, x, y, in_rect(x, y, main_interface().stack_pane));
     return true;
 }
 
@@ -1433,8 +1433,8 @@ void statuswin_say_morale(char* out, int32_t veh_id, int32_t faction_id) { say_m
 // The tile of the world map pane under the screen point (sx, sy): 0 and the tile, 1 outside it
 // (pfncProcZoomKey's Win_get_mouse_pos on WorldWin and WorldWin_pixel_to_tile).
 int32_t worldwin_screen_tile(int32_t sx, int32_t sy, int32_t* tx, int32_t* ty) {
-    const UiRect& pos = mi_rect(kMiPos);
-    const UiRect& pane = mi_rect(0xCFC);
+    const UiRect& pos = main_interface().pos;
+    const UiRect& pane = main_interface().world_map;
     int32_t px = sx - pos.left - pane.left, py = sy - pos.top - pane.top;
     if (px < 0 || py < 0 || px >= pane.right - pane.left || py >= pane.bottom - pane.top) return 1;
     return worldwin_pixel_to_tile(px, py, tx, ty);
