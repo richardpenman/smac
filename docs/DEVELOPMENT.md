@@ -90,13 +90,34 @@ data (skipped without it); `names_table` checks that `re/original_names.tsv` mat
 declarations (`src/tools/names.py update` after adding or renaming one). Cleanup work (docs/CLEANUP_PLAN.md) is gated by
 `src/tools/gate.sh`.
 
-The hybrid build used by the comparison harness (Linux):
+The oracle used by the comparison harness (Linux): `oracle.dll`, injected into the original
+`terranx.exe`, and its launcher, which record the references (`work/ref`):
 
 ```sh
 cmake -S . -B build/native -DCMAKE_BUILD_TYPE=RelWithDebInfo && cmake --build build/native -j8
 cmake -S . -B build/hybrid -DSMACX_HYBRID=ON -DCMAKE_TOOLCHAIN_FILE=cmake/i686-mingw.cmake
-cmake --build build/hybrid -j8                                         # oracle.dll, hybrid.dll, oracle_launch.exe
+cmake --build build/hybrid -j8                                         # oracle.dll, oracle_launch.exe
 ```
+
+### The hybrid build after the freeze
+
+`hybrid.dll` (the reconstruction jump-patched into `terranx.exe`: `harness/verify.sh hybrid` and
+`fcompare`, and the recording of golden records, `harness/golden.sh record`) needs the game state
+at the original's addresses. Since cleanup step 20 native builds keep it in native objects
+(src/engine/state.h), so main builds only the oracle; the hybrid is built from the freeze commit,
+tagged `hybrid-final` (docs/CLEANUP_PLAN.md section 2), in a worktree of its own:
+
+```sh
+git worktree add work/hybrid-final hybrid-final
+cmake -S work/hybrid-final -B build/hybrid-final -DSMACX_HYBRID=ON -DCMAKE_TOOLCHAIN_FILE=$PWD/cmake/i686-mingw.cmake
+cmake --build build/hybrid-final -j2
+HYBRID_BUILD=build/hybrid-final harness/verify.sh hybrid all tiny20
+```
+
+It checks the functions as they were at the freeze. Changes made since are proven natively:
+`src/tools/diffnative.sh` plays new seeds, saves and the 29 scenarios with the build under test
+and with the freeze build (`--baseline hybrid-final`), and the golden records replay the
+original's results of 197 functions.
 
 On Windows with MSYS2, add `-G Ninja -DCMAKE_EXE_LINKER_FLAGS=-static` to the configure step.
 

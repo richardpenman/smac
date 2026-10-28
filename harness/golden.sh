@@ -13,7 +13,8 @@
 # GOLDEN_LIMIT (default 20) calls per function and hook (small argument domains are enumerated
 # completely up to that count). fcompare compares the original with the reconstruction while
 # recording; its mismatches are printed (the records stay the original's results either way).
-# Env: HYBRID_BUILD / NATIVE_BUILD as for verify.sh (default build/hybrid, build/native).
+# Env: HYBRID_BUILD / NATIVE_BUILD as for verify.sh (default build/hybrid, build/native); record
+# needs hybrid.dll, built from the freeze commit (docs/DEVELOPMENT.md).
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MODE="${1:-}"; shift

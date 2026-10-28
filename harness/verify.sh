@@ -13,7 +13,9 @@
 # reconstruction and compared (see harness/README.md). FCOMPARE_OPTS adds options to the command,
 # e.g. "hooks=turn,enemy limit=5000,200". Prints per-function mismatches and PASS/FAIL.
 # Env: HYBRID_BUILD / NATIVE_BUILD select build directories (default build/hybrid, build/native);
-# ORACLE_TIMEOUT (default 1800) limits each oracle/hybrid run in seconds.
+# ORACLE_TIMEOUT (default 1800) limits each oracle/hybrid run in seconds. hybrid and fcompare need
+# hybrid.dll, which main no longer builds since the hybrid freeze: HYBRID_BUILD must be a build of
+# the freeze commit (docs/DEVELOPMENT.md, "The hybrid build after the freeze").
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MODE="$1"; shift

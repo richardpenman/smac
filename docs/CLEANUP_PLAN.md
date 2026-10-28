@@ -21,23 +21,24 @@ Every commit passes `src/tools/gate.sh`. The script exits non-zero on any failur
 | Step | What it proves | Command it runs |
 | --- | --- | --- |
 | `static` | No original address was lost or added. The names table is current. Every fcompare entry names a declared function. Every `BUG(original)` site names a declared compat flag, and docs/COMPAT.md is current. | `src/tools/names.py check`, `src/tools/compat.py check` |
-| `build` | Native, ASan and hybrid builds compile | `cmake` into `$GATE_PREFIX-{native,asan,hybrid}` |
+| `build` | Native and ASan builds compile | `cmake` into `$GATE_PREFIX-{native,asan}` |
 | `unit` | Unit tests pass, also under ASan; the original's recorded results of 197 functions still hold | `ctest` (smoke, `smacx_unit`, the golden replays, `names.py check`), ASan `smacx_unit` and golden replays |
 | `native` | The game is identical to the original on all 29 scenarios | `harness/verify.sh native <all>` |
 | `observer` | smacx, with every UI area replaced, plays observer games identical to the original's | `smacx --human 0 --snapshots` vs `work/ref`: tiny20 small12 std8 late140 |
 | `asan` | No memory or UB errors, same game | ASan `smacx_headless` + `compare.py`: tiny20 small12 std8 late140 council131 |
-| `hybrid` | Each reconstructed function still drops into the original | `harness/verify.sh hybrid all` tiny20 small12 std8 late140 |
-| `diffnative` | After the hybrid freeze: the native build plays new seeds and the 29 scenarios exactly as the frozen `hybrid-final` build does. Runs only when the baseline exists. | `src/tools/diffnative.sh --baseline $GATE_BASELINE` (default `hybrid-final`) |
-| `fcompare` | Function by function against the original. Run when a commit touches the functions listed in `GATE_FCOMPARE`. | `harness/verify.sh fcompare "$GATE_FCOMPARE"` |
+| `diffnative` | The native build plays new seeds and the 29 scenarios exactly as the frozen `hybrid-final` build does, with the original's bugs and with the fixes. A missing baseline fails the step. | `src/tools/diffnative.sh --baseline $GATE_BASELINE` (default `hybrid-final`): `--seeds 6 --turns 40 --scenarios all`, then `--fixes --seeds 3` |
 | `ui` | The scripted UI behaviour is unchanged, with no memory or UB errors | `tests/*/run.sh` (animated: `smacx --animate`, every slide, move, boom and movie played) with the native smacx, then with the ASan smacx (no sanitizer report in any case's log) |
 
 When to run what:
 
-* Per commit: `src/tools/gate.sh` (about 17 min on 2 cores with incremental builds; measured on the first increment).
-* While working: `src/tools/gate.sh --quick` (one scenario each for asan and hybrid), or
+* Per commit: `src/tools/gate.sh` (until `hybrid-final` is tagged: `GATE_BASELINE=178475a`).
+* While working: `src/tools/gate.sh --quick` (one scenario for asan, short diffnative games), or
   `--only static,build,unit,native`.
-* Any commit that changes a function body: also
-  `GATE_FCOMPARE="none +fn1 +fn2" src/tools/gate.sh --only build,fcompare`.
+* Until the freeze (step 20) the gate also had a `hybrid` step (`harness/verify.sh hybrid all` on
+  tiny20 small12 std8 late140) and, for commits changing a function body, `fcompare`
+  (`GATE_FCOMPARE="none +fn1 +fn2"`). Both need the state at the original's addresses; they now
+  run only on a build of the freeze commit (docs/DEVELOPMENT.md, "The hybrid build after the
+  freeze").
 * Commits that only rename or reformat: the build and the gate above are enough. A reformat can
   also be checked by comparing objects built with `-g0`. Their `.text` sections must be
   byte-identical.
@@ -71,6 +72,8 @@ as a C++ symbol. fcompare and patch specs also use the source name (`"none +vect
   saves** (cheap, no Wine). This is stronger coverage than the 29 references alone.
   `src/tools/diffnative.sh` does it (increment 18); the gate's `diffnative` step runs it once the
   tag exists.
+* **Status: frozen in step 20.** Its second commit moves the game state out of the image; main
+  builds no hybrid.dll since, and the gate has no `hybrid` or `fcompare` step (note 20).
 
 ## 3. Globals become game-state objects
 
@@ -101,6 +104,9 @@ The constraints: savegames stay byte-compatible, and the `.state` snapshots stay
    The snapshot writer emits the same `.state` regions from the objects, so `work/ref` stays the
    golden reference. The image then only seeds the initial data (rules defaults, tables), until
    those are re-created in source.
+
+Status: 1-3 as notes 7, 15, 16 say; 4 done in step 20 for the saved game state (note 20). The
+engine's scratch globals, the rule tables and the UI's objects are still in the image.
 
 ## 4. `BUG(original)` behind named compatibility code
 
@@ -247,7 +253,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 17 | Golden-record fcompare mode + data-dependent unit tests | M | done (see note 17) |
 | 18 | `diffnative.sh` (native-vs-baseline on new seeds); tag `hybrid-final` | S | script done (see note 18); the tag is set by the user |
 | 19 | Split `enemy_move` and the AI (stack residues as explicit context) | XL | done (see note 19) |
-| 20 | Native state containers + explicit save/snapshot serialisation (phase B) | XL | |
+| 20 | Native state containers + explicit save/snapshot serialisation (phase B) | XL | done (see note 20) |
 | 21 | UI windows: typed views, then classes | L | |
 
 Sizes: XS < 1 h, S ≈ hours, M ≈ a day, L ≈ several days, XL ≈ a week or more of agent time.
@@ -663,3 +669,71 @@ Notes on the increments:
     can_terraform, alien_move, assemble_passengers, enemy_move; 0 mismatches), diffnative against
     b55e6a9 in both settings (6 + 20 new games, the scenarios), the ASan fixes step, the scripted
     UI suites.
+
+20. Three commits. The baseline of every comparison is the build of 178475a (the end of step 19,
+    the last commit the full gate checked with the hybrid build; `diffnative.sh --baseline 178475a`
+    until the user tags `hybrid-final`).
+    * Serialisation (state still in the image). `engine/serialize.h`: a `Writer` and a `Reader`
+      (little-endian integers in their own width, fields in order) and one field list per record
+      type, `serialize(io, record)`, which both writes and reads (`engine/state_io.cpp`: GamePrefs,
+      Faction, Goal, MFaction, MapHeader, Landmark, MAP, Continent, UNIT, VEH, BASE, ReplayEvent,
+      Monument(Event), and the new layout structs `MapHeader` (0x949870, 0xAA4: the header block of
+      map_write), `ScenarioRules` (0x94B4C0, 0x98) and `PbemState` (0x93A9AC, 0x4C), types/data.h).
+      The field lists were generated once from the struct definitions and are maintained by hand;
+      tests/unit/test_serialize.cpp checks each against the packed layout (random bytes in and out,
+      so a field left out, doubled or misplaced fails). `game_data` and `map_data`'s `map_read` /
+      `map_write` move every game-state block through them with the original's block boundaries
+      (each `encrypt_write` call restarts its keys); a read fills a buffer that starts as the
+      records' current bytes, so a short file leaves the rest as fread would. The legacy conversions
+      (version 10 factions and bases, version < 11 preferences) work on the byte layout, then read
+      it. The `.state` snapshots (headless, smacx) and the state hash of the golden records are
+      `state_regions_write`: every region of harness/state_regions.h serialised from the records,
+      checked against the region's size. With the original's bugs the replay table can overflow
+      (`replay_events_overflow`); the bytes past it are the original's memory after it
+      (`mem::read_bytes` / `write_bytes`), in saves, snapshots, the network block and replay_base.
+    * Native records. `engine/state.h`: the saved game state as native objects (`state::factions`,
+      `bases`, `vehs`, `units`, `mfactions`, `prefs` (GamePrefs), `map_header`,
+      `faction_turn_might`, `continents`, `monuments`, `replay_events` and their size, `bung_list`,
+      `scenario_rules`, `pbem`, `diplo_state_b`/`c`, the combat counts, the council's pending
+      session, proposal and votes, `faction_rankings_unk`, `tectonic_detonation_count`,
+      `game_alt_path`, `scenario_file_name`), each its own object, listed by original address with
+      its loader (state.cpp). `mem::host` resolves an address inside a record to the object, so
+      every `GLOBAL` there and every alias inside a record (VehCount is a GamePrefs field) binds to
+      it with no change to its users; `mem::init` seeds the records from the data image through
+      their serialisation and fills their image bytes with 0xA5; a global lying partly in a record
+      stops the start (`mem::bind`; MapFilePath became the 80 bytes the header holds). The
+      original's address stays a record's identity: save blocks, snapshot regions, and the
+      original's address arithmetic (CurrentBasePtr, interlude's text addresses, the network
+      blocks, `poke`), which `mem::host` serves as long as a record's type keeps the original
+      layout (the `SMAC_LAYOUT` assertions); `mem::address_of` maps back (golden replays,
+      tutwin). The original's reads outside a table land in a neighbouring record or the image
+      (Bases[-1] is the end of Factions[7], Factions[-1] lies in Vehs, Units[-1] before Units):
+      `engine/table_at.h` (`table_at`, `table_bytes`) gives the entry in range and the bytes at the
+      original's address outside; 20 sites use it. Golden replays capture and restore the image
+      and the records (`state_capture`). Not moved: CouncilWinState and CouncilWinVotes, saved
+      but fields of the council window object (CouncilWin + 0xA1C, reached through `self`; moving
+      them broke 10 scenarios), which go with the UI windows (step 21); the rest of the image (rule
+      tables, the engine's scratch globals, the UI) is unchanged. The records keep fixed arrays of
+      the layout structs: their sizes are game rules (2048 vehicles, 512 bases) and the address
+      users above need the layout. Turning a record into a container with another type (a vector,
+      real pointers, wider fields) now needs only its serialize() to keep the bytes and its
+      address users (`grep mem::host`, table_at) to go first.
+    * Freeze. The second commit is the first whose state no longer lives at the original's
+      addresses in native builds. Decision: main builds no hybrid.dll (CMake's `SMACX_HYBRID`
+      builds the oracle and its launcher, still needed to record references), and the gate drops
+      the `hybrid` and `fcompare` steps; its `diffnative` step is mandatory (a missing baseline
+      fails it) and also plays 3 new games with the fixes. hybrid.dll, fcompare and the recording
+      of golden records are built from the freeze commit (docs/DEVELOPMENT.md). The engine's
+      `SMACX_HYBRID` code paths (patch thunks, shadow thunks, hybrid UI bridges, gen_bindings'
+      hybrid table) are dead in main now; removing them is a separate deletion.
+    Proof per commit: native build (the hybrid build for the first two, hybrid games on tiny20 and
+    late140 for the first), names/compat checks, ctest with
+    the golden replays, `harness/verify.sh native` on the 29 scenarios (845 snapshots),
+    `diffnative --baseline 178475a --seeds 6 --turns 40 --scenarios all` and `--fixes --seeds 3`,
+    byte-identical `.state`/`.sav`/`.rng` files against the 178475a build (tiny20, late140,
+    loadsave, loadscn, an encrypted PBEM save written and reloaded, a save with 9800 bytes of
+    replay events written, reloaded and played on), the original under Wine loading saves smacx
+    wrote (from turn_200 and tiny20_turn_005 of work/saves_late) and playing 3 turns identical to
+    smacx, the ASan unit, golden, fixes and original-bugs runs (tiny20 small12 std8 late140
+    council131 probe131 cov_late300, no report, no difference from work/ref), the scripted UI
+    suites.

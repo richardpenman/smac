@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(SMACX_HYBRID "Build hybrid.dll (32-bit, injected into the original terranx.exe)" OFF)
+option(SMACX_HYBRID "Build oracle.dll (32-bit, injected into the original terranx.exe)" OFF)
 option(SMACX_SANITIZE "Native only: build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(SMACX_COVERAGE "Native only: build with gcov coverage (tools/coverage_report.py)" OFF)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -67,15 +67,10 @@ add_custom_command(
   COMMENT "Generating original-function bindings")
 
 if(SMACX_HYBRID)
-  add_library(hybrid SHARED ${ENGINE_SOURCES} ${GEN_DIR}/hybrid_bindings.cpp harness/oracle/oracle.cpp
-              harness/oracle/fcompare.cpp)
-  # Standard ebp frames like the original's MSVC code: keeps the dead-stack image left by
-  # reconstructed functions closer to the original's (see harness/README.md, stack poisoning).
-  target_compile_options(hybrid PRIVATE -fno-omit-frame-pointer)
-  target_compile_definitions(hybrid PRIVATE SMACX_HYBRID ORACLE_WITH_ENGINE)
-  target_include_directories(hybrid PRIVATE src harness/oracle harness)
-  target_link_options(hybrid PRIVATE -static)
-  set_target_properties(hybrid PROPERTIES PREFIX "")
+  # The oracle (oracle.dll and its launcher), which records the references of the original. Since
+  # the hybrid freeze (docs/CLEANUP_PLAN.md section 2, cleanup step 20) the game state is native
+  # objects and hybrid.dll (the reconstruction patched into terranx.exe, fcompare, golden
+  # recording) is built from the freeze commit only: see docs/DEVELOPMENT.md.
   add_library(oracle SHARED harness/oracle/oracle.cpp)
   target_include_directories(oracle PRIVATE harness/oracle harness src)
   target_compile_definitions(oracle PRIVATE SMACX_HYBRID)  # rules_dump.h binds engine globals

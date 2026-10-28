@@ -60,7 +60,10 @@ Ghidra prints `game_random`'s scaling as a signed `>>`, but the code uses `shr` 
 ### Globals
 
 * Use the names in `src/engine/globals.h` (or a module header). Every global is
-  `GLOBAL(type, Name, 0xADDR);`. Before adding one, grep for its address — it may already exist under
+  `GLOBAL(type, Name, 0xADDR);`. In native builds a global whose address lies in a game-state
+  record (src/engine/state.h: factions, bases, vehicles, the map header, GamePrefs, ...) binds to
+  that native object, every other one to the memory image; a global lying partly in a record
+  stops the program at start (`mem::init` names it). Before adding one, grep for its address — it may already exist under
   another name. Two names for one address are harmless.
 * Add new globals to the module header that owns them (or `globals.h` if shared), with the precise
   type: arrays sized correctly, structs where the memory is a struct.
@@ -100,8 +103,11 @@ Ghidra prints `game_random`'s scaling as a signed `>>`, but the code uses `shr` 
   a cast `int32_t*`: unaligned access is undefined behaviour and traps or miscompiles on some
   targets.
 * **Out-of-bounds indexes the original makes** (`Vehs[-1]`, `Tech[-1]`, one past a table) are read
-  from the memory image explicitly, not through the typed array: the compiler may assume an
-  in-bounds index and drop or reorder the access. (GCC builds add
+  at the original's address explicitly, not through the typed array: the compiler may assume an
+  in-bounds index and drop or reorder the access, and the game-state tables are separate native
+  objects, so `Bases[-1]` is not the end of `Factions[7]` in native memory. Use
+  `table_at`/`table_bytes` (src/engine/table_at.h) for the record tables and `mem::read_bytes` /
+  `write_bytes` for ranges; they resolve the original's address to the record or image holding it. (GCC builds add
   `-fno-aggressive-loop-optimizations` as a backstop; clang has no such option.)
 
 * **Out-of-bounds reads into pointer tables.** When such a read lands in a table that native
@@ -259,6 +265,14 @@ src/engine: gen_bindings.py counts a definition anywhere under src/, and hybrid 
 compile src/ui.
 
 ## Verification
+
+**Since the hybrid freeze** (docs/CLEANUP_PLAN.md section 2, cleanup step 20) the game state of
+native builds is native objects (src/engine/state.h), and main no longer builds hybrid.dll. The
+hybrid and fcompare instructions below need a build of the freeze commit (docs/DEVELOPMENT.md,
+"The hybrid build after the freeze") and only check code as it was there. Changes made after the
+freeze are verified natively: `harness/verify.sh native` against the oracle references,
+`src/tools/diffnative.sh` against the freeze build on new seeds, saves and the scenarios, the golden
+records (ctest `golden_*`), the unit tests and the gate (`src/tools/gate.sh`).
 
 Build in your own build directories so parallel work does not collide:
 

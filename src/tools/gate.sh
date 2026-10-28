@@ -4,14 +4,17 @@
 #
 #   src/tools/gate.sh [--quick] [--only STEPS] [--skip STEPS]
 #
-# Every comparison with the original runs with the original's bugs (--original-bugs, verify.sh;
-# the hybrid DLL always has them); the fixes step plays with them fixed.
+# Every comparison with the original runs with the original's bugs (--original-bugs, verify.sh);
+# the fixes step plays with them fixed. Since the hybrid freeze (cleanup step 20: the game state is
+# native objects) main builds no hybrid.dll; the per-function proof against the original is the
+# frozen build (diffnative) and the golden records (unit). hybrid.dll and fcompare are built from
+# the freeze commit when needed (docs/DEVELOPMENT.md, "The hybrid build after the freeze").
 #
 # Steps (in order; STEPS is a comma-separated list):
 #   static    src/tools/names.py check (no original address lost, names table current, fcompare
 #             entries name declared functions) and src/tools/compat.py check (every BUG(original)
 #             site names a declared compat flag, docs/COMPAT.md current)
-#   build     native (smacx_headless, smacx, smacx_unit), ASan native, hybrid (i686 mingw)
+#   build     native (smacx_headless, smacx, smacx_unit), ASan native
 #   unit      ctest in the native build (smacx_smoke, smacx_unit, the golden records of
 #             tests/golden replayed by smacx_headless --golden, names.py check) and, under ASan,
 #             smacx_unit and the golden replays
@@ -23,19 +26,16 @@
 #   fixes     the ASan smacx_headless with the original's bugs fixed (the game's default) on
 #             $GATE_FIXES_SCENARIOS (default tiny20 late140 council131 end300; --quick: tiny20):
 #             no sanitizer report, the run ends normally (nothing is compared: the game differs)
-#   hybrid    harness/verify.sh hybrid "all" on $GATE_HYBRID_SCENARIOS (default tiny20 small12 std8
-#             late140; --quick: tiny20). Runs the original under Wine, one process at a time.
-#   fcompare  only when GATE_FCOMPARE is set (a patch spec, e.g. "none +vector_dist"): verify.sh
-#             fcompare on $GATE_FCOMPARE_SCENARIOS (default tiny20 small12 std8)
-#   diffnative  only when the baseline exists (GATE_BASELINE, default the tag hybrid-final: the
-#             hybrid freeze, docs/CLEANUP_PLAN.md section 2): src/tools/diffnative.sh, the native
-#             build against the baseline's smacx_headless on new seeds and the harness scenarios
-#             ($GATE_DIFFNATIVE_OPTS, default "--seeds 6 --turns 40 --scenarios all"; --quick:
-#             "--seeds 2 --turns 20"), with the original's bugs
+#   diffnative  src/tools/diffnative.sh: the native build against the frozen baseline's
+#             smacx_headless (GATE_BASELINE, default the tag hybrid-final: the hybrid freeze,
+#             docs/CLEANUP_PLAN.md section 2; a missing baseline fails the step) on new seeds and the
+#             harness scenarios with the original's bugs ($GATE_DIFFNATIVE_OPTS, default "--seeds 6
+#             --turns 40 --scenarios all"; --quick: "--seeds 2 --turns 20"), then with the fixes
+#             ($GATE_DIFFNATIVE_FIXES_OPTS, default "--seeds 3"; --quick: "--seeds 1 --turns 20")
 #   ui        tests/*/run.sh (scripted smacx checks, animated: slides, moves, booms, movies), each
 #             against the native smacx, then again against the ASan smacx (no sanitizer report)
 #
-# Env: GATE_PREFIX build directory prefix (default build/gate: build/gate-native, -asan, -hybrid);
+# Env: GATE_PREFIX build directory prefix (default build/gate: build/gate-native, -asan);
 #      GATE_OUT output directory (default work/gate); GATE_JOBS (default 2).
 # The oracle references (work/ref/<scenario>) must exist: the gate never creates them (verify.sh
 # would run the original to make a missing one). Exit status 0 when every step passes; the summary
@@ -62,18 +62,14 @@ done
 if [ $QUICK = 1 ]; then
     ASAN_SCEN="${GATE_ASAN_SCENARIOS:-tiny20}"
     FIXES_SCEN="${GATE_FIXES_SCENARIOS:-tiny20}"
-    HYBRID_SCEN="${GATE_HYBRID_SCENARIOS:-tiny20}"
 else
     ASAN_SCEN="${GATE_ASAN_SCENARIOS:-tiny20 small12 std8 late140 council131}"
     FIXES_SCEN="${GATE_FIXES_SCENARIOS:-tiny20 late140 council131 end300}"
-    HYBRID_SCEN="${GATE_HYBRID_SCENARIOS:-tiny20 small12 std8 late140}"
 fi
-FC_SCEN="${GATE_FCOMPARE_SCENARIOS:-tiny20 small12 std8}"
 OBS_SCEN="tiny20 small12 std8 late140"
 ALL_SCEN="$(ls harness/scenarios/*.cmd | xargs -n1 basename | sed 's/\.cmd$//' | tr '\n' ' ')"
 NATIVE="$PREFIX-native"
 ASAN="$PREFIX-asan"
-HYBRID="$PREFIX-hybrid"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 SUMMARY="$OUT/summary.txt"
@@ -121,11 +117,6 @@ if want build; then
         build "$ASAN" "$OUT/build.log" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DSMACX_SANITIZE=ON -- \
             smacx_headless smacx_unit smacx || ok=0
         what="$what asan"
-    fi
-    if want hybrid || want fcompare; then
-        build "$HYBRID" "$OUT/build.log" -G "Unix Makefiles" -DSMACX_HYBRID=ON \
-            -DCMAKE_TOOLCHAIN_FILE="$ROOT/cmake/i686-mingw.cmake" || ok=0
-        what="$what hybrid"
     fi
     if [ $ok = 1 ]; then report build PASS "$what ($PREFIX-*)"; else report build FAIL "see $OUT/build.log"; fi
 fi
@@ -234,34 +225,24 @@ if want fixes; then
     else report fixes FAIL "see $OUT/fixes.log"; fi
 fi
 
-# ---- hybrid / fcompare (Wine) ----------------------------------------------------------------
-if want hybrid; then
-    # shellcheck disable=SC2086
-    if refs_ok $HYBRID_SCEN > "$OUT/hybrid.log" && \
-        HYBRID_BUILD="$HYBRID" harness/verify.sh hybrid all $HYBRID_SCEN >> "$OUT/hybrid.log" 2>&1 && \
-        ! grep -qE "DIFF|MISSING|FAIL|CRASH|not reconstructed|exit=[1-9]" "$OUT/hybrid.log"; then
-        report hybrid PASS "all patches: $(count_verify "$OUT/hybrid.log")"
-    else
-        report hybrid FAIL "$(count_verify "$OUT/hybrid.log"); see $OUT/hybrid.log"
-    fi
-fi
-if want fcompare && [ -n "${GATE_FCOMPARE:-}" ]; then
-    # shellcheck disable=SC2086
-    if HYBRID_BUILD="$HYBRID" harness/verify.sh fcompare "$GATE_FCOMPARE" $FC_SCEN > "$OUT/fcompare.log" 2>&1; then
-        report fcompare PASS "\"$GATE_FCOMPARE\" on $FC_SCEN"
-    else
-        report fcompare FAIL "see $OUT/fcompare.log"
-    fi
-fi
-
-# ---- diffnative: native against the frozen baseline (after the hybrid freeze) -------------------
+# ---- diffnative: native against the frozen baseline (the hybrid freeze) -------------------------
 BASELINE="${GATE_BASELINE:-hybrid-final}"
-if want diffnative && { [ -x "$BASELINE/smacx_headless" ] || git rev-parse --verify --quiet "$BASELINE^{commit}" > /dev/null; }; then
-    if [ $QUICK = 1 ]; then DN_OPTS="${GATE_DIFFNATIVE_OPTS:---seeds 2 --turns 20}"
-    else DN_OPTS="${GATE_DIFFNATIVE_OPTS:---seeds 6 --turns 40 --scenarios all}"; fi
+if want diffnative; then
+    if [ $QUICK = 1 ]; then
+        DN_OPTS="${GATE_DIFFNATIVE_OPTS:---seeds 2 --turns 20}"
+        DN_FIX_OPTS="${GATE_DIFFNATIVE_FIXES_OPTS:---seeds 1 --turns 20}"
+    else
+        DN_OPTS="${GATE_DIFFNATIVE_OPTS:---seeds 6 --turns 40 --scenarios all}"
+        DN_FIX_OPTS="${GATE_DIFFNATIVE_FIXES_OPTS:---seeds 3}"
+    fi
+    if ! [ -x "$BASELINE/smacx_headless" ] && ! git rev-parse --verify --quiet "$BASELINE^{commit}" > /dev/null; then
+        report diffnative FAIL "no baseline $BASELINE (tag hybrid-final, or GATE_BASELINE=<rev or build dir>)"
     # shellcheck disable=SC2086
-    if JOBS="$JOBS" DIFFNATIVE_OUT="$OUT/diffnative" src/tools/diffnative.sh --baseline "$BASELINE" --build "$NATIVE" $DN_OPTS > "$OUT/diffnative.log" 2>&1; then
-        report diffnative PASS "$(tail -n 1 "$OUT/diffnative.log" | cut -d'(' -f2 | cut -d, -f1) against $BASELINE"
+    elif JOBS="$JOBS" DIFFNATIVE_OUT="$OUT/diffnative" src/tools/diffnative.sh --baseline "$BASELINE" --build "$NATIVE" \
+            $DN_OPTS > "$OUT/diffnative.log" 2>&1 &&
+        JOBS="$JOBS" DIFFNATIVE_OUT="$OUT/diffnative_fixes" src/tools/diffnative.sh --baseline "$BASELINE" --build "$NATIVE" \
+            --fixes $DN_FIX_OPTS >> "$OUT/diffnative.log" 2>&1; then
+        report diffnative PASS "$(grep '^diffnative:' "$OUT/diffnative.log" | cut -d'(' -f2 | cut -d, -f1 | paste -sd+) against $BASELINE"
     else
         report diffnative FAIL "see $OUT/diffnative.log"
     fi

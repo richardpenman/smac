@@ -6,7 +6,7 @@ on the same scripted scenario, and compares the game state turn by turn.
 | Piece | Role |
 | --- | --- |
 | `oracle/oracle.cpp` → `oracle.dll` | Makes the original scriptable and deterministic. |
-| `oracle/oracle.cpp` → `hybrid.dll` | Same, plus the reconstructed engine jump-patched over original functions. |
+| `oracle/oracle.cpp` → `hybrid.dll` | Same, plus the reconstructed engine jump-patched over original functions. Built from the freeze commit only (`hybrid-final`, docs/DEVELOPMENT.md "The hybrid build after the freeze"): native builds keep the game state in native objects since cleanup step 20. |
 | `oracle/launch.c` → `oracle_launch.exe` | Starts terranx.exe suspended and injects the DLL. |
 | `../src/app/headless.cpp` → `smacx_headless` | Runs the same scripts on the pure reconstruction. |
 | `run_oracle.sh` | One isolated oracle/hybrid run (own run dir, pristine ini, own X display). |
@@ -306,6 +306,8 @@ line) is logged with the same return-address scan.
 
 ## Function comparison (`fcompare`)
 
+(hybrid.dll: a build of the freeze commit `hybrid-final`, see docs/DEVELOPMENT.md.)
+
 `fcompare` (hybrid.dll, `harness/oracle/fcompare.cpp`) checks reconstructed functions one by one
 on real game states, independently of whether a whole game stays in sync. At each selected hook
 (default: before every `turn_upkeep`; `hooks=turn,faction,enemy` adds the starts of
@@ -355,8 +357,8 @@ results of the functions that change no game memory (the fcompare table's entrie
 `mandate_color`, which returns UI palette indices headless builds never set up), recorded on the
 states of harness scenarios and replayed on the reconstruction without Wine.
 
-* Recording: `harness/golden.sh record [scenario...]` (default tiny20 late140) runs the scenario
-  in hybrid.dll with no patches and `fcompare <from> <to> every=<n> limit=20,0 golden <spec>`
+* Recording: `harness/golden.sh record [scenario...]` (default tiny20 late140; hybrid.dll of the
+  freeze commit, `HYBRID_BUILD=build/hybrid-final`) runs the scenario in hybrid.dll with no patches and `fcompare <from> <to> every=<n> limit=20,0 golden <spec>`
   (tiny20: turns 5, 12, 19; late140: turns 140, 142). At each of these turn_upkeep hooks fcompare
   writes `STATE <turn> <hash>` (`state_hash.h`: FNV-1a 64 of the `state_regions.h` regions, masked
   bytes as 0) and, for every call it makes, the arguments and the original's return value,
