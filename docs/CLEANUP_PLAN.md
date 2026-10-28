@@ -73,7 +73,8 @@ as a C++ symbol. fcompare and patch specs also use the source name (`"none +vect
   `src/tools/diffnative.sh` does it (increment 18); the gate's `diffnative` step runs it once the
   tag exists.
 * **Status: frozen in step 20.** Its second commit moves the game state out of the image; main
-  builds no hybrid.dll since, and the gate has no `hybrid` or `fcompare` step (note 20).
+  builds no hybrid.dll since, and the gate has no `hybrid` or `fcompare` step (note 20). The
+  engine's hybrid code paths were removed in step 21 (note 21).
 
 ## 3. Globals become game-state objects
 
@@ -105,8 +106,9 @@ The constraints: savegames stay byte-compatible, and the `.state` snapshots stay
    golden reference. The image then only seeds the initial data (rules defaults, tables), until
    those are re-created in source.
 
-Status: 1-3 as notes 7, 15, 16 say; 4 done in step 20 for the saved game state (note 20). The
-engine's scratch globals, the rule tables and the UI's objects are still in the image.
+Status: 1-3 as notes 7, 15, 16 say; 4 done in step 20 for the saved game state (note 20) and in
+step 21 for the council window's session (note 21). The engine's scratch globals, the rule tables
+and the UI's objects are still in the image (the UI's through typed views, note 21).
 
 ## 4. `BUG(original)` behind named compatibility code
 
@@ -187,7 +189,7 @@ and the screenshot comparisons (`tests/*/compare.sh`, which need Wine).
 
 1. Window objects that live in the image (MapWin `kMw*` offsets, Console, BaseWin) get a typed
    view: a struct of the original layout with `static_assert(offsetof)`, replacing the
-   `mapwin_field(win, kMwZoom)` reads. No behaviour change.
+   `mapwin_field(win, kMwZoom)` reads. No behaviour change. (Done in step 21, note 21.)
 2. Natively owned windows (`MapWinNative`, `SocialWinState`, popups) become classes with
    constructors and member functions. Vtable emulation is replaced by virtual functions once no
    engine code reaches the window through the bridge.
@@ -254,7 +256,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 18 | `diffnative.sh` (native-vs-baseline on new seeds); tag `hybrid-final` | S | script done (see note 18); the tag is set by the user |
 | 19 | Split `enemy_move` and the AI (stack residues as explicit context) | XL | done (see note 19) |
 | 20 | Native state containers + explicit save/snapshot serialisation (phase B) | XL | done (see note 20) |
-| 21 | UI windows: typed views, then classes | L | |
+| 21 | UI windows: typed views, then classes | L | done (see note 21) |
 
 Sizes: XS < 1 h, S ≈ hours, M ≈ a day, L ≈ several days, XL ≈ a week or more of agent time.
 
@@ -737,3 +739,57 @@ Notes on the increments:
     smacx, the ASan unit, golden, fixes and original-bugs runs (tiny20 small12 std8 late140
     council131 probe131 cov_late300, no report, no difference from work/ref), the scripted UI
     suites.
+
+21. Three commits (the hybrid code; the council record and the typed views; MapWinNative and the names),
+    each verified with `gate.sh --quick` (baseline 178475a).
+    * Dead hybrid code removed: the hybrid UI bridges (engine/ui_bridge_*hybrid.cpp), the shadow
+      and entry thunks (hybrid_shadow.h, the has_abil frame, Path_find's / base_energy's /
+      call_council's residue thunks), hybrid_patch.h, every `SMACX_HYBRID` branch of src/engine,
+      src/headless and src/platform (the native branch kept), the hooks only the hybrid oracle set
+      (`g_harness_human_turn`, `_enemy_veh_pump`, `_wants_to_attack_fresh`, `_council_modal`) and
+      gen_bindings' hybrid table. memmap.h keeps `SMACX_HYBRID`: oracle.dll still builds with it
+      (harness/rules_dump.h binds engine globals to the original's memory); harness/oracle's
+      `ORACLE_WITH_ENGINE` code (hybrid.dll, fcompare) is only built from the freeze commit.
+    * The council window's session (CouncilWin + 0xA1C, 0x78 bytes: proposal, candidate, result,
+      governor, the votes and council votes, which PBEM saves hold as CouncilWinState and
+      CouncilWinVotes) is a native record, `state::council_session` (type `CouncilSession`,
+      types/data.h, serialised like the others), reached as `CouncilWinSession` (engine/council.h)
+      by the engine, the headless window and smacx's window instead of `self + 0xA1C`; the saved
+      globals bind into it. In step 20 moving them broke 10 scenarios because the council code
+      still read the session through the window object in the image; now every reader goes through
+      the record. Saves and `.state` files are byte-identical with the 178475a build (council131,
+      late140, end300: every `.sav`, `.state`, `.rng`). smacx's native window class was renamed
+      `CouncilWindow` (it had the saved global's name).
+    * Typed views (section 7.1): the window objects that stay in the image (or in native buffers of
+      their layout) are read and written through structs of the original layout with
+      `static_assert(offsetof)` per named field, instead of `mw(win, kMwZoom)`, `bwf(kBwBase)`,
+      `mif(...)` and `mapwin_field(...)` (about 900 sites, rewritten by script; the constants are
+      gone): `MapWin` (engine/ui_bridge.h, `map_win(win).zoom`; game_io saves its six fields from
+      it), `Console` (ui/console.h, `console_win(self).veh`), `GraphicWin` at a window's virtual
+      base (ui/gfx.h, `graphic_win(win + vbase)`), `PlanWin` (planwin.cpp), `BaseWindow`
+      (ui/basewin.h, `base_win().queue_sel`; the original class is BaseWin, the name of its
+      object) and `MainInterface` (`main_interface().pane_queue`). Tables that hold rectangle
+      offsets (tours, expense rows, the stack arrows) keep them, written as `offsetof`. Where the
+      reconstruction addresses past a field (the go-to preview's sixth point, pfncProcZoomKey's
+      read of +0x4C4 / +0x4C8 of the MapWin instead of its GraphicWin, see below) the raw offset
+      stays, commented. Fields still unnamed are `unk_<offset>`.
+    * Classes (section 7.2): `MapWinNative` is a class (`attach`, `clear_cache`, `cache_entry`,
+      `fields`, `graphic`). The other natively owned windows already were classes derived from
+      ScreenWin (virtual redraw / on_button / on_key / on_click) with their original methods as
+      member functions, and the popups' BasePop keeps its original-named functions; no vtable
+      emulation is left in src/ui. The engine still reaches the windows through the bridge
+      (`uint8_t*` objects, ADDR_NATIVE functions), so the window objects stay where they are.
+    * Names (section 7.3): the 95 `FUN_*` addresses in src/ui comments got names, written
+      `Class_method (0xADDR)` (e.g. `ProdWin_draw_cell (0x4927C0)`, `DiploWin_add_offer
+      (0x441490)`); CRT helpers by their CRT name.
+    Findings, kept as they are (behaviour unchanged): pfncProcZoomKey's mouse zoom reads the
+    window's size at MapWin + 0x4C4 / 0x4C8 instead of at its GraphicWin (0x515229 reads through
+    the virtual base), so whether the zoom follows the mouse depends on what those bytes of the
+    object hold (not checked); BaseWin_draw_garrison's stack row reads MainInterface + 0xAC4 where maininfc.cpp
+    reads the left arrow's right edge (+0xAB4). The first is a difference from the original and
+    gets a proper fix after the cleanup.
+    Left of section 7: typed views for the other window objects still read by offset (StatusWin
+    `sw()` / `InfoWin`, InfoWindow `fld()`, TutWin `tf()`, BattleWin, NetState, the main interface's
+    mode at +0x1E8FC; about 150 sites), and the window objects themselves moving out of the image,
+    which waits until the engine no longer reaches them through the bridge as `uint8_t*` objects.
+

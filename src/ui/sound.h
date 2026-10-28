@@ -38,15 +38,16 @@ ADDR_NATIVE(0x4C6CE0) int32_t THISCALL Wave_load_2(uint8_t* wave);
 ADDR_NATIVE(0x4C7130) void THISCALL Wave_set_volume(uint8_t* wave, uint32_t volume);
 ADDR_NATIVE(0x4C6EE0) int32_t THISCALL Wave_set_pitch(uint8_t* wave, int32_t pitch);
 ADDR_NATIVE(0x4C66B0) void THISCALL Wave_set_pan(uint8_t* wave, int32_t pan);
-// Sound group of a wave (FUN_004C5240 on the sound system 0x90D978): 0 voices, 1 effects.
+// Sound group of a wave (SoundSys_group_of (0x4C5240) on the sound system 0x90D978): 0 voices, 1 effects.
 ADDR_NATIVE(0x4C5240) int32_t THISCALL SoundSys_add_to_group(uint8_t* sys, uint32_t group, uint8_t* wave);
 // Stops a wave (vtable +0x20).
 void Wave_stop(uint8_t* wave);
 // Sound_fade (0x4C65E0): fades the wave out over its fade time (+0x38, 1000 ms).
 void Sound_fade(uint8_t* wave);
-// The sound system's master volume (FUN_004C5150), group volumes (FUN_004C5320), group on / off
-// (FUN_004C53A0 / FUN_004C5400: the group's waves are reloaded / released) and master on / off
-// (FUN_004C51C0 / FUN_004C51D0).
+// The sound system's master volume (SoundSys_set_volume (0x4C5150)), group volumes
+// (SoundSys_set_group_volume (0x4C5320)), group on / off (SoundSys_group_on (0x4C53A0) /
+// SoundSys_group_off (0x4C5400): the group's waves are reloaded / released) and master on / off
+// (SoundSys_on (0x4C51C0) / SoundSys_off (0x4C51D0)).
 void sound_set_master_volume(int32_t volume);
 void sound_set_group_volume(int32_t group, int32_t volume);
 void sound_enable_group(int32_t group, bool on);
@@ -100,6 +101,6 @@ bool music_loaded();
 bool music_render(const char* path, int32_t seconds);
 
 // ---- movies (movie.cpp) ----
-// FUN_004BEA50: plays movies\NAME.wve full screen; Enter, Esc, space or a click end it.
+// amovie_play (0x4BEA50): plays movies\NAME.wve full screen; Enter, Esc, space or a click end it.
 // Returns false when the file could not be played.
 bool movie_play(const char* path);

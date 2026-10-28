@@ -708,7 +708,7 @@ void editor_toggle_omniscient() {
 bool editor_key(uint8_t* self, int32_t key, int32_t ch) {
     if (!(GameState & STATE_SCENARIO_EDITOR)) return false;
     int32_t vk = key & 0x7FFFF;
-    // The characters' switch (FUN_006466EF's lower case): 'y' the omniscient view. (F10 stays
+    // The characters' switch (tolower (0x6466EF)'s lower case): 'y' the omniscient view. (F10 stays
     // the hall of fame.)
     if (ch == 'y' || ch == 'Y') {
         set_dirty();
@@ -1042,7 +1042,7 @@ void THISCALL Console_editor_reset_tech(uint8_t* self) {
         if (u >= 64) p[0x30] &= 0xFE;
     }
     // (the loop counter is the console's selected unit, +0x23BDC: left at -1)
-    int32_t& sel = *reinterpret_cast<int32_t*>(self + 0x23BDC);
+    int32_t& sel = console_win(self).veh;
     for (sel = VehCount - 1; sel >= 0; sel--)
         if (Vehs[sel].unit_id > 0x3F) veh_kill(sel);
     for (int32_t b = 0; b < BaseCount; b++) {

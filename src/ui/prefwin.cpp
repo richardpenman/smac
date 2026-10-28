@@ -93,12 +93,12 @@ const Page kPages[6] = {
     {"MAPPREFS", 1077, {0x48, 0x49, 0x4e, 0x4a, 0x4b, 0x4c, 0x4d, 0x4f}},
 };
 
-// The gamma correction dialog (FUN_005C8E60 with FUN_005C9420 / 5C9520 / 5C95E0, PrefWin button
+// The gamma correction dialog (GammaWin_exec (0x5C8E60) with GammaWin_init (0x5C9420) / 5C9520 / 5C95E0, PrefWin button
 // 6): a full-screen window of colour 0xF8, centred: the ramp of the game colours 10..245 (one
 // pixel each, 0xEC x 0x20), below it the value ("%f"), below that the scroll bar (range 1..400,
 // the gamma in hundredths: no sprites, buttons of colour 7, a two-pixel bevel 7 / 0) and OK /
 // CANCEL (BasePop's texts, colour 0xF8, black text). While it is open the window's colours 10..245
-// are the grey ramp corrected by the scroll's gamma (FUN_005C9520: pow(i / 235, 1 / gamma)); OK
+// are the grey ramp corrected by the scroll's gamma (GammaWin_set_palette (0x5C9520): pow(i / 235, 1 / gamma)); OK
 // keeps the gamma (prefs "Gamma Correction", the game palette reloaded with it), CANCEL the old
 // one. Approximated: the scroll bar's thumb is not dragged (its buttons and track are clicked;
 // Left / Right step it).
@@ -118,7 +118,7 @@ struct GammaWin : ScreenWin {
         okr = {x0, by, (w + 3) / 2 - 3 + x0, by + 0x14};
         cancelr = {okr.right + 3, by, x0 + w, by + 0x14};
     }
-    void set_palette() {  // FUN_005C9520
+    void set_palette() {  // GammaWin_set_palette (0x5C9520)
         pal = GamePalette;
         double g = pos * 0.01;
         for (int32_t i = 0; i < 0xEC; i++) {

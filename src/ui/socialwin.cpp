@@ -1,5 +1,6 @@
 // Social engineering window (SocialWin 0x8A6270; ui module 0x4AE9E0..0x4B3C80, unnamed in the
-// decompilation: FUN_004b2740 is SocialWin_exec, FUN_004b26d0 SocialWin_close). Opened by
+// decompilation: FUN_004b2740 is SocialWin_exec, FUN_004b26d0 SocialWin_close; the other methods
+// are named here). Opened by
 // social_select ('e' on the main view, the menu, tech_achieved's new models): the four social
 // categories with a button per available model, ten effect buttons that pick, per category, the
 // model with the largest value of that effect, the effects of the tentative choice, the energy
@@ -7,16 +8,17 @@
 // Reset / Cancel.
 //
 // The game state changes are the original's, in its order of calls (asm-faithful):
-//   * a model click (FUN_004aebf0): the tentative choice's effects (social_calc), and the net
+//   * a model click (SocialWin_select_model (0x4AEBF0)): the tentative choice's effects (social_calc), and the net
 //     income and breakthrough time it would give (energy_compute with the choice written into the
 //     faction's pending effects, which are then recomputed from the pending choice);
-//   * an effect button (FUN_004af110): per category the available model with the largest value
+//   * an effect button (SocialWin_effect_choice (0x4AF110)): per category the available model with the largest value
 //     of the effect (> 0; model 0 when none);
-//   * the allocation buttons (FUN_004b2470, FUN_004b1ff0): +/- 1 on one share, the others
-//     rebalanced to a total of 10 in the original's order skipping locked shares; written to the
-//     faction (SE_alloc_psych / SE_alloc_labs) at once and applied with social_set;
-//   * Reset (FUN_004aece0, also the start): the pending choice and the allocation of the opening;
-//   * OK / Enter (FUN_004aef10): the upheaval cost (social_upheaval minus what was paid this
+//   * the allocation buttons (SocialWin_alloc_clicked (0x4B2470), SocialWin_rebalance (0x4B1FF0)):
+//     +/- 1 on one share, the others rebalanced to a total of 10 in the original's order skipping
+//     locked shares; written to the faction (SE_alloc_psych / SE_alloc_labs) at once and applied
+//     with social_set;
+//   * Reset (SocialWin_reset (0x4AECE0), also the start): the pending choice and the allocation of the opening;
+//   * OK / Enter (SocialWin_accept (0x4AEF10)): the upheaval cost (social_upheaval minus what was paid this
 //     turn): UPHEAVALTOOMUCH when the credits do not cover it, else the UPHEAVAL question; the
 //     cost is paid (net_energy) and the choice becomes the pending choice (synch_alloc,
 //     synch_soc); Cancel / Esc: Reset then OK (nothing to pay).
@@ -89,13 +91,13 @@ struct SocialWinState : ScreenWin {
     void log_state() override;
 
     // The original's methods.
-    void select_model(int32_t cat, int32_t model);  // FUN_004aebf0
-    void reset();  // FUN_004aece0
-    void accept();  // FUN_004aef10
-    void effect_choice(int32_t effect);  // FUN_004af110
-    void group_clicked(int32_t id);  // FUN_004b1ce0
-    void alloc_clicked(int32_t id);  // FUN_004b2470
-    void rebalance(int32_t index, int32_t value);  // FUN_004b1ff0
+    void select_model(int32_t cat, int32_t model);  // SocialWin_select_model (0x4AEBF0)
+    void reset();  // SocialWin_reset (0x4AECE0)
+    void accept();  // SocialWin_accept (0x4AEF10)
+    void effect_choice(int32_t effect);  // SocialWin_effect_choice (0x4AF110)
+    void group_clicked(int32_t id);  // SocialWin_group_clicked (0x4B1CE0)
+    void alloc_clicked(int32_t id);  // SocialWin_alloc_clicked (0x4B2470)
+    void rebalance(int32_t index, int32_t value);  // SocialWin_rebalance (0x4B1FF0)
     void refresh_buttons();  // ButtonGroup_set of the models
 };
 
@@ -287,7 +289,7 @@ void SocialWinState::on_button(int32_t id) {
     if (id >= 0 && id < 0x10) return group_clicked(id);
     if (id > 0x10 && id < 0x1B) return group_clicked(id);
     if (id >= 0x1D && id <= 0x22) return alloc_clicked(id);
-    // FUN_004b1e00
+    // SocialWin_on_iface_button (0x4B1E00)
     switch (id) {
     case kReset: reset(); break;
     case -2:
@@ -301,7 +303,7 @@ void SocialWinState::on_button(int32_t id) {
     }
 }
 
-// FUN_004b1e80: Enter accepts, Esc resets and accepts.
+// SocialWin_on_key (0x4B1E80): Enter accepts, Esc resets and accepts.
 void SocialWinState::on_key(int32_t key) {
     if (key == 0xD) {
         accept();
@@ -362,7 +364,7 @@ void SocialWinState::redraw() {
     Buffer_fill_3(c, &all, 9);
     UiRect frame{0x17, 0, 0x30A, 0x162};
     Buffer_box_sprite(c, &frame, box_def(9));
-    // The categories (FUN_004af310): frame, title bar, the models' effects under their buttons.
+    // The categories (SocialWin_draw_categories (0x4AF310)): frame, title bar, the models' effects under their buttons.
     for (int32_t cat = 0; cat < 4; cat++) {
         UiRect r = cat_rect(cat);
         Buffer_box_sprite(c, &r, box_def(3));
@@ -414,7 +416,7 @@ void SocialWinState::redraw() {
     Buffer* m = &mi;
     UiRect mall{0, 0, m->width, m->height};
     Buffer_set_clip(m, &mall);
-    // Left pane top (FUN_004af8c0): the faction and its leader.
+    // Left pane top (SocialWin_draw_faction (0x4AF8C0)): the faction and its leader.
     const UiRect& q = main_interface().pane_queue;
     UiRect lead{q.left + 4, q.top + 4, q.right - 4, alloc_rect(0).top - 6};
     Buffer_box_sprite(m, &lead, box_def(3));
@@ -426,7 +428,8 @@ void SocialWinState::redraw() {
     sw_text_cent(this, m, std::string(MFactions[faction].title_leader) + " " + MFactions[faction].name_leader, l2);
     UiRect l3{lead.left, l2.bottom, lead.right, l2.bottom + 20};
     sw_text_cent(this, m, std::to_string(fac(faction).energy_credits) + " " + sw_label(0x57C), l3);
-    // Centre pane (FUN_004afb60): net income, breakthroughs, the allocation's inefficiency, upheaval.
+    // Centre pane (SocialWin_draw_income (0x4AFB60)): net income, breakthroughs, the allocation's
+    // inefficiency, upheaval.
     UiRect sp = inset(main_interface().pane_center, 4);
     UiRect st{sp.left, sp.top, sp.right, sp.top + 0x14};
     Buffer_box_sprite(m, &st, box_def(6));
@@ -476,7 +479,7 @@ void SocialWinState::redraw() {
             sw_text(this, m, sw_label(0x574) + ": " + std::to_string(cost) + " " + sw_label(0x57C), x, y);
         }
     }
-    // Right pane (FUN_004b0410): SOCIAL EFFECTS, the value and SOCIO's text for it.
+    // Right pane (SocialWin_draw_effects (0x4B0410)): SOCIAL EFFECTS, the value and SOCIO's text for it.
     UiRect ep = inset(main_interface().pane_right, 4);
     UiRect et{ep.left + 3, ep.top + 3, ep.right - 3, ep.top + 0x17};
     Buffer_box_sprite(m, &ep, box_def(3));
@@ -512,7 +515,8 @@ void SocialWinState::redraw() {
         y += font_small->height;
     }
     Buffer_set_clip(m, &mall);
-    // The allocation (FUN_004b08a0 / 004b0d50 / 004b0b00): name and share, the bar.
+    // The allocation (SocialWin_draw_alloc (0x4B08A0) / SocialWin_draw_alloc_2 (0x4B0D50) /
+    // SocialWin_draw_alloc_3 (0x4B0B00)): name and share, the bar.
     static const uint32_t names[3] = {0x5B8, 0x4F8, 0xF0};
     Faction& f = fac(faction);
     int32_t shares[3] = {10 - f.SE_alloc_psych - f.SE_alloc_labs, f.SE_alloc_psych, f.SE_alloc_labs};
@@ -577,7 +581,7 @@ void load_art(SocialWinState* s) {
 void THISCALL SocialWin_exec(uint8_t* self, int32_t faction_id) {
     SocialWinState* s = &g_sw;
     s->name = "social";
-    s->slide = true;  // FUN_004B2120: slide_show / slide_hide
+    s->slide = true;  // SocialWin_on_status (0x4B2120): slide_show / slide_hide
     bool tour = faction_id < 0;
     if (tour) faction_id = -faction_id;
     *reinterpret_cast<int32_t*>(self + 0xCF4) = faction_id;
@@ -650,7 +654,8 @@ void THISCALL SocialWin_exec(uint8_t* self, int32_t faction_id) {
 
 bool socialwin_open() { return g_sw.open; }
 
-// FUN_004B26B0 / FUN_004B26D0 after the tour's display: the window hidden, its buttons closed.
+// SocialWin_hide (0x4B26B0) / SocialWin_close (0x4B26D0) after the tour's display: the window
+// hidden, its buttons closed.
 void socialwin_tour_close() {
     g_sw.open = false;
     sw_hide(&g_sw);
@@ -687,7 +692,7 @@ void socialwin_point(int32_t which, int32_t* x, int32_t* y) {
     }
 }
 
-// SocialWin_close (FUN_004b26d0): the buttons and groups closed, the hover state cleared.
+// SocialWin_close (0x4B26D0): the buttons and groups closed, the hover state cleared.
 void THISCALL SocialWin_close(uint8_t*) {
     sw_clear_buttons(&g_sw);
     // (The buttons are deleted here: no pointer to them may outlive the window, or the next

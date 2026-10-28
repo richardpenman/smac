@@ -717,10 +717,11 @@ bool has_hq(int32_t base_id) {
     return (Bases[base_id].facilities_built[off] & (uint8_t)mask) != 0;
 }
 // PROPOSEBASE / COUNTERBASE: the bases (without headquarters) to swap; -1 when none was chosen.
-// PlanWin previews them (FUN_0048BC60, its background FUN_0048B3F0): zoomed on the first base,
-// its single-point "route" (FUN_0048AE90(b, b, 0)); the list's selection callback is the
-// original's battle_routine (its routes from attack_from for DiploBattlePlayer / Rival, as left
-// by the last battle plans: proposal_menu sets it, FUN_0054DC90 the base preview is not used).
+// PlanWin previews them (PlanWin_show (0x48BC60), its background PlanWin_draw_background
+// (0x48B3F0)): zoomed on the first base, its single-point "route" (PlanWin_add_base_line
+// (0x48AE90)(b, b, 0)); the list's selection callback is the original's battle_routine (its routes
+// from attack_from for DiploBattlePlayer / Rival, as left by the last battle plans: proposal_menu
+// sets it, base_preview (0x54DC90) the base preview is not used).
 int32_t base_menu(const char* label, int32_t owner, int32_t viewer, int32_t fw) {
     planwin_open();
     planwin_redraw_back();
@@ -1099,8 +1100,8 @@ void GAMEAPI battle_plans(int32_t f, int32_t fw) {
         pop("NOBATTLEPLANS", fw);
         return;
     }
-    // PlanWin (FUN_0048BC60) between the two targets and their attacking bases: each side's route
-    // in its colour; it stays shown until battle_plans returns (FUN_0048BC50).
+    // PlanWin (PlanWin_show (0x48BC60)) between the two targets and their attacking bases: each side's route
+    // in its colour; it stays shown until battle_plans returns (PlanWin_hide (0x48BC50)).
     struct PlanGuard {
         ~PlanGuard() { planwin_close(); }
     } plan_guard;

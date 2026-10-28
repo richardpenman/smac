@@ -1,35 +1,36 @@
-// diplo (0x444D90 -> FUN_00443F10): the diplomacy between two human players, the DiploWin (ui
+// diplo (0x444D90 -> DiploWin_init (0x443F10)): the diplomacy between two human players, the DiploWin (ui
 // module 0x440F80..0x445080; interface mode 11). commlink_attempt calls it in a hotseat / PBEM
 // game when the faction called is human, and control_turn's handover when another human left
 // offers for the new player (DiploStateB bit 1).
 //
-// From the asm: the two sides' offers (at most 8 each: type and value; 0 a technology, a
-// commlink frequency (0x59 + faction) or the maps (9999), 1 energy credits, 2 a pact, 3 a treaty,
-// 4 a truce, 5 a vendetta against a faction), each side's state (0 nothing, 1 agreed, 2 rejected,
-// 3 done) and the buttons (FUN_004415C0: 2 AGREE, 3 REJECT, 4 CLOSE, 5 a technology (DIPLOTECH:
-// ours not offered yet, "*" those the other already has, the commlinks of the factions we have a
-// commlink with and they not, the maps), 6 energy (DIPLOENERGY, at most our credits), 7 every
-// technology they lack, 8 a vendetta (DIPLOVENDETTA: the factions either side knows and the
+// From the asm: the two sides' offers (at most 8 each: type and value; 0 a technology, a commlink
+// frequency (0x59 + faction) or the maps (9999), 1 energy credits, 2 a pact, 3 a treaty, 4 a truce,
+// 5 a vendetta against a faction), each side's state (0 nothing, 1 agreed, 2 rejected, 3 done) and
+// the buttons (DiploWin_on_button_clicked (0x4415C0): 2 AGREE, 3 REJECT, 4 CLOSE, 5 a technology
+// (DIPLOTECH: ours not offered yet, "*" those the other already has, the commlinks of the factions
+// we have a commlink with and they not, the maps), 6 energy (DIPLOENERGY, at most our credits), 7
+// every technology they lack, 8 a vendetta (DIPLOVENDETTA: the factions either side knows and the
 // humans; DIPLONOVENDETTA when none), 9 truce, 10 treaty, 11 pact, 12 end the pact (DONTHAVEPACT /
 // REALLYENDPACT: net_pact_ends)); an offer added or removed clears both sides' states
-// (FUN_00441490 / FUN_004413F0; a click on one of our offers removes it: FUN_00442510); both
-// sides agreed: the deal is done (FUN_00442740: net_tech, net_energy (at most the giver's
-// credits), net_treaty_on, and for a vendetta net_treaty_on(vendetta) + net_double_cross); the
-// chat (FUN_00442590: Enter sends the edit line "LEADER: text", an empty line or Esc closes).
-// In a hotseat / PBEM game the state is kept per pair of factions (DiploStateC[me][them] and
-// the mirror [them][me] with the sides swapped), the other player is called at their turn when
-// we changed something and have offers or a state (DiploStateB[them][me] bit 1), and the chat's
-// last three lines are kept in DiploMessageLists (FUN_00441040: appended at the end, as the
-// original, also the lines shown again; FUN_00441100: the last three shown at the opening).
-// The layout: the window (0x340 wide over the main interface, the rectangles of FUN_00443F10),
-// the relations line, the two leaders' boxes with their portraits, states and offers, TRADE and
-// DIPLOMACY with their buttons, AGREE / REJECT / CLOSE; the chat in the main interface's lower
-// centre pane (StringBox, EditBox).
-// Approximated: the boxes' art (interface.pcx box sprites as the original's), the StringBox and
-// EditBox (a list of the last lines and a text line), the panes' FUN_00443E50 background.
-// In a network game each side's changes travel as messages (message_data 0x1506..0x150F,
-// message_chat 0x1E00) and the other player's arrive through ui_diplo_net / ui_diplo_chat
-// (NetDaemon_process_message) while the window waits (its pop_expire callback).
+// (DiploWin_add_offer (0x441490) / DiploWin_remove_offer (0x4413F0); a click on one of our offers
+// removes it: DiploWin_offer_clicked (0x442510)); both sides agreed: the deal is done
+// (DiploWin_deal (0x442740): net_tech, net_energy (at most the giver's credits), net_treaty_on, and
+// for a vendetta net_treaty_on(vendetta) + net_double_cross); the chat (DiploWin_chat_key
+// (0x442590): Enter sends the edit line "LEADER: text", an empty line or Esc closes). In a hotseat
+// / PBEM game the state is kept per pair of factions (DiploStateC[me][them] and the mirror
+// [them][me] with the sides swapped), the other player is called at their turn when we changed
+// something and have offers or a state (DiploStateB[them][me] bit 1), and the chat's last three
+// lines are kept in DiploMessageLists (DiploWin_save_chat (0x441040): appended at the end, as the
+// original, also the lines shown again; DiploWin_load_chat (0x441100): the last three shown at the
+// opening). The layout: the window (0x340 wide over the main interface, the rectangles of
+// DiploWin_init (0x443F10)), the relations line, the two leaders' boxes with their portraits,
+// states and offers, TRADE and DIPLOMACY with their buttons, AGREE / REJECT / CLOSE; the chat in
+// the main interface's lower centre pane (StringBox, EditBox). Approximated: the boxes' art
+// (interface.pcx box sprites as the original's), the StringBox and EditBox (a list of the last
+// lines and a text line), the panes' DiploWin_draw_pane_back (0x443E50) background. In a network
+// game each side's changes travel as messages (message_data 0x1506..0x150F, message_chat 0x1E00)
+// and the other player's arrive through ui_diplo_net / ui_diplo_chat (NetDaemon_process_message)
+// while the window waits (its pop_expire callback).
 #include <algorithm>
 #include <cstdarg>
 #include <cstdio>
@@ -106,7 +107,7 @@ void log_offer(const char* what, int32_t side, int32_t t, int32_t v) {
     dnote("diplo %s: side %d type %d value %d", what, side, t, v);
 }
 
-// FUN_004413F0: offer `idx` of `side` removed.
+// DiploWin_remove_offer (0x4413F0): offer `idx` of `side` removed.
 void remove_offer(int32_t side, int32_t idx) {
     if (side == 0) message_data(0x1507, g_dw.them, idx, 0, 0, 0);
     if (idx >= g_dw.count[side]) return;
@@ -121,7 +122,7 @@ void remove_offer(int32_t side, int32_t idx) {
     refresh();
 }
 
-// FUN_00441490: an offer added to `side`: a treaty replaces the side's treaty, energy replaces
+// DiploWin_add_offer (0x441490): an offer added to `side`: a treaty replaces the side's treaty, energy replaces
 // the energy (energy 0 or less removes it), a technology or a vendetta already offered changes
 // nothing; at most 8.
 void add_offer(int32_t side, int32_t t, int32_t v) {
@@ -157,7 +158,7 @@ set:
     refresh();
 }
 
-// FUN_00442740: both sides agreed, the deal is done.
+// DiploWin_deal (0x442740): both sides agreed, the deal is done.
 void execute() {
     if (!((g_dw.me <= g_dw.them || PbemActive) && NetCommlinkActive < 2)) return;
     NetCommlinkActive = 2;
@@ -241,7 +242,7 @@ void random_offers() {  // (single player only: the window's test offers, from g
     }
 }
 
-// FUN_004415C0: the window's commands.
+// DiploWin_on_button_clicked (0x4415C0): the window's commands.
 void command(int32_t id) {
     switch (id) {
     case 0:
@@ -403,7 +404,7 @@ std::string offer_text(int32_t side, int32_t i, bool* has) {
 }
 
 void DiploWin::layout() {
-    // FUN_00443F10's rectangles (window coordinates).
+    // DiploWin_init (0x443F10)'s rectangles (window coordinates).
     r_frame = {0x17, 0, 0x340 - 0x17 - 0x20, h};
     const int32_t L = r_frame.left, R = r_frame.right;
     r_status = {L + 7, 7, R - 7, 7 + 0x14};
@@ -439,7 +440,7 @@ void DiploWin::redraw() {
     Buffer_box_sprite(c, &r_frame, box_def(9));
     spot_kill_type(&spots[0], 0);
     spot_kill_type(&spots[0], 1);
-    // FUN_004436C0: the groups, TRADE, DIPLOMACY, the relations line.
+    // DiploWin_draw_groups (0x4436C0): the groups, TRADE, DIPLOMACY, the relations line.
     for (int32_t k = 0; k < 2; k++) {
         Buffer_box_sprite(c, &r_group[k], box_def(3));
         Buffer_box_sprite(c, &r_title[k], box_def(6));
@@ -466,7 +467,7 @@ void DiploWin::redraw() {
         UiRect t{r_status.left + 3, r_status.top + 3, r_status.right - 3, r_status.bottom - 3};
         Buffer_write_cent_l_7(c, s.c_str(), &t, (int32_t)s.size());
     }
-    // FUN_00442A10 / FUN_00442DC0: each leader's name, portrait and state.
+    // DiploWin_draw_leader (0x442A10) / DiploWin_draw_leader_2 (0x442DC0): each leader's name, portrait and state.
     static const uint32_t kState[4] = {0x73C, 0x740, 0x744, 0x780};
     for (int32_t side = 0; side < 2; side++) {
         int32_t f = faction_of(side);
@@ -490,7 +491,7 @@ void DiploWin::redraw() {
         UiRect sr{px + 4, o.top + 1 + p->full_height - 0x18, px + p->full_width - 4, o.top + 1 + p->full_height - 4};
         texts.push_back(st);
         Buffer_write_cent_l_7(c, st.c_str(), &sr, (int32_t)st.size());
-        // FUN_00443170: the offers, centred beside the portrait (a spot each: index, side).
+        // DiploWin_draw_offers (0x443170): the offers, centred beside the portrait (a spot each: index, side).
         int32_t lx = side == 0 ? o.left + 1 + p->full_width + 3 : o.left + 3;
         int32_t rx = side == 0 ? o.right - 3 : px - 3;
         int32_t lh = f14->height ? f14->height : 16;
@@ -540,7 +541,8 @@ void DiploWin::redraw() {
 
 void DiploWin::on_button(int32_t id) { command(id); }
 
-// FUN_00442590 / FUN_00442560: Esc closes; Enter sends the line (empty: closes); other keys edit.
+// DiploWin_chat_key (0x442590) / DiploWin_chat_key_2 (0x442560): Esc closes; Enter sends the line
+// (empty: closes); other keys edit.
 void DiploWin::on_key(int32_t key) {
     int32_t vk = key & 0xFFFF;
     if (vk == 0x1B) {
@@ -576,7 +578,7 @@ void DiploWin::on_key(int32_t key) {
     if (ch && edit.size() < 100) edit += ch;  // (EditBox +0x2B68: 100 characters)
 }
 
-// FUN_00442510: a click on one of our offers removes it.
+// DiploWin_offer_clicked (0x442510): a click on one of our offers removes it.
 void DiploWin::on_click(int32_t parent, int32_t index, int32_t type, int32_t, int32_t, bool right, bool) {
     if (parent != 0 || right || index < 0 || type != 0) return;
     remove_offer(0, index);
@@ -593,7 +595,7 @@ void DiploWin::log_state() {
     std::fprintf(stderr, " chat %d\n", (int32_t)chat.size());
 }
 
-// FUN_004412F0: a chat line from the other player ("LEADER:  text").
+// DiploWin_chat_received (0x4412F0): a chat line from the other player ("LEADER:  text").
 void add_chat(const char* text, int32_t f) {
     std::string line = MFactions[f].name_leader;
     win32::CharUpperA(&line[0]);
@@ -629,7 +631,7 @@ int32_t ui_diplo_net(int32_t op, int32_t a, int32_t b) {
     case 0x1506: add_offer(1, a, b); break;
     case 0x1507: remove_offer(1, a); break;
     case 0x1508: g_dw.count[1] = 0; break;
-    case 0x1509:  // FUN_004426F0
+    case 0x1509:  // DiploWin_net_agree (0x4426F0)
         g_dw.state[1] = a;
         dnote("diplo: faction %d state %d", g_dw.them, a);
         if (g_dw.state[0] == 1 && g_dw.state[1] == 1) {
@@ -642,7 +644,7 @@ int32_t ui_diplo_net(int32_t op, int32_t a, int32_t b) {
         g_dw.state[1] = a;
         g_dw.state[0] = b;
         break;
-    case 0x150D:  // FUN_004429C0
+    case 0x150D:  // DiploWin_net_reject (0x4429C0)
         g_dw.state[1] = 3;
         g_dw.state[0] = 3;
         g_dw.count[1] = 0;
@@ -688,7 +690,7 @@ void GAMEAPI diplo(int32_t f, int32_t fw) {
         s->count[0] = s->count[1] = 0;
         s->state[0] = s->state[1] = 0;
     } else {
-        // FUN_00441100: the pair's last three chat lines; the pair's offers and states.
+        // DiploWin_load_chat (0x441100): the pair's last three chat lines; the pair's offers and states.
         uint8_t* list = pair_list(f, fw);
         int32_t n = ui_stringlist_count(list);
         for (int32_t i = n - 3; i < n; i++) {
@@ -715,7 +717,7 @@ void GAMEAPI diplo(int32_t f, int32_t fw) {
     iface_set_mode(11);  // SubInterface_set_iface_mode (mode 0xB)
     sw_run(s);
     if (PbemActive) {
-        // FUN_00441040: the box's last three lines appended to the pair's list.
+        // DiploWin_save_chat (0x441040): the box's last three lines appended to the pair's list.
         int32_t n = (int32_t)s->chat.size();
         for (int32_t i = n - 3; i < n; i++) {
             if (i < 0) continue;

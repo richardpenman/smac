@@ -91,7 +91,9 @@ src/app/smacx.cpp the native game executable
   text layout) so screenshots match; per-function fidelity as in docs/RECONSTRUCTION.md, with
   bit-exact drawing as the goal for every function marked done.
 * **Objects in the memory image**: window objects that the engine sees (MainConsole, BaseWin, ...)
-  stay at their original addresses; their integer fields are used in place (`mw(win, offset)`).
+  stay at their original addresses; their integer fields are used in place through typed views of
+  the original layout (`map_win(win).zoom`, `console_win(self).veh`, `base_win().base`; docs/CLEANUP_PLAN.md
+  note 21).
   Pointer-holding parts (canvas, caches, fonts' handles are ints) live in native side structures.
 * **Bridge switch (UI areas)**: the engine calls the UI through the bridge (`ADDR_NATIVE`
   declarations). Hybrid builds bind them to the original (gen_bindings.py forwarders). Native builds

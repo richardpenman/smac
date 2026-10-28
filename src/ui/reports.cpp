@@ -278,7 +278,7 @@ std::string governor_text(int32_t base_id) {
     return sw_label(0xBFC);
 }
 
-// FUN_00493B70: the mandate whose colour a facility is drawn in.
+// ProdWin_facility_mandate (0x493B70): the mandate whose colour a facility is drawn in.
 int32_t report_facility_mandate(int32_t fac) {
     switch (fac) {
     case 3:
@@ -413,7 +413,7 @@ void ReportScreen::draw_ops() {
                           : (plan == 3 || plan == 7 || plan == 8) ? 0
                           : (plan == 9 || plan == 10)             ? 2
                           : plan == 11                            ? 1
-                                                                  : 3;  // FUN_00493AF0
+                                                                  : 3;  // ProdWin_unit_mandate (0x493AF0)
                 int32_t v = veh_fake(item, (uint8_t)b.faction_id);
                 Buffer_set_clip(c, &row);
                 veh_draw(c, v, col, row.top + 4, -8, 0x4C, 0);

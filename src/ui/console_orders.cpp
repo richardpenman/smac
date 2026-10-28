@@ -1321,7 +1321,7 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
             return;
         }
         BasePop_set_active(pop.p, active);
-        // PlanWin (FUN_0048BC60) in the world map pane, from the route's start (DAT_00915680 /
+        // PlanWin (PlanWin_show (0x48BC60)) in the world map pane, from the route's start (DAT_00915680 /
         // DAT_00915650); the list's selection callback (Popup +0x3280) redraws it.
         GotoFromX = x;
         GotoFromY = y;
@@ -1329,7 +1329,7 @@ void THISCALL Console_go_to(uint8_t* self, int32_t id, int32_t mode, int32_t gro
         BasePop_set_select_callback(pop.p, Console_goto_routine);
         Console_goto_routine(BasePop_selected_id(pop.p));  // Dialog_get_selected_id
         int32_t chosen = BasePop_exec_3(pop.p, 0, 0);
-        planwin_close();  // FUN_0048BC50
+        planwin_close();  // PlanWin_hide (0x48BC50)
         if (chosen < 0) {
             finish();
             return;

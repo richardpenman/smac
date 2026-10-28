@@ -11,7 +11,7 @@
 // name's edit field and OK / CANCEL. Keys: typing edits the name, Up / Down / Home / End / PgUp /
 // PgDn move in the list (the selected entry's name goes to the edit field), Enter is OK, Esc is
 // CANCEL; a click selects, a double click is OK.
-// OK (FUN_006146A0): ".." goes up; a directory is entered; a file name (the dialog's extension
+// OK (FileBox_on_ok (0x6146A0)): ".." goes up; a directory is entered; a file name (the dialog's extension
 // added when it has none) is the answer when loading it exists (else FILEWIN_LOAD), when saving it
 // is new (else FILEWIN_SAVEEXISTS asks) and has no illegal character (FILEWIN_ILLEGALCHAR).
 // The original changes the process's current directory while browsing and answers an absolute
@@ -91,7 +91,7 @@ struct FileBoxWin : ScreenWin {
 
     int32_t rows() const { return std::max(1, (list_r.bottom - list_r.top) / row_h); }
 
-    // FUN_00614360: the directory's entries.
+    // FileBox_list_dir (0x614360): the directory's entries.
     void fill(const std::string& dir) {
         std::error_code ec;
         std::string h = host(dir);
@@ -152,7 +152,7 @@ struct FileBoxWin : ScreenWin {
             sw_button(this, t.c_str(), r == &ok ? -1 : -2, r->left, r->top, r->right - r->left, r->bottom - r->top, 0,
                       &btn_font);
         }
-        // jackal.pcx: the up, folder and file icons (FUN_00613BA0).
+        // jackal.pcx: the up, folder and file icons (FileBox_load_icons (0x613BA0)).
         Buffer j;
         Buffer_ctor(&j);
         if (!Buffer_load_pcx(&j, "jackal.pcx", nullptr, 10, 0xEC)) {
@@ -178,7 +178,7 @@ struct FileBoxWin : ScreenWin {
         }
         UiRect in{r.left + 3, r.top + 3, r.right - 3, r.bottom - 3};
         Buffer_box_sprite(&canvas, &in, box_def(0));
-        // The title (FUN_00407920 / FUN_00407A80).
+        // The title (Win_draw_title (0x407920) / Win_draw_title_2 (0x407A80)).
         title_r = UiRect{r.left + 6, r.top + 6, r.right - 6, r.top + 0x1A};
         Buffer_box_sprite(&canvas, &title_r, box_def(6));
         sw_font(&canvas, title_font, 0xA0);
@@ -194,7 +194,7 @@ struct FileBoxWin : ScreenWin {
                 Buffer_box_sprite(&canvas, &band, box_def(29));
             }
             int32_t t = entries[i].type;
-            Sprite* ic = &icons[t == 2 ? 2 : (t == 0 ? 1 : 0)];  // FUN_00614C50
+            Sprite* ic = &icons[t == 2 ? 2 : (t == 0 ? 1 : 0)];  // FileBox_icon_of (0x614C50)
             if (ic->width) sprite_copy1(ic, &canvas, ic->key, list_r.left + 9, y, 1, 1);
             sw_font(&canvas, list_font, s ? mem_i32(0x8C6C8C) : mem_i32(0x8C6B5C));
             sw_text(this, &canvas, entries[i].name, list_r.left + 0x1D, y + 1);
@@ -229,7 +229,7 @@ struct FileBoxWin : ScreenWin {
         fresh = true;
     }
 
-    // FUN_006146A0: OK.
+    // FileBox_on_ok (0x6146A0): OK.
     void ok() {
         std::string name = edit;
         while (!name.empty() && name.back() == ' ') name.pop_back();
@@ -349,7 +349,7 @@ struct FileBoxWin : ScreenWin {
     }
 };
 
-// FileBox_save / FileBox_load (FUN_00613D50 / FUN_00613F60): the list of the path's directory, the
+// FileBox_save (0x613D50) / FileBox_load (0x613F60): the list of the path's directory, the
 // path's file selected (load) or its name in the edit field (save), the modal loop.
 char* run(int32_t kind) {
     FileBoxWin w;

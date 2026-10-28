@@ -19,7 +19,7 @@
 // hall_of_fame(add): reads hallfame.jhh (7 factions x 5 entries of 0x8C bytes, 0x9A3840),
 // shows the viewer's faction's top five, and writes the table back. smacx reads and writes the
 // file in --outdir (the original: the game directory), so tests never change the game data.
-// The finished game's entry (add != 0, end of game: FUN_0044A660) is added (fame_add) with its world
+// The finished game's entry (add != 0, end of game: FameWin_add_entry (0x44A660)) is added (fame_add) with its world
 // map picture hof_<faction>_<slot>.pcx (also in --outdir).
 #include <algorithm>
 #include <cstdio>
@@ -526,7 +526,7 @@ void load_portraits(int32_t viewer) {
 
 struct FameWinState : ScreenWin {
     int32_t faction = 1;
-    int32_t entry = -1;  // +0xA918: the entry analysed (FUN_00448400: -1; the new one after fame_add)
+    int32_t entry = -1;  // +0xA918: the entry analysed (FameWin_init (0x448400): -1; the new one after fame_add)
     Font *f_text = nullptr, *f_bold = nullptr;
     void redraw() override;
     void on_button(int32_t id) override;
@@ -542,13 +542,13 @@ FameWinState g_fw;
 
 uint8_t* fame_entry(int32_t f, int32_t slot) { return &HallOfFame[((f - 1) * 5 + slot) * 0x8C]; }
 
-// FUN_00448400's layout: the 800 x 600 panel at (0x77, 0x50) of the 1024 x 768 window and its
+// FameWin_init (0x448400)'s layout: the 800 x 600 panel at (0x77, 0x50) of the 1024 x 768 window and its
 // rectangles (+0xB42C ..), relative to the panel.
 constexpr int32_t kFx = 0x77, kFy = 0x50;
 UiRect fr(int32_t l, int32_t t, int32_t r, int32_t b) { return {l + kFx, t + kFy, r + kFx, b + kFy}; }
 
 void FameWinState::redraw() {
-    // FUN_00448D90: frame.pcx over the window, hof.pcx (the panel) at its origin; the six score
+    // FameWin_draw (0x448D90): frame.pcx over the window, hof.pcx (the panel) at its origin; the six score
     // categories (hoficons.pcx buttons 0x8AE..: their pressed picture for the analysed entry's
     // "best of" marks), the factions' emblems (buttons 1..7 of ButtonGroup 0x15: the faction's
     // PCX at 0x2BD, 0x48 / pressed 0x2BD, 1), the analysed entry's world map picture, its
@@ -735,7 +735,7 @@ void strncpy_pad(char* d, const char* s, size_t n) {  // _strncpy: zeros after t
     for (; i < n; i++) d[i] = 0;
 }
 
-// FUN_0044AC10: entry `slot` (< 4) of faction f moves down one place, its world map picture too.
+// FameWin_move_entry_down (0x44AC10): entry `slot` (< 4) of faction f moves down one place, its world map picture too.
 void fame_move_down(int32_t f, int32_t slot) {
     if (slot >= 4) return;
     Buffer pic;
@@ -753,7 +753,7 @@ void fame_move_down(int32_t f, int32_t slot) {
     std::memcpy(dst + 0x6C, src + 0x6C, 0x20);
 }
 
-// FUN_0044A660 (hall_of_fame(1), the end of the game): the viewer's entry where its rating ranks
+// FameWin_add_entry (0x44A660) (hall_of_fame(1), the end of the game): the viewer's entry where its rating ranks
 // among the faction's five (not in a scenario: GameState 0x20), the lower ones moved down; its
 // fields (year, the score and rating of compute_score / get_rating, the faction's totals, its
 // leader's title, name and faction noun, the difficulty, how the game was won), the "best of"

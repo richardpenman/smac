@@ -63,17 +63,32 @@ extern uint32_t TileVariantBase;
 // The tile cache entry of (x, y) (12 bytes; nullptr without cache).
 uint8_t* ui_mapwin_cache_entry(uint8_t* win, int32_t x, int32_t y);
 
-// Native parts of a map window.
-struct MapWinNative {
-    uint8_t* win = nullptr;  // object in the memory image
+// Native parts of a map window: what the original keeps behind pointers (its canvas, the tile
+// cache). One per window object, made by ui_mapwin_attach (the part of MapWin_ctor 0x4626E0 and
+// GraphicWin_init that native builds run) and found by ui_mapwin_native.
+class MapWinNative {
+public:
+    MapWinNative() = default;
+    // Binds the window object `win` (GraphicWin at +vbase) to `canvas`: the GraphicWin's size and
+    // client rectangle from the canvas, MapWin_ctor's caches and label fonts, the tile cache cleared.
+    void attach(uint8_t* win, uint32_t vbase, Buffer* canvas);
+    // MapWin_clear_terrain for the native cache (all entries unknown, 0xFF).
+    void clear_cache();
+    // The tile cache entry of (x, y) (12 bytes; nullptr without cache).
+    uint8_t* cache_entry(int32_t x, int32_t y);
+    // The object's fields: its MapWin and its GraphicWin (at the virtual base).
+    MapWin& fields() const { return map_win(win); }
+    GraphicWin& graphic() const { return graphic_win(win + vbase); }
+
+    uint8_t* win = nullptr;  // the window object (memory image, or a native buffer of its layout)
     uint32_t vbase = kMapWinVBase;  // virtual base offset of its GraphicWin
     Buffer* canvas = nullptr;  // GraphicWin canvas (+vbase+0x444)
     std::vector<uint8_t> tile_cache;  // +4: 12 bytes per tile, see pfncMapGetCornerYOffset
 };
-// Registers the native parts of a window; the GraphicWin size fields are set from the canvas.
+// Registers the native parts of a window (MapWinNative::attach) / finds them (nullptr: none).
 MapWinNative* ui_mapwin_attach(uint8_t* win, uint32_t vbase, Buffer* canvas);
 MapWinNative* ui_mapwin_native(uint8_t* win);
-// MapWin_clear_terrain for the native cache (all entries unknown, 0xFF).
+// MapWinNative::clear_cache of the window, if it has native parts.
 void ui_mapwin_clear_cache(uint8_t* win);
 // Map canvas dumps (the oracle's `mapdump`, harness/README.md): "SMXMAP1\0", int32 width,
 // height, viewer, zoom, centre x, centre y, turn, 0; 256 x RGB palette; width * height pixels.
@@ -128,7 +143,7 @@ ADDR_NATIVE(0x469CA0) void THISCALL pfncDrawMap(uint8_t* win, int32_t faction_id
 ADDR_NATIVE(0x55AF20)
 void GAMEAPI base_draw(Buffer* dest, int32_t base_id, int32_t px, int32_t py, int32_t zoom, int32_t flags);
 // veh_draw and the unit art are in ui/vehdraw.h.
-// The map label font cache (FUN_005592D0): Arial of the zoom unit * num / den pixels (10 -> 11),
+// The map label font cache (label_font (0x5592D0)): Arial of the zoom unit * num / den pixels (10 -> 11),
 // three fonts kept, least recently used replaced.
 Font* ui_label_font(int32_t zoom, int32_t num, int32_t den, int32_t style);
 
@@ -162,7 +177,8 @@ ADDR_NATIVE(0x4688E0) void THISCALL MapWin_gen_overlays(uint8_t* win, int32_t x,
 ADDR_NATIVE(0x469720) void THISCALL MapWin_draw_legend(uint8_t* win);
 // Options 0x100000: the factions' names and the table of their diplomatic states.
 ADDR_NATIVE(0x4698D0) void THISCALL MapWin_draw_wars(uint8_t* win);
-// FUN_004216F0 (basewin.cpp): (x, y) is in the view at least `margin` tiles from its edges.
+// MapWin_tile_in_view (0x4216F0; basewin.cpp): (x, y) is in the view at least `margin` tiles from
+// its edges.
 bool mapwin_tile_in_view(uint8_t* win, int32_t x, int32_t y, int32_t margin);
 // Centres the view on (x, y) and redraws it.
 void THISCALL pfncMoveMap(uint8_t* win, int32_t x, int32_t y, int32_t redraw);  // 0x46B1F0

@@ -2,19 +2,19 @@
 // operations of engine/council.h (ui_councilwin_*); the session logic (votes, tally, keys) is the
 // engine's (council.cpp: CouncilWin_session / CouncilWin_vote / CouncilWin_tally / CouncilWin_key).
 //
-// As the original (FUN_00427230's window parts, FUN_00424870 the button handler): the window is
-// 0x32C wide, as tall as the space above the main interface allows (at most 0x18B), centred at
-// x = (width - 0x30C) / 2; the title, seven faction columns (the rectangles of the original's
-// layout: portrait, leader, council votes, the vote cast) and the result line; the buttons are in
-// the main interface's info pane: YEA (id 1, vote -1), NAY or VETO for the governor (id 2, -2) and
-// ABSTAIN (id 3, -3) for proposals, VOTE (id 4: the GOVVOTE menu of candidates, "abstain" -3) for
-// elections, OK (id 5: Enter) once decided. Enter / Esc go to CouncilWin_key (before the human
-// votes it fills in the computer players' votes; after the result it closes the window and a
-// passed proposal is applied). A viewer that is not human (observer mode) does what the
-// unattended window does (src/headless/ui_headless_council.cpp): no window is shown.
-// Approximated: the panels' art (the portraits are the faction art's sprite 26; the original's
-// panel frames and fonts are box sprites and find_font), the vote animations, the multiplayer
-// timer and messages.
+// As the original (CouncilWin_session (0x427230)'s window parts, CouncilWin_on_button_clicked
+// (0x424870) the button handler): the window is 0x32C wide, as tall as the space above the main
+// interface allows (at most 0x18B), centred at x = (width - 0x30C) / 2; the title, seven faction
+// columns (the rectangles of the original's layout: portrait, leader, council votes, the vote cast)
+// and the result line; the buttons are in the main interface's info pane: YEA (id 1, vote -1), NAY
+// or VETO for the governor (id 2, -2) and ABSTAIN (id 3, -3) for proposals, VOTE (id 4: the GOVVOTE
+// menu of candidates, "abstain" -3) for elections, OK (id 5: Enter) once decided. Enter / Esc go to
+// CouncilWin_key (before the human votes it fills in the computer players' votes; after the result
+// it closes the window and a passed proposal is applied). A viewer that is not human (observer
+// mode) does what the unattended window does (src/headless/ui_headless_council.cpp): no window is
+// shown. Approximated: the panels' art (the portraits are the faction art's sprite 26; the
+// original's panel frames and fonts are box sprites and find_font), the vote animations, the
+// multiplayer timer and messages.
 #include <cstdio>
 #include <string>
 
@@ -166,7 +166,7 @@ void CouncilWindow::buttons() {
         sw_button(this, sw_upper(sw_label(labels[b] * 4)).c_str(), b + 1, x0 + b * (w + 3), y0, w, y1 - y0, 1, f_bold);
 }
 
-// FUN_00424870 (the window's button handler).
+// CouncilWin_on_button_clicked (0x424870) (the window's button handler).
 void CouncilWindow::on_button(int32_t id) {
     CouncilSession& s = session(win);
     if (id >= 1 && id <= 3) {
@@ -230,7 +230,7 @@ void ui_councilwin_build(uint8_t* win) {
     int32_t avail = ScreenHeight - MiConsoleHeight;
     int32_t h = avail > 0x18B ? 0x18B : avail;
     sw_init(s, (ScreenWidth - 0x30C) / 2, avail - h, kW, h, true);
-    s->slide = true;  // FUN_00426FA0 (the window's on_status): slide_show / slide_hide
+    s->slide = true;  // CouncilWin_on_status (0x426FA0) (the window's on_status): slide_show / slide_hide
     s->f_title = find_font(14, 1);
     s->f_text = find_font(12, 0);
     s->f_bold = find_font(12, 1);

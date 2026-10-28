@@ -1,12 +1,12 @@
 // Movies (ui module): amovie_project (0x403BA0: the secret project's movie by its line in
 // movlist.txt's #PROJECTS) and amovie_project_name (0x403BE0: movies\NAME.wve, else the CD's, else
-// movies\NAME.avi; the opening, faction, defeat and victory movies), played by FUN_004BEA50 (the
-// EA movie player of the video module, 640 x 480: Enter, Esc, space or a click end it). The WVE
-// files are decoded by wve.cpp; the frames (15 per second, timed by the clock from the start of the
-// sound) fill the window keeping their aspect, the other sounds are switched off meanwhile (as the
-// player's FUN_004C51D0 / FUN_004C4FC0). Unattended runs (--hidden, scripted keys) do not wait: they
-// decode the first SMACX_MOVIE_FRAMES frames (default none) and, when it is set, write the last one
-// to OUTDIR/movie.bmp (test aid).
+// movies\NAME.avi; the opening, faction, defeat and victory movies), played by amovie_play
+// (0x4BEA50) (the EA movie player of the video module, 640 x 480: Enter, Esc, space or a click end
+// it). The WVE files are decoded by wve.cpp; the frames (15 per second, timed by the clock from the
+// start of the sound) fill the window keeping their aspect, the other sounds are switched off
+// meanwhile (as the player's SoundSys_off (0x4C51D0) / SoundSys_stop_all (0x4C4FC0)). Unattended
+// runs (--hidden, scripted keys) do not wait: they decode the first SMACX_MOVIE_FRAMES frames
+// (default none) and, when it is set, write the last one to OUTDIR/movie.bmp (test aid).
 #include <cstdio>
 #include <cstdlib>
 #include <vector>

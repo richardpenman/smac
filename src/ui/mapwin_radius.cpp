@@ -22,7 +22,7 @@ Buffer* canvas_of(uint8_t* win) {
     MapWinNative* n = ui_mapwin_native(win);
     return n ? n->canvas : nullptr;
 }
-UiRect* client_rect(uint8_t* win) { return &graphic_win(win + ui_mapwin_native(win)->vbase).client; }
+UiRect* client_rect(uint8_t* win) { return &ui_mapwin_native(win)->graphic().client; }
 int32_t wrap_tile_x(int32_t x) {
     if (MapToggleFlat & 1) return x;
     if (x < 0) return x + MapAreaX;
@@ -95,7 +95,7 @@ int32_t THISCALL MapWin_compute_clip(uint8_t* win, int32_t x, int32_t y, int32_t
     }
     ty = y + 2 + radius * 2;
     if (ty < 0 || MapAreaY <= ty || x < 0 || MapAreaX <= x) {
-        r.bottom = -graphic_win(win + ui_mapwin_native(win)->vbase).height;
+        r.bottom = -ui_mapwin_native(win)->graphic().height;
     } else {
         for (int32_t i = 0, tx = x - radius * 2; i < radius * 2 + 1; i++, tx += 2) {
             pfncTileToPoint(win, tx, ty, &px, &py);

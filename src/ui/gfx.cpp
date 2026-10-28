@@ -32,7 +32,7 @@ void GAMEAPI load_palette() {
     for (int32_t i = 0; i < 10; i++) std::memcpy(GamePalette.rgb[i], kStaticColors[i], 3);
     for (int32_t i = 0; i < 10; i++) std::memcpy(GamePalette.rgb[246 + i], kStaticColors[10 + i], 3);
     Buffer_load_pcx(&canvas, "PALETTE.PCX", &GamePalette, 10, 0xEC);
-    // FUN_005C8E60 -> FUN_005C95E0: gamma correction of the game colours 10..245, also at 100%:
+    // GammaWin_exec (0x5C8E60) -> gamma_apply (0x5C95E0): gamma correction of the game colours 10..245, also at 100%:
     // each component c becomes (int)(clamp(pow(c / 235, 1 / gamma), 0, 1) * 235.99), so 236..255
     // become 235.
     double inv = 1.0 / (double)(float)((float)gamma * 0.01);
@@ -521,7 +521,7 @@ void THISCALL Buffer_line_2(Buffer* self, int32_t x1, int32_t y1, int32_t x2, in
 }
 
 namespace {
-// Polygon edge (FUN_00626470): integer x with Bresenham steps.
+// Polygon edge (polygon_edge (0x626470)): integer x with Bresenham steps.
 struct PolyEdge {
     int32_t dir, count, end, x, xstep, sign, err, rem, dy;
 };

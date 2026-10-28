@@ -917,7 +917,7 @@ Sprite* facility_picture(int32_t fac) {
     return sp;
 }
 
-// FUN_00493B70: the mandate whose colour a facility is drawn in.
+// ProdWin_facility_mandate (0x493B70): the mandate whose colour a facility is drawn in.
 int32_t facility_mandate(int32_t fac) {
     if (fac > 0x45) return 1;
     switch (fac) {
@@ -1279,7 +1279,7 @@ void THISCALL BaseWin_draw_queue(uint8_t* self, int32_t flag) {
 
 namespace {
 
-// Polygon edge of polygon / polygon_dest (FUN_00626470).
+// Polygon edge of polygon / polygon_dest (polygon_edge (0x626470)).
 struct PolyEdge {
     int32_t dir, count, end, x, xstep, sign, err, rem, dy;
 };

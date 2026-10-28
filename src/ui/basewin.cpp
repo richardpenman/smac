@@ -116,7 +116,7 @@ void console_center() {
     pfncMoveMap(MapWins[0], MapWinCursorX[MapWinCursorIndex], MapWinCursorY[MapWinCursorIndex], 1);
 }
 
-// FUN_004216F0 (MapWin): whether tile (x, y) is in the view at least `margin` tiles from its edges
+// MapWin_tile_in_view (0x4216F0) (MapWin): whether tile (x, y) is in the view at least `margin` tiles from its edges
 // (land tiles also by their height above the top edge).
 bool mapwin_tile_in_view(uint8_t* win, int32_t x, int32_t y, int32_t margin) {
     if (margin && y >= 0 && y < MapAreaY && x >= 0 && x < MapAreaX) {

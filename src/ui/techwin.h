@@ -1,4 +1,4 @@
-// The research choice (tech_pick's dialog, FUN_00486510 "TechWin"), the new technology window
+// The research choice (tech_pick's dialog, TechWin_exec (0x486510) "TechWin"), the new technology window
 // (NewTechWin) and Console_set_tech / Console_set_ai (techwin.cpp).
 #pragma once
 #include <cstdint>

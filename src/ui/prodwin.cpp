@@ -2,25 +2,25 @@
 // 0x492420..0x494700): a grid of pictures of what the base can build, opened by
 // BaseWin_production (basewin_prod.cpp) for the current production (slot 0) or a queue slot.
 //
-// Reconstructed from the asm: the list (FUN_00492FA0: the prototypes in proto_sort order with
-// their build time and stats, then the facilities with their time and effect; the selection on
-// the slot's item), the window (FUN_00494700: the base window's size, the grid of 5 columns of
-// (width - 0x51) / 5 by 108 pixels, 3 rows (4 above 800 pixels), the buttons HELP / WORKSHOP /
-// OK / [RESET] / CANCEL or, for a queue slot, HELP / OK / REPLACE / INSERT / DELETE / CANCEL in a
-// frame below), a cell (FUN_004927C0: frame box 0 / 2 when selected, the name in the item's
-// mandate colour, the picture (a facility's in the mandate colour, a unit by veh_draw with its 3D
-// model turned 30 degrees), the build time and the stats at the bottom, "Prototype +n%"), the
-// keys (FUN_00494280: arrows / keypad by cell, Home, End, PgUp / PgDn by page; Enter OK, Esc
-// Cancel), the mouse (a click selects the cell under the point (FUN_004941C0: the point is not
-// offset by the grid's margin, as the original), a double click chooses it, a right click opens
-// the menu: set production / add to queue / obsolete / cancel all obsolete / help
-// (FUN_00493EA0)), the buttons (FUN_004945D0: the mode returned to BaseWin_production) and the
-// dimmed base window under it (BaseWin_production's window: the base window's canvas with the
-// tile at +0xBDD0 over it).
-// The scroll bar (FUN_00494700: Scroll_init at (width - 0x14, 0x15), 0x18 x 0x13A, scroll_normal,
-// when the list has more cells than shown; its position top / cols, range 0 .. count / cols -
-// rows + 2, page rows - 1; scroll.cpp): its buttons move a row, the track a page. The unit spin
-// timer (FUN_004946D0) is never started by the original.
+// Reconstructed from the asm: the list (ProdWin_make_list (0x492FA0): the prototypes in proto_sort
+// order with their build time and stats, then the facilities with their time and effect; the
+// selection on the slot's item), the window (ProdWin_exec (0x494700): the base window's size, the
+// grid of 5 columns of (width - 0x51) / 5 by 108 pixels, 3 rows (4 above 800 pixels), the buttons
+// HELP / WORKSHOP / OK / [RESET] / CANCEL or, for a queue slot, HELP / OK / REPLACE / INSERT /
+// DELETE / CANCEL in a frame below), a cell (ProdWin_draw_cell (0x4927C0): frame box 0 / 2 when
+// selected, the name in the item's mandate colour, the picture (a facility's in the mandate colour,
+// a unit by veh_draw with its 3D model turned 30 degrees), the build time and the stats at the
+// bottom, "Prototype +n%"), the keys (ProdWin_on_key (0x494280): arrows / keypad by cell, Home,
+// End, PgUp / PgDn by page; Enter OK, Esc Cancel), the mouse (a click selects the cell under the
+// point (ProdWin_select_at (0x4941C0): the point is not offset by the grid's margin, as the
+// original), a double click chooses it, a right click opens the menu: set production / add to queue
+// / obsolete / cancel all obsolete / help (ProdWin_right_menu (0x493EA0))), the buttons
+// (ProdWin_on_button_clicked (0x4945D0): the mode returned to BaseWin_production) and the dimmed
+// base window under it (BaseWin_production's window: the base window's canvas with the tile at
+// +0xBDD0 over it). The scroll bar (ProdWin_exec (0x494700): Scroll_init at (width - 0x14, 0x15),
+// 0x18 x 0x13A, scroll_normal, when the list has more cells than shown; its position top / cols,
+// range 0 .. count / cols - rows + 2, page rows - 1; scroll.cpp): its buttons move a row, the track
+// a page. The unit spin timer (ProdWin_timer (0x4946D0)) is never started by the original.
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -61,7 +61,7 @@ struct ProdItem {  // the three StringStruct lists of the window (+0xA788, +0xA7
 struct ProdWin : ScreenWin {
     std::vector<ProdItem> items;
     int32_t sel = -1;  // +0xA774
-    int32_t mode = 0;  // +0xA778: the button's action (FUN_004945D0)
+    int32_t mode = 0;  // +0xA778: the button's action (ProdWin_on_button_clicked (0x4945D0))
     int32_t top = 0;  // +0xA77C: first shown cell
     int32_t cur = 0;  // the lists' current entry (StringStruct_current_entry)
     int32_t faction = 0;  // +0xA76C
@@ -80,7 +80,7 @@ ProdWin g_pw;
 
 int32_t line_h(const Font* f) { return f->field_0 < 0 ? f->height : f->ascent_above + f->field_0; }
 
-// FUN_00493AF0: the mandate whose colour a unit is drawn in.
+// ProdWin_unit_mandate (0x493AF0): the mandate whose colour a unit is drawn in.
 uint32_t unit_mandate(int32_t u) {
     if (u >= 0x40 && !(Units[u].unit_flags & 4)) return 1;
     switch (Units[u].plan) {
@@ -94,7 +94,7 @@ uint32_t unit_mandate(int32_t u) {
     }
 }
 
-// FUN_00493B70.
+// ProdWin_facility_mandate (0x493B70).
 uint32_t facility_mandate(int32_t fac) {
     if (fac > 0x45) return 1;
     switch (fac) {
@@ -117,7 +117,7 @@ uint32_t facility_mandate(int32_t fac) {
 
 std::string num(int32_t v) { return std::to_string(v); }
 
-// FUN_00492FA0: the list of what the base can build.
+// ProdWin_make_list (0x492FA0): the list of what the base can build.
 void build_list(ProdWin* w) {
     BASE& b = Bases[CurrentBaseID];
     w->items.clear();
@@ -228,7 +228,7 @@ const ProdItem* entry(ProdWin* w, int32_t index) {
     return &w->items[std::min(std::max(w->cur, 0), (int32_t)w->items.size() - 1)];
 }
 
-// FUN_004927C0: cell `i`.
+// ProdWin_draw_cell (0x4927C0): cell `i`.
 void draw_cell(ProdWin* w, int32_t i) {
     if (i < w->top || i >= w->top + w->visible) return;
     Buffer* c = &w->canvas;
@@ -284,7 +284,7 @@ void draw_cell(ProdWin* w, int32_t i) {
                 Scene_init(&w->scene);
                 w->scene_ready = true;
             }
-            // FUN_00494700's camera: angles (0, 0, 0.785), the light and the shadow straight down.
+            // ProdWin_exec (0x494700)'s camera: angles (0, 0, 0.785), the light and the shadow straight down.
             float angles[3] = {0.0f, 0.0f, 0.785f}, mat[9];
             mat3_from_euler(angles, mat);
             mat[6] = -mat[6];
@@ -357,7 +357,7 @@ void ProdWin::redraw() {
     ui_invalidate();
 }
 
-// FUN_004945D0: a button.
+// ProdWin_on_button_clicked (0x4945D0): a button.
 void on_button(ProdWin* w, int32_t id, bool* done) {
     switch (id) {
     case 0:
@@ -388,7 +388,7 @@ void on_button(ProdWin* w, int32_t id, bool* done) {
     if (w->slot != 0 && (id == -1 || id == -2)) w->shown = false;  // hide
 }
 
-// The scroll bar of FUN_00494700.
+// The scroll bar of ProdWin_exec (0x494700).
 ScrollBar scroll_bar(ProdWin* w) {
     ScrollBar s;
     s.r = {w->canvas.width - 0x14, 0x15, w->canvas.width - 0x14 + 0x18, 0x15 + 0x13A};
@@ -397,7 +397,7 @@ ScrollBar scroll_bar(ProdWin* w) {
     return s;
 }
 
-// FUN_00494280: the keys (the scroll bar's position is top / cols, its page rows - 1, its range
+// ProdWin_on_key (0x494280): the keys (the scroll bar's position is top / cols, its page rows - 1, its range
 // 0 .. count / cols - rows + 2).
 void on_key(ProdWin* w, int32_t vk) {
     int32_t old_top = w->top, old_sel = w->sel, n = (int32_t)w->items.size(), cols = w->cols;
@@ -466,7 +466,7 @@ void on_key(ProdWin* w, int32_t vk) {
     }
 }
 
-// FUN_00493EA0: the menu of a right click.
+// ProdWin_right_menu (0x493EA0): the menu of a right click.
 void right_menu(ProdWin* w, int32_t x, int32_t y, bool* done) {
     PullDown pd;
     const ProdItem* it = entry(w, w->sel);
@@ -502,7 +502,7 @@ void right_menu(ProdWin* w, int32_t x, int32_t y, bool* done) {
     }
 }
 
-void select_at(ProdWin* w, int32_t x, int32_t y) {  // FUN_004941C0
+void select_at(ProdWin* w, int32_t x, int32_t y) {  // ProdWin_select_at (0x4941C0)
     int32_t old = w->sel;
     w->sel = w->top + (y / w->ch) * w->cols + x / w->cw;
     if (old != w->sel) {
@@ -519,7 +519,7 @@ BaseButton* button_under(ProdWin* w, int32_t x, int32_t y) {
 
 }  // namespace
 
-// FUN_00494700: runs the picker for queue slot `slot` of the current base (faction: the base's
+// ProdWin_exec (0x494700): runs the picker for queue slot `slot` of the current base (faction: the base's
 // owner). Returns the item (unit id, -facility id), -9999 cancelled, 0 a mode without a selection;
 // *mode: the button's mode (0 OK, 1 help, 2 workshop, 3 new design, 4 delete / 6 reset, 5 insert,
 // 7 replace). The window stays shown between calls for a queue slot until OK or Cancel.
@@ -651,7 +651,7 @@ int32_t prodwin_pick(int32_t faction, int32_t slot, int32_t* mode) {
     return item;
 }
 
-// The list again (BaseWin_production after the design workshop: FUN_00492FA0).
+// The list again (BaseWin_production after the design workshop: ProdWin_make_list (0x492FA0)).
 void prodwin_rebuild() {
     if (!g_pw.shown && !g_pw.open) return;
     build_list(&g_pw);

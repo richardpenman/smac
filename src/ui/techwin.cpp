@@ -1,6 +1,6 @@
 // The research choice and the new technology window (techwin.h).
 //
-// tech_pick (0x5BEB70) runs the research dialog FUN_00486510 on a TechWin on its stack
+// tech_pick (0x5BEB70) runs the research dialog TechWin_exec (0x486510) on a TechWin on its stack
 // (asm-faithful in what it changes and returns):
 //   * blind research (GameRules 0x200, no source faction): the viewer is asked for the research
 //     priorities (Console_set_ai: TECHRANDOM) on the turns the original asks, then tech_ai picks;
@@ -13,29 +13,30 @@
 //     display weights the original computes and discards) and its tech_val;
 //   * a computer player takes the listed tech with the highest tech_val (the last of equal ones),
 //     a human player chooses in the window; -1 when nothing is listed.
-// The window (FUN_004863F0 / FUN_00484C60 draw it, FUN_00486170 its keys, FUN_00485FC0 the mouse,
-// FUN_004860B0 / FUN_00486110 the clicks): a grid of panels (columns by the number of choices,
-// panel size from the screen size), each with the tech's name, its category and level
-// (tech_recurse), its picture in the category colour, the TECHSHORTS.txt quote and, from the
-// bottom up, what it leads to (techs, facilities, abilities, terraforming, models, chassis,
-// weapons, armour, reactors, units) while there is room; with nine or more choices only the
-// names. Arrows / keypad move the selection, a letter selects the first tech with that initial,
-// Enter / space choose, H / F1 open the datalinks; the mouse selects, a click chooses, a right
-// click opens the tech's datalinks page. The window cannot be cancelled.
-// Not reconstructed: the panels' pixel-exact layout is the original's arithmetic but the glyphs
-// are smacx's (font_text.h); the tutorial popups are shown as the original's (popt).
+// The window (TechWin_draw_panel (0x4863F0) / TechWin_draw_content (0x484C60) draw it,
+// TechWin_on_key (0x486170) its keys, TechWin_on_mouse_move (0x485FC0) the mouse,
+// TechWin_on_left_click (0x4860B0) / TechWin_on_right_click (0x486110) the clicks): a grid of
+// panels (columns by the number of choices, panel size from the screen size), each with the tech's
+// name, its category and level (tech_recurse), its picture in the category colour, the
+// TECHSHORTS.txt quote and, from the bottom up, what it leads to (techs, facilities, abilities,
+// terraforming, models, chassis, weapons, armour, reactors, units) while there is room; with nine
+// or more choices only the names. Arrows / keypad move the selection, a letter selects the first
+// tech with that initial, Enter / space choose, H / F1 open the datalinks; the mouse selects, a
+// click chooses, a right click opens the tech's datalinks page. The window cannot be cancelled. Not
+// reconstructed: the panels' pixel-exact layout is the original's arithmetic but the glyphs are
+// smacx's (font_text.h); the tutorial popups are shown as the original's (popt).
 //
 // Console_set_tech (0x515010): TECHCHANGE when research is under way (half the accumulated
 // points are lost when the goal changes), tech_pick, synch_research. Console_set_ai (0x514F50):
 // the TECHRANDOM check boxes into AI_fight / growth / tech / wealth, synch_ai.
 //
-// NewTechWin_exec (0x483F90, drawn by FUN_00483950): the 550 x 600 window of a technology the
+// NewTechWin_exec (0x483F90, drawn by NewTechWin_draw (0x483950)): the 550 x 600 window of a technology the
 // viewer discovered or acquired: title (OUR RESEARCHERS HAVE MADE A BREAKTHROUGH! / WE HAVE
 // ACQUIRED TECHNOLOGY!), the tech's name in its category colour and picture, the four sections of
 // help_tech_info (base facilities, technologies, unit advances, miscellaneous) with their links,
 // the BLURBSX quote and OK. A click on a link opens that datalinks page, then the window again.
 // The two picture buttons beside the quote (a ButtonGroup, the quote's selected) show the BLURBSX
-// quote or the long description of techlongs.txt in its place (FUN_00483EB0).
+// quote or the long description of techlongs.txt in its place (NewTechWin_on_button_clicked (0x483EB0)).
 // The voice clip voices\techN.mp3 plays while the window is up (sound.cpp's Wave objects).
 // Not reconstructed: scroll bars of the sections.
 #include "ui/techwin.h"
@@ -71,7 +72,7 @@ namespace {
 
 bool is_human(int32_t f) { return (FactionStatus[0] & (1u << (f & 31))) != 0; }
 
-// The column count of the grid by the number of choices (the table on FUN_00486510's stack).
+// The column count of the grid by the number of choices (the table on TechWin_exec (0x486510)'s stack).
 int32_t grid_columns(int32_t n) {
     static const int8_t kCols[40] = {0, 1, 2, 3, 4, 5, 3, 4, 4, 5, 5, 6, 4, 5, 5, 5, 4, 5, 6, 5,
                                      5, 7, 6, 6, 6, 5, 7, 7, 7, 8, 8, 8, 8, 7, 7, 7, 8, 8, 8, 8};
@@ -98,7 +99,7 @@ struct TechWinState : ScreenWin {
     bool chosen = false;
     std::string caption;
     Font fonts[4];  // +0xBBC, +0xBE4, +0xC0C (text), +0xC34
-    // FUN_00484C60's cursors.
+    // TechWin_draw_content (0x484C60)'s cursors.
     int32_t px = 0, pwidth = 0, ptop = 0, pbottom = 0, a54 = 0;
 
     void redraw() override;
@@ -107,11 +108,11 @@ struct TechWinState : ScreenWin {
     void log_state() override;
 
     UiRect panel_rect(int32_t i) const;
-    int32_t draw_panel(int32_t i, int32_t highlight);  // FUN_004863F0
-    int32_t draw_content(int32_t t, const UiRect& r);  // FUN_00484C60
-    void bottom_line(const std::string& s);  // FUN_00484B80
-    void mouse_move(int32_t x, int32_t y);  // FUN_00485FC0
-    void key(int32_t ch, int32_t vk);  // FUN_00486170
+    int32_t draw_panel(int32_t i, int32_t highlight);  // TechWin_draw_panel (0x4863F0)
+    int32_t draw_content(int32_t t, const UiRect& r);  // TechWin_draw_content (0x484C60)
+    void bottom_line(const std::string& s);  // TechWin_bottom_line (0x484B80)
+    void mouse_move(int32_t x, int32_t y);  // TechWin_on_mouse_move (0x485FC0)
+    void key(int32_t ch, int32_t vk);  // TechWin_on_key (0x486170)
 };
 
 TechWinState* g_techwin = nullptr;
@@ -396,7 +397,7 @@ void TechWinState::log_state() {
                  cols, rows, pw, ph, sel, l.c_str());
 }
 
-// The research choice window of FUN_00486510 for the listed techs; returns the chosen tech.
+// The research choice window of TechWin_exec (0x486510) for the listed techs; returns the chosen tech.
 int32_t techwin_run(int32_t f, const int32_t* list, int32_t n, const char* label) {
     TechWinState w;
     w.name = "techwin";
@@ -457,8 +458,8 @@ struct NewTechWinState : ScreenWin {
     int32_t shown = 1;  // the ButtonGroup's selection
 
     void redraw() override;
-    // FUN_00483EB0: button 1 loads the BLURBSX quote TECHn into the quote's StringBox, button 2
-    // techlongs' TECHn (the ButtonGroup selects the button).
+    // NewTechWin_on_button_clicked (0x483EB0): button 1 loads the BLURBSX quote TECHn into the
+    // quote's StringBox, button 2 techlongs' TECHn (the ButtonGroup selects the button).
     void show_text(int32_t id) {
         shown = id;
         for (int32_t i = 0; i < 2; i++)

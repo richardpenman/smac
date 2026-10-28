@@ -5,7 +5,7 @@
 // treaty and agenda check boxes of the pair (a CheckBox group in the right half: pact 8, treaty
 // 0x10, truce 4, ... and the agenda bits 8 / 0x2000 marked 0x80000000) and four buttons along the
 // bottom: 3 atrocities (EDITATROCITY), 2 integrity (EDITINTEGRITY), 1 reset the pair's relations
-// (the friction drawn again: game_random), -1 done. The check boxes are applied (FUN_004DA990:
+// (the friction drawn again: game_random), -1 done. The check boxes are applied (EditorDiplo_apply (0x4DA990):
 // treaty_on / off, set_treaty, agenda_on / off, set_agenda and the pact's consequences) when
 // another faction is selected and when the window closes.
 // Approximated: the list box's and the check boxes' look (rows of the window's Arial 14 with the
@@ -44,7 +44,7 @@ int32_t& fac_i(int32_t f, uint32_t off) {
 uint32_t& status(int32_t a, int32_t b) { return fac_u(a, 0x18 + 4 * b); }
 uint32_t& agenda(int32_t a, int32_t b) { return fac_u(a, 0x38 + 4 * b); }
 
-// The check boxes (FUN_004DB080's CheckBox_item order): label offset, id (0x80000000: an agenda bit).
+// The check boxes (EditorDiplo_init (0x4DB080)'s CheckBox_item order): label offset, id (0x80000000: an agenda bit).
 const struct {
     uint32_t label;
     uint32_t id;
@@ -72,7 +72,7 @@ struct DiploEdWin : ScreenWin {
         for (int32_t i = 0; i < 13; i++)
             if (kChecks[i].id == id) state[i] = on;
     }
-    // FUN_004DADA0: the check boxes from the pair's status and agenda.
+    // EditorDiplo_load_boxes (0x4DADA0): the check boxes from the pair's status and agenda.
     void load() {
         for (int32_t i = 0; i < 13; i++) {
             uint32_t id = kChecks[i].id;
@@ -80,8 +80,8 @@ struct DiploEdWin : ScreenWin {
                                          : (status(faction, other) & id) != 0;
         }
     }
-    // FUN_004DA760 / 870 / 7E0 / 900: one box applied with treaty_on / off or set_treaty, agenda_on /
-    // off or set_agenda.
+    // EditorDiplo_apply_box (0x4DA760) / 870 / 7E0 / 900: one box applied with treaty_on / off or
+    // set_treaty, agenda_on / off or set_agenda.
     void apply_treaty(uint32_t id, bool with_set) {
         bool on = get(id), has = (status(faction, other) & id) != 0;
         if (on == has) return;
@@ -96,7 +96,7 @@ struct DiploEdWin : ScreenWin {
         else if (on) agenda_on(faction, other, bit);
         else agenda_off(faction, other, bit);
     }
-    // FUN_004DA990: the boxes applied, then the pact's and the vendetta's consequences.
+    // EditorDiplo_apply (0x4DA990): the boxes applied, then the pact's and the vendetta's consequences.
     void apply() {
         for (uint32_t id : {8u, 0x10u, 4u, 2u, 1u}) apply_treaty(id, false);
         for (uint32_t id : {0x1000u, 0x2000u}) apply_treaty(id, true);
@@ -113,13 +113,13 @@ struct DiploEdWin : ScreenWin {
         std::fprintf(stderr, "diploedit %d-%d: status %08X agenda %08X\n", faction, other, status(faction, other),
                      agenda(faction, other));
     }
-    // FUN_004DA740: another faction selected.
+    // EditorDiplo_select (0x4DA740): another faction selected.
     void select(int32_t f) {
         apply();
         other = f;
         load();
     }
-    // FUN_004D9DE0 button 1: the pair's relations reset, the friction drawn again.
+    // EditorDiplo_on_button_clicked (0x4D9DE0) button 1: the pair's relations reset, the friction drawn again.
     void reset() {
         treaty_off(faction, other, 0x1F);
         set_treaty(faction, other, 0x2043C20, 0);
@@ -249,7 +249,7 @@ struct DiploEdWin : ScreenWin {
 }  // namespace
 
 // Console_editor_diplomacy (0x4DB870): EDITORWHO (the viewer selected), then the editor window
-// (FUN_004DB080).
+// (EditorDiplo_init (0x4DB080)).
 void GAMEAPI Console_editor_diplomacy() {
     int32_t f;
     {

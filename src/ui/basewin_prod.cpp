@@ -5,7 +5,7 @@
 // (Faction units_queue), the retool penalty popup (RETOOLPENALTYn[A]), the queue insertion modes,
 // the production change bookkeeping (state/governor flags, log, wave, draw_radius, waking the
 // sentried formers / colony pods at the base), the redraw and the "Ascent" interlude, with the
-// picker (prodwin.cpp: FUN_00494700) and its modes (help, workshop, reset, queue delete / insert /
+// picker (prodwin.cpp: ProdWin_exec (0x494700)) and its modes (help, workshop, reset, queue delete / insert /
 // replace; the picker stays open while a queue slot is edited).
 #include <cstdio>
 #include <cstring>
@@ -67,7 +67,7 @@ void THISCALL BaseWin_production(uint8_t* self, int32_t slot, int32_t no_lock) {
     queue_count(faction, -1);
     for (;;) {
         refresh_base(self);
-        // FUN_00494700: the picker (BaseWin's member at +0xA1C) for the selected queue slot.
+        // ProdWin_exec (0x494700): the picker (BaseWin's member at +0xA1C) for the selected queue slot.
         int32_t mode = 0;
         int32_t item = prodwin_pick(faction, base_win().queue_sel, &mode);
         if (slot != 0 && item == -9999) {

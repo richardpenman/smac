@@ -565,7 +565,7 @@ int32_t scaled(BasePop* p, int32_t v) {
 
 int32_t atoi_s(const char* s) { return std::atoi(s); }
 
-// The section header keyword at p (case-insensitive prefix compare, FUN_0064FDF0 = _strnicmp).
+// The section header keyword at p (case-insensitive prefix compare, _strnicmp (0x64FDF0) = _strnicmp).
 bool kw(const char* p, const char* word) {
     size_t n = std::strlen(word);
     for (size_t i = 0; i < n; i++)

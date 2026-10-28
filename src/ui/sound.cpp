@@ -113,7 +113,7 @@ void fade(WaveState& w, int32_t ms) { platform::audio_stop(w.voice, ms); }
 // Finds a game file (fx\NAME.wav) case-insensitively in the game directory.
 bool file_ok(const std::string& name) { return win32::file_exists(name.c_str()); }
 
-// FX_init's loader (FUN_00445BB0): fx\NAME (.wav added without an extension), else NAME.
+// FX_init's loader (FX_load_wave (0x445BB0)): fx\NAME (.wav added without an extension), else NAME.
 void fx_wave(uint8_t* wave, const char* name, uint32_t flags) {
     if (!(flags & 0x81)) flags |= 4;
     std::string path = std::string("fx\\") + name;

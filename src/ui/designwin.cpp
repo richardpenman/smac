@@ -10,13 +10,13 @@
 //     automatic one, 2 cleared), or for an empty slot the best chassis / weapon / armour the
 //     faction has refined by consider_designs; an invalid prototype (psi / intrinsic 15) gives the
 //     first empty slot of the sorted list;
-//   * the component pickers (FUN_00433F70: a grid of the enabled components; only researched ones
-//     can be chosen) and DesignWin_select_chassis / weapon / armor / reactor with their rules
-//     (missile chassis and payloads, sea / air weapons, transports), DesignWin_suggest_abil
-//     (GamePreferences 0x4000: abilities suggested for the new component) and check_abil
-//     (abil_cond, two abilities only with the tech); select_special: TWOSPECIAL / MISSILESPECIAL
-//     or the UNITSPECIAL list (available abilities that are not a free faction ability or in the
-//     other slot);
+//   * the component pickers (DesignWin_pick_component (0x433F70): a grid of the enabled components;
+//     only researched ones can be chosen) and DesignWin_select_chassis / weapon / armor / reactor
+//     with their rules (missile chassis and payloads, sea / air weapons, transports),
+//     DesignWin_suggest_abil (GamePreferences 0x4000: abilities suggested for the new component)
+//     and check_abil (abil_cond, two abilities only with the tech); select_special: TWOSPECIAL /
+//     MISSILESPECIAL or the UNITSPECIAL list (available abilities that are not a free faction
+//     ability or in the other slot);
 //   * the buttons (DesignWin_on_button_clicked): APPLY (1) and DONE (4, Enter) save the design
 //     (DesignWin_design_it: an identical prototype is reused and un-obsoleted, else the slot
 //     (an empty one, the first own unused non-obsolete one...; OVERWRITEPROTO / retire_proto when
@@ -399,7 +399,7 @@ void DesignWinState::suggest_abil(uint32_t flag) {
     rebuild_slots();
 }
 
-// ---- the component picker (FUN_00433F70) ----
+// ---- the component picker (DesignWin_pick_component (0x433F70)) ----
 
 struct PickerState : ScreenWin {
     int32_t kind = 0;  // 0 chassis, 1 weapon, 2 armour, 3 reactor
@@ -529,7 +529,7 @@ void PickerState::on_click(int32_t parent, int32_t, int32_t, int32_t x, int32_t 
     if (valid) sw_close(this);
 }
 
-// FUN_00433F70: the picker over the design window; returns the index of the chosen component
+// DesignWin_pick_component (0x433F70): the picker over the design window; returns the index of the chosen component
 // among the enabled ones (preq_tech >= -1), or `current` when nothing was chosen.
 int32_t run_picker(DesignWinState* dw, int32_t kind, int32_t current) {
     PickerState p;

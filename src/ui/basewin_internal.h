@@ -118,7 +118,7 @@ bool mapwin_tile_in_view(uint8_t* win, int32_t x, int32_t y, int32_t margin);
 // stays in the headless boot area.
 void textcolor_load();
 Sprite* bw_sprite_at(uint32_t off);  // the base window's sprite at +off (ArtSprite)
-// The production picker (prodwin.cpp, FUN_00494700): see there.
+// The production picker (prodwin.cpp, ProdWin_exec (0x494700)): see there.
 int32_t prodwin_pick(int32_t faction, int32_t slot, int32_t* mode);
 void prodwin_rebuild();
 void prodwin_hide();

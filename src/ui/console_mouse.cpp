@@ -411,7 +411,7 @@ void THISCALL MapWin_on_mouse_move(uint8_t* win, int32_t px, int32_t py) {
     Buffer_set_text_color(d, 0x9F, 0x41, 1, 1);
     Buffer_set_font(d, find_font(12, 1), nullptr, nullptr, nullptr);
     uint8_t* mv = main_view();
-    int32_t width = graphic_win(mv + ui_mapwin_native(mv)->vbase).width;
+    int32_t width = ui_mapwin_native(mv)->graphic().width;
     int32_t tw = Buffer_text_width(d, text);
     Buffer_write_l_3(d, text, px - tw * px / (width ? width : 1), py + map_win(&MainConsole).tile_h,
                      (int32_t)std::strlen(text));

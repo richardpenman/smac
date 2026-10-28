@@ -91,7 +91,7 @@ bool base_known(int32_t i, int32_t viewer) {
 
 bool planwin_shown() { return shown() != 0; }
 
-// FUN_0048BC60: PlanWin set up and shown (MapWin_clear(1), MapWin_init_2(3, 0): the world map
+// PlanWin_show (0x48BC60): PlanWin set up and shown (MapWin_clear(1), MapWin_init_2(3, 0): the world map
 // pane's rectangle, options 0x80000082; zoom -14, an empty background).
 void planwin_open() {
     UiRect pane = main_interface().world_map;
@@ -114,16 +114,16 @@ void planwin_open() {
     ui_invalidate();
 }
 
-// FUN_0048BC50: hidden (+0x21A68 cleared, MapWin_close).
+// PlanWin_hide (0x48BC50): hidden (+0x21A68 cleared, MapWin_close).
 void planwin_close() {
     shown() = 0;
     ui_invalidate();
 }
 
-// FUN_0048AF20.
+// PlanWin_clear_lines (0x48AF20).
 void planwin_clear_lines() { plan().lines = 0; }
 
-// FUN_0048AE40: a line from (x1, y1) to (x2, y2) in `color` (at most four).
+// PlanWin_add_line (0x48AE40): a line from (x1, y1) to (x2, y2) in `color` (at most four).
 void planwin_add_line(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t color) {
     int32_t n = plan().lines;
     if (n >= 4) return;
@@ -136,7 +136,7 @@ void planwin_add_line(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t co
     plan().lines = n + 1;
 }
 
-// FUN_0048B3F0: the terrain redrawn into the canvas (options 0x84010002) and kept as background.
+// PlanWin_draw_background (0x48B3F0): the terrain redrawn into the canvas (options 0x84010002) and kept as background.
 void planwin_redraw_back() {
     plan().map.options = (int32_t)0x84010002;
     Buffer_fill_2(&g_canvas, 0);
@@ -144,7 +144,7 @@ void planwin_redraw_back() {
     Buffer_copy_4(&g_canvas, &g_back, 0, 0, 0, 0, g_canvas.width, g_canvas.height);
 }
 
-// FUN_0048B8E0: zoom in from -13 while the 81 tiles around (x, y) stay in view (to -11 at most);
+// PlanWin_zoom_tile (0x48B8E0): zoom in from -13 while the 81 tiles around (x, y) stay in view (to -11 at most);
 // the background redrawn when forced or the view changed. The centre is left as it is.
 void planwin_zoom_tile(int32_t x, int32_t y, int32_t force) {
     int32_t zoom0 = plan().map.zoom, cx0 = plan().map.center_x, cy0 = plan().map.center_y;
@@ -163,7 +163,7 @@ void planwin_zoom_tile(int32_t x, int32_t y, int32_t force) {
         planwin_redraw_back();
 }
 
-// FUN_0048B630: centred on (x1, y1), zoomed in from -13 while the 25 tiles around both ends stay
+// PlanWin_zoom_route (0x48B630): centred on (x1, y1), zoomed in from -13 while the 25 tiles around both ends stay
 // in view (up to -10).
 void planwin_zoom_route(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t force) {
     int32_t zoom0 = plan().map.zoom, cx0 = plan().map.center_x, cy0 = plan().map.center_y;
@@ -184,7 +184,7 @@ void planwin_zoom_route(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t 
         planwin_redraw_back();
 }
 
-// FUN_0048AF30 (PlanWin's redraw): the background; the bases the viewer knows (an end point's
+// PlanWin_redraw (0x48AF30) (PlanWin's redraw): the background; the bases the viewer knows (an end point's
 // highlighted while the blink is on: flags 0x200); a stand-in unit (veh_fake) at the end points
 // without a base; the lines, dashed 4 on / 4 off with the moving pattern.
 void planwin_draw() {
@@ -262,7 +262,7 @@ void planwin_log_state() {
     std::fprintf(stderr, "\n");
 }
 
-// FUN_0048B450: the centre between two pairs of tiles: the middle column of each pair (across the
+// PlanWin_center_between (0x48B450): the centre between two pairs of tiles: the middle column of each pair (across the
 // map's wrap when that is shorter), then of the two middles; the row the mean of the pairs' means.
 // The zoom is left as it is.
 void planwin_center_between(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t x3, int32_t y3, int32_t x4,
@@ -285,7 +285,7 @@ void planwin_center_between(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int3
     plan().map.center_y = ((y2 + y1) / 2 + (y4 + y3) / 2) / 2;
 }
 
-// FUN_0048AE90: a line from base a to base b.
+// PlanWin_add_base_line (0x48AE90): a line from base a to base b.
 void planwin_add_base_line(int32_t a, int32_t b, int32_t color) {
     if (a < 0 || b < 0) return;  // (the original reads the base array at the index)
     planwin_add_line(Bases[a].x, Bases[a].y, Bases[b].x, Bases[b].y, color);

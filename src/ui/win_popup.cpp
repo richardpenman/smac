@@ -27,7 +27,7 @@
 
 namespace {
 
-// The alien factions' scripts (Crossfire): FUN_00645646 = fopen(name, "rb") as an existence test.
+// The alien factions' scripts (Crossfire): fopen (0x645646) = fopen(name, "rb") as an existence test.
 bool file_exists(const char* name) {
     if (CrtFile* f = crt_fopen(name, "rb")) {
         crt_fclose(f);

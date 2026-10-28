@@ -259,7 +259,7 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
                     }
                     Sprite_draw_multi_table_dest_2(s, nat->canvas, s->key, rect[i].left, rect[i].top, xtable(table));
                 } else {
-                    // FUN_0062A070: the buster's next frame, scaled by its size.
+                    // buster_frame (0x62A070): the buster's next frame, scaled by its size.
                     Buffer fb;
                     Buffer_ctor(&fb);
                     Buffer_init(&fb, g_buster.width, g_buster.height, 8, 0);

@@ -50,7 +50,7 @@ int32_t tile_occupant(MAP* sq) {
 }
 bool is_spartans(int32_t faction_id) { return !std::strcmp(MFactions[faction_id].search_key, "SPARTANS"); }
 
-// Map label fonts (FUN_005592D0): a three-entry cache of Arial fonts keyed by size and style;
+// Map label fonts (label_font (0x5592D0)): a three-entry cache of Arial fonts keyed by size and style;
 // size = zoom unit (50 at normal zoom) * num / den (10 is bumped to 11).
 struct LabelFonts {
     Font fonts[3];
@@ -250,7 +250,7 @@ void THISCALL MapWin_draw_base_names(uint8_t* win) {
     MapWinNative* n = ui_mapwin_native(win);
     Buffer* canvas = n->canvas;
     UiRect saved = canvas->clip;
-    Buffer_set_clip(canvas, &graphic_win(win + n->vbase).client);
+    Buffer_set_clip(canvas, &n->graphic().client);
     MapWin_draw_base_dest(win, 0);
     if (!(map_win(win).options & 0x800) || !(GameMorePreferences & MPREF_MAP_SHOW_BASE_NAMES)) {
         Buffer_set_clip(canvas, &saved);

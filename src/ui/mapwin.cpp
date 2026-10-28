@@ -48,20 +48,24 @@ MAP* tile(int32_t x, int32_t y) { return &MapTiles[MapHalfX * y + (x >> 1)]; }
 
 }  // namespace
 
+uint8_t* MapWinNative::cache_entry(int32_t x, int32_t y) {
+    if (tile_cache.empty()) return nullptr;
+    size_t i = ((size_t)(MapAreaX >> 1) * y + (x >> 1)) * 0xC;
+    if (i + 0xC > tile_cache.size()) return nullptr;
+    return &tile_cache[i];
+}
+
 uint8_t* ui_mapwin_cache_entry(uint8_t* win, int32_t x, int32_t y) {
     MapWinNative* n = ui_mapwin_native(win);
-    if (!n || n->tile_cache.empty()) return nullptr;
-    size_t i = ((size_t)(MapAreaX >> 1) * y + (x >> 1)) * 0xC;
-    if (i + 0xC > n->tile_cache.size()) return nullptr;
-    return &n->tile_cache[i];
+    return n ? n->cache_entry(x, y) : nullptr;
 }
 
 namespace {
 
 uint8_t* cache_entry(uint8_t* win, int32_t x, int32_t y) { return ui_mapwin_cache_entry(win, x, y); }
 
-int32_t gw_width(uint8_t* win) { return graphic_win(win + ui_mapwin_native(win)->vbase).width; }
-int32_t gw_height(uint8_t* win) { return graphic_win(win + ui_mapwin_native(win)->vbase).height; }
+int32_t gw_width(uint8_t* win) { return ui_mapwin_native(win)->graphic().width; }
+int32_t gw_height(uint8_t* win) { return ui_mapwin_native(win)->graphic().height; }
 
 // Landmark detail value of corner `corner` from one of the landmark overlay tables. Removed
 // landmarks have a negative code: the original then reads before the index table.
@@ -74,22 +78,26 @@ int32_t landmark_detail(uint32_t table, uint32_t lm, int32_t corner, bool is_sig
 
 }  // namespace
 
-MapWinNative* ui_mapwin_attach(uint8_t* win, uint32_t vbase, Buffer* canvas) {
-    MapWinNative& n = g_windows[win];
-    n.win = win;
-    n.vbase = vbase;
-    n.canvas = canvas;
-    graphic_win(win + vbase).width = canvas->width;
-    graphic_win(win + vbase).height = -canvas->height;
-    graphic_win(win + vbase).client = {0, 0, canvas->width, canvas->height};
+void MapWinNative::attach(uint8_t* window, uint32_t base, Buffer* buffer) {
+    win = window;
+    vbase = base;
+    canvas = buffer;
+    graphic().width = canvas->width;
+    graphic().height = -canvas->height;
+    graphic().client = {0, 0, canvas->width, canvas->height};
     // What MapWin_ctor (0x4626E0) initialises (native builds never run the original's
     // constructors): the zoom/height caches and the label fonts.
-    map_win(win).last_zoom = -9999;
-    map_win(win).last_elev = -1;
+    fields().last_zoom = -9999;
+    fields().last_elev = -1;
     Font_ctor(mapwin_font(win, 0));
     Font_ctor(mapwin_font(win, 1));
     Font_ctor(mapwin_font(win, 2));
-    ui_mapwin_clear_cache(win);
+    clear_cache();
+}
+
+MapWinNative* ui_mapwin_attach(uint8_t* win, uint32_t vbase, Buffer* canvas) {
+    MapWinNative& n = g_windows[win];
+    n.attach(win, vbase, canvas);
     return &n;
 }
 
@@ -98,11 +106,13 @@ MapWinNative* ui_mapwin_native(uint8_t* win) {
     return it == g_windows.end() ? nullptr : &it->second;
 }
 
+void MapWinNative::clear_cache() {
+    tile_cache.assign((size_t)std::max(MapAreaTiles, 0) * 0xC, 0);
+    for (size_t i = 0; i < tile_cache.size(); i += 0xC) std::memset(&tile_cache[i], 0xFF, 9);
+}
+
 void ui_mapwin_clear_cache(uint8_t* win) {
-    MapWinNative* n = ui_mapwin_native(win);
-    if (!n) return;
-    n->tile_cache.assign((size_t)std::max(MapAreaTiles, 0) * 0xC, 0);
-    for (size_t i = 0; i < n->tile_cache.size(); i += 0xC) std::memset(&n->tile_cache[i], 0xFF, 9);
+    if (MapWinNative* n = ui_mapwin_native(win)) n->clear_cache();
 }
 
 bool ui_mapdump_read_header(const char* path, MapDumpHeader* out) {
@@ -145,9 +155,9 @@ bool ui_mapdump_like(uint8_t* win, const char* path, const char* like, int32_t s
     if (like && *like && ui_mapdump_read_header(like, &ref)) {
         if (ref.width != n->canvas->width || ref.height != n->canvas->height) {
             Buffer_init(n->canvas, ref.width, ref.height, 8, 0);
-            graphic_win(win + n->vbase).width = ref.width;
-            graphic_win(win + n->vbase).height = -ref.height;
-            graphic_win(win + n->vbase).client = {0, 0, ref.width, ref.height};
+            n->graphic().width = ref.width;
+            n->graphic().height = -ref.height;
+            n->graphic().client = {0, 0, ref.width, ref.height};
         }
         TileVariantBase = (uint32_t)ref.reserved;
         // The oracle dumps after control_turn's redraw of the current view: the terrain cache
@@ -326,7 +336,7 @@ void THISCALL pfncZoomProcessing(uint8_t* win) {
 
 int32_t THISCALL pfncPtToTile(uint8_t* win, int32_t px, int32_t py, int32_t* out_x, int32_t* out_y) {
     MapWinNative* n = ui_mapwin_native(win);
-    if (!n || px >= graphic_win(win + n->vbase).width || py >= -graphic_win(win + n->vbase).height) return 1;
+    if (!n || px >= n->graphic().width || py >= -n->graphic().height) return 1;
     px -= map_win(win).pixel_x;
     py -= map_win(win).pixel_y;
     if (px < 0 || py < 0) return 1;
@@ -821,7 +831,7 @@ void THISCALL pfncRedrawMap(uint8_t* win, int32_t flag) {
         pfncDrawMap(win, viewer, flag < 0);
     }
     // (mouse tracking: the window's mouse-move handler runs again here; not reconstructed)
-    Buffer_set_clip(canvas, &graphic_win(win + n->vbase).client);
+    Buffer_set_clip(canvas, &n->graphic().client);
 }
 
 void THISCALL pfncMoveMap(uint8_t* win, int32_t x, int32_t y, int32_t redraw) {
