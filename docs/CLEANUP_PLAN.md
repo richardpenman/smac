@@ -31,7 +31,7 @@ Every commit passes `src/tools/gate.sh`. The script exits non-zero on any failur
 
 When to run what:
 
-* Per commit: `src/tools/gate.sh` (the tag `hybrid-final` is set, on 178475a).
+* Per commit: `src/tools/gate.sh` (the tag `hybrid-final` is set, on be8186a).
 * While working: `src/tools/gate.sh --quick` (one scenario for asan, short diffnative games), or
   `--only static,build,unit,native`.
 * Until the freeze (step 20) the gate also had a `hybrid` step (`harness/verify.sh hybrid all` on
@@ -253,7 +253,7 @@ Each row is one commit (or a few), and each passes the gate.
 | 15 | Methods on layout structs (`Base::`, `Faction::`, `Veh::`) with `ADDR` forwarders | L | first pass done (see note 15) |
 | 16 | Scratch globals → contexts/locals | L | native part done; image globals after the freeze (see note 16) |
 | 17 | Golden-record fcompare mode + data-dependent unit tests | M | done (see note 17) |
-| 18 | `diffnative.sh` (native-vs-baseline on new seeds); tag `hybrid-final` | S | done (see note 18); the tag is set (178475a) |
+| 18 | `diffnative.sh` (native-vs-baseline on new seeds); tag `hybrid-final` | S | done (see note 18); the tag is set (be8186a) |
 | 19 | Split `enemy_move` and the AI (stack residues as explicit context) | XL | done (see note 19) |
 | 20 | Native state containers + explicit save/snapshot serialisation (phase B) | XL | done (see note 20) |
 | 21 | UI windows: typed views, then classes | L | done (see note 21) |
@@ -617,7 +617,7 @@ Notes on the increments:
     compares the games with the fixes instead (both builds then play the game's default, which a
     refactoring must not change either). Checked: two identical builds pass; a baseline that plays
     a different game (the fixes against the original's bugs) fails on the first snapshot; the
-    previous commit (d6a4db6) built as the baseline against this increment's build passes on new
+    previous commit (a358a31) built as the baseline against this increment's build passes on new
     seeds (6 games of 40 turns), two late saves (turns 140 and 200) and all 29 scenarios, and with
     `--fixes` on 3 new games. The gate's new `diffnative` step runs it when the
     baseline exists (`GATE_BASELINE`, default `hybrid-final`; `--seeds 6 --turns 40 --scenarios
@@ -662,7 +662,7 @@ Notes on the increments:
       fcompare compares).
     * Side fix and finding: net_daemon.cpp's header() read the event sequence number as `NetSessionState[-1]`
       (UB, flagged by UBSan); it is its own global `NetEventSequence` (0x93E8BC) now. The
-      fixed-mode hang of cov_actions on turn 300 (also in b55e6a9) is the scenario's: its setup
+      fixed-mode hang of cov_actions on turn 300 (also in 1da546d) is the scenario's: its setup
       calls use vehicle ids past VehCount (`action_tectonic 278`, `action_gate 274`), which links a
       stale vehicle into base 9's stack; with the fix of turn_upkeep_air_return the turn goes on and
       an AI transport walks the broken stack (veh_top). diffnative --fixes left cov_actions out
@@ -673,11 +673,11 @@ Notes on the increments:
     Proof per commit: native verify (29 scenarios), hybrid all (tiny20, council131, small12, std8,
     late140, cov_missiles), fcompare of the touched entry points (air_power, enemy_strategy,
     can_terraform, alien_move, assemble_passengers, enemy_move; 0 mismatches), diffnative against
-    b55e6a9 in both settings (6 + 20 new games, the scenarios), the ASan fixes step, the scripted
+    1da546d in both settings (6 + 20 new games, the scenarios), the ASan fixes step, the scripted
     UI suites.
 
-20. Three commits. The baseline of every comparison is the build of 178475a (the end of step 19,
-    the last commit the full gate checked with the hybrid build; `diffnative.sh --baseline 178475a`,
+20. Three commits. The baseline of every comparison is the build of be8186a (the end of step 19,
+    the last commit the full gate checked with the hybrid build; `diffnative.sh --baseline be8186a`,
     now tagged `hybrid-final`).
     * Serialisation (state still in the image). `engine/serialize.h`: a `Writer` and a `Reader`
       (little-endian integers in their own width, fields in order) and one field list per record
@@ -735,8 +735,8 @@ Notes on the increments:
     Proof per commit: native build (the hybrid build for the first two, hybrid games on tiny20 and
     late140 for the first), names/compat checks, ctest with
     the golden replays, `harness/verify.sh native` on the 29 scenarios (845 snapshots),
-    `diffnative --baseline 178475a --seeds 6 --turns 40 --scenarios all` and `--fixes --seeds 3`,
-    byte-identical `.state`/`.sav`/`.rng` files against the 178475a build (tiny20, late140,
+    `diffnative --baseline be8186a --seeds 6 --turns 40 --scenarios all` and `--fixes --seeds 3`,
+    byte-identical `.state`/`.sav`/`.rng` files against the be8186a build (tiny20, late140,
     loadsave, loadscn, an encrypted PBEM save written and reloaded, a save with 9800 bytes of
     replay events written, reloaded and played on), the original under Wine loading saves smacx
     wrote (from turn_200 and tiny20_turn_005 of work/saves_late) and playing 3 turns identical to
@@ -745,7 +745,7 @@ Notes on the increments:
     suites.
 
 21. Three commits (the hybrid code; the council record and the typed views; MapWinNative and the names),
-    each verified with `gate.sh --quick` (baseline 178475a).
+    each verified with `gate.sh --quick` (baseline be8186a).
     * Dead hybrid code removed: the hybrid UI bridges (engine/ui_bridge_*hybrid.cpp), the shadow
       and entry thunks (hybrid_shadow.h, the has_abil frame, Path_find's / base_energy's /
       call_council's residue thunks), hybrid_patch.h, every `SMACX_HYBRID` branch of src/engine,
@@ -761,7 +761,7 @@ Notes on the increments:
       by the engine, the headless window and smacx's window instead of `self + 0xA1C`; the saved
       globals bind into it. In step 20 moving them broke 10 scenarios because the council code
       still read the session through the window object in the image; now every reader goes through
-      the record. Saves and `.state` files are byte-identical with the 178475a build (council131,
+      the record. Saves and `.state` files are byte-identical with the be8186a build (council131,
       late140, end300: every `.sav`, `.state`, `.rng`). smacx's native window class was renamed
       `CouncilWindow` (it had the saved global's name).
     * Typed views (section 7.1): the window objects that stay in the image (or in native buffers of
