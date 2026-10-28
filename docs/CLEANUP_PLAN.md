@@ -292,7 +292,8 @@ Notes on the increments:
 
 7. The view is `GameStateView` (engine/game_state.h), not `GameState`: that name is taken by the
    original's game state flags word (`GameState`, 0x9A64C0, a Thinker name used all over the
-   engine). `game()` returns the one instance, `g_game_state`, whose members are references onto
+   engine). `game()` returns the one instance (a function-local static: as a namespace-scope inline
+   variable, `g_game_state`, the Windows build bound it before the globals), whose members are references onto
    the globals: `map` (`x`, `y`, `half_x`, `tile_count`, `sq_root`, `flat`, `tiles`), `factions`,
    `mfactions`, `bases`, `base_count`, `vehs`, `veh_count`, `rules`, `turn`. The engine (src/engine,
    src/headless) uses `game()` for the map, factions, bases and vehicles; comments and strings

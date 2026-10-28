@@ -30,6 +30,7 @@
 // (CUSTOMNAMES) is not reconstructed; NetWin_pick_num_players has no spot (as the original).
 #include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <set>
 #include <string>

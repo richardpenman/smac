@@ -123,6 +123,12 @@ On Windows with MSYS2, add `-G Ninja -DCMAKE_EXE_LINKER_FLAGS=-static` to the co
 
 Cross-compiling from Linux with the local llvm-mingw: `-DCMAKE_TOOLCHAIN_FILE=cmake/x86_64-mingw.cmake`
 (64-bit) or `cmake/i686-mingw.cmake` without `SMACX_HYBRID` (32-bit native, runs under 32-bit Wine).
+The 64-bit `smacx.exe` (the release's) runs under a 64-bit Wine: with only Debian's `wine32`
+installed, `apt-get download wine64 libwine:amd64 libz-mingw-w64` and `dpkg -x` them into a folder
+of `work/`, point its `usr/lib/wine/wineserver` script at the `wineserver64` beside it (the script
+names `/usr/lib/wine`), and copy the x86-64 `zlib1.dll` into the prefix's `system32`; then
+`WINEARCH=win64 WINEPREFIX=... .../usr/lib/wine/wine64 smacx.exe` (a game folder in the prefix's
+`C:\GOG Games` is found at the first start). The cross-built `smacx_unit.exe` runs the same way.
 Run `smacx_headless` from the repository root (or pass `--gamedir`, `--image`, `--ini`).
 
 ## Compilers

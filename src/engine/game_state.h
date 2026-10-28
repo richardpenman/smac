@@ -32,15 +32,19 @@ struct GameStateView {
     int32_t& turn;  // CurrentTurn
 };
 
-// Defined after every global it refers to in each translation unit, so it is initialised after them.
-inline GameStateView g_game_state{{MapAreaX, MapAreaY, MapHalfX, MapAreaTiles, MapAreaSqRoot, MapToggleFlat, MapTiles},
-                                  Factions,
-                                  MFactions,
-                                  Bases,
-                                  BaseCount,
-                                  Vehs,
-                                  VehCount,
-                                  Rules,
-                                  CurrentTurn};
-
-inline GameStateView& game() { return g_game_state; }
+// Made at the first call (a function-local static), after the globals it refers to are bound: as a
+// namespace-scope inline variable its initialisation could run before theirs (inline variables'
+// dynamic initialisers are not ordered across translation units by every toolchain: the Windows
+// build with llvm-mingw bound its references to null and crashed in read_factions).
+inline GameStateView& game() {
+    static GameStateView state{{MapAreaX, MapAreaY, MapHalfX, MapAreaTiles, MapAreaSqRoot, MapToggleFlat, MapTiles},
+                               Factions,
+                               MFactions,
+                               Bases,
+                               BaseCount,
+                               Vehs,
+                               VehCount,
+                               Rules,
+                               CurrentTurn};
+    return state;
+}
