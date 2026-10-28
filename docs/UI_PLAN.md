@@ -249,7 +249,10 @@ computer players move with the engine.
   assemble, tutorial hints log
   "not reconstructed". Multiplayer paths stop at the first network call.
 * **Testing**: `--keys` scripts input (characters, `C-`/`S-`/`A-` modifiers, `ALT`, `CLICK:XxY`,
-  `RCLICK:XxY`, `MOVE:XxY`, `DRAG:X1xY1:X2xY2` (a held left button: the go-to drag), KP1..KP9, named keys, and
+  `RCLICK:XxY`, `MOVE:XxY`, `DRAG:X1xY1:X2xY2` (a held left button: the go-to drag), `CLOSE` (the window's close
+  button: smacx's own, the original's window has none; it quits at once before a game runs and in
+  observer mode, asks REALLYQUIT / REALLYWIMPOUT from a game's main screen and is ignored while a
+  popup or modal window is up), KP1..KP9, named keys, and
   the commands `SHOT[:file]`, `SAVE:file` (also writes `file.rng`), `UNITS`, `QUIT`);
   `--snapshots DIR` writes the harness's turn_NNN.state/.rng/.sav before every turn_upkeep and
   `--rng FILE` restores a snapshot's generators after `--save`.

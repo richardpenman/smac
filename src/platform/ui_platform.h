@@ -37,7 +37,7 @@ void set_layer_palettes(const uint8_t* layers, int32_t pitch, const Rgb* const* 
 // ---- input (the window procedure's messages) ----
 enum EventType : int32_t {
     EV_NONE = 0,
-    EV_QUIT,  // WM_CLOSE
+    EV_QUIT,  // the process is asked to end (SIGINT / SIGTERM, the system's quit command)
     EV_KEY_DOWN,  // WM_KEYDOWN: key = Windows virtual-key code, mods = MOD_* bits
     EV_KEY_UP,  // WM_KEYUP
     EV_CHAR,  // WM_CHAR: key = character (Windows-1252)
@@ -48,6 +48,7 @@ enum EventType : int32_t {
     EV_RBUTTON_UP,
     EV_MOUSE_WHEEL,  // WM_MOUSEWHEEL: key = +1 (up) / -1 (down)
     EV_EXPOSE,  // WM_PAINT: the window needs to be presented again
+    EV_CLOSE,  // the window's close button (WM_SYSCOMMAND SC_CLOSE)
 };
 enum : int32_t { MOD_SHIFT = 1, MOD_CTRL = 2, MOD_ALT = 4 };
 struct Event {

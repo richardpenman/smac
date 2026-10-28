@@ -112,6 +112,9 @@ bool movie_play(const char* path) {
                 ev.type == platform::EV_LBUTTON_DOWN || ev.type == platform::EV_RBUTTON_DOWN ||
                 ev.type == platform::EV_QUIT)
                 skip = true;
+            // The close button: before a game runs (the opening movie) smacx quits; in a game
+            // the movie plays on (win.h ui_window_close_modal).
+            if (ev.type == platform::EV_CLOSE && ui_window_close_modal()) skip = true;
         }
         if (skip) break;
         platform::delay_ms(5);

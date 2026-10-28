@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # Drive the plain original (no oracle) under Xvfb: run terranx.exe, then follow a step file:
 #   wait SECONDS | key KEYSYM [n] | text STRING | shot NAME | click X Y [S|C] | rclick X Y [S|C] | move X Y
-#   | press X Y | release (the left button held / let go: drags) | quit
+#   | press X Y | release (the left button held / let go: drags) | close (the window manager's close:
+#   WM_DELETE_WINDOW to the game's mapped top-level windows; Wine makes it WM_SYSCOMMAND SC_CLOSE) | quit
 # Screenshots go to OUTDIR/NAME.png. Usage: orig_drive.py STEPFILE OUTDIR [extra ini lines file]
 # Keys are X keysyms with C+/S+/A+ modifiers (sent with XTEST to the game's Xvfb display). The game
 # runs in work/popup_orig_run with harness/oracle/runtime's ini (no sound, no DirectDraw, no movie).
@@ -80,6 +81,17 @@ try:
             xtest.fake_input(d,XX.ButtonPress,1); d.sync()
         elif c=='release':
             xtest.fake_input(d,XX.ButtonRelease,1); d.sync(); time.sleep(0.2)
+        elif c=='close':
+            from Xlib import protocol
+            wm_del=d.intern_atom('WM_DELETE_WINDOW'); wm_prot=d.intern_atom('WM_PROTOCOLS')
+            for w in d.screen().root.query_tree().children:
+                try:
+                    if w.get_attributes().map_state!=XX.IsViewable or wm_del not in (w.get_wm_protocols() or []): continue
+                except Exception: continue
+                print('close',hex(w.id),w.get_wm_name())
+                ev=protocol.event.ClientMessage(window=w,client_type=wm_prot,data=(32,[wm_del,XX.CurrentTime,0,0,0]))
+                w.send_event(ev); d.sync()
+            time.sleep(0.5)
         elif c=='quit': break
 finally:
     # Only the processes started here are stopped (never wineserver -k: the prefix is shared).

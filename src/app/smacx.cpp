@@ -643,6 +643,10 @@ bool parse_key(std::string tok, ScriptedKey* out) {
         out->command = "pixel " + std::to_string(x) + " " + std::to_string(y);
         return true;
     }
+    if (tok == "CLOSE") {  // the window's close button (win.cpp close_requested)
+        out->command = "close";
+        return true;
+    }
     if (tok == "QUIT" || tok == "UNITS") {
         out->command = tok == "QUIT" ? "quit" : "units";
         return true;

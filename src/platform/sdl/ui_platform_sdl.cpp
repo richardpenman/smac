@@ -147,6 +147,10 @@ bool translate(const SDL_Event& e, Event* ev) {
             ev->type = EV_EXPOSE;
             return true;
         }
+        if (e.window.event == SDL_WINDOWEVENT_CLOSE) {
+            ev->type = EV_CLOSE;
+            return true;
+        }
         return false;
     default: return false;
     }
@@ -332,6 +336,11 @@ std::string find_font_file(const char* face, bool bold, bool italic) {
 void set_game_dir(const std::string& dir) { g_game_dir = dir; }
 
 bool video_init(const char* title, int32_t width, int32_t height, bool hidden) {
+    // The window's close button is EV_CLOSE (the game asks first); SDL_QUIT then only comes from
+    // signals and the system's quit command.
+#ifdef SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE  // SDL 2.0.22
+    SDL_SetHint(SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE, "0");
+#endif
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         std::fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
         return false;

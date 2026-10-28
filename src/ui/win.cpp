@@ -19,6 +19,7 @@
 
 #include "engine/clock.h"
 #include "engine/diplomacy.h"
+#include "engine/game.h"
 #include "engine/net.h"
 #include "engine/random.h"
 #include "engine/save.h"
@@ -164,9 +165,52 @@ void ui_dispatch_key(int32_t key) { dispatch_key(key); }
 namespace {
 
 void quit_requested() {
-    std::fprintf(stderr, "window closed: quitting\n");
+    std::fprintf(stderr, "quit requested: quitting\n");
     ControlTurnA = 1;
 }
+
+// The window's close button (EV_CLOSE, scripted CLOSE). The original's window has no close button
+// (a WS_POPUP window without a system menu); its WM_SYSCOMMAND SC_CLOSE (Alt+F4, or the window
+// manager under Wine) goes to pfncWinProc (0x5F08F4), which calls the window object's
+// on_sys_close, and the game goes on: at the main menu, in the game and through the end of the
+// turn (checked under Wine: tests/popups/orig_drive.py `close`); while a popup is up the window is
+// disabled and the close does nothing either. smacx's close button is its own: before a game runs
+// (the opening movie and screens, the setup dialogs: GameNotStarted) it quits at once; in a game
+// the main screen asks the quit question of Esc / ctrl+Q (Console_on_key_click: REALLYQUIT, or
+// REALLYWIMPOUT with other humans), while a popup or another modal window (the question itself
+// too) is up the close is ignored; in observer mode (no game of the player's) it quits at once.
+enum class CloseAt { MAIN, MODAL, OBSERVER };
+bool g_close_asking = false;
+bool g_close_quit = false;  // closed before a game ran: every input loop ends
+void close_requested(CloseAt at) {
+    if (at == CloseAt::OBSERVER) {
+        quit_requested();
+        return;
+    }
+    if (at == CloseAt::MODAL || g_close_asking) {
+        ui_window_close_modal();
+        return;
+    }
+    std::fprintf(stderr, "window close: the quit question\n");
+    g_close_asking = true;
+    dispatch_key(0x20051);  // ctrl+Q
+    g_close_asking = false;
+}
+
+}  // namespace
+
+bool ui_window_close_modal() {
+    if (GameNotStarted) {
+        std::fprintf(stderr, "window close: no game running: quitting\n");
+        g_close_quit = true;
+        ControlTurnA = 1;
+        return true;
+    }
+    std::fprintf(stderr, "window close: ignored (a modal window is up)\n");
+    return false;
+}
+
+namespace {
 
 // Runs a scripted command; returns false when it is unknown.
 bool run_command(const std::string& cmd) {
@@ -260,6 +304,10 @@ bool run_command(const std::string& cmd) {
                      map_win(view).center_y);
         return true;
     }
+    if (cmd == "close") {  // the window's close button where no input loop says otherwise
+        close_requested(CloseAt::MODAL);
+        return true;
+    }
     if (cmd == "menustate") {  // test aid: the open menu column of the opening screens (topmenu.h)
         topmenu_log_state();
         return true;
@@ -349,6 +397,11 @@ bool pump_platform(int32_t timeout_ms) {
         any = true;
         if (ev.type == platform::EV_QUIT) quit_requested();
         else if (ev.type == platform::EV_EXPOSE) g_dirty = true;
+        else if (ev.type == platform::EV_CLOSE) {  // once, for the loop that takes input next
+            if (std::none_of(g_input.begin(), g_input.end(),
+                             [](const platform::Event& e) { return e.type == platform::EV_CLOSE; }))
+                g_input.push_back(ev);
+        }
         else if (ev.type == platform::EV_KEY_DOWN || ev.type == platform::EV_LBUTTON_DOWN ||
                  ev.type == platform::EV_LBUTTON_UP || ev.type == platform::EV_RBUTTON_DOWN ||
                  ev.type == platform::EV_RBUTTON_UP) {
@@ -766,6 +819,8 @@ void GAMEAPI wait_task() {
             console_ui_drag(x1, y1, x2, y2, shot[0] ? g_ui_outdir + "/" + shot : std::string());
         } else if (std::sscanf(k.command.c_str(), "move %d %d", &x1, &y1) == 2) {
             ui_mouse(UiInput::MOVE, x1, y1);
+        } else if (k.command == "close") {
+            close_requested(CloseAt::MAIN);
         } else if (!k.command.empty()) {
             run_command(k.command);
         } else {
@@ -796,6 +851,7 @@ void GAMEAPI wait_task() {
     case platform::EV_RBUTTON_DOWN: ui_mouse(UiInput::RDOWN, ev.x, ev.y); break;
     case platform::EV_RBUTTON_UP: ui_mouse(UiInput::RUP, ev.x, ev.y); break;
     case platform::EV_MOUSE_MOVE: ui_mouse(UiInput::MOVE, ev.x, ev.y); break;
+    case platform::EV_CLOSE: close_requested(CloseAt::MAIN); break;
     default: break;
     }
 }
@@ -885,6 +941,10 @@ int32_t ui_wait_key() {
             ScriptedKey k = g_script.front();
             g_script.pop_front();
             ui_trace(("wait_key key " + std::to_string(k.vk) + " " + k.command).c_str());
+            if (k.command == "close") {
+                close_requested(CloseAt::OBSERVER);
+                return 0;
+            }
             if (!k.command.empty()) {
                 run_command(k.command);
                 continue;
@@ -902,6 +962,10 @@ int32_t ui_wait_key() {
         platform::Event ev = g_input.front();
         g_input.pop_front();
         if (ev.type == platform::EV_KEY_DOWN) return event_key(ev);
+        if (ev.type == platform::EV_CLOSE) {
+            close_requested(CloseAt::OBSERVER);
+            return 0;
+        }
     }
 }
 
@@ -946,6 +1010,10 @@ bool ui_wait_input(UiInput* in) {
                 pending_up = 1;
                 return true;
             }
+            if (k.command == "close") {
+                close_requested(CloseAt::MODAL);
+                continue;
+            }
             if (!k.command.empty()) {
                 run_command(k.command);
                 continue;
@@ -954,6 +1022,7 @@ bool ui_wait_input(UiInput* in) {
             return true;
         }
         if (g_script_given && g_ui_exit_when_script_done && g_script.empty()) return false;
+        if (g_close_quit) ControlTurnA = 1;  // (control_game clears it before the main menu)
         if (ControlTurnA) return false;
         if (g_idle_hook && g_idle_hook()) return false;  // (the network setup window: started)
         if (!modal_callback()) return false;
@@ -969,6 +1038,10 @@ bool ui_wait_input(UiInput* in) {
         if (ev.type == platform::EV_KEY_DOWN) {
             in->key = event_key(ev);
             return true;
+        }
+        if (ev.type == platform::EV_CLOSE) {
+            close_requested(CloseAt::MODAL);
+            continue;
         }
         in->x = ev.x;
         in->y = ev.y;

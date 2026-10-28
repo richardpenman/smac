@@ -97,6 +97,10 @@ extern int32_t g_ui_shots;
 
 // Dispatches a key (virtual key with modifier bits) as Win_on_key / WM_CHAR deliver it.
 void ui_dispatch_key(int32_t key);
+// The window's close button where no game's main screen takes input (modal windows, the opening
+// screens, movies): before a game runs (GameNotStarted) smacx quits (true; the input loops then
+// return no more input), in a game the close is ignored (false). win.cpp close_requested.
+bool ui_window_close_modal();
 // Next key for a modal placeholder (popups): scripted or real; 0 when the input ended.
 int32_t ui_wait_key();
 // Next input of a modal window (popups, popup.cpp): a key (virtual key with the modifier bits), or

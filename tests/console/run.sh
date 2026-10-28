@@ -79,6 +79,37 @@ check zoomat "zoom 0: zoomed out around the centre" "^zoomat 530,200 tile 35,7 c
 check zoomat "zoom -2: centred on the tile under the mouse" "^zoomat 600,150 tile 35,5 centre 35,7 -> zoom -4 centre 35,5$"
 nocrash zoomat
 
+# 3c. The window's close button (CLOSE): the quit question of ctrl+Q (REALLYQUIT); a second close
+#     while it is up is ignored (a modal window), "Oops, no" plays on (the hold order is given
+#     afterwards); then close and "Yes" quit (the last UNITS never runs). smacx's own: the
+#     original's window has no close button (win.cpp close_requested).
+run close $NEW --keys "ENTER,CLOSE,CLOSE,ENTER,h,UNITS,CLOSE,DOWN,ENTER,UNITS"
+check close "close: the quit question" "^window close: the quit question$"
+check close "a second close while it is up: ignored" "^window close: ignored \(a modal window is up\)$"
+check close "No: the answer" "popup REALLYQUIT answer: 0 "
+check close "No: playing on (hold given afterwards)" "^unit 4 f1 Scout Patrol \(35,7\) order 2 "
+check close "Yes: quit" "popup REALLYQUIT answer: 1 "
+if [ "$(grep -c '^unit 4 ' "$OUT/close.log")" = 1 ] && [ "$(grep -c '^window close: the quit question' "$OUT/close.log")" = 2 ]; then
+    echo "PASS close: quit after Yes (no more input taken)"
+else echo "FAIL close: quit after Yes"; FAIL=1; fi
+nocrash close
+#     Before a game runs (the main menu, the setup screens) the close quits at once (the
+#     MENUSTATE after it never runs); in observer mode too.
+run closemenu --keys "CLOSE,WAIT:200,MENUSTATE"
+check closemenu "main menu: quits" "^window close: no game running: quitting$"
+if grep -q "^menustate" "$OUT/closemenu.log"; then echo "FAIL closemenu: input after the close"; FAIL=1
+else echo "PASS closemenu: no input after the close"; fi
+nocrash closemenu
+run closesetup --keys "ENTER,WAIT:200,MENUSTATE,CLOSE,WAIT:200,MENUSTATE"
+check closesetup "setup screen shown" "^menustate caption=\"\" selected=0 \[MAKE RANDOM MAP\]"
+check closesetup "setup screen: quits" "^window close: no game running: quitting$"
+if [ "$(grep -c '^menustate' "$OUT/closesetup.log")" = 1 ]; then echo "PASS closesetup: no input after the close"
+else echo "FAIL closesetup: input after the close"; FAIL=1; fi
+nocrash closesetup
+run closeobs --new size=0 --human 0 --seed 1,2 --keys "CLOSE"
+check closeobs "observer: quits" "^quit requested: quitting$"
+nocrash closeobs
+
 # 4. Unit orders through the menus (Alt+A: Action; the items run Console_menu_proc).
 run menu $NEW --keys "ENTER,A-a,SHOT:menu_action.bmp,ESC,ALT,RIGHT,SHOT:menu_game.bmp,ESC,A-a,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,UNITS"
 check menu "a menu command chosen" "menu item [0-9A-F]+ "
