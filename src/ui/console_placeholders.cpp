@@ -130,7 +130,7 @@ void THISCALL Console_chat(uint8_t*, int32_t to) {
 // name, the faction's formal name, noun and adjective, the leader's title and adjective, and the
 // gender (male / female labels 0xB88 / 0xB8C); OK copies the fields back (female when the gender
 // text starts as label 0xB8C, compared case-insensitively on its first letter).
-// (NetDaemon_synch of the names: multiplayer, out of scope.)
+// In a network game the faction's block goes to the other players (NetDaemon_synch 7).
 void THISCALL Console_custom_my_faction(uint8_t*) {
     int32_t f = CurrentPlayerFaction;
     if ((GameState & STATE_SCENARIO_EDITOR) && (GameState & STATE_OMNISCIENT_VIEW)) {
@@ -169,6 +169,7 @@ void THISCALL Console_custom_my_faction(uint8_t*) {
     crt_strcpy(m.adj_leader, ParseStrBuffer[5]);
     const char* fem = label_get(0xB8C / 4);
     m.is_leader_female = std::toupper((uint8_t)ParseStrBuffer[6][0]) == std::toupper((uint8_t)fem[0]);
+    NetDaemon_synch(&NetState, 7, f, 0, 0, nullptr, 1, 0x2101);
     std::fprintf(stderr, "custom faction %d: %s %s, %s / %s / %s (%s)\n", f, m.title_leader, m.name_leader,
                  m.formal_name_faction, m.noun_faction, m.adj_name_faction, m.is_leader_female ? "female" : "male");
 }

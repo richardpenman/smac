@@ -56,8 +56,12 @@ HMOVE="WAITFOR:player turn faction 1,ENTER,WAIT:500,KP2,WAITFOR:move veh 0 dir 3
 HCHAT="WAITFOR:player turn faction 1,ENTER,WAIT:500,C-c,h,i,ENTER,WAITFOR:net: chat,$END,$W"
 HOST="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,ENTER,ENTER,WAITFOR:netmsg ADDED,ENTER,WAITFOR:player 2 ready 1,$READY,WAITFOR:game started,ENTER,\
 $HMOVE,$HCHAT,$HTURN,WAITFOR:player turn faction 1,WAIT:2000"
+# The client's first turn renames its leader (Console_custom_my_faction, "+": CUSTOMNAMES, a Z added
+# to the leader's name): NetDaemon_synch 7 sends the faction's names to the host, so the states
+# compared below agree.
+CCUSTOM="$W,WAITFOR:player turn faction 2,ENTER,WAIT:500,+,Z,ENTER,WAIT:500,$END"
 CLIENT="DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,ENTER,DOWN,ENTER,ENTER,WAITFOR:setup window open,WAIT:500,$READY,\
-WAITFOR:game started,ENTER,$CTURN,$CTURN,$CTURN,WAITFOR:player turn faction 1,WAIT:1000"
+WAITFOR:game started,ENTER,$CCUSTOM,$CTURN,$CTURN,WAITFOR:player turn faction 1,WAIT:1000"
 game() {
     local name="$1"; shift
     local port=$((29000 + RANDOM % 2000))
@@ -115,6 +119,7 @@ check game-client "the NetMsg box (UPKEEP5)" "^netmsg UPKEEP5: Upkeep Phase"
 nocheck game-client "not a modal popup" "^popup UPKEEP5 shown"
 check game-host "the host" "^net: hosting on port"
 check game-client "the client" "^net: joined 127.0.0.1"
+check game-client "the leader renamed (CUSTOMNAMES)" "^custom faction 2: [^,]*Z, "
 check game-client "the host's setting: the original bugs" "^net: the host plays with the original bugs"
 compare game "host and client states equal each turn"
 
