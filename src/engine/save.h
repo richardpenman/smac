@@ -89,8 +89,8 @@ ADDR(0x5ABEC0) void GAMEAPI wipe_undo();
 // Scenario editor: rotates the undo files and saves the current state as undo slot 1.
 ADDR(0x5ABF20) void GAMEAPI auto_undo();
 
-// ---- file dialogs (UI shells around the daemons: hybrid builds always call the original; the
-// native reconstruction runs the dialogs through engine/ui_bridge.h, headless: cancelled) ----
+// ---- file dialogs (UI shells around the daemons: the dialogs run through engine/ui_bridge.h,
+// headless: cancelled) ----
 // "Save game" (scenario != 0: save scenario) dialog and save. Returns 0 when saved, 1 otherwise.
 ADDR_NATIVE(0x5A9EB0) int32_t GAMEAPI save_game(int32_t scenario);
 // "Load game" (scenario != 0: load scenario) dialog and load_daemon(path, relinearize). Returns

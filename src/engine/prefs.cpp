@@ -231,9 +231,7 @@ void GAMEAPI prefs_use() {
     GameWarnings = AlphaIniPrefs.announce;
 }
 
-#ifndef SMACX_HYBRID
 void prefs_static_init(const char* ini_path) {
     PrefsIniPath = ini_path ? ini_path : ".\\Alpha Centauri.Ini";
     PrefsSection = "Alpha Centauri";
 }
-#endif

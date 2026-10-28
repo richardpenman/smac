@@ -93,9 +93,8 @@ bool decode_players(const uint8_t* data, size_t size, std::vector<PlayerInfo>& o
 
 }  // namespace nettcp
 
-// ---- the sockets (native builds; the hybrid DLL runs inside the original, with DirectPlay) ----
+// ---- the sockets ----
 
-#ifndef SMACX_HYBRID
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -449,4 +448,3 @@ void Transport::flush(uint32_t timeout_ms) {
 }
 
 }  // namespace nettcp
-#endif  // SMACX_HYBRID

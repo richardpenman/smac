@@ -3,13 +3,7 @@
 #include "engine/compat.h"
 #include "engine/compat_reads.h"
 #include "engine/game_state.h"
-#include "engine/hybrid_shadow.h"
 #include "engine/stack_residue.h"
-#ifdef SMACX_HYBRID
-extern "C" int32_t GAMEAPI speed_impl_c(int32_t veh_id, int32_t skip_morale);
-extern "C" int32_t GAMEAPI speed_proto_impl_c(int32_t unit_id);
-extern "C" int32_t GAMEAPI morale_veh_impl_c(int32_t veh_id, int32_t check_drone_riot, int32_t faction_id_vs_native);
-#endif
 
 #include <cctype>
 #include <cstdlib>
@@ -32,86 +26,10 @@ extern "C" int32_t GAMEAPI morale_veh_impl_c(int32_t veh_id, int32_t check_drone
 #include "engine/ui_bridge.h"
 #include "engine/table_at.h"
 
-#ifdef SMACX_HYBRID
-// Hybrid builds: stack image of the original has_abil.
-//
-// Some original AI code (below enemy_veh) reads an uninitialised local whose stack slot was last
-// written by a has_abil call, so the stack contents has_abil leaves behind influence the game.
-// The hybrid build therefore reproduces them: an asm thunk builds the original frame (saved
-// ebp/ebx/esi/edi, unit_id * 0x34 at [ebp-4], loop counter in the unit_id argument slot), the
-// stack below it is saved before the C++ body runs and restored afterwards, and the frame of the
-// original's last has_tech call is rewritten. Native builds have no such dependency to reproduce
-// until the AI is reconstructed.
-namespace {
-constexpr int kSaveBytes = 1024;
-}
-extern "C" {
-uint32_t has_abil_saved_stack[kSaveBytes / 4];
-int32_t has_abil_result;
-int32_t has_abil_loop;  // final loop counter, -1 if the bonus loop was not entered
-int32_t has_abil_tech_called;  // the bonus loop called has_tech
-uint32_t has_abil_tech_args[4];  // edi, esi, preq_tech, faction (pushed order reversed)
-int32_t __cdecl has_abil_body(int32_t unit_id, uint32_t ability_flag);
-}
-
-#ifdef SMACX_UNINIT_DEBUG
-// Debug variant (uninitialised-read investigation only): HA_MASK (environment, hex) selects which
-// parts of the original stack image the thunk reproduces. bit0: [ebp-4]; bit1: restore the stack
-// below the frame; bit2: loop counter in the argument slot; bit3: has_tech frame. Default 0xF.
-#include <cstdlib>
-// bit4: after returning, overwrite the saved-EDI slot ([ebp-0x10]) with HA_EDI (hex).
-extern "C" uint32_t has_abil_dbg_mask = 0xF;
-extern "C" uint32_t has_abil_dbg_edi = 0;
-__attribute__((constructor)) static void has_abil_dbg_init() {
-    if (const char* m = getenv("HA_MASK")) has_abil_dbg_mask = (uint32_t)strtoul(m, nullptr, 16);
-    if (const char* m = getenv("HA_EDI")) has_abil_dbg_edi = (uint32_t)strtoul(m, nullptr, 16);
-}
-#define HA_DBG(bit, label) "testl $" #bit ", _has_abil_dbg_mask\n jz " #label "\n"
-#define HA_DBG_ONLY(code)  code
-#else
-#define HA_DBG(bit, label) ""
-#define HA_DBG_ONLY(code)  ""
-#endif
-__attribute__((naked)) int32_t GAMEAPI has_abil(int32_t unit_id, uint32_t ability_flag) {
-    __asm__(
-        "push %ebp\n mov %esp, %ebp\n push %ecx\n push %ebx\n push %esi\n push %edi\n"
-        HA_DBG(1, 5f) "mov 8(%ebp), %eax\n imul $0x34, %eax, %eax\n mov %eax, -4(%ebp)\n5:\n"
-        // save the stack below the frame
-        "lea -1024(%esp), %esi\n mov $_has_abil_saved_stack, %edi\n mov $256, %ecx\n rep movsl\n"
-        "push 12(%ebp)\n push 8(%ebp)\n call _has_abil_body\n add $8, %esp\n"
-        "mov %eax, _has_abil_result\n"
-        // restore it
-        HA_DBG(2, 6f) "mov $_has_abil_saved_stack, %esi\n lea -1024(%esp), %edi\n mov $256, %ecx\n rep movsl\n6:\n"
-        // loop counter in the unit_id argument slot
-        HA_DBG(4, 1f) "mov _has_abil_loop, %eax\n test %eax, %eax\n js 1f\n mov %eax, 8(%ebp)\n1:\n"
-        // frame of the last has_tech call: faction, preq_tech, return address, ebp, esi, edi
-        HA_DBG(8, 2f) "cmpl $0, _has_abil_tech_called\n je 2f\n"
-        "mov _has_abil_tech_args+12, %eax\n mov %eax, -20(%ebp)\n"
-        "mov _has_abil_tech_args+8, %eax\n mov %eax, -24(%ebp)\n"
-        "movl $0x5BF291, -28(%ebp)\n"
-        "mov %ebp, -32(%ebp)\n"
-        "mov _has_abil_tech_args+4, %eax\n mov %eax, -36(%ebp)\n"
-        "mov _has_abil_tech_args, %eax\n mov %eax, -40(%ebp)\n"
-        "2:\n"
-        "mov _has_abil_result, %eax\n"
-        "pop %edi\n"
-        HA_DBG_ONLY(HA_DBG(16, 7f) "mov _has_abil_dbg_edi, %ecx\n mov %ecx, -16(%ebp)\n7:\n")
-        "pop %esi\n pop %ebx\n mov %ebp, %esp\n pop %ebp\n ret\n");
-}
-#define HA_RECORD_LOOP(i) (has_abil_loop = (i))
-#define HA_RECORD_TECH(f, i, preq, faction)                                                                           \
-    (has_abil_tech_called = 1, has_abil_tech_args[0] = (uint32_t)(f) * 0x59C,                                         \
-     has_abil_tech_args[1] = (uint32_t)(uintptr_t)&game().mfactions[0].faction_bonus_val1[0] + (f) * 0x59C + (i) * 4, \
-     has_abil_tech_args[2] = (uint32_t)(preq), has_abil_tech_args[3] = (uint32_t)(faction))
-extern "C" int32_t __cdecl has_abil_body(int32_t unit_id, uint32_t ability_flag) {
-    has_abil_loop = -1;
-    has_abil_tech_called = 0;
-#else
 #define HA_RECORD_LOOP(i)                   ((void)0)
 #define HA_RECORD_TECH(f, i, preq, faction) ((void)0)
 // Whether unit_id has ability_flag (see veh.h).
 int32_t GAMEAPI has_abil(int32_t unit_id, uint32_t ability_flag) {
-#endif
     int32_t faction_id = unit_id / 64;
     if (Units[unit_id].ability_flags & ability_flag) return 1;
     if (!faction_id) return 0;
@@ -572,7 +490,7 @@ int32_t GAMEAPI can_arty(int32_t unit_id, int32_t sea_triad_retn) {
     return 0;
 }
 
-int32_t GAMEAPI SHADOWABLE(morale_veh)(int32_t veh_id, int32_t check_drone_riot, int32_t faction_id_vs_native) {
+int32_t GAMEAPI morale_veh(int32_t veh_id, int32_t check_drone_riot, int32_t faction_id_vs_native) {
     VEH& veh = game().vehs[veh_id];
     uint32_t faction_id = veh.faction_id;
     if (faction_id == 0) return morale_alien(veh_id, faction_id_vs_native);
@@ -642,7 +560,7 @@ int32_t GAMEAPI armor_proto(int32_t unit_id, int32_t veh_id_atk, int32_t is_bomb
     return value;
 }
 
-int32_t GAMEAPI SHADOWABLE(speed_proto)(int32_t unit_id) {
+int32_t GAMEAPI speed_proto(int32_t unit_id) {
     UNIT& u = Units[unit_id];
     int32_t triad = Chassis[u.chassis_id].triad;
     int32_t value = Chassis[u.chassis_id].speed;
@@ -687,7 +605,7 @@ static void speed_note_stack_residue(int32_t veh_id) {
     else if (unit_id != 19) g_stack_residue.speed = unit_id * 0x34;
 }
 
-int32_t GAMEAPI SHADOWABLE(speed)(int32_t veh_id, int32_t skip_morale) {
+int32_t GAMEAPI speed(int32_t veh_id, int32_t skip_morale) {
     VEH& veh = game().vehs[veh_id];
     int32_t value = speed_proto(veh.unit_id);
     if (veh_triad(veh_id) == 1 && SecretProjects[FAC_MARITIME_CONTROL_CENTER - SP_ID_First] >= 0 &&
@@ -863,13 +781,3 @@ int32_t Veh::wake() {
     return veh_id;
 }
 
-#ifdef SMACX_HYBRID
-// Hybrid: these functions run the original code a second time so that the dead stack they leave
-// is the original's (Path_find reads it uninitialised, see "Known uninitialised reads").
-HYBRID_SHADOW_THUNK(int32_t, speed, (int32_t veh_id, int32_t skip_morale), 2, 0x5C1545,
-                    "push %ebp\n mov %esp, %ebp\n push %ebx\n push %esi")
-HYBRID_SHADOW_THUNK(int32_t, speed_proto, (int32_t unit_id), 1, 0x5C13B7,
-                    "push %ebp\n mov %esp, %ebp\n push %ebx\n mov 8(%ebp), %ebx")
-HYBRID_SHADOW_THUNK(int32_t, morale_veh, (int32_t veh_id, int32_t check_drone_riot, int32_t faction_id_vs_native), 3,
-                    0x5C0E46, "push %ebp\n mov %esp, %ebp\n sub $8, %esp")
-#endif

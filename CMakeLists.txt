@@ -61,7 +61,7 @@ file(GLOB HEADLESS_SOURCES_FOR_GEN CONFIGURE_DEPENDS src/headless/*.cpp)
 file(GLOB UI_FILES_FOR_GEN CONFIGURE_DEPENDS src/ui/*.cpp src/ui/*.h)
 set(GEN_DIR ${CMAKE_BINARY_DIR}/generated)
 add_custom_command(
-  OUTPUT ${GEN_DIR}/native_stubs.cpp ${GEN_DIR}/hybrid_bindings.cpp ${GEN_DIR}/status.tsv
+  OUTPUT ${GEN_DIR}/native_stubs.cpp ${GEN_DIR}/status.tsv
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/src/tools/gen_bindings.py ${GEN_DIR} ${CMAKE_SOURCE_DIR}/src
   DEPENDS ${ENGINE_SOURCES} ${ENGINE_HEADERS} ${HEADLESS_SOURCES_FOR_GEN} ${UI_FILES_FOR_GEN} ${CMAKE_SOURCE_DIR}/src/tools/gen_bindings.py
   COMMENT "Generating original-function bindings")

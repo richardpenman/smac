@@ -1,7 +1,6 @@
 // Headless implementations of the base window (BaseWin) functions the engine calls
-// (engine/ui_bridge.h), and of the window visibility / redraw requests they depend on. Native
-// builds only: hybrid builds call the original UI. smacx replaces this area (src/ui/basewin*.cpp).
-#ifndef SMACX_HYBRID
+// (engine/ui_bridge.h), and of the window visibility / redraw requests they depend on. smacx
+// replaces this area (src/ui/basewin*.cpp).
 #include "engine/ui_bridge.h"
 
 // No window is ever visible: the base window is never shown, nothing is recomputed or redrawn.
@@ -15,4 +14,3 @@ void THISCALL BaseWin_check_base(uint8_t*, int32_t) {}
 void THISCALL BaseWin_check_loc(uint8_t*, int32_t, int32_t, int32_t) {}
 void THISCALL BaseWin_check_veh(uint8_t*, int32_t) {}
 void THISCALL BaseWin_base_killed(uint8_t*, int32_t) {}
-#endif

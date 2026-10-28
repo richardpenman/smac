@@ -4,10 +4,9 @@
 //
 // The original objects hold Windows handles and heap pointers, so they live in native memory
 // (not in the engine memory image); their fields keep the original meaning and the original byte
-// offset is noted per field. Functions keep the original names and addresses (ADDR_NATIVE: hybrid
-// builds always call the original UI). Methods are free functions taking the object first.
-// Drawing semantics follow the asm; where a routine is approximated (not bit-exact yet) its
-// comment says so.
+// offset is noted per field. Functions keep the original names and addresses (ADDR_NATIVE). Methods
+// are free functions taking the object first. Drawing semantics follow the asm; where a routine is
+// approximated (not bit-exact yet) its comment says so.
 #pragma once
 #include <cstdint>
 #include <vector>

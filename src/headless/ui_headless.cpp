@@ -1,7 +1,5 @@
 // Headless implementations of the UI-layer functions declared in engine/ui_bridge.h (the areas
 // that no native UI replaces yet; see ui_headless_mapview.cpp for how areas are replaced).
-// Native builds only: hybrid builds always call the original UI.
-#ifndef SMACX_HYBRID
 #include "engine/ui_bridge.h"
 
 #include <cstdlib>
@@ -106,4 +104,3 @@ void ui_stringlist_add(uint8_t* list, int32_t id, char* text) {
     *reinterpret_cast<int32_t*>(list + 0x14) = (int32_t)entries.size() - 1;
 }
 void GAMEAPI do_all_draws() {}
-#endif

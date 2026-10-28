@@ -58,8 +58,8 @@ int32_t wrap_dx(int32_t x1, int32_t x2) {
 }
 
 // Raw reads of the original tables (base_build indexes them with ids out of range, see the BUG
-// notes at the call sites). Hybrid builds read the original memory; native builds read the
-// memory image (tables with pointers live outside it, so out-of-range reads there differ).
+// notes at the call sites): ids out of range read the original's memory at their address
+// (table_at, mem::host).
 int16_t raw_veh_unit_id(int32_t veh_id) {
     int16_t v;
     std::memcpy(&v, table_bytes(game().vehs, kVehsAddr, veh_id) + offsetof(VEH, unit_id), 2);
@@ -67,12 +67,8 @@ int16_t raw_veh_unit_id(int32_t veh_id) {
 }
 uint8_t raw_unit_chassis(int32_t unit_id) { return table_at(Units, kUnitsAddr, unit_id).chassis_id; }
 uint8_t raw_chassis_speed(int32_t chassis_id) {
-#ifdef SMACX_HYBRID
-    return reinterpret_cast<const uint8_t*>(&Chassis[0])[chassis_id * 0x90 + 0x48];
-#else
     if (chassis_id < 9) return Chassis[chassis_id].speed;
     return *mem::host(0x94A330 + chassis_id * 0x90 + 0x48);
-#endif
 }
 
 bool human(int32_t id) { return (FactionStatus[0] & (uint8_t)(1u << (id & 31))) != 0; }

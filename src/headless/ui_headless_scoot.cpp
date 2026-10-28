@@ -1,6 +1,5 @@
-// Headless implementation of veh_scoot, the unit's sliding animation (engine/ui_bridge.h). Native
-// builds only: hybrid builds call the original UI. smacx replaces this area (src/ui/sound.cpp).
-#ifndef SMACX_HYBRID
+// Headless implementation of veh_scoot, the unit's sliding animation (engine/ui_bridge.h). smacx
+// replaces this area (src/ui/sound.cpp).
 #include "engine/game_state.h"
 #include "engine/ui_bridge.h"
 
@@ -10,4 +9,3 @@ void GAMEAPI veh_scoot(int32_t veh_id, int32_t, int32_t, int32_t dir, int32_t) {
     if (dir > 7) dir %= 8;
     game().vehs[veh_id].rotate_angle = (int8_t)dir;
 }
-#endif

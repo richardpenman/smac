@@ -1,6 +1,4 @@
 // Headless implementations of the UI-layer functions used by the turn module (engine/ui_bridge.h).
-// Native builds only: hybrid builds call the original UI.
-#ifndef SMACX_HYBRID
 #include "engine/game_state.h"
 #include "engine/ui_bridge.h"
 
@@ -51,4 +49,3 @@ void THISCALL GraphicWin_fill(uint8_t*, int32_t) {}
 void THISCALL Win_show(uint8_t*, int32_t) {}
 bool ui_directplay_registered() { return false; }
 void ui_main_mapwin_set_options(uint32_t) {}
-#endif

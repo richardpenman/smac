@@ -1,8 +1,8 @@
 // The game state as one object (docs/CLEANUP_PLAN.md, "Globals become game-state objects", stage 1).
 //
 // GameStateView groups the main records of the game: a view of reference members onto the
-// globals of globals.h, which native builds bind to the native records of engine/state.h (hybrid
-// builds: the original's memory); game().bases[i] is Bases[i].
+// globals of globals.h, which bind to the native records of engine/state.h; game().bases[i] is
+// Bases[i].
 // (GameState itself is the original's game state flags word, 0x9A64C0, hence the name of the view.)
 //
 // Engine code reaches the state through game(): game().bases[id], game().map.x, ... The globals

@@ -158,17 +158,6 @@ int32_t GAMEAPI game_io(uint8_t* win, CrtFile* file) {
 
 // The TimeControl block (6 records of 0x20 bytes); reading keeps the current name pointers.
 static uint32_t save_io_time_control(CrtFile* file, int32_t write) {
-#ifdef SMACX_HYBRID
-    char* names[6];
-    if (!write) {
-        for (int32_t i = 0; i < 6; i++) names[i] = TimeControl[i].name;
-    }
-    if (!save_io(TimeControl, 0xC0, file)) return 0;
-    if (!write) {
-        for (int32_t i = 0; i < 6; i++) TimeControl[i].name = names[i];
-    }
-    return 1;
-#else
     // Native TimeControl holds host pointers: the block is built in the image layout, with the
     // name slots taken from the memory image (pointers of the original process).
     uint8_t* image = mem::host(0x94F1B8);
@@ -185,7 +174,6 @@ static uint32_t save_io_time_control(CrtFile* file, int32_t write) {
         }
     }
     return 1;
-#endif
 }
 
 // Version 2 faction record (0x1CBC bytes: unit tables of 256 prototypes) to version 10 (0x20BC).
@@ -749,7 +737,7 @@ int32_t GAMEAPI load_daemon(const char* filename, int32_t relinearize) {
                     PbemActive = 0;
                 }
                 // smacx: a hotseat, PBEM or online game plays with the setting it was saved with
-                // (save.h), unless the setting was forced (--original-bugs, the hybrid build).
+                // (save.h), unless the setting was forced (--original-bugs).
                 if ((PbemActive || MultiplayerActive) && g_save_original_bugs >= 0 && !g_original_bugs_forced &&
                     (g_save_original_bugs != 0) != g_original_bugs) {
                     compat_set_original_bugs(g_save_original_bugs != 0);
@@ -948,8 +936,7 @@ void GAMEAPI clear_monuments() {
     }
 }
 
-// ---- file dialogs (native builds; hybrid builds call the original UI functions) ----
-#ifndef SMACX_HYBRID
+// ---- file dialogs ----
 #include "engine/game.h"
 #include "engine/parse.h"
 #include "engine/prefs.h"
@@ -1271,4 +1258,3 @@ void GAMEAPI save_map() {
     }
     FileDialog_dtor(dialog);
 }
-#endif

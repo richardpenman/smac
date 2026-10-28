@@ -1,6 +1,5 @@
 // Native emulation of values the original leaves on its stack and later code reads (docs/
-// RECONSTRUCTION.md, "Known uninitialised reads"). Not original memory: the hybrid build reads the
-// real stack slots with entry thunks instead (path.cpp, base.cpp, turn.cpp, diplomacy_b.cpp).
+// RECONSTRUCTION.md, "Known uninitialised reads"). Not original memory.
 // Each value emulates an original bug behind a flag of Compat::StackResidue (compat.h).
 #pragma once
 #include <cstdint>

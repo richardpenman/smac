@@ -1,6 +1,4 @@
 // Headless implementations of the council window's operations (engine/council.h).
-// Native builds only: hybrid builds use the original window (src/engine/ui_bridge_council_hybrid.cpp).
-#ifndef SMACX_HYBRID
 #include "engine/council.h"
 
 void ui_councilwin_open(uint8_t*) {}
@@ -22,4 +20,3 @@ void ui_councilwin_panel_draw(uint8_t*, int32_t) {}
 void ui_councilwin_button_draw(uint8_t*) {}
 void ui_councilwin_release(uint8_t*) {}
 void ui_councilwin_close_fonts(uint8_t*) {}
-#endif

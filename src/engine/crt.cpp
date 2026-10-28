@@ -1,12 +1,6 @@
 // Native implementations of the MSVC runtime functions declared in crt.h.
 #include "engine/crt.h"
 
-#ifdef SMACX_HYBRID
-
-// MSVC FILE: int _cnt at +4... _flag at +0xC; _IOEOF = 0x10.
-bool crt_feof(CrtFile* file) { return (*((const uint8_t*)file + 0xC) & 0x10) != 0; }
-
-#else
 
 #include <cstdio>
 #include <cstdlib>
@@ -182,4 +176,3 @@ int32_t GAMEAPI crt_rename(const char* from, const char* to) {
     return std::rename(a, b) == 0 ? 0 : -1;
 }
 
-#endif

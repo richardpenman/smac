@@ -154,7 +154,6 @@ void GAMEAPI alien_start() {
     }
 }
 
-#ifndef SMACX_HYBRID
 uint8_t* GAMEAPI headless_basepop_alloc();
 
 void engine_static_init(const char* ini_path) {
@@ -170,4 +169,3 @@ void engine_static_init(const char* ini_path) {
     BasePopAlloc = headless_basepop_alloc;
     GameDialogFlags |= 4;
 }
-#endif

@@ -44,9 +44,6 @@ namespace {
 // runs at the stack depth of the base_minerals call before it.
 inline void base_energy_call() {
     base_energy();
-#ifdef SMACX_HYBRID
-    __asm__ volatile("");  // no tail call: base_energy reads the stack left by base_minerals
-#endif
 }
 // Raw byte view of the base table (the original indexes it without range checks).
 uint8_t* base_raw(int32_t base_id) { return table_bytes(game().bases, kBasesAddr, base_id); }
@@ -1627,34 +1624,9 @@ void GAMEAPI base_nutrient() {
 
 // base_energy reads a local it never writes for alien factions without trade partners (see
 // base_energy below): the slot holds base_minerals' last local (its eco-damage divisor), as every
-// caller runs base_minerals immediately before base_energy. Native builds pass the value through
-// g_stack_residue.minerals; hybrid builds capture/write the real stack slot with thunks.
-#ifdef SMACX_HYBRID
-extern "C" {
-int32_t base_minerals_residue_out;
-int32_t base_energy_residue_in;
-void __cdecl base_minerals_body();
-void __cdecl base_energy_body();
-}
-// [esp-8] at entry is the callee's [ebp-4].
-__attribute__((naked)) void GAMEAPI base_minerals() {
-    __asm__("call _base_minerals_body\n mov _base_minerals_residue_out, %eax\n mov %eax, -8(%esp)\n ret\n");
-}
-__attribute__((naked)) void GAMEAPI base_energy() {
-    __asm__("mov -8(%esp), %eax\n mov %eax, _base_energy_residue_in\n jmp _base_energy_body\n");
-}
-#define BASE_MINERALS_DEF       extern "C" void __cdecl base_minerals_body()
-#define BASE_ENERGY_DEF         extern "C" void __cdecl base_energy_body()
-#define MINERALS_RESIDUE_SET(v) (base_minerals_residue_out = (v))
-#define ENERGY_RESIDUE_GET()    (base_energy_residue_in)
-#else
-#define BASE_MINERALS_DEF       void GAMEAPI base_minerals()
-#define BASE_ENERGY_DEF         void GAMEAPI base_energy()
-#define MINERALS_RESIDUE_SET(v) (g_stack_residue.minerals = (v))
-#define ENERGY_RESIDUE_GET()    (g_stack_residue.minerals)
-#endif
-
-BASE_MINERALS_DEF {
+// caller runs base_minerals immediately before base_energy. The value passes through
+// g_stack_residue.minerals.
+void GAMEAPI base_minerals() {
     int32_t faction_id = (uint8_t)cur_base().faction_id;
     Faction& f = game().factions[faction_id];
     cur_base().mineral_intake_2 += BaseResourceConvoyTo[1];
@@ -1730,7 +1702,7 @@ BASE_MINERALS_DEF {
             cur_base().mineral_surplus = cur_base().mineral_intake_2 - cur_base().mineral_consumption;
         }
     }
-    MINERALS_RESIDUE_SET(reduce);
+    g_stack_residue.minerals = reduce;
 }
 
 // ---- psych, energy ------------------------------------------------------------------------------
@@ -1964,7 +1936,7 @@ void GAMEAPI base_psych() {
     }
 }
 
-BASE_ENERGY_DEF {
+void GAMEAPI base_energy() {
     int32_t faction_id = (uint8_t)cur_base().faction_id;
     Faction& f = game().factions[faction_id];
     MFaction& m = game().mfactions[faction_id];
@@ -1982,7 +1954,7 @@ BASE_ENERGY_DEF {
     }
     // BUG(original): the alien bonus below starts from a local that only the commerce loop writes
     // (residue of base_minerals otherwise).
-    int32_t value = g_compat.residue.alien_bonus_energy ? ENERGY_RESIDUE_GET() : 0;
+    int32_t value = g_compat.residue.alien_bonus_energy ? g_stack_residue.minerals : 0;
     for (int32_t i = 1; i < 8; i++) {
         BaseCommerceImport[i] = 0;
         BaseCommerceExport[i] = 0;

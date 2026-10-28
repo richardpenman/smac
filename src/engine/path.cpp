@@ -608,30 +608,12 @@ int32_t path_find_core(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y
     return best_dir;
 }
 
-#ifdef SMACX_HYBRID
-// Hybrid: original callers leave the uninitialised local's value on the stack; the entry thunk
-// captures the dword Path_find's frame would read ([ebp-0x2c] = [entry esp - 0x30]).
-extern "C" int32_t PathFindEntryResidue;
-int32_t PathFindEntryResidue = 0;
-static int32_t THISCALL path_find_entry(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t unit_id,
-                                        int32_t faction_id, int32_t flags, int32_t prev_dir) {
-    return path_find_core(self, x1, y1, x2, y2, unit_id, faction_id, flags, prev_dir, PathFindEntryResidue);
-}
-extern "C" void* path_find_entry_ptr;
-void* path_find_entry_ptr = reinterpret_cast<void*>(&path_find_entry);
-__attribute__((naked)) int32_t THISCALL Path_find(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y2,
-                                                  int32_t unit_id, int32_t faction_id, int32_t flags,
-                                                  int32_t prev_dir) {
-    __asm__("mov -0x30(%esp), %eax\n mov %eax, _PathFindEntryResidue\n jmp *_path_find_entry_ptr\n");
-}
-#else
 // Native: only Path_move reaches the uninitialised read (it calls path_find_core with the residue
 // speed() leaves); other callers see the canonical zero.
 int32_t THISCALL Path_find(Path* self, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t unit_id,
                            int32_t faction_id, int32_t flags, int32_t prev_dir) {
     return path_find_core(self, x1, y1, x2, y2, unit_id, faction_id, flags, prev_dir, 0);
 }
-#endif
 
 int32_t THISCALL Path_move(Path* self, int32_t veh_id, int32_t faction_id) {
     VEH& veh = game().vehs[veh_id];

@@ -13,9 +13,6 @@
 // blocks). That arithmetic needs the record's type to keep the original's layout, which the
 // SMAC_LAYOUT assertions pin; a record whose type changes must first lose its address users.
 //
-// Hybrid builds (32-bit, inside terranx.exe) have no such objects: their globals are the
-// original's memory.
-//
 // Not here although saved: CouncilWinState and CouncilWinVotes (0x6FF69C, 0x6FF6D4) are fields of
 // the council window object (CouncilWin + 0xA1C, engine/council.h), a UI object of the image that
 // the council code reaches through its `self` pointer; they move with the UI windows.
@@ -25,7 +22,6 @@
 
 #include "engine/types/all.h"
 
-#ifndef SMACX_HYBRID
 namespace state {
 // By original address (defined in state.cpp). Each is its own object, so a read past one record's
 // end cannot silently land in the next (ASan sees it; the original's reads past an end go through
@@ -57,7 +53,6 @@ extern UNIT units[512];  // 0x9AB868 Units
 extern char game_alt_path[256];  // 0x9B2078 GameAltPath
 extern char scenario_file_name[256];  // 0x9B2178 ScenarioFileName
 }  // namespace state
-#endif
 
 // One record: its original address and size, the native object, and how it is read from the
 // original's bytes (the initial data image).
@@ -68,7 +63,7 @@ struct StateRecord {
     void* object;
     void (*load)(const uint8_t* bytes);
 };
-// The records, sorted by address (none in hybrid builds).
+// The records, sorted by address.
 const StateRecord* state_records(size_t* count);
 
 // A copy of the memory image and of every record (golden replays put the state back after each

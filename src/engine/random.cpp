@@ -22,7 +22,6 @@ void GAMEAPI game_srand(uint32_t seed) {
     crt_srand(seed);
 }
 
-#ifndef SMACX_HYBRID
 static uint32_t g_crt_holdrand = 1;
 
 void GAMEAPI crt_srand(uint32_t seed) { g_crt_holdrand = seed; }
@@ -34,4 +33,3 @@ int32_t GAMEAPI game_rand() {
 
 uint32_t crt_rand_state() { return g_crt_holdrand; }
 void crt_set_rand_state(uint32_t state) { g_crt_holdrand = state; }
-#endif

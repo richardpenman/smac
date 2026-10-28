@@ -2491,19 +2491,8 @@ void call_council_body(int32_t faction_id, int32_t aliens_residue) {
 }
 }  // namespace
 
-#ifdef SMACX_HYBRID
-extern "C" {
-int32_t call_council_residue_in;
-void __cdecl call_council_entry(int32_t faction_id) { call_council_body(faction_id, call_council_residue_in); }
-}
-// The original's [ebp-0x14] is ECX at entry (stored by _chkstk).
-__attribute__((naked)) void GAMEAPI call_council(int32_t) {
-    __asm__("mov %ecx, _call_council_residue_in\n jmp _call_council_entry\n");
-}
-#else
 // Other callers (the human's council menu): ECX is not known; non-zero assumed.
 void GAMEAPI call_council(int32_t faction_id) { call_council_body(faction_id, 1); }
-#endif
 
 // ---- game loops -------------------------------------------------------------------------------------
 
@@ -2521,10 +2510,7 @@ void call_enemy_turn(int32_t faction_id) {
     if (g_harness_enemy_turn) g_harness_enemy_turn(faction_id);
     else enemy_turn(faction_id);
 }
-void call_human_turn() {
-    if (g_harness_human_turn) g_harness_human_turn();
-    else Console_human_turn(&MainConsole);
-}
+void call_human_turn() { Console_human_turn(&MainConsole); }
 // Hotseat/PBEM: what the next human player is told when taking over (engine part).
 void hotseat_take_turn(int32_t viewer) {
     // Tampering detected by the previous player's checks.

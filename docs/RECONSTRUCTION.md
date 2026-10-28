@@ -48,14 +48,15 @@ Ghidra prints `game_random`'s scaling as a signed `>>`, but the code uses `shr` 
 * Name functions as in `re/out/index.tsv`. Give `FUN_xxxxxx` functions a descriptive name and
   mention the address in the doc comment. Keep one short doc comment per function (purpose, return
   value meaning); no decompiler noise, no `iVar3`-style names.
-* `tools/gen_bindings.py` (run by the build) picks up `ADDR(...)` declarations: implemented ones
-  become hybrid patches, missing ones get stubs (native: abort with the function's name; hybrid:
-  forward to the original). `build/*/generated/status.tsv` lists the state of every declaration.
+* `src/tools/gen_bindings.py` (run by the build) picks up `ADDR(...)` declarations: missing ones
+  get stubs that abort with the function's name. `build/*/generated/status.tsv` lists the state of
+  every declaration. (Until the hybrid freeze it also made the hybrid build's patch table and
+  forwarders to the original.)
 * To call an original function that is not reconstructed yet, just declare it (with `ADDR`) in the
-  header of the module it belongs to. Hybrid builds will call the original; native builds abort
-  when it is reached, which is how we find what to do next.
+  header of the module it belongs to. Native builds abort when it is reached, which is how we find
+  what to do next.
 * `ADDR_NATIVE` is for functions whose state lives outside the memory image (CRT `rand()`), and for
-  UI functions (below). Hybrid builds always call the original for these.
+  UI functions (below). (The frozen hybrid build always called the original for these.)
 
 ### Globals
 
@@ -235,12 +236,13 @@ base claims keep the allocator's residue (e.g. scenario rival6, "look first": ow
 0x03, 0xFF in the original). Native `mem_get` returns zeroed blocks; the oracle clears both new
 blocks right after `map_init` allocates them (harness/README.md), so the references match that.
 
-Hybrid tool for side-effect-free functions whose dead stack matters: define the body as
-`int32_t GAMEAPI SHADOWABLE(name)(...)` and add `HYBRID_SHADOW_THUNK(...)` (src/engine/hybrid_shadow.h;
-example: speed/speed_proto/morale_veh in veh.cpp). In hybrid builds the thunk computes the result
-with the reconstruction, then re-runs the original code from the same stack position so the stack
-image is the original's. Native builds are unaffected; native code must emulate the read instead
-(e.g. `g_stack_residue.speed`, set by speed()).
+Up to the hybrid freeze, the hybrid build had a tool for side-effect-free functions whose dead
+stack matters: shadow thunks (src/engine/hybrid_shadow.h at the freeze commit; speed, speed_proto,
+morale_veh, morale_alien, wants_to_attack) computed the result with the reconstruction, then re-ran
+the original code from the same stack position so the stack image was the original's, and entry
+thunks captured the residues Path_find, base_energy and call_council read. Main has neither (the
+dead code was removed in cleanup step 21); native code emulates each read (e.g.
+`g_stack_residue.speed`, set by speed()).
 
 Tools for finding more: oracle commands `steptrace`, `slotlog`, `poison rand`, and
 `harness/scripts/uninit_reads.py` (see harness/README.md).
@@ -278,11 +280,10 @@ Build in your own build directories so parallel work does not collide:
 
 ```sh
 cmake -S . -B build/$ME-native && cmake --build build/$ME-native -j2
-cmake -S . -B build/$ME-hybrid -DSMACX_HYBRID=ON -DCMAKE_TOOLCHAIN_FILE=cmake/i686-mingw.cmake
-cmake --build build/$ME-hybrid -j2
 ```
 
-Both must build without errors (native proves the code is portable; hybrid is what we test).
+It must build without errors. (A hybrid build, for the instructions below, is built from the freeze
+commit: docs/DEVELOPMENT.md, "The hybrid build after the freeze".)
 
 **Hybrid verification** runs the original game with reconstructed functions jump-patched over the
 originals and compares every game-state field per turn against cached oracle runs:

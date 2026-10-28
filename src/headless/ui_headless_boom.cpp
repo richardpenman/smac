@@ -1,8 +1,6 @@
-// Headless implementation of boom, the combat animation (engine/battle.h). Native builds only:
-// hybrid builds call the original UI. smacx replaces this area (src/ui/sound.cpp: its sounds).
-#ifndef SMACX_HYBRID
+// Headless implementation of boom, the combat animation (engine/battle.h). smacx replaces this area
+// (src/ui/sound.cpp: its sounds).
 #include "engine/battle.h"
 
 // The combat animation draws and plays sounds only (its result is unused by every caller).
 int32_t GAMEAPI boom(int32_t, int32_t, int32_t) { return 0; }
-#endif

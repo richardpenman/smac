@@ -1,6 +1,5 @@
 // Headless implementations of the UI-layer functions used by the battle module (engine/ui_bridge.h,
-// boom in engine/battle.h). Native builds only: hybrid builds call the original UI.
-#ifndef SMACX_HYBRID
+// boom in engine/battle.h).
 #include "engine/battle.h"
 #include "engine/game_state.h"
 #include "engine/ui_bridge.h"
@@ -22,4 +21,3 @@ int32_t GAMEAPI tut_check2(int32_t bit) {
     TutorialHintsShown |= bit;
     return 1;
 }
-#endif

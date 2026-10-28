@@ -108,7 +108,7 @@ inline int32_t text_color(uint32_t addr) { return *reinterpret_cast<int32_t*>(me
 GLOBAL(char[8][32], BaseInvertNames, 0x6A7528);
 GLOBAL(int32_t, BaseInvertCount, 0x6EEE60);
 
-// ---- original functions (ADDR_NATIVE: hybrid builds call the original UI) ----
+// ---- original functions (ADDR_NATIVE) ----
 // Also defined here (engine/ui_bridge.h): BaseWin_zoom, BaseWin_on_redraw, BaseWin_close,
 // BaseWin_focus, BaseWin_check_base, BaseWin_check_loc, BaseWin_check_veh, BaseWin_base_killed,
 // Win_is_visible, GraphicWin_redraw.

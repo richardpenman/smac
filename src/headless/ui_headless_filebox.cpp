@@ -1,8 +1,6 @@
 // Headless UI area "filebox": the save / load file dialogs (FileDialog, FileBox, FileList;
 // engine/ui_bridge.h) of save_game and load_game.
 // Replaced in smacx by src/ui/console_filebox.cpp.
-// Native builds only: hybrid builds always call the original UI.
-#ifndef SMACX_HYBRID
 #include <cstring>
 
 #include "engine/ui_bridge.h"
@@ -25,4 +23,3 @@ int32_t THISCALL FileList_set_path(uint8_t*, const char*) { return 0; }
 int32_t THISCALL FileList_add_ext(uint8_t*, const char*) { return 0; }
 void THISCALL FileList_close(uint8_t*) {}
 void ui_filebox_destroy(uint8_t*) {}
-#endif

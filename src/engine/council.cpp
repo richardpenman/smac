@@ -302,4 +302,3 @@ int32_t THISCALL CouncilWin_key(uint8_t* self, int32_t, int32_t key) {
     return 1;
 }
 
-int32_t (*g_harness_council_modal)(uint8_t* win) = nullptr;

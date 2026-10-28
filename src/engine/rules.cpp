@@ -954,7 +954,6 @@ int32_t GAMEAPI read_rules(int32_t all_rules) {
     return 0;
 }
 
-#ifndef SMACX_HYBRID
 // Initial map-bit columns of Terraform (0x691878, .data): {bit, bit_incompatible}.
 static const uint32_t kTerraformBits[20][2] = {
     {0x8000, 0x200000},
@@ -987,7 +986,6 @@ void rules_static_init() {
         Terraform[i].bit_incompatible = kTerraformBits[i][1];
     }
 }
-#endif
 
 // ---- original layout of the pointer tables (see rules.h) ----
 
@@ -999,9 +997,6 @@ uint32_t rules_orig_string_addr(const char* str) {
 }
 
 uint8_t rules_orig_byte(uint32_t addr) {
-#ifdef SMACX_HYBRID
-    return *mem::host(addr);
-#else
     uint8_t rec[0x2C] = {};
     auto put32 = [&](uint32_t off, uint32_t v) { crt_memcpy(rec + off, &v, 4); };
     auto put16 = [&](uint32_t off, uint16_t v) { crt_memcpy(rec + off, &v, 2); };
@@ -1041,5 +1036,4 @@ uint8_t rules_orig_byte(uint32_t addr) {
         return rec[(addr - 0x94F358) % 0x2C];
     }
     return *mem::host(addr);
-#endif
 }

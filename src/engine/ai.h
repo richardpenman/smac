@@ -21,10 +21,8 @@ ADDR(0x561080) void GAMEAPI enemy_strategy(int32_t faction_id);
 
 // ---- AI strategy part 1 (enemy_move itself: see ai_move.cpp) -----------------------------------
 
-// Harness hooks (not original): enemy_turn -> enemy_veh, and enemy_veh's message pump
-// (do_all_non_input at 0x57928D). The oracle poisons the stack at these call sites.
+// Harness hook (not original): enemy_turn -> enemy_veh (smacx_headless's trace).
 extern int32_t (*g_harness_enemy_veh)(int32_t veh_id);
-extern void (*g_harness_enemy_veh_pump)();
 
 // AI move of one unit: 1 if the unit is done for the turn.
 ADDR(0x579240) int32_t GAMEAPI enemy_veh(int32_t veh_id);

@@ -2,12 +2,11 @@
 //
 // The original engine calls straight into its UI (popups, map redraws, sound, window classes).
 // Those functions belong to the UI reconstruction; until then they are declared here with
-// ADDR_NATIVE: hybrid builds always call the original UI, and native builds use the headless
-// implementations in src/headless (the static library smacx_ui_headless, one object file per UI
-// area), which behave like an unattended observer (no drawing, popups return their default
-// choice). smacx replaces whole areas with its SDL UI (src/ui) by defining their functions in its
-// own objects (src/headless/ui_headless_mapview.cpp explains the mechanism). Keep declarations
-// grouped by original class.
+// ADDR_NATIVE: native builds use the headless implementations in src/headless (the static library
+// smacx_ui_headless, one object file per UI area), which behave like an unattended observer (no
+// drawing, popups return their default choice). smacx replaces whole areas with its SDL UI (src/ui)
+// by defining their functions in its own objects (src/headless/ui_headless_mapview.cpp explains the
+// mechanism). Keep declarations grouped by original class.
 #pragma once
 #include "engine/globals.h"
 
@@ -75,10 +74,10 @@ ADDR_NATIVE(0x510CE0) int32_t THISCALL Console_ready_search(uint8_t* console, in
 ADDR_NATIVE(0x511520) void THISCALL Console_set_move(uint8_t* console, int32_t a);
 // Not an original function: pact_ends' dialog for the viewer ("ENDPACT1", and "ENDPACT2" when
 // units were withdrawn), a Popup object on the original's stack. Viewer only: no-op in headless
-// and hybrid builds (observer games never reach it).
+// builds (observer games never reach it).
 void ui_pact_ends_dialog(int32_t withdrawn);
 // Not an original function: Console_upgrade for a unit of a human faction (the upgrade dialog).
-// Hybrid: runs the original Console_upgrade; headless: no human players, returns 0 (cancelled).
+// Headless: no human players, returns 0 (cancelled).
 int32_t THISCALL Console_upgrade_human(uint8_t* console, int32_t veh_id);
 
 // ---- popups ----
@@ -280,7 +279,7 @@ ADDR_NATIVE(0x483F90) int32_t THISCALL NewTechWin_exec(uint8_t* win, int32_t tec
 // open: blurb "#TECH<n>" of BLURBSX (in StrBuffer) with separator lines; show: tech icon, popup
 // `label` (StrBuffer) of the main script with the given flags, the tech's help text for the
 // viewer, and the sound effect; exec: shows it (non-viewer factions in the omniscient view).
-// Hybrid builds and headless: not displayed (the object exists only inside the original
+// Headless: not displayed (the object exists only inside the original
 // function; only reached for the viewer or with GameState 0x80).
 void ui_tech_popup_open();
 void ui_tech_popup_show(int32_t tech_id, int32_t flags, int32_t faction_id, bool with_help);
@@ -304,7 +303,7 @@ ADDR_NATIVE(0x46B140) void GAMEAPI draw_tiles(int32_t x, int32_t y, int32_t mode
 // Not original functions: base_production's announcement popup, a Popup object on its stack.
 // open: BasePop_init with the given width; blurb: popup BLURBS / StrBuffer with separator lines
 // (is_project: the first line only below 800 px width, then the PRODUCE2 text); exec: shows it.
-// Hybrid builds and headless: not displayed (as ui_tech_popup_*).
+// Headless: not displayed (as ui_tech_popup_*).
 void ui_production_popup_open(int32_t width);
 void ui_production_popup_blurb(bool is_project);
 void ui_production_popup_exec();
@@ -344,7 +343,7 @@ GLOBAL(int32_t, BlitSourceScale, 0x696D1C);  // piSourceScale
 // 30-frame drop pod animation (alien pod or drop pod with smoke) over the map centred on (x, y),
 // with the map window's option bits 0x8C0 cleared; close: releases the animation canvas and fades
 // the sound. first_base_name: the FIRSTBASE popup that lets the player rename the first base
-// (default_name); the chosen name is left in ParseStrBuffer[0]. Hybrid builds and headless: not
+// (default_name); the chosen name is left in ParseStrBuffer[0]. Headless: not
 // displayed (the default name is kept); crash_landing only runs for a human viewer.
 void ui_crash_landing_drop(int32_t x, int32_t y, bool alien);
 void ui_crash_landing_close();
@@ -405,13 +404,13 @@ void ui_main_mapwin_set_options(uint32_t bits);
 // Hotseat/PBEM: hides the previous player's view and asks the next human (faction_id) to take
 // over (SWITCHING popup, password check, optional save and quit). password_tries is control_turn's
 // count of wrong passwords (kept for the whole control_turn, as the original's local). Returns 0
-// when the player takes the turn, 1 when the game was left (ControlTurnA set). Hybrid builds and
-// headless: not shown (returns 0).
+// when the player takes the turn, 1 when the game was left (ControlTurnA set). Headless:
+// not shown (returns 0).
 int32_t ui_hotseat_switch(int32_t faction_id, int32_t* password_tries);
 // Hotseat/PBEM: shows the new player's view (centred on a base or unit), the battle summary popup
-// and the message list. Hybrid builds and headless: not shown.
+// and the message list. Headless: not shown.
 void ui_hotseat_show(int32_t faction_id);
-// call_council's menu of proposals (a Popup object on its stack). Hybrid builds and headless: not
+// call_council's menu of proposals (a Popup object on its stack). Headless: not
 // shown; exec returns -1 (cancelled); only human callers show it.
 void ui_council_menu_open(int32_t faction_id);
 void ui_council_menu_add(const char* text, int32_t proposal);
@@ -486,7 +485,7 @@ ADDR_NATIVE(0x4BA650) int32_t GAMEAPI tut_check2(int32_t bit);
 void ui_battle_wait_sound();
 // Not an original function: supply_options' menu (a Popup object on its stack with the items of
 // SUPPLYMENU: 0 cancel, 1 help build, 2.. convoy resources; `items` lines are listed). Returns
-// the choice, 0 if cancelled. Hybrid builds and headless: not shown (returns 0); only the viewer's
+// the choice, 0 if cancelled. Headless: not shown (returns 0); only the viewer's
 // own supply crawlers ask.
 int32_t ui_supply_menu(int32_t veh_id, int32_t base_id, int32_t items);
 // Engine pitch of the moving unit's sound (order_veh; 0 restores it).
@@ -496,7 +495,7 @@ bool ui_ctrl_pressed();
 // Not original functions: order_veh's menus (a Popup object on its stack). Artifact entering one of
 // the viewer's bases (ARTIFACTMENU: 0 keep, 1 link to the network node, 2 hurry production;
 // `items` lines) and a ship's passengers disembarking (DISEMBARKERS: the chosen vehicle + 1, 0
-// cancelled). Hybrid builds and headless: not shown (return 0).
+// cancelled). Headless: not shown (return 0).
 int32_t ui_artifact_menu(int32_t veh_id, int32_t base_id, int32_t items);
 int32_t ui_disembark_menu(int32_t veh_id);
 
@@ -527,10 +526,8 @@ ADDR_NATIVE(0x458F10) void THISCALL InfoWin_set_state(uint8_t* win, int32_t stat
 // Popup_start on the script file's section label with the given flags (a second start appends
 // to the same menu); item adds an entry with its value; exec shows the menu with
 // faction_id_with's portrait and returns the chosen value (the meaning is per caller); close
-// discards it. Hybrid builds: the Popup is a heap object (BasePopAlloc) started by the original
-// Popup_start, so the section lookup sets the same text and file search state; exec is not
-// shown and returns 0 (BasePop_exec_3's no-display value, forced by the oracle). Headless:
-// nothing is shown, exec returns 0.
+// discards it. Headless: nothing is shown, exec returns 0 (BasePop_exec_3's no-display value,
+// which the oracle forces).
 void ui_diplo_menu_start(const char* label, int32_t flags);
 void ui_diplo_menu_item(const char* text, int32_t value);
 int32_t ui_diplo_menu_exec(int32_t faction_id_with);
@@ -569,7 +566,7 @@ ADDR_NATIVE(0x58FCE0) char* GAMEAPI get_he_she(int32_t faction_id, int32_t mode)
 // Headless: nothing happens (returns 0, as when the human closes the commlink at once).
 ADDR_NATIVE(0x54FFD0) int32_t GAMEAPI communicate(int32_t faction_id, int32_t faction_id_with, int32_t a3);
 // Not original functions: the probe menus the original builds on a Popup object on its stack,
-// shown only to a human player (VehAttackFlags bit 0). Hybrid builds and headless: not shown,
+// shown only to a human player (VehAttackFlags bit 0). Headless: not shown,
 // each returns its "cancelled" value (documented per function).
 // Action menu (PROBEMENU items whose bit is set in `items`): choice, -1 cancelled.
 int32_t ui_probe_menu(int32_t faction_id_tgt, uint32_t items, bool alien);

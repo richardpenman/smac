@@ -74,12 +74,8 @@ ADDR(0x55D430) void GAMEAPI enemies_trade_tech(int32_t faction_id, int32_t facti
 // ---- second half of the module (0x54B140-0x55F930; diplomacy_b.cpp) ----
 // wants_to_attack at a call that starts an evaluation (a single call, or the first call of an
 // (a, b) / (b, a) pair): the oracle poisons the slot array before these calls (harness/README.md),
-// so the slots start canonical (0). Native: clears g_stack_residue.wants_to_attack. Hybrid: calls the
-// oracle's poisoning thunk through g_harness_wants_to_attack_fresh (it fills the slots below the
-// entry ESP and enters 0x55BC80). Not an original function.
+// so the slots start canonical (0): clears g_stack_residue.wants_to_attack. Not an original function.
 int32_t wants_to_attack_fresh(int32_t faction_id, int32_t faction_id_target, int32_t odds_override);
-extern int32_t(GAMEAPI* g_harness_wants_to_attack_fresh)(int32_t faction_id, int32_t faction_id_target,
-                                                         int32_t odds_override);
 // Whether faction_id is the overwhelming human leader (top ranked, more than max(4, (turn+25)/50)
 // bases, difficulty above 1, intense rivalry or is_aggressive).
 ADDR(0x539B70) int32_t GAMEAPI great_beelzebub(int32_t faction_id, int32_t is_aggressive);

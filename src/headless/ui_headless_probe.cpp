@@ -1,6 +1,4 @@
 // Headless implementations of the UI-layer functions used by the probe module (engine/ui_bridge.h).
-// Native builds only: hybrid builds call the original UI.
-#ifndef SMACX_HYBRID
 #include "engine/game_state.h"
 #include "engine/strings.h"
 #include "engine/ui_bridge.h"
@@ -18,4 +16,3 @@ char* GAMEAPI get_him_her(int32_t faction_id, int32_t mode) {
     }
     return HisHerBuffer;
 }
-#endif

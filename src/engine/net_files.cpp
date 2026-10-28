@@ -38,7 +38,6 @@
 #include "engine/ui_bridge.h"
 #include "platform/win32.h"
 
-#ifndef SMACX_HYBRID
 #include <filesystem>
 #include <fstream>
 
@@ -321,6 +320,3 @@ void net_files_message(uint8_t* net, uint8_t* msg, int32_t size, int32_t from) {
         break;
     }
 }
-#else
-void net_files_message(uint8_t*, uint8_t*, int32_t, int32_t) {}
-#endif

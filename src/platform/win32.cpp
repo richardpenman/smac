@@ -4,56 +4,6 @@
 #include <cstdio>
 #include <cstring>
 
-#ifdef SMACX_HYBRID
-#include <windows.h>
-
-namespace win32 {
-uint32_t GetPrivateProfileStringA(const char* section, const char* key, const char* def, char* buf, uint32_t size,
-                                  const char* file) {
-    return ::GetPrivateProfileStringA(section, key, def, buf, size, file);
-}
-int32_t WritePrivateProfileStringA(const char* section, const char* key, const char* value, const char* file) {
-    return ::WritePrivateProfileStringA(section, key, value, file);
-}
-uint32_t GetCurrentDirectoryA(uint32_t size, char* buf) { return ::GetCurrentDirectoryA(size, buf); }
-int32_t SetCurrentDirectoryA(const char* path) { return ::SetCurrentDirectoryA(path); }
-uint32_t GetDriveTypeA(const char* root) { return ::GetDriveTypeA(root); }
-bool file_exists(const char* path) {
-    WIN32_FIND_DATAA data;
-    HANDLE h = ::FindFirstFileA(path, &data);
-    ::FindClose(h);  // the original also calls FindClose on INVALID_HANDLE_VALUE
-    return h != INVALID_HANDLE_VALUE;
-}
-int32_t MessageBoxA(const char* text, const char* caption, uint32_t type) {
-    return ::MessageBoxA(nullptr, text, caption, type);
-}
-uint8_t* read_file(const char* path, uint32_t* size) {
-    HANDLE h = ::CreateFileA(path, GENERIC_READ, 0, nullptr, OPEN_EXISTING,
-                             FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS, nullptr);
-    if (h == INVALID_HANDLE_VALUE) return nullptr;
-    DWORD n = ::GetFileSize(h, nullptr), got = 0;
-    uint8_t* data = (uint8_t*)::HeapAlloc(::GetProcessHeap(), 0, n ? n : 1);
-    if (data && !::ReadFile(h, data, n, &got, nullptr)) got = 0;
-    ::CloseHandle(h);
-    if (data && got != n) {
-        ::HeapFree(::GetProcessHeap(), 0, data);
-        return nullptr;
-    }
-    *size = n;
-    return data;
-}
-void free_file(uint8_t* data) { ::HeapFree(::GetProcessHeap(), 0, data); }
-void CharUpperA(char* str) { ::CharUpperA(str); }
-}  // namespace win32
-
-namespace platform {
-const char* resolve_path(const char* path, char* out, uint32_t out_size) {
-    std::snprintf(out, out_size, "%s", path);
-    return out;
-}
-}  // namespace platform
-
-#else  // native
 
 #include <cstdio>
 #include <cstdlib>
@@ -363,4 +313,3 @@ void CharUpperA(char* str) {
 
 }  // namespace win32
 
-#endif

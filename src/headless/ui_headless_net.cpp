@@ -30,6 +30,4 @@ void ui_net_clear_messages() {}
 void ui_net_turn(const char*) {}
 void ui_net_note_text(const char* text) { std::fprintf(stderr, "%s\n", text); }
 void GAMEAPI do_all_tasks() {}
-#ifndef SMACX_HYBRID
 int32_t THISCALL AlphaNet_setup(uint8_t*, int32_t) { return 1; }
-#endif

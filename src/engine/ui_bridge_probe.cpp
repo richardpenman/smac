@@ -1,5 +1,5 @@
 // The probe menus (engine/ui_bridge.h, ui_probe_*): Popup objects on the original probe()'s stack,
-// shown only to a human player. Hybrid builds and headless: not shown, the cancelled value.
+// shown only to a human player. Headless: not shown, the cancelled value.
 #include "engine/ui_bridge.h"
 
 int32_t ui_probe_menu(int32_t, uint32_t, bool) { return -1; }

@@ -16,7 +16,6 @@
 #include "engine/diplomacy.h"
 #include "engine/game_state.h"
 #include "engine/goals.h"
-#include "engine/hybrid_shadow.h"
 #include "engine/log.h"
 #include "engine/map.h"
 #include "engine/parse.h"
@@ -35,9 +34,6 @@
 #include "engine/zoc.h"
 #include "engine/table_at.h"
 
-#ifdef SMACX_HYBRID
-extern "C" int32_t GAMEAPI morale_alien_impl_c(int32_t veh_id, int32_t faction_id_vs_native);
-#endif
 
 // ---- helpers (not original functions) -----------------------------------------------------------
 
@@ -433,7 +429,7 @@ int32_t GAMEAPI defense_value(int32_t faction_id, int32_t x, int32_t y, int32_t 
     return bonus + 2;
 }
 
-int32_t GAMEAPI SHADOWABLE(morale_alien)(int32_t veh_id, int32_t faction_id_vs_native) {
+int32_t GAMEAPI morale_alien(int32_t veh_id, int32_t faction_id_vs_native) {
     int32_t morale;
     if (CurrentTurn < 45) morale = 0;
     else if (CurrentTurn < 90) morale = 1;
@@ -2554,9 +2550,3 @@ int32_t GAMEAPI battle_resolve(int32_t veh_id, int32_t dir, int32_t x, int32_t y
     return winner_ends_move(b);
 }
 
-#ifdef SMACX_HYBRID
-// morale_alien runs inside the original morale_veh/speed (whose dead stack an uninitialised read in
-// the AI depends on): keep the original's stack image (see hybrid_shadow.h).
-HYBRID_SHADOW_THUNK(int32_t, morale_alien, (int32_t veh_id, int32_t faction_id_vs_native), 2, 0x501356,
-                    "push %ebp\n mov %esp, %ebp\n sub $8, %esp")
-#endif

@@ -1,7 +1,5 @@
 // Headless implementations of the research dialog and the new technology window (tech module's
-// UI calls, engine/ui_bridge.h; smacx replaces this area: src/ui/techwin.cpp). Native builds only:
-// hybrid builds call the original UI.
-#ifndef SMACX_HYBRID
+// UI calls, engine/ui_bridge.h; smacx replaces this area: src/ui/techwin.cpp).
 #include "engine/game_state.h"
 #include "engine/tech.h"
 #include "engine/ui_bridge.h"
@@ -45,4 +43,3 @@ int32_t GAMEAPI tech_pick(int32_t faction_id, int32_t is_free, int32_t from_fact
 }
 // No window.
 int32_t THISCALL NewTechWin_exec(uint8_t*, int32_t, int32_t) { return 0; }
-#endif

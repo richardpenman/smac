@@ -6,7 +6,7 @@
 // fix. The player chooses only between two settings (compat_set_original_bugs): the fixes (the
 // default: every flag at its default value below, false for a fixed bug) or the original bugs
 // (smacx --original-bugs, or "Original Bugs=1" in the ini: every flag true, the game exactly as
-// terranx.exe plays it). Everything compared with the original (the harness, the hybrid build,
+// terranx.exe plays it). Everything compared with the original (the harness, the frozen baseline,
 // the scripted suites whose references come from the original) runs with the original bugs.
 // The single flags exist for the code and the tests (a test can switch one fix).
 //
@@ -580,8 +580,8 @@ inline Compat g_compat;
 
 // The setting the game plays with: true the original bugs, false the fixes (the default).
 inline bool g_original_bugs = false;
-// The setting was given on the command line (smacx --original-bugs) or by the build (the hybrid
-// DLL inside terranx.exe): a loaded multiplayer save does not change it. (An online game's host
+// The setting was given on the command line (smacx --original-bugs, smacx_headless
+// --original-bugs): a loaded multiplayer save does not change it. (An online game's host
 // always decides for its players.)
 inline bool g_original_bugs_forced = false;
 

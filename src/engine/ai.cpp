@@ -50,7 +50,6 @@ inline bool veh_moves_done(int32_t veh_id) {
 }  // namespace
 
 int32_t (*g_harness_enemy_veh)(int32_t) = nullptr;
-void (*g_harness_enemy_veh_pump)() = nullptr;
 
 // ---- capabilities -------------------------------------------------------------------------------
 
@@ -502,11 +501,7 @@ int32_t GAMEAPI enemy_veh(int32_t veh_id) {
     int32_t faction_id = game().vehs[veh_id].faction_id;
     bool synch = faction_id == CurrentPlayerFaction && MultiplayerActive;
     if (MultiplayerActive) VehAttackFlags = 3;
-    if (g_harness_enemy_veh_pump) {
-        g_harness_enemy_veh_pump();
-    } else {
-        do_all_non_input();
-    }
+    do_all_non_input();
     VEH& v = game().vehs[veh_id];
     if (!v.moves_spent || v.order != ORDER_MOVE_TO || Units[v.unit_id].plan == PLAN_NAVAL_TRANSPORT ||
         (v.state & VSTATE_EXPLORE) || zoc_any(v.x, v.y, faction_id)) {

@@ -217,11 +217,7 @@ namespace {
 // with the (negative) queue item. Native builds cannot follow the original's pointer there and use
 // the project's name (only reached when the viewer captures a base).
 const char* facility_name_raw(int32_t id) {
-#ifdef SMACX_HYBRID
-    return *reinterpret_cast<char* const*>(reinterpret_cast<const uint8_t*>(&Facility[0]) + id * 0x30);
-#else
     return Facility[id < 0 ? -id : id].name;
-#endif
 }
 
 // Original address of Bases[base_id].name (interlude takes it as an integer argument).

@@ -132,8 +132,7 @@ src/app/smacx.cpp the native game executable
   with `ADDR` in an engine header must be defined in the engine (src/engine), never only in
   src/ui (hybrid builds would patch it with code they do not link).
   The probe and diplomacy menus (`ui_probe_*`, `ui_diplo_menu_*`) have their unattended defaults
-  in engine objects (engine/ui_bridge_probe.cpp, ui_bridge_diplomacy.cpp, shared with the hybrid
-  build); smacx defines every function of each of those objects (popup_menus.cpp), so the linker
+  in engine objects (engine/ui_bridge_probe.cpp, ui_bridge_diplomacy.cpp); smacx defines every function of each of those objects (popup_menus.cpp), so the linker
   does not pull them.
 * **WinMain state**: `ScreenWidth/ScreenHeight` (GetSystemMetrics) are not set natively; smacx sets
   them from the window size. Engine-visible, so harness native runs should set the oracle's value

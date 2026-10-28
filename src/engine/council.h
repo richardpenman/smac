@@ -29,11 +29,6 @@ SMAC_LAYOUT(CouncilSession, 0x78);
 // Non-zero while the council window is open (0x703DE4).
 GLOBAL(int32_t, CouncilWinActive, 0x703DE4);
 
-// ---- harness hook (not in the original) -----------------------------------------------------------
-// Hybrid builds: when set, called by ui_councilwin_modal in place of the window's modal loop
-// (the oracle's observer: harness/README.md "Planetary Council sessions").
-extern int32_t (*g_harness_council_modal)(uint8_t* win);
-
 // ---- callees of other modules ------------------------------------------------------------------------
 // tech_analysis: engine/diplomacy.h.
 
@@ -62,10 +57,10 @@ ADDR(0x425BA0) int32_t THISCALL CouncilWin_key(uint8_t* self, int32_t a1, int32_
 
 // ---- window operations (not original functions) ------------------------------------------------
 // The parts of the methods above that work on the window itself: fonts, layout, buttons, panels,
-// drawing and the modal loop. Hybrid builds: the original window; headless: nothing, except:
+// drawing and the modal loop. smacx: the window (src/ui/councilwin.cpp); headless: nothing, except:
 // ui_councilwin_modal: the original's modal loop (Win_set_modal) returns once the viewer has voted
-// and closed the window. Hybrid builds run it (or g_harness_council_modal); headless (no human
-// is ever interactive) does what the oracle's observer does: the viewer casts the vote the window
+// and closed the window. Headless (no human is ever interactive) does what the oracle's
+// observer does: the viewer casts the vote the window
 // holds for its faction (CouncilWin_vote, unless decided) and presses Enter (CouncilWin_key).
 void ui_councilwin_open(uint8_t* win);  // panels and fonts closed, layout, fonts opened
 void ui_councilwin_build(uint8_t* win);  // portraits, frame, buttons; panels drawn

@@ -1,7 +1,6 @@
 // Win32 API functions used by engine code, with Windows semantics on every platform.
 //
-// Hybrid builds (a DLL inside the original process) call the real Win32 functions. Native builds
-// use portable equivalents: private-profile (.ini) access with case-insensitive sections and keys,
+// Portable equivalents: private-profile (.ini) access with case-insensitive sections and keys,
 // file lookup with case-insensitive path resolution (game data file names are case-insensitive on
 // Windows), and a headless MessageBoxA that prints to stderr.
 //
@@ -43,7 +42,6 @@ namespace platform {
 // the file system. Returns the resolved host path, or the input with separators converted when
 // nothing matches.
 const char* resolve_path(const char* path, char* out, uint32_t out_size);
-#ifndef SMACX_HYBRID
 // Native builds, portable file system access on resolved host paths (std::filesystem).
 // host_stat: false if nothing exists at path; otherwise *is_dir and *size (files) are set.
 bool host_stat(const char* path, bool* is_dir, uint64_t* size);
@@ -55,5 +53,4 @@ void set_saves_dir(const char* dir);
 // A file smacx provides (e.g. its own script texts): a path ending in `name` (any directory, any
 // case) that does not exist resolves to host_path.
 void set_builtin_file(const char* name, const char* host_path);
-#endif
 }  // namespace platform

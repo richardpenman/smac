@@ -1,6 +1,5 @@
 #include "engine/heap.h"
 
-#ifndef SMACX_HYBRID
 #include <cstdio>
 #include <cstdlib>
 
@@ -17,7 +16,6 @@ void* GAMEAPI mem_get(uint32_t size) {
 }
 
 void GAMEAPI mem_free(void* ptr) { std::free(ptr); }
-#endif
 
 // ---- Heap (gfx module) ----
 #include "engine/compat.h"

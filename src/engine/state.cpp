@@ -6,7 +6,6 @@
 #include "engine/memmap.h"
 #include "engine/state_io.h"
 
-#ifndef SMACX_HYBRID
 namespace state {
 int32_t council_session_pending;
 int32_t council_proposal[8];
@@ -121,9 +120,3 @@ void state_restore(const std::vector<uint8_t>& copy) {
         at += r.size;
     }
 }
-#else
-const StateRecord* state_records(size_t* count) {
-    *count = 0;
-    return nullptr;
-}
-#endif

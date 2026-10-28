@@ -1,7 +1,5 @@
 // Headless UI area "console": the Console functions the engine calls (engine/ui_bridge.h). No human
 // player is ever interactive headless. Replaced in smacx by src/ui/console.cpp.
-// Native builds only: hybrid builds always call the original UI.
-#ifndef SMACX_HYBRID
 #include "engine/ui_bridge.h"
 
 // Returns at once (also the observer's "turn complete" pause).
@@ -13,4 +11,3 @@ int32_t THISCALL Console_ready_search(uint8_t*, int32_t) { return 0; }
 void THISCALL Console_set_move(uint8_t*, int32_t) {}
 void THISCALL Console_cursor_next(uint8_t*, int32_t, int32_t) {}
 void THISCALL Console_update_data(uint8_t*, int32_t) {}
-#endif

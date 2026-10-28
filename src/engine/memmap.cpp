@@ -15,7 +15,6 @@ static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__, "little-endian target r
 
 namespace mem {
 
-#ifndef SMACX_HYBRID
 alignas(4096) uint8_t g_image[kImageEnd - kImageBase];
 
 namespace {
@@ -126,10 +125,5 @@ void write_bytes(uint32_t addr, const void* src, uint32_t n) {
         n -= piece;
     }
 }
-#else
-bool init(const char*) { return true; }
-void read_bytes(uint32_t addr, void* dst, uint32_t n) { std::memcpy(dst, host(addr), n); }
-void write_bytes(uint32_t addr, const void* src, uint32_t n) { std::memcpy(host(addr), src, n); }
-#endif
 
 }  // namespace mem

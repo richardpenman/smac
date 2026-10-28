@@ -27,10 +27,6 @@
 #include "engine/ui_bridge.h"
 #include "engine/veh.h"
 #include "platform/win32.h"
-#ifdef SMACX_HYBRID
-#include "engine/hybrid_shadow.h"
-#include "engine/table_at.h"
-#endif
 
 namespace {
 
@@ -203,30 +199,11 @@ static int32_t wants_to_attack_core(int32_t faction_id, int32_t faction_id_tgt, 
     return 1;
 }
 
-#ifdef SMACX_HYBRID
-// Hybrid: the slots are read from the stack image the shadow thunk saved at entry (1 KB below the
-// entry ESP; faction f's slot is [entry ESP - 0x138 + 4f]), so the result matches the original
-// whatever its caller left there; the thunk then re-runs the original to leave its stack image.
-extern "C" uint32_t wants_to_attack_shadow_buf[256];
-extern "C" int32_t GAMEAPI wants_to_attack_impl_c(int32_t faction_id, int32_t faction_id_tgt, int32_t odds_override);
-int32_t GAMEAPI SHADOWABLE(wants_to_attack)(int32_t faction_id, int32_t faction_id_tgt, int32_t odds_override) {
-    int32_t slots[8];
-    for (int32_t k = 0; k < 8; k++) slots[k] = (int32_t)wants_to_attack_shadow_buf[178 + k];
-    return wants_to_attack_core(faction_id, faction_id_tgt, odds_override, slots);
-}
-HYBRID_SHADOW_THUNK(int32_t, wants_to_attack, (int32_t faction_id, int32_t faction_id_tgt, int32_t odds_override), 3,
-                    0x55BC89, "push %ebp\n mov %esp, %ebp\n sub $0x134, %esp")
-#else
 int32_t GAMEAPI wants_to_attack(int32_t faction_id, int32_t faction_id_tgt, int32_t odds_override) {
     return wants_to_attack_core(faction_id, faction_id_tgt, odds_override, g_stack_residue.wants_to_attack);
 }
-#endif
-
-int32_t(GAMEAPI* g_harness_wants_to_attack_fresh)(int32_t, int32_t, int32_t) = nullptr;
 
 int32_t wants_to_attack_fresh(int32_t faction_id, int32_t faction_id_tgt, int32_t odds_override) {
-    if (g_harness_wants_to_attack_fresh)
-        return g_harness_wants_to_attack_fresh(faction_id, faction_id_tgt, odds_override);
     for (int32_t k = 0; k < 8; k++) g_stack_residue.wants_to_attack[k] = 0;
     return wants_to_attack(faction_id, faction_id_tgt, odds_override);
 }

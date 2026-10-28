@@ -11,8 +11,8 @@
 // native objects: an address inside one of them resolves to the object (mem::host), so their
 // globals, and every alias inside them (VehCount is a field of GamePrefs), bind to it. The image
 // keeps the rest (rule tables, the engine's scratch globals, the UI) and seeds the records.
-// Hybrid builds (SMACX_HYBRID, a 32-bit DLL injected into terranx.exe) bind the same names to the
-// original process memory.
+// SMACX_HYBRID builds (oracle.dll, injected into terranx.exe: the harness's rule dump,
+// harness/rules_dump.h) bind the same names to the original process memory.
 //
 // Globals whose type holds pointers cannot live in the image on 64-bit targets; declare them with
 // GLOBAL_NATIVE, which gives them ordinary storage in native builds.
@@ -64,15 +64,15 @@ using smac_type_t = T;  // lets array types appear in declarator position
 #endif
 
 // Marks a function declaration with the address of the original function it reconstructs.
-// tools/gen_bindings.py reads these markers to build the hybrid patch table and the stubs for
-// functions that are declared but not yet reconstructed.
+// src/tools/gen_bindings.py reads these markers to build the stubs for functions that are declared
+// but not yet reconstructed; src/tools/names.py keeps the table of original names.
 #define ADDR(a)
-// Like ADDR, but hybrid builds always call the original (state lives outside the memory image,
-// e.g. the CRT rand() seed). The native definition must be guarded with #ifndef SMACX_HYBRID.
+// Like ADDR, for functions whose state lives outside the memory image (e.g. the CRT rand() seed)
+// and for UI functions. (The frozen hybrid build always called the original for these.)
 #define ADDR_NATIVE(a)
 // Calling convention of original free functions (cdecl). Only meaningful on 32-bit x86.
 // Methods of the original C++ classes are reconstructed as free functions taking the object
-// pointer first, declared THISCALL so hybrid builds match the original convention.
+// pointer first, declared THISCALL (the original convention on 32-bit SMACX_HYBRID builds).
 #if defined(SMACX_HYBRID)
 #define GAMEAPI  __cdecl
 #define THISCALL __thiscall

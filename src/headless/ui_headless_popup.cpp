@@ -1,8 +1,6 @@
 // Headless UI area "popup": popups and message boxes (engine/ui_bridge.h). Nothing is shown; each
 // returns the default choice (0), like the oracle's forced no-display path. Replaced in smacx by
 // src/ui/win_popup.cpp and src/ui/popup_menus.cpp (the reconstructed BasePop / Popup, popup.h).
-// Native builds only: hybrid builds always call the original UI.
-#ifndef SMACX_HYBRID
 #include "engine/crt.h"
 #include "engine/ui_bridge.h"
 
@@ -46,4 +44,3 @@ int32_t ui_artifact_menu(int32_t, int32_t, int32_t) { return 0; }
 int32_t ui_disembark_menu(int32_t) { return 0; }
 void THISCALL Popup_ctor(uint8_t*) {}
 void THISCALL Popup_dtor(uint8_t*) {}
-#endif

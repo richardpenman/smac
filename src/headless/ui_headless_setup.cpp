@@ -1,7 +1,5 @@
-// Headless implementations of the setup-module UI functions declared in engine/ui_bridge.h.
-// Native builds only: hybrid builds always call the original UI. These functions change game
+// Headless implementations of the setup-module UI functions declared in engine/ui_bridge.h. These functions change game
 // data (diplomacy and council state, monuments, a text buffer); that part is reproduced exactly.
-#ifndef SMACX_HYBRID
 #include "engine/crt.h"
 #include "engine/game_state.h"
 #include "engine/strings.h"
@@ -60,6 +58,5 @@ char* GAMEAPI get_his_her(int32_t faction_id, int32_t mode) {
     }
     return HisHerBuffer;
 }
-#endif
 
 // crash_landing's UI (drop animation, FIRSTBASE question) is in the popup area.

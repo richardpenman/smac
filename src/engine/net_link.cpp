@@ -4,8 +4,7 @@
 // player ids (the transport's: the host 1, the clients 2, 3, ...), the player names, the session's
 // player events (DirectPlay's system messages, Net_handle_sys_msg) and Net_close. The DirectPlay
 // service enumeration, lobbies, voice, groups and packet splitting are not needed (the transport
-// carries messages of any size). Hybrid builds keep the original's DirectPlay layer.
-#ifndef SMACX_HYBRID
+// carries messages of any size).
 #include <cstdio>
 #include <cstring>
 #include <deque>
@@ -163,38 +162,4 @@ void THISCALL Net_handle_sys_msg(uint8_t* net) {
         }
     }
 }
-#endif  // SMACX_HYBRID
 
-#ifdef SMACX_HYBRID
-// The hybrid DLL runs inside the original: its windows and DirectPlay. smacx's transport and the
-// UI hooks of the reconstructed NetDaemon do nothing there (the harness plays single-player games).
-#include "engine/net.h"
-bool net_link_active() { return false; }
-void net_link_pump() {}
-int32_t net_link_host(uint8_t*, uint16_t, const char*, char*, uint32_t) { return 1; }
-int32_t net_link_join(uint8_t*, const char*, uint16_t, const char*, char*, uint32_t) { return 1; }
-bool ui_netwin_visible() { return false; }
-void ui_netwin_redraw() {}
-void ui_netwin_cancel() {}
-void ui_netwin_fill_player(uint8_t*, int32_t) {}
-void ui_netwin_faction_data(const uint8_t*) {}
-void ui_netwin_pick_pass(int32_t) {}
-void ui_netwin_chat(int32_t, const char*) {}
-void ui_main_chat(const char*, int32_t) {}
-void ui_diplo_chat(const char*, int32_t) {}
-int32_t ui_diplo_net(int32_t, int32_t, int32_t) { return 0; }
-void ui_diplo_closed(int32_t) {}
-void ui_multiwin_draw() {}
-const uint8_t* ui_netwin_faction_blob() { return nullptr; }
-bool net_trace_enabled() { return false; }
-const char* ui_user_dir() { return "."; }
-bool ui_escape_pressed() { return false; }
-void ui_net_close_windows() {}
-void ui_console_set_ai(int32_t) {}
-void ui_console_set_view() {}
-void ui_net_end_of_turn() {}
-void ui_net_center(int32_t, int32_t) {}
-void ui_net_clear_messages() {}
-void ui_net_turn(const char*) {}
-void ui_net_note_text(const char*) {}
-#endif
