@@ -39,9 +39,11 @@ make clean      # start the build again from scratch
 
 ## Status
 
-The whole single-player game works: game setup, the map, units, bases, research, the design
-workshop, diplomacy, the Planetary Council, reports, saving and loading, sound, music and movies.
-Multiplayer is not supported. Known gaps are listed in the [UI plan](docs/UI_PLAN.md) (section 13).
+The whole game works: game setup, the map, units, bases, research, the design workshop,
+diplomacy, the Planetary Council, reports, saving and loading, sound, music and movies.
+Multiplayer works between copies of smacx: hotseat, play by email and online (TCP); it can't join
+games with the original. Known gaps are listed in the [UI plan](docs/UI_PLAN.md) (section 13) and
+[MULTIPLAYER.md](docs/MULTIPLAYER.md).
 
 smacx fixes the original game's bugs by default ([the list](docs/COMPAT.md)); start it with
 `--original-bugs` (or set `Original Bugs=1` in its ini) to play with every bug as the original does.
