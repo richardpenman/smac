@@ -664,8 +664,11 @@ Notes on the increments:
       fixed-mode hang of cov_actions on turn 300 (also in b55e6a9) is the scenario's: its setup
       calls use vehicle ids past VehCount (`action_tectonic 278`, `action_gate 274`), which links a
       stale vehicle into base 9's stack; with the fix of turn_upkeep_air_return the turn goes on and
-      an AI transport walks the broken stack (veh_top). diffnative --fixes leaves cov_actions out
-      until the scenario is corrected and its reference re-recorded.
+      an AI transport walks the broken stack (veh_top). diffnative --fixes left cov_actions out
+      until the scenario was corrected (after step 21: each unit is acted on right after its
+      `call veh_init`, through `$veh`, the nerve staples moved to turn 300; its reference
+      re-recorded; for a baseline whose parser has no `$veh`, diffnative gives it the ids the new
+      build's veh_init calls returned).
     Proof per commit: native verify (29 scenarios), hybrid all (tiny20, council131, small12, std8,
     late140, cov_missiles), fcompare of the touched entry points (air_power, enemy_strategy,
     can_terraform, alien_move, assemble_passengers, enemy_move; 0 mismatches), diffnative against

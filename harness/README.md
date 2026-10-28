@@ -170,20 +170,26 @@ state is a fair start state and the following turns are compared as usual
   reconstruction when the function is patched; `smacx_headless` calls the reconstruction. Add
   functions to the table as needed (`smacx_headless` checks the result flag at compile time).
   Examples: `call veh_init <unit> <faction> <x> <y>` creates a unit, `call probe <veh> <base> -1 1`
-  lets a probe team act, `call action_arty <veh> <x> <y>`.
+  lets a probe team act, `call action_arty <veh> <x> <y>`. The argument `$veh` is the id the last
+  `call veh_init` returned (`call action_arty $veh 8 22` right after creating the artillery); both
+  programs parse the arguments with `harness/script_args.h`. A call whose first argument is a
+  vehicle (the table's last column) logs `call NAME: warning: vehicle N is not in use (VehCount M)`
+  when that id is past the vehicles in use.
 * `at <turn> <command>` queues one of these commands. It runs at the turn_upkeep hook of that turn
   (CurrentTurn), before the snapshot `turn_NNN`, so the snapshot shows its effect; it runs once
   even when turn_upkeep runs again for the same turn (an aircraft in flight makes turn_upkeep
   return early, BUG(original)). Use `at` rather than plain setup commands before `turns`: the
   oracle's windows only exist once the game loop runs.
 
-Vehicle ids are predictable (veh_init appends at `VehCount`), but `kill`/`veh_kill` renumber the
-vehicles above the killed one: scripts create their units first and then use them in descending
-id order. Generated scenarios list the ids in comments. Some edited states make the original loop
-forever (`hangdump` shows it): with the units cov_actions creates on end300's turn-300 state, a
-nerve staple (`action_staple`) or a base given away (`give_a_base`) before the turn is played
-leads to a stack list that `veh_top` (0x579920, called from enemy_move) follows forever; the
-reconstruction loops the same way. cov_actions therefore staples only before its last snapshot.
+Vehicle ids are predictable (veh_init appends at `VehCount`), but `kill`/`veh_kill` and every
+action that kills a unit renumber the vehicles above it, so a script acts on each unit right after
+creating it, through `$veh`. cov_actions once created all its units first and then used fixed ids
+in descending order: the missiles killed more units than their own, so later calls used ids past
+`VehCount` (`action_gate 274` linked a dead vehicle record into base 9's stack, a circular stack
+list that `veh_top` (0x579920, from enemy_move) follows forever once a transport walks it). That,
+not the actions themselves, made a nerve staple or a base given away before the turn look like
+a hang of the original's turn loop: with the ids right, the original plays cov_actions' turns
+with its staples on turn 300, and with `give_a_base` added there too.
 
 ## Map view dumps
 

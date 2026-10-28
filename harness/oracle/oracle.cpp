@@ -22,6 +22,7 @@
 /* Rule-table dump (dumprules); included before the address macros below, which reuse some of
  * the engine's global names. */
 #include "rules_dump.h"
+#include "script_args.h"
 
 #ifdef ORACLE_WITH_ENGINE
 #include "engine/clock.h"
@@ -1483,9 +1484,12 @@ struct ScriptCall {
     const char* name;
     uint32_t addr;
     bool has_result; /* false: void, EAX is not logged */
+    bool veh_arg;    /* the first argument is a vehicle id */
 };
+/* The vehicle the last `call veh_init` returned (`$veh` in a call's arguments, script_args.h). */
+static int g_script_veh = -1;
 static const ScriptCall kScriptCalls[] = {
-#define SCRIPT_CALL(name, addr, has_result) {#name, addr, has_result},
+#define SCRIPT_CALL(name, addr, has_result, veh_arg) {#name, addr, has_result, veh_arg},
 #include "script_calls.h"
 #undef SCRIPT_CALL
 };
@@ -1523,11 +1527,13 @@ static bool setup_command(const char* cmd, char* args) {
     } else if (!strcmp(cmd, "call")) {
         char name[64] = "";
         int a[8] = {};
-        int n =
-            sscanf(args, "%63s %i %i %i %i %i %i %i %i", name, &a[0], &a[1], &a[2], &a[3], &a[4], &a[5], &a[6], &a[7]);
+        int n = script_call_parse(args, g_script_veh, name, a);
         for (const ScriptCall& c : kScriptCalls) {
             if (strcmp(c.name, name)) continue;
+            if (c.veh_arg && (a[0] < 0 || a[0] >= VehCount))
+                logf_("call %s: warning: vehicle %d is not in use (VehCount %d)\n", name, a[0], VehCount);
             int r = ((f_call8)c.addr)(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
+            if (!strcmp(name, "veh_init")) g_script_veh = r;
             if (c.has_result) logf_("call %s (%d args) -> %d\n", name, n - 1, r);
             else logf_("call %s (%d args)\n", name, n - 1);
             return true;

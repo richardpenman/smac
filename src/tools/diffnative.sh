@@ -15,7 +15,9 @@
 #                       --first 7 --seeds 6 plays six other games
 #   --turns T           turns per new game and per saved game (default 30)
 #   --save FILE         also a game loaded from FILE, T turns with seeds of its own (repeatable)
-#   --scenarios LIST    also these harness scenarios, as harness/scenarios/*.cmd ("all": every one)
+#   --scenarios LIST    also these harness scenarios, as harness/scenarios/*.cmd ("all": every one;
+#                       `$veh` in a scenario reaches the baseline as the ids the new build's
+#                       veh_init calls returned, as older baselines do not parse it)
 #   --fixes             play with the original's bugs fixed (the game's default) instead of
 #                       --original-bugs; the default compares the original's behaviour, as every
 #                       comparison against the original or an original-behaviour baseline must
@@ -112,8 +114,17 @@ FAIL=0
 for g in "${GAMES[@]}"; do
     d="$OUT/$g"
     mkdir -p "$d/base" "$d/new"
-    "$BASE" "$OUT/cmd/$g.cmd" --outdir "$d/base" $BUGS > "$d/base/headless.log" 2>&1; sb=$?
     "$NEW" "$OUT/cmd/$g.cmd" --outdir "$d/new" $BUGS > "$d/new/headless.log" 2>&1; sn=$?
+    cmd="$OUT/cmd/$g.cmd"
+    if grep -q '\$veh' "$cmd"; then
+        # `$veh` (the id the last `call veh_init` returned) is newer than older baselines' parser:
+        # the baseline gets the ids the new build's veh_init calls returned, in order.
+        awk 'NR == FNR { if ($0 ~ /^call veh_init .* -> /) ids[++n] = $NF; next }
+             /call veh_init / { last = ids[++k] }
+             { gsub(/\$veh/, last); print }' "$d/new/oracle.log" "$cmd" > "$d/base.cmd"
+        cmd="$d/base.cmd"
+    fi
+    "$BASE" "$cmd" --outdir "$d/base" $BUGS > "$d/base/headless.log" 2>&1; sb=$?
     python3 harness/compare.py "$d/base" "$d/new" > "$d/compare.log" 2>&1; sc=$?
     n=$(grep -c " OK$" "$d/compare.log")
     nb=$(ls "$d/base" | grep -c "\.state$"); nn=$(ls "$d/new" | grep -c "\.state$")

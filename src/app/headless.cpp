@@ -52,6 +52,7 @@
 #include "engine/world.h"
 #include "golden.h"
 #include "rules_dump.h"
+#include "script_args.h"
 
 namespace fs = std::filesystem;
 
@@ -132,18 +133,21 @@ struct ScriptCall {
     const char* name;
     int32_t (*fn)(const int32_t*);
     bool has_result;  // false: void (the oracle logs no result either)
+    bool veh_arg;  // the first argument is a vehicle id
 };
 template <typename R, typename... A>
 constexpr bool script_returns_value(R (*)(A...)) {
     return !std::is_void_v<R>;
 }
-#define SCRIPT_CALL(name, addr, has_result) \
+#define SCRIPT_CALL(name, addr, has_result, veh_arg) \
     static_assert(script_returns_value(&name) == (has_result), "script_calls.h: wrong result flag of " #name);
 #include "script_calls.h"
 #undef SCRIPT_CALL
+// The vehicle the last `call veh_init` returned (`$veh` in a call's arguments, script_args.h).
+static int g_script_veh = -1;
 static const ScriptCall kScriptCalls[] = {
-#define SCRIPT_CALL(name, addr, has_result) \
-    {#name, [](const int32_t* a) { return script_invoke(&name, a); }, has_result},
+#define SCRIPT_CALL(name, addr, has_result, veh_arg) \
+    {#name, [](const int32_t* a) { return script_invoke(&name, a); }, has_result, veh_arg},
 #include "script_calls.h"
 #undef SCRIPT_CALL
 };
@@ -177,12 +181,14 @@ static bool setup_command(const char* cmd, char* args) {
         }
     } else if (!std::strcmp(cmd, "call")) {
         char name[64] = "";
-        int32_t a[8] = {};
-        int n = std::sscanf(args, "%63s %i %i %i %i %i %i %i %i", name, &a[0], &a[1], &a[2], &a[3], &a[4], &a[5], &a[6],
-                            &a[7]);
+        int a[8] = {};
+        int n = script_call_parse(args, g_script_veh, name, a);
         for (const ScriptCall& c : kScriptCalls) {
             if (std::strcmp(c.name, name)) continue;
+            if (c.veh_arg && (a[0] < 0 || a[0] >= VehCount))
+                logf_("call %s: warning: vehicle %d is not in use (VehCount %d)\n", name, a[0], VehCount);
             int32_t r = c.fn(a);
+            if (!std::strcmp(name, "veh_init")) g_script_veh = r;
             if (c.has_result) logf_("call %s (%d args) -> %d\n", name, n - 1, r);
             else logf_("call %s (%d args)\n", name, n - 1);
             return true;
