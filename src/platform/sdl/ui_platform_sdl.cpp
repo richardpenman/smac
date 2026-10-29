@@ -27,6 +27,41 @@ SDL_Texture* g_texture = nullptr;
 std::vector<uint32_t> g_rgb;  // frame converted to ARGB8888
 int32_t g_width = 0, g_height = 0;
 std::string g_game_dir = ".";
+// Interactive play (video_init_display): Alt+Enter toggles fullscreen; the window's size when
+// windowed; who is told of a toggle.
+bool g_alt_enter = false;
+int32_t g_windowed_w = 0, g_windowed_h = 0;
+void (*g_on_fullscreen)(bool) = nullptr;
+
+// The frame shown at the largest whole multiple of its size that fits the window's drawable
+// (SDL_RenderSetIntegerScale: centred, black around it; nearest pixel). A window smaller than the
+// frame shows it scaled down to fit, smoothed (a fraction of nearest pixels would drop rows).
+int g_output_w = 0, g_output_h = 0;  // the drawable's size update_scaling saw
+void update_scaling() {
+    if (!g_renderer || g_width <= 0 || g_height <= 0) return;
+    int pw = 0, ph = 0;
+    if (SDL_GetRendererOutputSize(g_renderer, &pw, &ph) != 0) return;
+    g_output_w = pw;
+    g_output_h = ph;
+    bool whole = pw / g_width >= 1 && ph / g_height >= 1;
+    SDL_RenderSetLogicalSize(g_renderer, g_width, g_height);
+    SDL_RenderSetIntegerScale(g_renderer, whole ? SDL_TRUE : SDL_FALSE);
+#if SDL_VERSION_ATLEAST(2, 0, 12)
+    if (g_texture) SDL_SetTextureScaleMode(g_texture, whole ? SDL_ScaleModeNearest : SDL_ScaleModeLinear);
+#endif
+}
+
+void toggle_fullscreen() {
+    if (!g_window) return;
+    bool full = (SDL_GetWindowFlags(g_window) & SDL_WINDOW_FULLSCREEN) != 0;
+    SDL_SetWindowFullscreen(g_window, full ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
+    if (full && g_windowed_w > 0) {
+        SDL_SetWindowSize(g_window, g_windowed_w, g_windowed_h);
+        SDL_SetWindowPosition(g_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    }
+    update_scaling();
+    if (g_on_fullscreen) g_on_fullscreen(!full);
+}
 
 uint32_t argb(const Rgb& c) { return 0xFF000000u | (uint32_t)c.r << 16 | (uint32_t)c.g << 8 | c.b; }
 
@@ -144,6 +179,7 @@ bool translate(const SDL_Event& e, Event* ev) {
         return e.wheel.y != 0;
     case SDL_WINDOWEVENT:
         if (e.window.event == SDL_WINDOWEVENT_EXPOSED || e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+            if (e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) update_scaling();
             ev->type = EV_EXPOSE;
             return true;
         }
@@ -154,6 +190,52 @@ bool translate(const SDL_Event& e, Event* ev) {
         return false;
     default: return false;
     }
+}
+
+// Alt+Enter (interactive play): the Alt press is held back until the next event shows whether
+// it starts Alt+Enter (the game opens its menu column on an Alt press); Alt+Enter toggles
+// fullscreen and neither key reaches the game, any other event delivers the Alt press first.
+std::vector<Event> g_queued;  // events to deliver before SDL's next
+bool g_alt_held = false;  // an Alt press held back
+bool g_alt_used = false;  // Alt+Enter done: the Alt and Enter releases are dropped
+Event g_alt_press;
+
+bool take(const SDL_Event& e, Event* ev) {
+    Event t;
+    if (!translate(e, &t)) return false;
+    if (g_alt_enter) {
+        if (t.type == EV_KEY_DOWN && t.key == VKEY_MENU && !g_alt_held) {
+            g_alt_held = true;
+            g_alt_used = false;
+            g_alt_press = t;
+            return false;
+        }
+        if (t.type == EV_KEY_DOWN && t.key == VKEY_RETURN && (t.mods & MOD_ALT) && (g_alt_held || g_alt_used)) {
+            g_alt_held = false;
+            g_alt_used = true;
+            toggle_fullscreen();
+            return false;
+        }
+        if (g_alt_used && t.type == EV_KEY_UP && (t.key == VKEY_RETURN || t.key == VKEY_MENU)) {
+            if (t.key == VKEY_MENU) g_alt_used = false;
+            return false;
+        }
+        if (g_alt_held) {
+            g_alt_held = false;
+            g_queued.push_back(t);
+            *ev = g_alt_press;
+            return true;
+        }
+    }
+    *ev = t;
+    return true;
+}
+
+bool pop_queued(Event* ev) {
+    if (g_queued.empty()) return false;
+    *ev = g_queued.front();
+    g_queued.erase(g_queued.begin());
+    return true;
 }
 
 // ---- fonts ----
@@ -335,7 +417,8 @@ std::string find_font_file(const char* face, bool bold, bool italic) {
 
 void set_game_dir(const std::string& dir) { g_game_dir = dir; }
 
-bool video_init(const char* title, int32_t width, int32_t height, bool hidden) {
+namespace {
+bool sdl_init() {
     // The window's close button is EV_CLOSE (the game asks first); SDL_QUIT then only comes from
     // signals and the system's quit command.
 #ifdef SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE  // SDL 2.0.22
@@ -349,6 +432,25 @@ bool video_init(const char* title, int32_t width, int32_t height, bool hidden) {
         std::fprintf(stderr, "TTF_Init: %s\n", TTF_GetError());
         return false;
     }
+    return true;
+}
+
+// No vsync: the game paces its animations itself (window slides 20 ms a frame, unit moves 16,
+// the menu's 10), as the original's blits did. A present waiting for the display's refresh
+// (16.7 ms at 60 Hz) made those frames land 17 or 33 ms apart in turn: jerky slides and moves.
+bool create_renderer() {
+    g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_ACCELERATED);
+    if (!g_renderer) g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_SOFTWARE);
+    if (!g_renderer) {
+        std::fprintf(stderr, "SDL_CreateRenderer: %s\n", SDL_GetError());
+        return false;
+    }
+    return true;
+}
+}  // namespace
+
+bool video_init(const char* title, int32_t width, int32_t height, bool hidden) {
+    if (!sdl_init()) return false;
     g_width = width;
     g_height = height;
     if (hidden) return true;  // offscreen: frames are only saved
@@ -358,18 +460,75 @@ bool video_init(const char* title, int32_t width, int32_t height, bool hidden) {
         std::fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError());
         return false;
     }
-    // No vsync: the game paces its animations itself (window slides 20 ms a frame, unit moves 16,
-    // the menu's 10), as the original's blits did. A present waiting for the display's refresh
-    // (16.7 ms at 60 Hz) made those frames land 17 or 33 ms apart in turn: jerky slides and moves.
-    g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_ACCELERATED);
-    if (!g_renderer) g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_SOFTWARE);
-    if (!g_renderer) {
-        std::fprintf(stderr, "SDL_CreateRenderer: %s\n", SDL_GetError());
-        return false;
-    }
+    if (!create_renderer()) return false;
     SDL_RenderSetLogicalSize(g_renderer, width, height);
     g_texture = SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, width, height);
+    update_scaling();
     SDL_StartTextInput();
+    return g_texture != nullptr;
+}
+
+bool video_init_display(const char* title, const display::Settings& settings, int32_t* width, int32_t* height,
+                        void (*on_fullscreen)(bool)) {
+    // Windows: the window's sizes in the display's pixels (no bitmap stretching by the system's
+    // display scaling); macOS: sizes in points, the drawable in pixels (SDL_WINDOW_ALLOW_HIGHDPI).
+#ifdef SDL_HINT_WINDOWS_DPI_AWARENESS  // SDL 2.24
+    SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
+#endif
+    if (!sdl_init()) return false;
+    SDL_Rect full{0, 0, display::kMinWidth, display::kMinHeight}, usable;
+    SDL_DisplayMode dm;
+    if (SDL_GetDesktopDisplayMode(0, &dm) == 0) {
+        full.w = dm.w;
+        full.h = dm.h;
+    }
+    if (SDL_GetDisplayUsableBounds(0, &usable) != 0) usable = full;
+    g_window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, display::kMinWidth,
+                                display::kMinHeight,
+                                SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_HIDDEN);
+    if (!g_window) {
+        std::fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError());
+        return false;
+    }
+    if (!create_renderer()) return false;
+    // The display's pixels per window unit (2 on a Retina Mac).
+    int ww = 0, wh = 0, pw = 0, ph = 0;
+    SDL_GetWindowSize(g_window, &ww, &wh);
+    double ratio = 1.0;
+    if (SDL_GetRendererOutputSize(g_renderer, &pw, &ph) == 0 && ww > 0 && pw > 0) ratio = (double)pw / ww;
+    // The room for a window: the usable bounds less its frame (a title bar of 40 when the system
+    // does not tell it: X11 before the window is shown), so the frame fits at a whole scale.
+    int top = 0, left = 0, bottom = 0, right = 0;
+    if (SDL_GetWindowBordersSize(g_window, &top, &left, &bottom, &right) != 0 || top + left + bottom + right == 0) {
+        top = 40;
+        left = bottom = right = 0;
+    }
+    int32_t room_w = std::max(1, usable.w - left - right), room_h = std::max(1, usable.h - top - bottom);
+    const SDL_Rect area = settings.fullscreen ? full : SDL_Rect{0, 0, room_w, room_h};
+    display::Mode m = display::choose(settings, (int32_t)(area.w * ratio), (int32_t)(area.h * ratio));
+    g_width = m.width;
+    g_height = m.height;
+    // The window when windowed: the frame at its scale, no bigger than the room.
+    g_windowed_w = std::min(room_w, (int32_t)(m.width * m.scale / ratio));
+    g_windowed_h = std::min(room_h, (int32_t)(m.height * m.scale / ratio));
+    // Fullscreen: the window the display's size first (a system without a window manager may not
+    // resize it for the fullscreen request).
+    if (settings.fullscreen) SDL_SetWindowSize(g_window, full.w, full.h);
+    else SDL_SetWindowSize(g_window, g_windowed_w, g_windowed_h);
+    SDL_SetWindowPosition(g_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    if (settings.fullscreen) SDL_SetWindowFullscreen(g_window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+    SDL_ShowWindow(g_window);
+    g_texture =
+        SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, g_width, g_height);
+    update_scaling();
+    SDL_StartTextInput();
+    g_alt_enter = true;
+    g_on_fullscreen = on_fullscreen;
+    std::fprintf(stderr, "display: %dx%d at %d (%s, %dx%d pixels per window unit %.2f)\n", g_width, g_height,
+                 m.scale, settings.fullscreen ? "fullscreen" : "windowed", (int)(area.w * ratio),
+                 (int)(area.h * ratio), ratio);
+    *width = g_width;
+    *height = g_height;
     return g_texture != nullptr;
 }
 
@@ -392,6 +551,10 @@ void video_shutdown() {
 
 void video_present(const uint8_t* pixels, int32_t pitch, int32_t width, int32_t height, const Rgb* palette) {
     if (!g_texture) return;
+    // A drawable resized without its event seen yet (the fullscreen switch of a busy game).
+    int pw = 0, ph = 0;
+    if (SDL_GetRendererOutputSize(g_renderer, &pw, &ph) == 0 && (pw != g_output_w || ph != g_output_h))
+        update_scaling();
     convert(pixels, pitch, width, height, palette);
     SDL_UpdateTexture(g_texture, nullptr, g_rgb.data(), width * 4);
     SDL_RenderClear(g_renderer);
@@ -451,20 +614,22 @@ bool save_bmp(const char* path, const uint8_t* pixels, int32_t pitch, int32_t wi
 }
 
 bool poll_event(Event* ev) {
+    if (pop_queued(ev)) return true;
     SDL_Event e;
     while (SDL_PollEvent(&e))
-        if (translate(e, ev)) return true;
+        if (take(e, ev)) return true;
     return false;
 }
 
 bool wait_event(Event* ev, int32_t timeout_ms) {
+    if (pop_queued(ev)) return true;
     SDL_Event e;
     uint32_t end = SDL_GetTicks() + (uint32_t)timeout_ms;
     for (;;) {
         int32_t left = (int32_t)(end - SDL_GetTicks());
         if (left < 0) left = 0;
         if (!SDL_WaitEventTimeout(&e, left)) return false;
-        if (translate(e, ev)) return true;
+        if (take(e, ev)) return true;
         if (left == 0) return false;
     }
 }

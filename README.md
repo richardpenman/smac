@@ -48,6 +48,10 @@ games with the original. Known gaps are listed in the [UI plan](docs/UI_PLAN.md)
 smacx fixes the original game's bugs by default ([the list](docs/COMPAT.md)); start it with
 `--original-bugs` (or set `Original Bugs=1` in its ini) to play with every bug as the original does.
 
+It starts fullscreen at your display's resolution (widescreen and 4K included, scaled sharply by
+whole steps); Alt+Enter switches to a window. The ini's `Screen Size`, `UI Scale` and `Fullscreen`
+change this (packaging/README.txt).
+
 | | |
 |---|---|
 | ![Developed land, late game](docs/screenshots/map.png) | ![Base window](docs/screenshots/base.png) |

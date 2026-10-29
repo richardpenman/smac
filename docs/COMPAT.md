@@ -11,7 +11,7 @@ setting its save was made with, and in an online game the host's setting applies
 Bugs marked "Not fixed" keep the original's behaviour in both settings. In the code each bug
 is a flag of `g_compat` (`true` plays the bug); Where lists the files with its `BUG(original)` sites.
 
-128 bugs (123 fixed), 175 sites.
+131 bugs (126 fixed), 179 sites.
 
 ## bugs at several sites
 
@@ -73,6 +73,12 @@ is a flag of `g_compat` (`true` plays the bug); Where lists the files with its `
 | When the AI rates a Subspace Generator (and a few other facilities) for a base, it reads the population of the base whose id is the number of bases (a stale value: past the last base) instead of this base's. | This base's population. | `src/engine/base_misc.cpp` |
 | When the AI rates a Geosynchronous Survey Pod, its priorities (growth, tech, wealth, power) are meant to adjust the facility's score, but adjust the stored id of the unit on the base's tile instead. | They adjust the score. | `src/engine/base_misc.cpp` |
 
+## basewin_cmd
+
+| Bug | Fix | Where |
+| --- | --- | --- |
+| On a screen wider than 1024 pixels the base window shows both of its energy panes (the resources and the energy allocation), but the right click's help bubbles of one of them are missing: the code tests for a screen exactly 1024 pixels wide. | Every screen but 800 x 600 has the bubbles of both panes. | `src/ui/basewin_cmd.cpp` |
+
 ## battle
 
 | Bug | Fix | Where |
@@ -91,6 +97,12 @@ is a flag of `g_compat` (`true` plays the bug); Where lists the files with its `
 | Bug | Fix | Where |
 | --- | --- | --- |
 | Ordering a sea former to lower the sea floor at the lowest depth shows the SEATOOLOW message ("too low") but gives the order anyway. | The order is not given after the message. | `src/ui/console.cpp` |
+
+## console_frame
+
+| Bug | Fix | Where |
+| --- | --- | --- |
+| On a screen wider than 1024 pixels the console stays 1024 pixels wide, centred at the bottom, and the map view ends 213 pixels above the bottom of the screen: the strips to the left and right of the console are left black. | The map view fills the screen's whole height, so the map shows beside the console. | `src/ui/console_frame.cpp` (2) |
 
 ## console_mouse
 
@@ -279,6 +291,12 @@ is a flag of `g_compat` (`true` plays the bug); Where lists the files with its `
 | Bug | Fix | Where |
 | --- | --- | --- |
 | Reading a text string at the end of a text file stores a null string (the original reads memory address 0, which on Windows gives an empty or invalid entry). | The empty string is stored. | `src/engine/text.cpp` (2) |
+
+## topmenu
+
+| Bug | Fix | Where |
+| --- | --- | --- |
+| On a screen bigger than 1024 x 768 the credits picture is drawn at its own size in the top left corner, the enlarged opening picture showing to its right and below. | The credits picture is stretched over the screen like the opening picture, and the scrolling text keeps its place on it. | `src/ui/topmenu.cpp` |
 
 ## turn
 

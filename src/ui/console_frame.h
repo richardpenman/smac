@@ -41,8 +41,10 @@ void console_menu_popup(int32_t index, int32_t x, int32_t y);
 void console_menu_check(int32_t index, int32_t id, bool on);
 // The Map menu's display toggles (console_menu.cpp), also bound to keys.
 void console_toggle_pref(int32_t id);
-// Height of the main view (the map window): the screen minus the console's lower part.
-int32_t console_view_height(int32_t screen_height);
+// Height of the main view (the map window): the screen minus the console's lower part (168
+// pixels, the oracle's view at 1024 x 768); on a screen wider than the console (1024) the whole
+// height, so the map fills the screen beside the console (console_frame_draw).
+int32_t console_view_height(int32_t screen_width, int32_t screen_height);
 
 // The main interface's panes drawn by the original's code (maininfc.cpp): the pane rectangles of
 // MainInterface_init, the world map (WorldWin_on_redraw), the date box (MainInterface_set_date)

@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "engine/clock.h"
+#include "engine/compat.h"
 #include "engine/game.h"
 #include "engine/globals.h"
 #include "engine/map.h"
@@ -69,6 +70,21 @@ bool g_desk_up = false;
 void palette_from(Palette* out, const Buffer& b) {
     std::memcpy(out, &GamePalette, sizeof(Palette));
     for (int32_t i = 10; i < 246; i++) std::memcpy(out->rgb[i], b.colors[i], 3);
+}
+
+// Buffer_copy_3 (a StretchDIBits): the whole of `src` onto the whole of `dst`, each pixel the
+// source pixel under its centre, stepped in 16.16 fixed point (the identity when the sizes agree:
+// the pictures are the screen's size at 800 x 600 and 1024 x 768). The sampling of the original
+// under Wine at 1920 x 1080 (tests/screen/compare.sh: 98.9% of the opening picture's pixels equal).
+void stretch_copy(const Buffer& src, Buffer* dst) {
+    int64_t sx = ((int64_t)src.width << 16) / dst->width, sy = ((int64_t)src.height << 16) / dst->height;
+    for (int32_t y = 0; y < dst->height; y++) {
+        int64_t ry = std::min<int64_t>(((int64_t)y * sy + sy / 2) >> 16, src.height - 1);
+        const uint8_t* s = src.data + (size_t)ry * src.stride;
+        uint8_t* d = dst->data + (size_t)y * dst->stride;
+        for (int32_t x = 0; x < dst->width; x++)
+            d[x] = s[std::min<int64_t>(((int64_t)x * sx + sx / 2) >> 16, src.width - 1)];
+    }
 }
 
 const char* opening_pcx() {
@@ -304,11 +320,9 @@ int32_t GAMEAPI change_opening(const char* pcx) {
         Buffer_ctor(&g_desk.canvas);
         Buffer_init(&g_desk.canvas, ScreenWidth, ScreenHeight, 8, 0);
     }
-    // GraphicWin_fill(0), then the picture (Buffer_copy_3).
-    std::memset(g_desk.canvas.data, 0, (size_t)g_desk.canvas.stride * g_desk.canvas.height);
-    for (int32_t y = 0; y < std::min(b.height, g_desk.canvas.height); y++)
-        std::memcpy(g_desk.canvas.data + (size_t)y * g_desk.canvas.stride, b.data + (size_t)y * b.stride,
-                    (size_t)std::min(b.width, g_desk.canvas.width));
+    // The picture stretched over the window (Buffer_copy_3 from the picture's size to the window's:
+    // a bigger screen shows it enlarged).
+    stretch_copy(b, &g_desk.canvas);
     palette_from(&g_desk_pal, b);
     ui_set_layer_palette(1, &g_desk_pal);
     g_desk.layer = 1;
@@ -798,8 +812,14 @@ struct CreditsWin : ScreenWin {
     void redraw() override {
         UiRect all{0, 0, canvas.width, canvas.height};
         Buffer_set_clip(&canvas, &all);
-        std::memcpy(canvas.data, back.data, (size_t)back.stride * back.height);
         int32_t ox = 0x1E, oy = ScreenWidth == 800 ? 100 : 200, w = 400, hh = 400;
+        if (canvas.width == back.width && canvas.height == back.height) {
+            std::memcpy(canvas.data, back.data, (size_t)back.stride * back.height);
+        } else {  // (the fix of compat wide_credits_picture) the picture and the text's place scaled
+            stretch_copy(back, &canvas);
+            ox = ox * canvas.width / back.width;
+            oy = oy * canvas.height / back.height;
+        }
         uint32_t t = animate ? (platform::ticks_ms() - start) / 30 : 0;
         int32_t scroll = (int32_t)t - hh;  // the text enters at the window's bottom
         Buffer_set_font(&canvas, &font, nullptr, nullptr, nullptr);
@@ -831,7 +851,11 @@ void GAMEAPI show_credits() {
     if (Buffer_load_pcx(&w.back, ScreenWidth == 800 ? "credits.pcx" : "credits2.pcx", nullptr, 10, 0xEC)) return;
     palette_from(&g_credits_pal, w.back);
     ui_set_layer_palette(2, &g_credits_pal);
-    sw_init(&w, 0, 0, w.back.width, w.back.height, false);
+    // BUG(original): the window is the screen's size but the picture is loaded at its own size
+    // (GraphicWin_load_pcx into the window's canvas): on a screen bigger than 1024 x 768 it covers
+    // only the top left of the screen, the stretched opening picture showing around it.
+    if (g_compat.wide_credits_picture) sw_init(&w, 0, 0, w.back.width, w.back.height, false);
+    else sw_init(&w, 0, 0, std::max(ScreenWidth, w.back.width), std::max(ScreenHeight, w.back.height), false);
     w.layer = 2;
     Font_ctor(&w.font);
     Font_init(&w.font, "Alpha Centauri", 0xE, 1);

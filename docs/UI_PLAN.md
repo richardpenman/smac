@@ -795,3 +795,72 @@ tests/placeholders/compare.sh (orig_rmenu.steps; orig_basewin.steps by eye).
 | Map view | partial and scrolled redraws (MapWin_gen_radius), MapWin_draw_wars / legend / overlays, pfncProcZoomKey's mouse position, palette cycling | done. base_draw: the base's art by its founder (faction_id_former) and the drone riot icon (pixel-exact against the oracle's mapdump of turn_300, tests/placeholders case 13); pfncProcZoomKey's mouse position (console.cpp); mapwin_radius.cpp: MapWin_compute_clip, MapWin_gen_radius, MapWin_draw_vehicles_2, MapWin_draw_radius / draw_tile and the engine's draw_tile, draw_tiles, draw_radius, draw_tile_fixup(_2) (the changed tiles redrawn at once on every open map window, as the original; boom's MapWin_draw_tile), MapWin_gen_overlays (AI goals, option 0x2000), MapWin_draw_legend (0x20000), MapWin_draw_wars (0x100000) in pfncDrawMap and the partial redraws: pixel-exact against the oracle's mapdump options= / radius= (case 17; the legend's bold digits differ in 10 pixels, the font rasteriser's); scrolled redraws (pfncRedrawMap's scroll path) pixel-exact against the oracle's mapdump scrollfrom= (turn_300 scrolled to 1,13 from 60,9 and from 7,17, case 17; the edge unit's difference was smacx's: vehdraw_draw / vehdraw_scoot took the camera yaw of the last unit drawn, the original computes the unit's camera before its rotation; the original has no dependency on its terrain cache there: its full and scrolled pictures from 60,9 are the same); palette cycling (gfx.cpp: Palette_init_cycle / start_cycle / timer_callback, the nearest-colour searches skip the cycles' entries; the shipped system.txt has no #CYCLING entries, so the original animates no colours: case 18 checks a game directory with three). Approximated: the cursor texture MapWin_draw_radius draws again (drawn over the view at each presentation), do_all_draws after a partial redraw (the next frame) | — |
 | Music | soundx.dll's ambient engine | approximated (music.cpp); not made more faithful: soundx.dll was decompiled (Ghidra, 1482 functions) and its .amb loader found (FUN_10003A30: chnl / trak / glbl / prgm / kmap chunks, then the MIDI file; glbl entries of 0x38 bytes kept in a list sorted by their second field, FUN_1001E820), but its sequencer is a large C++ engine driven through vtables (the tick FUN_1001B920, 16 channel slots of 0x428 bytes each with 128 random values pre-drawn in a [min, max] range, the patterns' own two random tables, FUN_1001DDF0), and every random table is reseeded from timeGetTime (FUN_1001C300 / C420 / C750 / CB60 / E040): the original's choices cannot be reproduced, and how the slots' values map to track, timing and pitch choices could not be settled without reconstructing most of the engine | L |
 | Multiplayer | multiplayer_init, config_game's HOTSEATADD, control_turn's handovers, the tamper checks, NetDaemon, NetWin, NetMsg, MultiWin, the DiploWin | done (docs/MULTIPLAYER.md): hotseat (setup, handovers, passwords, DiploWin; tests/hotseat), PBEM (SAVE AND EXIT, the tamper checks, passwords on load; tests/pbem) and online play between smacx copies over TCP (NetDaemon's messages and synch blocks, the setup window NetWin, NetMsg, MultiWin's panel and chat, time controls, the DiploWin between players, players dropping, saved games and scenarios; tests/online, tests/online2). Approximated: NetWin_pick_player (the own row's names, CUSTOMNAMES) not reconstructed; NetWin's drop-down menus (PopMenu) shown as popup lists; the session's title empty (DirectPlay's session name); no play with the original (smacx to smacx only, no DirectPlay) | — |
+
+## 14. Screen sizes, fullscreen and HiDPI
+
+**What the original does at large sizes.** With DirectDraw (the game's default) WinMain sets a
+1024 x 768 mode (800 x 600 below 1024 pixels of desktop width): the original never runs larger.
+Without DirectDraw (`DirectDraw=0`, windowed GDI, as the harness runs it) Win_init_class
+(0x5F01F0) takes the desktop's size (GetSystemMetrics), so the original lays its windows out for
+any size; under Wine an Xvfb screen of the size sets it (tests/popups/orig_drive.py `ORIG_SCREEN`,
+harness/run_oracle.sh `ORACLE_SCREEN`). Its layout at 1280 x 1024, 1366 x 768 and 1920 x 1080
+(screenshots and the oracle's map dumps and memory):
+
+* The main interface (MainInterface_init 0x459680, +0xA1C) is the console's 1024 pixels, centred
+  at the bottom: `((W - 1024) / 2, H - 257)` (the oracle's memory: 448,823 .. 1472,1080 at
+  1920 x 1080). Its pane rectangles are the 1024 layout's, relative to it.
+* The map window (MapWin_UNK5 0x46FA20) is `W x (H - 213)` (the oracle's map dumps: 1024 x 555,
+  1280 x 811, 1366 x 555, 1920 x 867). Beside the console, below it, nothing is drawn: two black
+  strips (213 rows high) on a screen wider than 1024 pixels.
+* Every other window keeps its 1024 x 768 size and is placed from the screen's size as at 1024:
+  popups, DiploPop and the design workshop centred over the console (`(W - w + 32) / 2`, their
+  bottom on the console's top), the base window, social engineering, the reports, the council
+  centred above the console, the Datalinks at `(W - 800) / 2`, the monuments `(W - 1024) / 2,
+  H - 768`, the menu column (AlphaMenu_adjust) on the console's left, the preferences
+  0x26A pixels above the bottom (PrefWin_init). Popups with a picture may be wider than at 1024
+  (Popup_calculate_dimensions limits them to `W - 0x16E`).
+* The opening screens: the opening picture (xopeninga.pcx, 1024 x 768) is stretched over the
+  screen (change_opening's Buffer_copy_3: the source pixel under each pixel's centre, 16.16 fixed
+  point steps under Wine), the menu column at the bottom right; the custom planet's pictures only
+  at exactly 800 or 1024 pixels (SetupWin_draw_item); the credits picture at its own size in the
+  top left corner, the stretched opening picture around it.
+* Bugs at large sizes (docs/COMPAT.md): the black strips (compat `wide_console_strips`), the
+  credits picture (`wide_credits_picture`), the base window's help bubbles of one energy pane
+  missing above 1024 pixels (BaseWin_click tests `ScreenWidth == 1024`: `wide_base_bubbles`).
+  The original under Wine also crashed at 1366 x 768 (while loading a game) and at 1920 x 1080
+  (closing the design workshop); not investigated (nothing in smacx corresponds).
+
+**smacx.** The windows were already placed by the original's formulas (`ScreenWidth == 800`
+tests, centring); what assumed a 1024-pixel screen: the main interface spanned the screen's
+width from x = 0 (basewin.cpp mi_init: now centred as MainInterface_init), change_opening copied
+the picture unstretched (topmenu.cpp stretch_copy), the preferences' height test (`== 768`). By
+default the map view is the screen's whole height beside the console (console_frame.cpp
+console_view_height: a screen wider than 1024 pixels; 1024 x 768 and 800 x 600 unchanged), the
+credits picture is stretched, the bubbles shown.
+
+**Display settings** (interactive play only; the tests and the harness keep 1024 x 768 or
+`--size`): platform/display.h chooses the logical screen (ScreenWidth x ScreenHeight) and an
+integer scale from the ini's `Screen Size` (auto), `UI Scale` (auto: the largest s with display
+height / s >= 768 and width / s >= 1024) and `Fullscreen` (1: SDL's desktop fullscreen, no mode
+change); the platform (ui_platform_sdl.cpp video_init_display) measures the display in pixels
+(SDL_WINDOW_ALLOW_HIGHDPI: the renderer's output, so a Retina Mac's points count as pixels;
+Windows per-monitor DPI aware), shows the frame at the largest whole multiple that fits (nearest
+pixel, SDL_RenderSetIntegerScale, black around it; a window smaller than the frame scales it down,
+smoothed), and maps the mouse through SDL's logical size. A windowed start takes the usable
+desktop less the window's frame as its area (a 40-pixel title bar when the system does not tell
+it: 1920 x 1040 on a 1920 x 1080 X11 desktop). Alt+Enter toggles fullscreen (the Alt press is held
+back until the next event, so it does not open the menu column) and saves `Fullscreen`; F11 is the
+game's (menu detail). A resized window keeps the logical size; a changed Screen Size or UI Scale
+applies at the next start.
+
+**Checks.** tests/screen/run.sh: at 1024 x 768, 1280 x 1024, 1366 x 768, 1920 x 1080 and
+2560 x 1440 the console's bottom rows equal the 1024 x 768 run's (centred), the strips beside it
+show the map (and are black with --original-bugs), clicks on MENU (the column at the console's
+left), the info pane's M / I buttons, the base window's OK and the quit question's row land; the
+opening picture is the 1024 x 768 one stretched; the display computation (smacx_unit); an
+interactive start on a 3840 x 2160 Xvfb (1920 x 1080 at 2, every pixel a 2 x 2 block, a click at
+twice a popup row's place answers it, Alt+Enter saves Fullscreen=0). tests/screen/compare.sh: the
+original under Wine against smacx --original-bugs at 1280 x 1024 and 1920 x 1080: the opening
+screen equal (100%), the strips equal (black), the console's frame in the same place (its top
+band 71-78%: the map seen through the frame's gaps differs, the games differ), the quit question
+at the same place and size (92%: the original's rails beside it, the row under the mouse).

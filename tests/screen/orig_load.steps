@@ -1,0 +1,19 @@
+; The plain original under Xvfb at ORIG_SCREEN's size (tests/popups/orig_drive.py, tests/screen/compare.sh):
+; the main menu, then LOAD GAME's FileBox with ORIG_SAVE (work/saves_late/turn_120.sav) the only save,
+; loaded (its confirmation answered): the main screen.
+wait 10
+shot menu
+key Down
+key Down
+key Down
+key Return
+wait 3
+key Return
+wait 3
+key Return
+wait 18
+shot map
+key C+q
+wait 2
+key Return
+wait 1

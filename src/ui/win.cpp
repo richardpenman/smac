@@ -48,10 +48,6 @@ int32_t g_ui_shots = 0;
 
 namespace {
 
-// Height of the console panel below the main view (the original's console/world window layout,
-// MapWin_UNK5 0x46FA20, is not reconstructed; 168 pixels match the oracle's view at 1024x768).
-constexpr int32_t kPanelHeight = 168;
-
 Buffer g_canvas;  // the window
 Buffer g_view;  // the main view's GraphicWin canvas
 bool g_ready = false;
@@ -460,7 +456,7 @@ void ui_screen_init(int32_t width, int32_t height) {
     Buffer_ctor(&g_canvas);
     Buffer_init(&g_canvas, width, height, 8, 0);
     Buffer_ctor(&g_view);
-    Buffer_init(&g_view, width, std::max(height - kPanelHeight, 100), 8, 0);
+    Buffer_init(&g_view, width, std::max(console_view_height(width, height), 100), 8, 0);
     ui_mapwin_attach(&MainConsole, kConsoleVBase, &g_view);
     Font_ctor(&g_font);
     g_font_ok = Font_init(&g_font, "Arial", 14, 0) == 0;

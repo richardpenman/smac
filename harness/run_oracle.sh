@@ -4,6 +4,7 @@
 # Env: ORACLE_DLL=oracle|hybrid (default oracle) selects the injected DLL;
 #      HYBRID_BUILD=<dir> (default build/hybrid) is where the DLLs are taken from.
 #      PATCH_SPEC="<spec>" (hybrid only) is applied at DLL load, before the game boots.
+#      ORACLE_SCREEN=WxH (default 1024x768) is the Xvfb screen: the original runs at its size.
 # Creates an isolated run directory (symlinked game data + pristine ini), runs the script, and
 # copies results into <outdir>.
 set -u
@@ -26,7 +27,7 @@ grep -q '^outdir' "$RUN/oracle.cmd" || sed -i '1i outdir oracle_out' "$RUN/oracl
 . "$ROOT/harness/wine_env.sh"
 # private X display per run
 DISP=$(( 100 + RANDOM % 800 ))
-Xvfb ":$DISP" -screen 0 1024x768x24 >/dev/null 2>&1 &
+Xvfb ":$DISP" -screen 0 "${ORACLE_SCREEN:-1024x768}x24" >/dev/null 2>&1 &
 XPID=$!
 sleep 1
 cd "$RUN"

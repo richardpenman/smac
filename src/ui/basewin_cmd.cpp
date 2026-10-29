@@ -7,6 +7,7 @@
 
 #include "engine/action.h"
 #include "engine/base.h"
+#include "engine/compat.h"
 #include "engine/crt.h"
 #include "engine/diplo_act.h"
 #include "engine/diplomacy.h"
@@ -731,8 +732,12 @@ void THISCALL BaseWin_click(uint8_t* self, int32_t x, int32_t y, int32_t right, 
     // Right clicks on the panes: their help bubbles (Win_set_bubble_text at the click).
     if (right) {
         uint32_t label = 0;
-        bool alt_mode = ScreenWidth == 0x400 || base_win().energy_layout;  // (the energy pane's two layouts)
-        bool alt_mode2 = ScreenWidth == 0x400 || !base_win().energy_layout;
+        // (The energy pane's two layouts at 800 x 600; above, both panes are shown.) BUG(original):
+        // the test is ScreenWidth == 1024, so on a wider screen the bubbles of one of the two panes
+        // are missing (the one the 800 x 600 layout would hide).
+        bool both = g_compat.wide_base_bubbles ? ScreenWidth == 0x400 : ScreenWidth != 800;
+        bool alt_mode = both || base_win().energy_layout;
+        bool alt_mode2 = both || !base_win().energy_layout;
         if (in_box(x, y, base_win().rect_map)) {
             int32_t pane = base_win().pane;
             label = pane == 0 ? 0xC98 : pane == 2 ? 0xC20 : pane == 1 ? 0xC24 : 0;

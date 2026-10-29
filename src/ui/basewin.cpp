@@ -285,8 +285,10 @@ void mi_init() {
         for (int32_t i = 0; i < 11; i++) f[i] = r800[i];
         main_interface().pane_bottom = {0xF4, 0xBC, 0x220, 0xFC};
     } else {
-        // 1024 (the original's values; the window spans the screen width at its bottom).
-        main_interface().pos = {0, sh - 0x101, sw, sh};
+        // 1024 and wider (the original's values): the window is the console's 1024 pixels, centred
+        // at the bottom of the screen (+0xA1C: (width - 0x400) / 2, height - 0x101).
+        int32_t left = (sw - 0x400) / 2;
+        main_interface().pos = {left, sh - 0x101, left + 0x400, sh};
         main_interface().pane_queue = {4, 0x38, 0xF5, 0xFC};
         main_interface().pane_right = {0x30B, 0x38, 0x3FC, 0xFC};
         main_interface().pane_center = {0x106, 0x42, 0x2FB, 0xAC};

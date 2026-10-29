@@ -20,6 +20,7 @@
 #include <cstring>
 
 #include "engine/base.h"
+#include "engine/compat.h"
 #include "engine/crt.h"
 #include "engine/design.h"
 #include "engine/map.h"
@@ -132,11 +133,20 @@ void draw_button(Buffer* s, const UiRect& r, const char* label) {
 
 }  // namespace
 
-int32_t console_view_height(int32_t h) { return h - 168; }
+// The original's map window (MapWin_UNK5 0x46FA20) is the screen's width and its height less the
+// console's (MiConsoleHeight, 0xD5): its view ends 0xD5 pixels above the bottom of the screen
+// (the oracle's map dumps: 1024 x 555 at 1024 x 768, 1920 x 867 at 1920 x 1080). At 1024 pixels
+// the console's art is opaque below that row, so smacx's view of 168 pixels less looks the same.
+int32_t console_view_height(int32_t w, int32_t h) { return w > 0x400 ? h : h - 168; }
 
 bool console_frame_hit(int32_t x, int32_t y) {
     load_art();
     if (!g_art.ok) return false;
+    // BUG(original) (compat wide_console_strips): the black strips beside the console are no map;
+    // the clicks there reach nothing.
+    if (ScreenWidth > 0x400 && g_compat.wide_console_strips && y >= ScreenHeight - MiConsoleHeight &&
+        (x < main_interface().pos.left || x >= main_interface().pos.right))
+        return true;
     int32_t fx = x - g_ox, fy = y - g_oy;
     if (fx < 0 || fy < 0 || fx >= g_art.frame.width || fy >= g_art.frame.height) return false;
     if (Win_is_visible(&BaseWin)) return false;
@@ -176,7 +186,11 @@ void console_frame_draw(Buffer* s) {
     if (!g_art.ok || Win_is_visible(&BaseWin)) return;
     maininfc_geometry();
     // Below the main view the screen has nothing else: black.
-    int32_t view_h = console_view_height(s->height);
+    int32_t view_h = console_view_height(s->width, s->height);
+    // BUG(original): on a screen wider than 1024 pixels the console (1024 wide, centred:
+    // MainInterface_init) leaves strips to its left and right that nothing draws: the map window
+    // ends MiConsoleHeight pixels above the bottom (MapWin_UNK5), so they stay black.
+    if (s->width > 0x400 && g_compat.wide_console_strips) view_h = s->height - MiConsoleHeight;
     for (int32_t y = view_h; y < s->height; y++) std::memset(s->data + (size_t)y * s->stride, 0, (size_t)s->width);
     // MainInterface_on_redraw (mode 0): the console art, the panes' background and their contents
     // drawn into the main interface's canvas.

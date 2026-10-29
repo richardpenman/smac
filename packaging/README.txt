@@ -59,7 +59,27 @@ in your own folder:
 The game folder itself is only read.
 
 
-4. Notes
+4. Screen
+---------
+
+smacx starts fullscreen at your display's size: the map fills the screen, the game's
+windows keep their size and the interface sits at the bottom centre. On large displays every
+pixel of the game is shown as 2 x 2 (or 3 x 3) pixels, so it stays sharp and readable (a 4K
+display shows a 1920 x 1080 screen at twice the size). Alt+Enter switches between fullscreen
+and a window, and is remembered. A window can be resized: the picture is scaled to fit.
+
+Settings in Alpha Centauri.Ini, section [Alpha Centauri] (read at start):
+
+  Screen Size=auto     the game's screen in pixels, e.g. 1920x1080 (auto: the display's
+                       size divided by the UI Scale; at least 1024x768)
+  UI Scale=auto        1, 2 or 3: the size of each game pixel on the display (auto: the
+                       largest that leaves the game at least 768 pixels high)
+  Fullscreen=1         0: in a window
+
+The start option --size WxH (e.g. --size 1280x1024) overrides them for one run, in a window.
+
+
+5. Notes
 --------
 
   - Single player only; multiplayer is not supported.

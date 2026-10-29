@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 
+#include "platform/display.h"
+
 namespace platform {
 
 struct Rgb {
@@ -22,6 +24,13 @@ struct Rgb {
 // Creates the game window with a client area of width x height pixels. hidden: no visible window
 // (offscreen rendering for screenshots/tests; use SDL_VIDEODRIVER=dummy without a display).
 bool video_init(const char* title, int32_t width, int32_t height, bool hidden);
+// Interactive play (smacx's display settings, platform/display.h): the window or the desktop's
+// fullscreen sized for the display, the logical screen chosen by display::choose from its pixels
+// (HiDPI: the drawable's pixels, not the window's points) and returned in *width x *height, shown
+// at a whole multiple of its size when it fits (nearest pixel, centred on black). Alt+Enter
+// toggles fullscreen (on_fullscreen is told the new state, e.g. to save it).
+bool video_init_display(const char* title, const display::Settings& settings, int32_t* width, int32_t* height,
+                        void (*on_fullscreen)(bool fullscreen));
 void video_shutdown();
 // Shows an 8-bit frame (top-down rows of `pitch` bytes) through `palette` (256 entries).
 void video_present(const uint8_t* pixels, int32_t pitch, int32_t width, int32_t height, const Rgb* palette);

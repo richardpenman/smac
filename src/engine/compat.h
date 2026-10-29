@@ -154,6 +154,11 @@ struct Compat {
     // the facility's score, but adjust the stored id of the unit on the base's tile instead. Fix: they adjust the
     // score.
     bool base_build_stack_adjust = false;
+    // ---- basewin_cmd ----
+    // On a screen wider than 1024 pixels the base window shows both of its energy panes (the resources and the energy
+    // allocation), but the right click's help bubbles of one of them are missing: the code tests for a screen exactly
+    // 1024 pixels wide. Fix: every screen but 800 x 600 has the bubbles of both panes.
+    bool wide_base_bubbles = false;
     // ---- battle ----
     // The base defence bonus computed without an attacker (the defence strength shown for a base's units) uses level
     // -1, so a Tachyon Field (+2 levels) never counts there and the shown strength is lower than in a real attack.
@@ -173,6 +178,11 @@ struct Compat {
     // Ordering a sea former to lower the sea floor at the lowest depth shows the SEATOOLOW message ("too low") but
     // gives the order anyway. Fix: the order is not given after the message.
     bool terraform_sea_too_low = false;
+    // ---- console_frame ----
+    // On a screen wider than 1024 pixels the console stays 1024 pixels wide, centred at the bottom, and the map view
+    // ends 213 pixels above the bottom of the screen: the strips to the left and right of the console are left black.
+    // Fix: the map view fills the screen's whole height, so the map shows beside the console.
+    bool wide_console_strips = false;
     // ---- console_mouse ----
     // While dragging a base's rally point, the drawn route's end point stores the tile's y as its x and leaves its y
     // stale, so the route line is drawn to a wrong spot. Fix: the end point is the tile.
@@ -454,6 +464,11 @@ struct Compat {
     // Reading a text string at the end of a text file stores a null string (the original reads memory address 0,
     // which on Windows gives an empty or invalid entry). Fix: the empty string is stored.
     bool text_null_string = false;
+    // ---- topmenu ----
+    // On a screen bigger than 1024 x 768 the credits picture is drawn at its own size in the top left corner, the
+    // enlarged opening picture showing to its right and below. Fix: the credits picture is stretched over the screen
+    // like the opening picture, and the scrolling text keeps its place on it.
+    bool wide_credits_picture = false;
     // ---- turn ----
     // The random events that destroy a sea base's kelp farms or tidal platforms require a tile that is ocean and land
     // at once, so they never happen. Fix: an ocean tile is enough: the events happen as their messages (KELPWIPE,

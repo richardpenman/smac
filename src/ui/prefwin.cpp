@@ -347,7 +347,9 @@ struct PrefWin : ScreenWin {
         Font_ctor(&font);
         Font_init(&font, "Arial", 0xE, 1);
         int32_t w = 0x2B9, h = 0x182;
-        int32_t x = (ScreenWidth - w) / 2 + 26 + 4, y = ScreenHeight == 768 ? 150 : (ScreenHeight - h) / 2;
+        // PrefWin_init's GraphicWin_init: 0x26A pixels above the bottom of the screen (150 at 768).
+        int32_t x = (ScreenWidth - w) / 2 + 26 + 4;
+        int32_t y = ScreenWidth == 800 ? (ScreenHeight - h) / 2 : ScreenHeight - 0x26A;
         sw_init(this, x, y, w, h, false);
         panel = UiRect{0xE6, 5, w - 10, h - 5};
         int32_t bx = 10, bw = 0xD6, bh = 0x13;

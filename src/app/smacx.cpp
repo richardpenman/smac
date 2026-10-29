@@ -5,6 +5,13 @@
 //         [--rng FILE] [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR]
 //         [--gamedir DIR] [--image FILE] [--ini FILE] [--nosound] [--original-bugs]
 //
+// The screen. Interactive play (no --hidden, --keys, --size, --shot, --dump or --basedump) takes the
+// ini's display settings ([Alpha Centauri] Screen Size = auto | WxH, UI Scale = auto | 1 | 2 | 3,
+// Fullscreen = 0 | 1; platform/display.h): by default the desktop's fullscreen at the display's
+// size, each game pixel shown as s x s display pixels (s: the largest whole scale leaving at least
+// 768 rows; 4K: 1920 x 1080 at 2); Alt+Enter toggles fullscreen and saves it. Every other run
+// (the tests, the harness) is 1024 x 768, or --size WxH, in a window of that size.
+//
 // The original's bugs (engine/compat.h, docs/COMPAT.md): smacx plays with them fixed unless the
 // ini says "Original Bugs=1" ([Alpha Centauri] section) or --original-bugs is given (the tests
 // whose references come from the original, the harness). --original-bugs also overrides the
@@ -121,6 +128,7 @@
 #include "engine/turn.h"
 #include "engine/ui_bridge.h"
 #include "engine/world.h"
+#include "platform/display.h"
 #include "platform/ui_platform.h"
 #include "platform/win32.h"
 #include "ui/console.h"
@@ -152,8 +160,12 @@ struct Options {
     unsigned seed_crt = 0, seed_game = 0;
     bool seeded = false, seed_given = false, hidden = false, exit_after_keys = false, nosound = false, animate = false;
     bool original_bugs = false;  // --original-bugs
+    bool size_given = false;  // --size
     std::vector<ScriptedKey> keys;
 } g_opt;
+
+// The ini the game reads and writes (Alt+Enter saves Fullscreen there).
+std::string g_ini_path;
 
 int g_turns_done = 0;
 bool g_quit = false;
@@ -780,7 +792,8 @@ int main(int argc, char** argv) {
                 g_opt.keys.push_back(k);
             }
         } else if (a == "--center") std::sscanf(next().c_str(), "%d,%d", &g_opt.cx, &g_opt.cy);
-        else if (a == "--size") std::sscanf(next().c_str(), "%dx%d", &g_opt.width, &g_opt.height);
+        else if (a == "--size")
+            g_opt.size_given = std::sscanf(next().c_str(), "%dx%d", &g_opt.width, &g_opt.height) == 2;
         else return usage();
     }
     if (!g_opt.save.empty() && g_opt.new_game) return usage();
@@ -857,10 +870,33 @@ int main(int argc, char** argv) {
     // The harness's deterministic clock (engine/clock.h): the same keys give the same game.
     engine_set_deterministic(true);
     // WinMain: the screen size (GetSystemMetrics) the windows are laid out for; config_popups
-    // copies it into CanvasWidth/CanvasHeight.
+    // copies it into CanvasWidth/CanvasHeight. The tests, the harness and every scripted or hidden
+    // run: 1024 x 768 (or --size) in a window of that size. Interactive play: the ini's display
+    // settings (platform/display.h): Screen Size, UI Scale (auto: the display's) and Fullscreen
+    // (default 1, the desktop's; Alt+Enter toggles it and saves it).
+    bool interactive = !g_opt.size_given && !g_opt.hidden && g_opt.keys.empty() && g_opt.shot.empty() &&
+                       g_opt.dump.empty() && g_opt.basedump.empty();
+    if (interactive) {
+        char buf[32] = "";
+        display::Settings ds;
+        win32::GetPrivateProfileStringA("Alpha Centauri", "Screen Size", "auto", buf, sizeof(buf), ini_copy.c_str());
+        display::parse_size(buf, &ds.width, &ds.height);
+        win32::GetPrivateProfileStringA("Alpha Centauri", "UI Scale", "auto", buf, sizeof(buf), ini_copy.c_str());
+        ds.scale = display::parse_scale(buf);
+        win32::GetPrivateProfileStringA("Alpha Centauri", "Fullscreen", "1", buf, sizeof(buf), ini_copy.c_str());
+        ds.fullscreen = std::atoi(buf) != 0;
+        g_ini_path = ini_copy;
+        auto save_fullscreen = [](bool on) {
+            win32::WritePrivateProfileStringA("Alpha Centauri", "Fullscreen", on ? "1" : "0", g_ini_path.c_str());
+        };
+        if (!platform::video_init_display("Sid Meier's Alpha Centauri", ds, &g_opt.width, &g_opt.height,
+                                          save_fullscreen))
+            return 1;
+    } else if (!platform::video_init("Sid Meier's Alpha Centauri", g_opt.width, g_opt.height, g_opt.hidden)) {
+        return 1;
+    }
     ScreenWidth = g_opt.width;
     ScreenHeight = g_opt.height;
-    if (!platform::video_init("Sid Meier's Alpha Centauri", g_opt.width, g_opt.height, g_opt.hidden)) return 1;
     // WinMain's init_sound (soundx.dll, DirectSound): the SDL audio device unless --nosound.
     sound_startup(!g_opt.nosound);
     // system_init's UI part (load_fixed_sprites -> load_palette, load_sprites -> load_terrain)

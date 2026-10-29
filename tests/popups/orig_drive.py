@@ -6,6 +6,8 @@
 # Screenshots go to OUTDIR/NAME.png. Usage: orig_drive.py STEPFILE OUTDIR [extra ini lines file]
 # Keys are X keysyms with C+/S+/A+ modifiers (sent with XTEST to the game's Xvfb display). The game
 # runs in work/popup_orig_run with harness/oracle/runtime's ini (no sound, no DirectDraw, no movie).
+# ORIG_SCREEN=WxH (default 1024x768): the Xvfb screen's size; without DirectDraw the original runs at
+# the desktop's size (Win_init_class 0x5F01F0: GetSystemMetrics), so this sets its ScreenWidth/Height.
 import sys, os, time, subprocess, shutil, random, glob, signal
 ROOT=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
 steps=[l.strip() for l in open(sys.argv[1]) if l.strip() and not l.startswith(';')]
@@ -15,13 +17,15 @@ for f in glob.glob(ROOT+'/game/*'):
     os.symlink(f,os.path.join(run,os.path.basename(f)))
 os.remove(os.path.join(run,'saves')) if os.path.islink(os.path.join(run,'saves')) else None
 os.makedirs(os.path.join(run,'saves'),exist_ok=True)
+# ORIG_SAVE=FILE.sav: copied into the run's saves folder (LOAD GAME's FileBox lists it).
+if os.environ.get('ORIG_SAVE'): shutil.copy(os.environ['ORIG_SAVE'],os.path.join(run,'saves'))
 ini=open(ROOT+'/harness/oracle/runtime/Alpha Centauri.Ini').read()
 if len(sys.argv)>3: ini+=open(sys.argv[3]).read()
 p=os.path.join(run,'Alpha Centauri.Ini')
 if os.path.lexists(p): os.remove(p)
 open(p,'w').write(ini)
 disp=':%d'%random.randint(900,990)
-X=subprocess.Popen(['Xvfb',disp,'-screen','0','1024x768x24'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+X=subprocess.Popen(['Xvfb',disp,'-screen','0',os.environ.get('ORIG_SCREEN','1024x768')+'x24'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 time.sleep(1.5)
 # The prefix with the game's fonts and Windows' text measurement (harness/wine_env.sh).
 wenv=subprocess.run(['bash','-c','ROOT="$1"; . "$1/harness/wine_env.sh"; env -0','-',ROOT],capture_output=True).stdout
