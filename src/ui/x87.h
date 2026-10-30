@@ -18,7 +18,7 @@
 #include <cstdint>
 
 #if (defined(__x86_64__) || defined(__i386__)) && (defined(__GNUC__) || defined(__clang__))
-#define SMACX_X87_NATIVE 1
+#define OPENSMAC_X87_NATIVE 1
 using ext = long double;
 // The x87 control word for the duration of a scope: 0x27F (the original's: 53-bit precision,
 // round to nearest, exceptions masked). Native x86-64 code runs with 0x37F (64-bit precision).
@@ -58,7 +58,7 @@ inline double x87_add(ext a, ext b) {
     return (double)r;
 }
 #else
-#define SMACX_X87_NATIVE 0
+#define OPENSMAC_X87_NATIVE 0
 using ext = double;
 inline ext x87_fsin(ext x) { return std::sin(x); }
 inline ext x87_fcos(ext x) { return std::cos(x); }

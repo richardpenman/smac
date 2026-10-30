@@ -1,13 +1,13 @@
 #!/bin/bash
-# Scripted checks of smacx at screen sizes other than 1024 x 768 (docs/UI_PLAN.md section 14): the
+# Scripted checks of OpenSMAC at screen sizes other than 1024 x 768 (docs/UI_PLAN.md section 14): the
 # main interface centred at the bottom as MainInterface_init places it, the map beside it (the
 # fix of compat wide_console_strips; black under --original-bugs, as the original), clicks on the
 # console's buttons, a popup's rows and the base window landing where the windows are drawn, and
 # the opening picture stretched over the screen (change_opening); then the display settings'
-# computation (smacx_unit's display tests) and, when Xvfb and tools/venv are there, an interactive
+# computation (opensmac_unit's display tests) and, when Xvfb and tools/venv are there, an interactive
 # start on a 3840 x 2160 display (the ini's auto size and scale: 1920 x 1080 shown at 2).
 #
-#   tests/screen/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/g-native/smacx)
+#   tests/screen/run.sh [OUTDIR]        (OPENSMAC=path/to/opensmac, default build/g-native/opensmac)
 #
 # Sizes: 1024x768 (the reference: every other size is compared with it), 1280x1024, 1366x768,
 # 1920x1080, 2560x1440 (SIZES="..." to choose). The windows anchored at the bottom centre (the
@@ -15,24 +15,24 @@
 # places, so the scripted clicks are the 1024 x 768 ones moved by that. Exit status 0 when every
 # check passes.
 set -u
-# Animated by default (smacx --animate: slides, unit moves, booms, battle reports and movies play
+# Animated by default (opensmac --animate: slides, unit moves, booms, battle reports and movies play
 # with their waits, as in an interactive game); TEST_FAST=1 runs unattended (skips them).
-if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
+if [ "${TEST_FAST:-0}" = 1 ]; then export OPENSMAC_ANIMATE=0; else export OPENSMAC_ANIMATE=1; fi
 # No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SMACX="$(realpath "${SMACX:-$ROOT/build/g-native/smacx}")"
+OPENSMAC="$(realpath "${OPENSMAC:-$ROOT/build/g-native/opensmac}")"
 OUT="$(realpath -m "${1:-$ROOT/work/screen_test}")"
 SIZES="${SIZES:-1024x768 1280x1024 1366x768 1920x1080 2560x1440}"
 LAYOUT="$ROOT/tests/screen/layout.py"
 mkdir -p "$OUT"
 FAIL=0
 
-run() {  # run CASE SIZE ARGS... : smacx at SIZE, log in OUT/CASE.log
+run() {  # run CASE SIZE ARGS... : OpenSMAC at SIZE, log in OUT/CASE.log
     local name="$1" size="$2"; shift 2
     rm -rf "$OUT/$name"
     mkdir -p "$OUT/$name"
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --hidden --size "$size" --outdir "$OUT/$name" "$@" \
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$OPENSMAC" --hidden --size "$size" --outdir "$OUT/$name" "$@" \
         > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
@@ -113,8 +113,8 @@ for size in $SIZES; do
     fi
 done
 
-# 3. The auto size and scale (platform/display.h): smacx_unit's display tests, when built.
-UNIT="$(dirname "$SMACX")/smacx_unit"
+# 3. The auto size and scale (platform/display.h): opensmac_unit's display tests, when built.
+UNIT="$(dirname "$OPENSMAC")/opensmac_unit"
 if [ -x "$UNIT" ]; then
     if "$UNIT" -tc="display*" > "$OUT/unit.log" 2>&1; then echo "PASS unit: display tests"
     else echo "FAIL unit: display tests (see $OUT/unit.log)"; FAIL=1; fi
@@ -136,7 +136,7 @@ if command -v Xvfb > /dev/null && [ -x "$PY" ]; then
     Xvfb "$disp" -screen 0 3840x2160x24 > /dev/null 2>&1 &
     xpid=$!
     sleep 1
-    (cd "$ROOT" && DISPLAY=$disp exec timeout 120 "$SMACX" --outdir "$OUT/$c" --seed 0,0 --save work/saves_late/turn_147.sav --human 3 \
+    (cd "$ROOT" && DISPLAY=$disp exec timeout 120 "$OPENSMAC" --outdir "$OUT/$c" --seed 0,0 --save work/saves_late/turn_147.sav --human 3 \
         > "$OUT/$c.log" 2>&1) &
     spid=$!
     for i in $(seq 60); do  # the call shown (at most a minute), then a moment for its first frames

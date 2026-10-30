@@ -35,7 +35,7 @@ struct CompatScope {
 };
 
 std::string temp_file(const char* name) {
-    return (std::filesystem::temp_directory_path() / (std::string("smacx_unit_") + name)).string();
+    return (std::filesystem::temp_directory_path() / (std::string("opensmac_unit_") + name)).string();
 }
 }  // namespace
 
@@ -261,8 +261,8 @@ TEST_CASE("compat encrypt_odd_size: an odd-sized block encrypts without reading 
 // ---- the setting ----
 
 TEST_CASE("compat: the save mark of the setting") {
-    CHECK(kSmacxSaveMark == 0x42584D53u);  // "SMXB"
+    CHECK(kOpenSmacSaveMark == 0x42584D53u);  // "SMXB"
     uint32_t mark;
     std::memcpy(&mark, "SMXB", 4);
-    CHECK(mark == kSmacxSaveMark);
+    CHECK(mark == kOpenSmacSaveMark);
 }

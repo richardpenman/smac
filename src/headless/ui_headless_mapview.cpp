@@ -1,12 +1,12 @@
 // Headless UI area "map view": the MapWin drawing entry points the engine calls (engine/ui_bridge.h).
 // Nothing is drawn.
-// How UI areas are replaced: src/headless is the static library smacx_ui_headless, the default
+// How UI areas are replaced: src/headless is the static library opensmac_ui_headless, the default
 // implementation of every UI bridge function, with one object file per area (ui_headless_<area>.cpp).
-// smacx_headless uses all of it. smacx defines the functions of the areas its SDL UI implements
+// opensmac_headless uses all of it. OpenSMAC defines the functions of the areas its SDL UI implements
 // (src/ui) in its own objects, so the linker never pulls those areas' objects from the library.
 // To replace an area, implement every function
 // of its file in src/ui (a partial replacement is a duplicate-symbol link error); to replace a single
-// function, first move it into an area file of its own here. Areas replaced by smacx: mapview,
+// function, first move it into an area file of its own here. Areas replaced by OpenSMAC: mapview,
 // console, art, pump, popup.
 #include "engine/ui_bridge.h"
 

@@ -1,6 +1,6 @@
 // The F-key reports and the monuments / hall of fame windows (reports.cpp, monuwin.cpp; built on
 // screenwin.h). report_score, report_intel, monument and hall_of_fame are declared with the
-// engine's bridge (engine/ui_bridge.h): smacx replaces the headless "reports" area with them.
+// engine's bridge (engine/ui_bridge.h): OpenSMAC replaces the headless "reports" area with them.
 #pragma once
 #include <cstdint>
 

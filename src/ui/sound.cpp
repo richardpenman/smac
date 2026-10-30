@@ -163,7 +163,7 @@ std::shared_ptr<const platform::Pcm> decode_wav(const uint8_t* d, uint32_t n) {
 // Setup and logging
 
 void sound_startup(bool enabled) {
-    const char* e = std::getenv("SMACX_SOUNDLOG");
+    const char* e = std::getenv("OPENSMAC_SOUNDLOG");
     g_log = e && *e && *e != '0';
     platform::audio_init(enabled);
     // An exit() from inside the game (the end of a scripted or harness game, show_replay) skips

@@ -8,7 +8,7 @@
 // selection, the key dispatcher (Console_on_key_click: the main view's keys; menu commands, the
 // scenario editor and debug keys are placeholders) and the unit orders Console_veh_key dispatches
 // to skip, wait, sentry, hold, build base and terraform. The Console functions the engine calls are
-// declared in engine/ui_bridge.h; smacx replaces their headless "console" area with these.
+// declared in engine/ui_bridge.h; OpenSMAC replaces their headless "console" area with these.
 // Functions called here but not reconstructed yet are placeholders (console_placeholders.cpp).
 #pragma once
 #include <cstdint>
@@ -316,7 +316,7 @@ ADDR_NATIVE(0x515770) void THISCALL Console_chat(uint8_t* console, int32_t facti
 ADDR_NATIVE(0x583E30) int32_t GAMEAPI design_workshop(int32_t faction_id, int32_t pick);
 
 // The auto play timer (win.cpp): Console_on_key_click's ctrl+shift+F11 starts / stops it; its tick
-// (auto_play_callback 0x50E890) from smacx's input loops (main_loop: the console's).
+// (auto_play_callback 0x50E890) from OpenSMAC's input loops (main_loop: the console's).
 void auto_play_toggle();
 void auto_play_tick(bool main_loop);
 

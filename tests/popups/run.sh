@@ -1,31 +1,31 @@
 #!/bin/bash
-# Scripted popup checks of smacx (the reconstructed BasePop / Popup, docs/UI_PLAN.md section 6).
+# Scripted popup checks of OpenSMAC (the reconstructed BasePop / Popup, docs/UI_PLAN.md section 6).
 #
-#   tests/popups/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/pp-native/smacx)
+#   tests/popups/run.sh [OUTDIR]        (OPENSMAC=path/to/opensmac, default build/pp-native/opensmac)
 #
-# Plays scripted keys (smacx --keys, hidden, SDL dummy video) through popups of a new game, popups
+# Plays scripted keys (opensmac --keys, hidden, SDL dummy video) through popups of a new game, popups
 # shown by label (POPUP:...), mouse clicks (CLICK:...) and three turns of a late save, and checks the
 # answers the popups log ("popup LABEL answer: N"). Screenshots of every popup go to
-# OUTDIR/<case>/pop_NNN_LABEL.bmp (SMACX_POPUP_SHOTS). Exit status 0 when every check passes.
+# OUTDIR/<case>/pop_NNN_LABEL.bmp (OPENSMAC_POPUP_SHOTS). Exit status 0 when every check passes.
 set -u
-# Animated by default (smacx --animate: slides, unit moves, booms, battle reports and movies play
+# Animated by default (opensmac --animate: slides, unit moves, booms, battle reports and movies play
 # with their waits, as in an interactive game); TEST_FAST=1 runs unattended (skips them).
-if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
-# Every wrapped text is checked against its box (SMACX_TEXTCHECK: ink right of the box is logged).
-export SMACX_TEXTCHECK=1
+if [ "${TEST_FAST:-0}" = 1 ]; then export OPENSMAC_ANIMATE=0; else export OPENSMAC_ANIMATE=1; fi
+# Every wrapped text is checked against its box (OPENSMAC_TEXTCHECK: ink right of the box is logged).
+export OPENSMAC_TEXTCHECK=1
 # No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SMACX="$(realpath "${SMACX:-$ROOT/build/pp-native/smacx}")"
+OPENSMAC="$(realpath "${OPENSMAC:-$ROOT/build/pp-native/opensmac}")"
 OUT="$(realpath -m "${1:-$ROOT/work/popup_test}")"
 mkdir -p "$OUT"
 FAIL=0
 
-run() {  # run CASE ARGS... : runs smacx, log in OUT/CASE.log
+run() {  # run CASE ARGS... : runs OpenSMAC, log in OUT/CASE.log
     local name="$1"; shift
     mkdir -p "$OUT/$name"
     rm -f "$OUT/$name"/*.bmp
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy SMACX_POPUP_SHOTS="$OUT/$name" timeout 600 "$SMACX" --original-bugs --hidden \
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy OPENSMAC_POPUP_SHOTS="$OUT/$name" timeout 600 "$OPENSMAC" --original-bugs --hidden \
         --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
 }
 

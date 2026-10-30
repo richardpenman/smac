@@ -1,9 +1,9 @@
 #!/bin/bash
-# Scripted base window checks of smacx (the reconstructed BaseWin, src/ui/basewin*.cpp).
+# Scripted base window checks of OpenSMAC (the reconstructed BaseWin, src/ui/basewin*.cpp).
 #
-#   tests/basewin/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/bw-native/smacx)
+#   tests/basewin/run.sh [OUTDIR]        (OPENSMAC=path/to/opensmac, default build/bw-native/opensmac)
 #
-# Plays scripted keys (smacx --keys, hidden, SDL dummy video) on late saves as a human faction: opens
+# Plays scripted keys (opensmac --keys, hidden, SDL dummy video) on late saves as a human faction: opens
 # a base window (BASE:N, a test aid; the console's Enter on a base calls the same BaseWin_zoom), works
 # tiles by clicks on the city map, changes the production (c: the build menu), adds a queue item
 # (click on a queue slot), hurries (h: HURRY popup, pay in full), renames (r), and closes (Esc).
@@ -11,22 +11,22 @@
 # the expected values; the game saved after the changes is loaded again to check that they stay.
 # Screenshots go to OUTDIR/<case>/. Exit status 0 when every check passes.
 set -u
-# Animated by default (smacx --animate: slides, unit moves, booms, battle reports and movies play
+# Animated by default (opensmac --animate: slides, unit moves, booms, battle reports and movies play
 # with their waits, as in an interactive game); TEST_FAST=1 runs unattended (skips them).
-if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
+if [ "${TEST_FAST:-0}" = 1 ]; then export OPENSMAC_ANIMATE=0; else export OPENSMAC_ANIMATE=1; fi
 # No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SMACX="$(realpath "${SMACX:-$ROOT/build/bw-native/smacx}")"
+OPENSMAC="$(realpath "${OPENSMAC:-$ROOT/build/bw-native/opensmac}")"
 OUT="$(realpath -m "${1:-$ROOT/work/basewin_test}")"
 mkdir -p "$OUT"
 FAIL=0
 
-run() {  # run CASE ARGS... : runs smacx, log in OUT/CASE.log
+run() {  # run CASE ARGS... : runs OpenSMAC, log in OUT/CASE.log
     local name="$1"; shift
     mkdir -p "$OUT/$name"
     rm -f "$OUT/$name"/*.bmp
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy SMACX_POPUP_SHOTS="$OUT/$name" timeout 600 "$SMACX" --original-bugs --hidden \
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy OPENSMAC_POPUP_SHOTS="$OUT/$name" timeout 600 "$OPENSMAC" --original-bugs --hidden \
         --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
 }
 
@@ -42,7 +42,7 @@ check() {  # check WHAT GOT WANT
     if [ "$2" == "$3" ]; then echo "PASS $1"; else echo "FAIL $1: got '$2' want '$3'"; FAIL=1; fi
 }
 
-aborts() {  # aborts CASE : fails when smacx stopped on a function not reconstructed
+aborts() {  # aborts CASE : fails when OpenSMAC stopped on a function not reconstructed
     if grep -q "is not reconstructed yet\|Aborted\|abort" "$OUT/$1.log"; then
         echo "FAIL $1 (abort: $(grep -m1 'not reconstructed yet\|abort' "$OUT/$1.log"))"
         FAIL=1
@@ -82,7 +82,7 @@ check "reload" "$(grep '^basestate' "$OUT/reload.log" | head -1)" \
 # 2. turn_120 / turn_147 / turn_300 as faction 3 (University Base, base 2): the build menu's next
 #    item (the item after the current one in the list: the next grid cell), a hurry (turn_120: a facility, partial payment of 50 credits; turn_147: a unit, in full),
 #    the next / previous base. turn_300: one popup first (Enter), then the turn's messages, so only
-#    the absence of aborts is checked there. (The runs are reproducible: smacx seeds the generators,
+#    the absence of aborts is checked there. (The runs are reproducible: OpenSMAC seeds the generators,
 #    --seed default 0,0; with the original's clock seed the turn's events, e.g. FUNGUSGROWS2, came
 #    and went between runs and took the scripted keys.)
 for t in 120 147 300; do

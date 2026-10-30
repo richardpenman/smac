@@ -16,7 +16,7 @@
 // spore launcher's), the weapon of the second unit (energy 1, 4, 0x49..0x59 by weapon; psi 0).
 // Approximated: the buster's frames use the sprite blitter's scaling.
 // Unattended runs (--hidden with scripted keys) skip the frames (their sounds and the game-state
-// calls stay); SMACX_ANIM=1 draws them without waiting (SMACX_ANIM_SHOT=FILE: the screen after
+// calls stay); OPENSMAC_ANIM=1 draws them without waiting (OPENSMAC_ANIM_SHOT=FILE: the screen after
 // the middle frame, a test aid).
 #include <cstdio>
 #include <cstdlib>
@@ -90,7 +90,7 @@ void save_rect(Buffer* to, Buffer* from, int32_t x, int32_t y, int32_t w, int32_
     Buffer_copy_4(from, to, x, y, 0, 0, w, h);
 }
 
-bool animate() { return !g_ui_unattended || std::getenv("SMACX_ANIM"); }
+bool animate() { return !g_ui_unattended || std::getenv("OPENSMAC_ANIM"); }
 
 }  // namespace
 
@@ -229,7 +229,7 @@ int32_t GAMEAPI boom(int32_t x, int32_t y, int32_t flags) {
         int32_t frames = anim == 0 ? 16 : (g_buster_ok ? (int32_t)g_buster.frames.size() / 2 : 0);
         uint32_t last = platform::ticks_ms();
         bool nowait = g_ui_unattended;
-        const char* shot_file = std::getenv("SMACX_ANIM_SHOT");
+        const char* shot_file = std::getenv("OPENSMAC_ANIM_SHOT");
         for (int32_t f = 0; f < frames; f++) {
             if (MultiplayerActive && shot && (f & 1)) continue;
             for (int32_t i = 0; i < 8; i++) {

@@ -49,7 +49,7 @@ bool is_air(int32_t veh_id) { return Chassis[Units[Vehs[veh_id].unit_id].chassis
 
 void THISCALL MapWin_right_menu(uint8_t* win, int32_t x, int32_t y, int32_t px, int32_t py) {
     PullDown pd;
-    // Win_client_to_screen_2: the map views are at the screen's origin in smacx.
+    // Win_client_to_screen_2: the map views are at the screen's origin in OpenSMAC.
     int32_t base_id = base_at(x, y);
     int32_t veh_id = veh_at(x, y);
     int32_t active = MapWinVehA;

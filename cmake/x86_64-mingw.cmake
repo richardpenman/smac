@@ -1,4 +1,4 @@
-# Toolchain for a native 64-bit Windows build (smacx_headless.exe) with the local llvm-mingw.
+# Toolchain for a native 64-bit Windows build (opensmac_headless.exe) with the local llvm-mingw.
 #   cmake -S . -B build/win64 -DCMAKE_TOOLCHAIN_FILE=cmake/x86_64-mingw.cmake
 set(CMAKE_SYSTEM_NAME Windows)
 set(CMAKE_SYSTEM_PROCESSOR x86_64)

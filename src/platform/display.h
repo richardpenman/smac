@@ -1,7 +1,7 @@
-// The game's screen size and scale for interactive play (smacx's display settings).
+// The game's screen size and scale for interactive play (OpenSMAC's display settings).
 //
 // The original runs at the size of the Windows desktop (WinMain, Win_init_class 0x5F01F0:
-// GetSystemMetrics), 1024 x 768 or 800 x 600 under DirectDraw. smacx chooses a logical screen
+// GetSystemMetrics), 1024 x 768 or 800 x 600 under DirectDraw. OpenSMAC chooses a logical screen
 // (ScreenWidth x ScreenHeight, the size the windows are laid out for) and an integer scale: each
 // logical pixel is shown as scale x scale pixels of the display, so that the 8-bit art stays sharp
 // on a large or HiDPI display. The ini's [Alpha Centauri] keys:

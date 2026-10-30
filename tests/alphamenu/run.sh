@@ -1,18 +1,18 @@
 #!/bin/bash
 # The main view's menus as a player meets them (src/ui/menu.cpp: AlphaMenu, the column of menu
-# buttons above the console's MENU button, and its pull-downs; docs/UI_PLAN.md section 5): smacx
+# buttons above the console's MENU button, and its pull-downs; docs/UI_PLAN.md section 5): OpenSMAC
 # with a window (SDL dummy video, not --hidden) and the animations on (the column's slide, its
 # sounds), driven by the mouse and the keys.
 #
-#   tests/alphamenu/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/menu-native/smacx)
+#   tests/alphamenu/run.sh [OUTDIR]        (OPENSMAC=path/to/opensmac, default build/menu-native/opensmac)
 #
 # Checks the log and the screenshots (the column's pixels on the screen, not only its state).
 # Exit status 0 when every check passes.
 set -u
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
-export SMACX_ANIMATE=1
+export OPENSMAC_ANIMATE=1
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SMACX="$(realpath "${SMACX:-$ROOT/build/menu-native/smacx}")"
+OPENSMAC="$(realpath "${OPENSMAC:-$ROOT/build/menu-native/opensmac}")"
 OUT="$(realpath -m "${1:-$ROOT/work/alphamenu_test}")"
 PY="$ROOT/tools/venv/bin/python"
 mkdir -p "$OUT"
@@ -24,7 +24,7 @@ run() {  # run CASE ARGS... : log in OUT/CASE.log, screenshots in OUT/CASE/
     local name="$1"; shift
     rm -rf "$OUT/$name"
     mkdir -p "$OUT/$name"
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --original-bugs --exit-after-keys --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$OPENSMAC" --original-bugs --exit-after-keys --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
 check() {  # check CASE DESCRIPTION REGEX: the log matches (grep -E)

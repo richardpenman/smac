@@ -1,7 +1,7 @@
 // The engine's popups built on Popup objects on the original functions' stacks (engine/ui_bridge.h,
-// the ui_*_menu / ui_*_popup functions): smacx shows them with the reconstructed Popup (popup.h).
+// the ui_*_menu / ui_*_popup functions): OpenSMAC shows them with the reconstructed Popup (popup.h).
 // The headless "popup" area holds their unattended defaults; the diplomacy menus replace the
-// engine's ui_bridge_diplomacy.cpp in smacx (all four functions, so that object is not linked).
+// engine's ui_bridge_diplomacy.cpp in OpenSMAC (all four functions, so that object is not linked).
 #include <cstdio>
 #include <cstring>
 #include <string>

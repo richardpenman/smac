@@ -11,7 +11,7 @@ Starting point (cfe8a1b):
 | --- | --- |
 | Code | engine ~47k lines, UI ~48k lines, 1402 `ADDR`/`ADDR_NATIVE` functions, 581 `GLOBAL` + 53 `GLOBAL_NATIVE` |
 | Hard spots | `base_build` ~2.2k lines, `order_veh` 1.3k lines with 176 gotos, `enemy_move` (state machine over the original's stack frame), 506 gotos (335 engine, 171 UI), 173 `BUG(original)` |
-| Proof | 29 harness scenarios natively; hybrid and fcompare against the original under Wine; ASan; 10 scripted UI suites; observer games of smacx |
+| Proof | 29 harness scenarios natively; hybrid and fcompare against the original under Wine; ASan; 10 scripted UI suites; observer games of OpenSMAC |
 
 ## 1. The invariant and the gate
 
@@ -22,12 +22,12 @@ Every commit passes `src/tools/gate.sh`. The script exits non-zero on any failur
 | --- | --- | --- |
 | `static` | No original address was lost or added. The names table is current. Every fcompare entry names a declared function. Every `BUG(original)` site names a declared compat flag, and docs/COMPAT.md is current. | `src/tools/names.py check`, `src/tools/compat.py check` |
 | `build` | Native and ASan builds compile | `cmake` into `$GATE_PREFIX-{native,asan}` |
-| `unit` | Unit tests pass, also under ASan; the original's recorded results of 197 functions still hold | `ctest` (smoke, `smacx_unit`, the golden replays, `names.py check`), ASan `smacx_unit` and golden replays |
+| `unit` | Unit tests pass, also under ASan; the original's recorded results of 197 functions still hold | `ctest` (smoke, `opensmac_unit`, the golden replays, `names.py check`), ASan `opensmac_unit` and golden replays |
 | `native` | The game is identical to the original on all 29 scenarios | `harness/verify.sh native <all>` |
-| `observer` | smacx, with every UI area replaced, plays observer games identical to the original's | `smacx --human 0 --snapshots` vs `work/ref`: tiny20 small12 std8 late140 |
-| `asan` | No memory or UB errors, same game | ASan `smacx_headless` + `compare.py`: tiny20 small12 std8 late140 council131 |
+| `observer` | OpenSMAC, with every UI area replaced, plays observer games identical to the original's | `opensmac --human 0 --snapshots` vs `work/ref`: tiny20 small12 std8 late140 |
+| `asan` | No memory or UB errors, same game | ASan `opensmac_headless` + `compare.py`: tiny20 small12 std8 late140 council131 |
 | `diffnative` | The native build plays new seeds and the 29 scenarios exactly as the frozen `hybrid-final` build does, with the original's bugs and with the fixes. A missing baseline fails the step. | `src/tools/diffnative.sh --baseline $GATE_BASELINE` (default `hybrid-final`): `--seeds 6 --turns 40 --scenarios all`, then `--fixes --seeds 3` |
-| `ui` | The scripted UI behaviour is unchanged, with no memory or UB errors | `tests/*/run.sh` (animated: `smacx --animate`, every slide, move, boom and movie played) with the native smacx, then with the ASan smacx (no sanitizer report in any case's log) |
+| `ui` | The scripted UI behaviour is unchanged, with no memory or UB errors | `tests/*/run.sh` (animated: `opensmac --animate`, every slide, move, boom and movie played) with the native OpenSMAC, then with the ASan OpenSMAC (no sanitizer report in any case's log) |
 
 When to run what:
 
@@ -114,11 +114,11 @@ and the UI's objects are still in the image (the UI's through typed views, note 
 
 * `engine/compat.h`: `struct Compat { bool read_after_kill = false; ... }` plus `inline Compat
   g_compat;`. A flag `true` plays the original's bug, `false` its fix.
-* User decision (after increment 9): smacx plays with every fix by default; one switch,
+* User decision (after increment 9): OpenSMAC plays with every fix by default; one switch,
   `--original-bugs` or `Original Bugs=1` in the ini (`compat_set_original_bugs`), turns every flag
   on, i.e. the game exactly as terranx.exe plays it. There is no per-bug user option; the single
   flags stay for the code and the tests. Everything compared with the original runs with the
-  original bugs: `harness/verify.sh` (`smacx_headless --original-bugs`), the gate's observer and
+  original bugs: `harness/verify.sh` (`opensmac_headless --original-bugs`), the gate's observer and
   ASan steps, the hybrid DLL (forced on in `DllMain`: patched functions must behave as the
   original's), the scripted suites (see docs/DEVELOPMENT.md). Multiplayer: a hotseat/PBEM save
   carries the setting (a mark in the legacy preferences block, engine/save.h), an online host
@@ -167,7 +167,7 @@ Approach:
   role-specific blocks into functions that take a context struct. A `goto` to a shared join point
   becomes a `return` of an enum, which the caller dispatches. `enemy_move` already does this with
   `Flow`.
-* Before splitting, run coverage (`SMACX_COVERAGE`, `coverage_report.py --missed`). Every block
+* Before splitting, run coverage (`OPENSMAC_COVERAGE`, `coverage_report.py --missed`). Every block
   being moved must be executed by a scenario or fcompare. Otherwise add a scenario first.
 * fcompare the entry point after each split (`GATE_FCOMPARE`).
 
@@ -198,7 +198,7 @@ and the screenshot comparisons (`tests/*/compare.sh`, which need Wine).
 
 ## 8. Unit tests
 
-* Framework: **doctest 2.4.11**, vendored (`third_party/doctest`, MIT). Target `smacx_unit`, run by
+* Framework: **doctest 2.4.11**, vendored (`third_party/doctest`, MIT). Target `opensmac_unit`, run by
   `ctest` and the gate. No game data needed. Tests set image globals through `SaveGlobal` /
   `MapDims` (`tests/unit/unit.h`).
 * First tests (done): util (`quick_root`, `stoi`, `fixed_div`, …), map geometry (`vector_dist`,
@@ -377,7 +377,7 @@ Notes on the increments:
     namespace. Most expected values were recorded from native games (tiny20, late140,
     cov_late300, small_wet), which match the original's; the others (human-only branches,
     satellites, which no scenario builds) follow the code.
-    Coverage (`-DSMACX_COVERAGE`, all 29 scenarios, line counts of the code before the split): every
+    Coverage (`-DOPENSMAC_COVERAGE`, all 29 scenarios, line counts of the code before the split): every
     moved block of `base_yield` and `base_growth` runs except the governor priorities (now unit
     tested), the convoy stop and death of a starving base. In `base_production` the blocks no
     observer game reaches are human-player messages (ALREADYPROJECT, ABANDONBASE, the PRODUCE
@@ -585,7 +585,7 @@ Notes on the increments:
     `src/tools/golden.py import` files the result as `tests/golden/<function>.tsv` plus
     `states.tsv`: 197 functions, 17103 calls, 0.7 MB. `mandate_color` is not recorded (it returns
     UI palette indices that headless builds never set up; `golden.py`'s `NOT_RECORDED`). The
-    replay is `smacx_headless <scenario> --golden tests/golden` (src/app/golden.cpp; implies
+    replay is `opensmac_headless <scenario> --golden tests/golden` (src/app/golden.cpp; implies
     `--original-bugs`): it plays the scenario, checks the state hash at each recorded turn and calls
     the functions through a table generated from fcompare_table.h (`golden.py gen`), comparing the
     results in the width of the return type. Rather than a doctest case that loads a save, the
@@ -605,11 +605,11 @@ Notes on the increments:
     were not cleanup commits and the gate was not run on them. The table is refreshed, and ctest
     now runs `names.py check` (test `names_table`), so a plain `make test` catches a stale table.
 
-18. `src/tools/diffnative.sh` plays the same games with a baseline `smacx_headless` and with the
+18. `src/tools/diffnative.sh` plays the same games with a baseline `opensmac_headless` and with the
     build under test, one game at a time, and compares every snapshot with `harness/compare.py`
     (plus the number of snapshots and the exit status). The baseline is a build directory or a git
     revision (default the tag `hybrid-final`), which it builds once into `build/baseline-<commit>`
-    from a temporary worktree (`smacx_headless` only). The games: `--seeds N` new games whose
+    from a temporary worktree (`opensmac_headless` only). The games: `--seeds N` new games whose
     seeds, map size (0-2), difficulty and random leaders derive from the game's number (`--first K`
     picks another set), `--save FILE` games loaded from saves with seeds of their own, and
     `--scenarios` the harness scenarios (`all`: the 29). Both builds play with `--original-bugs`,
@@ -692,7 +692,7 @@ Notes on the increments:
       (each `encrypt_write` call restarts its keys); a read fills a buffer that starts as the
       records' current bytes, so a short file leaves the rest as fread would. The legacy conversions
       (version 10 factions and bases, version < 11 preferences) work on the byte layout, then read
-      it. The `.state` snapshots (headless, smacx) and the state hash of the golden records are
+      it. The `.state` snapshots (headless, OpenSMAC) and the state hash of the golden records are
       `state_regions_write`: every region of harness/state_regions.h serialised from the records,
       checked against the region's size. With the original's bugs the replay table can overflow
       (`replay_events_overflow`); the bytes past it are the original's memory after it
@@ -725,12 +725,12 @@ Notes on the increments:
       real pointers, wider fields) now needs only its serialize() to keep the bytes and its
       address users (`grep mem::host`, table_at) to go first.
     * Freeze. The second commit is the first whose state no longer lives at the original's
-      addresses in native builds. Decision: main builds no hybrid.dll (CMake's `SMACX_HYBRID`
+      addresses in native builds. Decision: main builds no hybrid.dll (CMake's `OPENSMAC_HYBRID`
       builds the oracle and its launcher, still needed to record references), and the gate drops
       the `hybrid` and `fcompare` steps; its `diffnative` step is mandatory (a missing baseline
       fails it) and also plays 3 new games with the fixes. hybrid.dll, fcompare and the recording
       of golden records are built from the freeze commit (docs/DEVELOPMENT.md). The engine's
-      `SMACX_HYBRID` code paths (patch thunks, shadow thunks, hybrid UI bridges, gen_bindings'
+      `OPENSMAC_HYBRID` code paths (patch thunks, shadow thunks, hybrid UI bridges, gen_bindings'
       hybrid table) are dead in main now; removing them is a separate deletion.
     Proof per commit: native build (the hybrid build for the first two, hybrid games on tiny20 and
     late140 for the first), names/compat checks, ctest with
@@ -738,9 +738,9 @@ Notes on the increments:
     `diffnative --baseline be8186a --seeds 6 --turns 40 --scenarios all` and `--fixes --seeds 3`,
     byte-identical `.state`/`.sav`/`.rng` files against the be8186a build (tiny20, late140,
     loadsave, loadscn, an encrypted PBEM save written and reloaded, a save with 9800 bytes of
-    replay events written, reloaded and played on), the original under Wine loading saves smacx
+    replay events written, reloaded and played on), the original under Wine loading saves OpenSMAC
     wrote (from turn_200 and tiny20_turn_005 of work/saves_late) and playing 3 turns identical to
-    smacx, the ASan unit, golden, fixes and original-bugs runs (tiny20 small12 std8 late140
+    OpenSMAC, the ASan unit, golden, fixes and original-bugs runs (tiny20 small12 std8 late140
     council131 probe131 cov_late300, no report, no difference from work/ref), the scripted UI
     suites.
 
@@ -748,21 +748,21 @@ Notes on the increments:
     each verified with `gate.sh --quick` (baseline be8186a).
     * Dead hybrid code removed: the hybrid UI bridges (engine/ui_bridge_*hybrid.cpp), the shadow
       and entry thunks (hybrid_shadow.h, the has_abil frame, Path_find's / base_energy's /
-      call_council's residue thunks), hybrid_patch.h, every `SMACX_HYBRID` branch of src/engine,
+      call_council's residue thunks), hybrid_patch.h, every `OPENSMAC_HYBRID` branch of src/engine,
       src/headless and src/platform (the native branch kept), the hooks only the hybrid oracle set
       (`g_harness_human_turn`, `_enemy_veh_pump`, `_wants_to_attack_fresh`, `_council_modal`) and
-      gen_bindings' hybrid table. memmap.h keeps `SMACX_HYBRID`: oracle.dll still builds with it
+      gen_bindings' hybrid table. memmap.h keeps `OPENSMAC_HYBRID`: oracle.dll still builds with it
       (harness/rules_dump.h binds engine globals to the original's memory); harness/oracle's
       `ORACLE_WITH_ENGINE` code (hybrid.dll, fcompare) is only built from the freeze commit.
     * The council window's session (CouncilWin + 0xA1C, 0x78 bytes: proposal, candidate, result,
       governor, the votes and council votes, which PBEM saves hold as CouncilWinState and
       CouncilWinVotes) is a native record, `state::council_session` (type `CouncilSession`,
       types/data.h, serialised like the others), reached as `CouncilWinSession` (engine/council.h)
-      by the engine, the headless window and smacx's window instead of `self + 0xA1C`; the saved
+      by the engine, the headless window and OpenSMAC's window instead of `self + 0xA1C`; the saved
       globals bind into it. In step 20 moving them broke 10 scenarios because the council code
       still read the session through the window object in the image; now every reader goes through
       the record. Saves and `.state` files are byte-identical with the be8186a build (council131,
-      late140, end300: every `.sav`, `.state`, `.rng`). smacx's native window class was renamed
+      late140, end300: every `.sav`, `.state`, `.rng`). OpenSMAC's native window class was renamed
       `CouncilWindow` (it had the saved global's name).
     * Typed views (section 7.1): the window objects that stay in the image (or in native buffers of
       their layout) are read and written through structs of the original layout with
@@ -794,7 +794,7 @@ Notes on the increments:
     the console suite reaches it through the test aid `ZOOMAT:XxY`. BaseWin_draw_garrison's
     stack row reads MainInterface + 0xAC4 as the original does (0x4105A7: the right edge of
     +0xABC, the rectangle of button 0x3F1, which MainInterface_init 0x45A883 puts at the bottom
-    pane's left; the main screen's row uses 0x3F0's +0xAB4, 0x4B8276). smacx never set +0xABC,
+    pane's left; the main screen's row uses 0x3F0's +0xAB4, 0x4B8276). OpenSMAC never set +0xABC,
     so with more units than cells the base window's row started at x 1, over the queue pane, and
     drew 0x3F0's arrow: +0xABC is now set and the base window shows 0x3F1 / 0x3F2 (the basewin
     suite's garrison case; tests/basewin/compare.sh turn_147:30 has the original's units at the

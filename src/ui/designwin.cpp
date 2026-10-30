@@ -1535,7 +1535,7 @@ int32_t GAMEAPI design_workshop(int32_t faction_id, int32_t pick) {
         FX_play(&Sounds, 0xF);
         std::fprintf(stderr, "design_workshop: answer %d button %d\n", sel, button);
         if (button == 0) return -1;
-        if (sel < 0 || sel >= 0x200) return -1;  // (no item: smacx guard)
+        if (sel < 0 || sel >= 0x200) return -1;  // (no item: OpenSMAC guard)
         UNIT& u = Units[sel];
         if (button == 2) {
             if (X_pop_ask("DESIGNNAME", 0x1F, u.name, 0, 0) == 0) {

@@ -11,7 +11,7 @@
 // native objects: an address inside one of them resolves to the object (mem::host), so their
 // globals, and every alias inside them (VehCount is a field of GamePrefs), bind to it. The image
 // keeps the rest (rule tables, the engine's scratch globals, the UI) and seeds the records.
-// SMACX_HYBRID builds (oracle.dll, injected into terranx.exe: the harness's rule dump,
+// OPENSMAC_HYBRID builds (oracle.dll, injected into terranx.exe: the harness's rule dump,
 // harness/rules_dump.h) bind the same names to the original process memory.
 //
 // Globals whose type holds pointers cannot live in the image on 64-bit targets; declare them with
@@ -23,7 +23,7 @@
 namespace mem {
 constexpr uint32_t kImageBase = 0x682000;
 constexpr uint32_t kImageEnd = 0x9CA000;
-#ifdef SMACX_HYBRID
+#ifdef OPENSMAC_HYBRID
 inline uint8_t* host(uint32_t addr) { return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(addr)); }
 inline uint8_t* bind(uint32_t addr, uint32_t, const char*) { return host(addr); }
 #else
@@ -56,7 +56,7 @@ template <class T>
 using smac_type_t = T;  // lets array types appear in declarator position
 
 #define GLOBAL(type, name, addr) inline std::add_lvalue_reference_t<type> name = smac_bind<type>(addr, #name)
-#ifdef SMACX_HYBRID
+#ifdef OPENSMAC_HYBRID
 #define GLOBAL_NATIVE(type, name, addr) GLOBAL(type, name, addr)
 #else
 #define GLOBAL_NATIVE(type, name, addr) \
@@ -72,8 +72,8 @@ using smac_type_t = T;  // lets array types appear in declarator position
 #define ADDR_NATIVE(a)
 // Calling convention of original free functions (cdecl). Only meaningful on 32-bit x86.
 // Methods of the original C++ classes are reconstructed as free functions taking the object
-// pointer first, declared THISCALL (the original convention on 32-bit SMACX_HYBRID builds).
-#if defined(SMACX_HYBRID)
+// pointer first, declared THISCALL (the original convention on 32-bit OPENSMAC_HYBRID builds).
+#if defined(OPENSMAC_HYBRID)
 #define GAMEAPI  __cdecl
 #define THISCALL __thiscall
 #else

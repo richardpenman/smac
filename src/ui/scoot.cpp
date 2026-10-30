@@ -18,8 +18,8 @@
 // rectangle of the same size at the unit's position less the quarters (so only what the unit can
 // have covered). The slide's position is a float point stepped by (next - source) / frames each
 // frame (the first step before the first frame), drawn at its truncated coordinates.
-// Unattended runs (--hidden with scripted keys) skip the frames; SMACX_ANIM=1 draws them without
-// waiting (SMACX_SCOOT_SHOT=FILE: the screen at the half way of a slide, a test aid). The facing (the
+// Unattended runs (--hidden with scripted keys) skip the frames; OPENSMAC_ANIM=1 draws them without
+// waiting (OPENSMAC_SCOOT_SHOT=FILE: the screen at the half way of a slide, a test aid). The facing (the
 // only game state) is set in every case.
 #include <cstdio>
 #include <algorithm>
@@ -64,7 +64,7 @@ bool intersects(const UiRect& a, const UiRect& b) {  // IntersectRect's result
     return std::max(a.left, b.left) < std::min(a.right, b.right) && std::max(a.top, b.top) < std::min(a.bottom, b.bottom);
 }
 
-bool animate() { return !g_ui_unattended || std::getenv("SMACX_ANIM"); }
+bool animate() { return !g_ui_unattended || std::getenv("OPENSMAC_ANIM"); }
 
 void wait_ms(uint32_t* last, int32_t ms) {
     if (g_ui_unattended) return;
@@ -194,7 +194,7 @@ void GAMEAPI veh_scoot(int32_t veh_id, int32_t x, int32_t y, int32_t dir, int32_
             if (drawing) {
                 vehdraw_scoot_start(veh_id, dir, frames, 2);
                 for (int32_t f = 0; f < frames; f++) {
-                    const char* shot = std::getenv("SMACX_SCOOT_SHOT");
+                    const char* shot = std::getenv("OPENSMAC_SCOOT_SHOT");
                     if (shot && *shot && f == frames / 2) {  // test aid: the screen of this frame
                         for (int32_t i = 0; i < 8; i++)
                             if (mv[i].on)
@@ -213,7 +213,7 @@ void GAMEAPI veh_scoot(int32_t veh_id, int32_t x, int32_t y, int32_t dir, int32_
         } else {
             no_final = true;  // (the original's path skips to the end)
         }
-        if (drawing && std::getenv("SMACX_ANIM"))
+        if (drawing && std::getenv("OPENSMAC_ANIM"))
             std::fprintf(stderr, "scoot anim: veh %d dir %d turn %d slide %d\n", veh_id, dir, turn,
                          (flags & 1) ? 0 : frames);
     } else {

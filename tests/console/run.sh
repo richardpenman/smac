@@ -2,19 +2,19 @@
 # Scripted checks of the main screen (src/ui/console*.cpp, menu.cpp, statuswin.cpp): unit orders by
 # key, mouse and menu, the go-to list and drag, save / load, the interface frame.
 #
-#   tests/console/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/pp-native/smacx)
+#   tests/console/run.sh [OUTDIR]        (OPENSMAC=path/to/opensmac, default build/pp-native/opensmac)
 #
-# Each case runs smacx with scripted keys (hidden, SDL dummy video) and checks the units the
+# Each case runs OpenSMAC with scripted keys (hidden, SDL dummy video) and checks the units the
 # script lists (UNITS: "unit ID fF NAME (X,Y) order O moves M state S") and the log. Screenshots go
 # to OUTDIR/<case>/. Exit status 0 when every check passes.
 set -u
-# Animated by default (smacx --animate: slides, unit moves, booms, battle reports and movies play
+# Animated by default (opensmac --animate: slides, unit moves, booms, battle reports and movies play
 # with their waits, as in an interactive game); TEST_FAST=1 runs unattended (skips them).
-if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
+if [ "${TEST_FAST:-0}" = 1 ]; then export OPENSMAC_ANIMATE=0; else export OPENSMAC_ANIMATE=1; fi
 # No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SMACX="$(realpath "${SMACX:-$ROOT/build/pp-native/smacx}")"
+OPENSMAC="$(realpath "${OPENSMAC:-$ROOT/build/pp-native/opensmac}")"
 OUT="$(realpath -m "${1:-$ROOT/work/console_test}")"
 mkdir -p "$OUT"
 FAIL=0
@@ -23,7 +23,7 @@ NEW="--new size=0 --human 1 --seed 1,2"
 run() {  # run CASE ARGS... : log in OUT/CASE.log
     local name="$1"; shift
     mkdir -p "$OUT/$name"
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --original-bugs --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$OPENSMAC" --original-bugs --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
 # check CASE DESCRIPTION REGEX: the log matches (grep -E)
@@ -81,7 +81,7 @@ nocrash zoomat
 
 # 3c. The window's close button (CLOSE): the quit question of ctrl+Q (REALLYQUIT); a second close
 #     while it is up is ignored (a modal window), "Oops, no" plays on (the hold order is given
-#     afterwards); then close and "Yes" quit (the last UNITS never runs). smacx's own: the
+#     afterwards); then close and "Yes" quit (the last UNITS never runs). OpenSMAC's own: the
 #     original's window has no close button (win.cpp close_requested).
 run close $NEW --keys "ENTER,CLOSE,CLOSE,ENTER,h,UNITS,CLOSE,DOWN,ENTER,UNITS"
 check close "close: the quit question" "^window close: the quit question$"

@@ -136,7 +136,7 @@ void draw_button(Buffer* s, const UiRect& r, const char* label) {
 // The original's map window (MapWin_UNK5 0x46FA20) is the screen's width and its height less the
 // console's (MiConsoleHeight, 0xD5): its view ends 0xD5 pixels above the bottom of the screen
 // (the oracle's map dumps: 1024 x 555 at 1024 x 768, 1920 x 867 at 1920 x 1080). At 1024 pixels
-// the console's art is opaque below that row, so smacx's view of 168 pixels less looks the same.
+// the console's art is opaque below that row, so OpenSMAC's view of 168 pixels less looks the same.
 int32_t console_view_height(int32_t w, int32_t h) { return w > 0x400 ? h : h - 168; }
 
 bool console_frame_hit(int32_t x, int32_t y) {

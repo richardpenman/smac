@@ -3,8 +3,8 @@
 // The original engine calls straight into its UI (popups, map redraws, sound, window classes).
 // Those functions belong to the UI reconstruction; until then they are declared here with
 // ADDR_NATIVE: native builds use the headless implementations in src/headless (the static library
-// smacx_ui_headless, one object file per UI area), which behave like an unattended observer (no
-// drawing, popups return their default choice). smacx replaces whole areas with its SDL UI (src/ui)
+// opensmac_ui_headless, one object file per UI area), which behave like an unattended observer (no
+// drawing, popups return their default choice). OpenSMAC replaces whole areas with its SDL UI (src/ui)
 // by defining their functions in its own objects (src/headless/ui_headless_mapview.cpp explains the
 // mechanism). Keep declarations grouped by original class.
 #pragma once
@@ -31,7 +31,7 @@ void ui_mapwins_clear_terrain();
 void ui_mapwins_clear_alt(int32_t x, int32_t y);
 // MapWin (vtable 0x669D48 .. ; ui 0x4626E0..0x4712D0): a map view, a UI object. The main view is
 // MainConsole (a Console, ui/console.h); the others are MapWins[1..7] and WorldMapWin. The objects
-// live in the memory image (or, for the windows smacx owns, in native buffers of the same
+// live in the memory image (or, for the windows OpenSMAC owns, in native buffers of the same
 // layout), so this is a view of their integer fields at the original's offsets; the GraphicWin
 // virtual base follows at +0x21A6C (a Console's at +0x23D94). Savegames hold six of the fields
 // (game_io). What the original keeps behind pointers (the canvas, the per-tile terrain cache at

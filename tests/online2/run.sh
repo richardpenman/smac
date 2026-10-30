@@ -1,7 +1,7 @@
 #!/bin/bash
 # Online play, part 2 (docs/MULTIPLAYER.md, phase 3): saving and loading a network game, the type
 # of game in the setup window (a saved game, a scenario and its files sent to the players), the
-# passwords, a player trying to join a game under way and the network windows over the map. Two smacx processes on localhost (the
+# passwords, a player trying to join a game under way and the network windows over the map. Two OpenSMAC processes on localhost (the
 # host and a client, SDL dummy drivers, scripted keys) as in tests/online/run.sh; each game's
 # states are compared turn by turn (harness/compare.py) and the original's checksums must agree.
 #
@@ -13,17 +13,17 @@
 #    sends it to the client (send_rules / send_game). The loaded game goes on at the saved turn on
 #    both machines with equal states.
 #
-#   tests/online2/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/net-native/smacx)
+#   tests/online2/run.sh [OUTDIR]        (OPENSMAC=path/to/opensmac, default build/net-native/opensmac)
 #
-# The games play with the original's bugs fixed (smacx's default; neither ini has "Original Bugs"):
+# The games play with the original's bugs fixed (OpenSMAC's default; neither ini has "Original Bugs"):
 # the copies must agree in that mode too, and the client is told the host's setting.
 #
-# Runs two smacx processes at once: run it alone. Exit status 0 when every check passes.
+# Runs two OpenSMAC processes at once: run it alone. Exit status 0 when every check passes.
 set -u
-if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
+if [ "${TEST_FAST:-0}" = 1 ]; then export OPENSMAC_ANIMATE=0; else export OPENSMAC_ANIMATE=1; fi
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}" SDL_VIDEODRIVER=dummy
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SMACX="$(realpath "${SMACX:-$ROOT/build/net-native/smacx}")"
+OPENSMAC="$(realpath "${OPENSMAC:-$ROOT/build/net-native/opensmac}")"
 OUT="$(realpath -m "${1:-$ROOT/work/online2_test}")"
 # ONLY="load ..." runs those sessions alone (their inputs from an earlier run kept in OUTDIR).
 ONLY="${ONLY:-}"
@@ -71,11 +71,11 @@ session() {
     printf 'Difficulty=2\r\nNet Port=%s\r\nNet Address=127.0.0.1\r\nNet Name=Host\r\n%b' $port "${HOSTINI:-}" >> "$OUT/$name.ini"
     grep -av "^Latest " "$OUT/$name.ini" > "$OUT/$name-client.ini"
     sed -i 's/^Net Name=Host/Net Name=Client/' "$OUT/$name-client.ini"
-    (cd "$ROOT" && timeout 600 "$SMACX" --hidden --seed 1001,2001 --ini "$OUT/$name.ini" --outdir "$OUT/$name-host" \
+    (cd "$ROOT" && timeout 600 "$OPENSMAC" --hidden --seed 1001,2001 --ini "$OUT/$name.ini" --outdir "$OUT/$name-host" \
         --snapshots "$OUT/$name-host/snap" --keys "$hk" > "$OUT/$name-host.log" 2>&1; echo $? > "$OUT/$name-host.rc") &
     local hp=$!
     sleep 2
-    (cd "$ROOT" && timeout 600 "$SMACX" --hidden --seed 1002,2002 --ini "$OUT/$name-client.ini" \
+    (cd "$ROOT" && timeout 600 "$OPENSMAC" --hidden --seed 1002,2002 --ini "$OUT/$name-client.ini" \
         --outdir "$OUT/$name-client" --snapshots "$OUT/$name-client/snap" --keys "$ck" \
         > "$OUT/$name-client.log" 2>&1; echo $? > "$OUT/$name-client.rc") &
     local cp=$!

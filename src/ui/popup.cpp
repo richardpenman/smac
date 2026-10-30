@@ -1448,7 +1448,7 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t callback) {
     }
     if (p->items.empty()) p->item_type = -1;
     calculate(p);
-    // smacx's observer mode (no human player) takes the no-display path, as the oracle forces it
+    // OpenSMAC's observer mode (no human player) takes the no-display path, as the oracle forces it
     // for unattended runs (harness/README.md "Determinism measures"), so observer games play as
     // the oracle's.
     // The opening screens' dialogs (desktop mode, before a game) are always shown.
@@ -1501,8 +1501,8 @@ int32_t BasePop_exec_3(BasePop* p, int32_t no_display, int32_t callback) {
             std::fprintf(stderr, "popup %s button %d at %d,%d\n", p->label.c_str(), b.id,
                          p->win_x + (b.r.left + b.r.right) / 2, p->win_y + (b.r.top + b.r.bottom) / 2);
     ui_trace("popup shown");
-    // Test aid: SMACX_POPUP_SHOTS=DIR writes a screenshot of every popup when it opens.
-    if (const char* dir = std::getenv("SMACX_POPUP_SHOTS")) {
+    // Test aid: OPENSMAC_POPUP_SHOTS=DIR writes a screenshot of every popup when it opens.
+    if (const char* dir = std::getenv("OPENSMAC_POPUP_SHOTS")) {
         static int32_t count = 0;
         char path[512];
         std::snprintf(path, sizeof(path), "%s/pop_%03d_%s.bmp", dir, count++, p->label.c_str());

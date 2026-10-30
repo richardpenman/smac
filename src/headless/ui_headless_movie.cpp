@@ -1,5 +1,5 @@
 // Headless implementations of the movie functions (engine/ui_bridge.h): secret project movies,
-// the opening, faction, defeat and victory movies (amovie_project_name). smacx replaces this area (src/ui/movie.cpp).
+// the opening, faction, defeat and victory movies (amovie_project_name). OpenSMAC replaces this area (src/ui/movie.cpp).
 #include "engine/ui_bridge.h"
 
 // Not shown (no game state).

@@ -340,7 +340,7 @@ void MultiWinState::redraw() {
         UiRect r{0, 0, c->width, row_h};
         Buffer_write_cent_l_7(c, t.c_str(), &r, (int32_t)t.size());
     }
-    // (The right-click menu: smacx's PullDown stand-in, drawn over the panel.)
+    // (The right-click menu: OpenSMAC's PullDown stand-in, drawn over the panel.)
     if (menu_faction >= 0) {
         Buffer_box_sprite(c, &menu_rect, box_def(9));
         int32_t my = menu_rect.top + 4;
@@ -475,7 +475,7 @@ void MultiWinState::log_state() {
 
 }  // namespace
 
-// MultiWin_show (0x479970) with the modal run of smacx (see above).
+// MultiWin_show (0x479970) with the modal run of OpenSMAC (see above).
 void THISCALL MultiWin_show(uint8_t*) {
     MultiWinState* s = &g_mp;
     if (g_modeless) {  // (MainInterface_on_iface_button_clicked 0x3EC: shown, F12 hides it)

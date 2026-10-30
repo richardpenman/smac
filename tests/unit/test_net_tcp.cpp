@@ -1,4 +1,4 @@
-// smacx's network transport (platform/net_tcp): the frame codec, the host's routing, the player
+// OpenSMAC's network transport (platform/net_tcp): the frame codec, the host's routing, the player
 // list codec, and a host with two clients on localhost.
 #include <chrono>
 #include <thread>

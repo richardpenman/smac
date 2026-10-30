@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# crop.py ORACLE.smxbase SMACX.smxbase CANVAS(0|1) x0 y0 x1 y1 OUT.png [SCALE]: one region of a
-# canvas from both dumps (oracle above, smacx, differing pixels in white) and its match share.
+# crop.py ORACLE.smxbase OPENSMAC.smxbase CANVAS(0|1) x0 y0 x1 y1 OUT.png [SCALE]: one region of a
+# canvas from both dumps (oracle above, OpenSMAC, differing pixels in white) and its match share.
 import sys
 sys.path.insert(0, __import__('os').path.dirname(__file__))
 from cmp import read, img

@@ -1,5 +1,5 @@
 // Headless UI area "console": the Console functions the engine calls (engine/ui_bridge.h). No human
-// player is ever interactive headless. Replaced in smacx by src/ui/console.cpp.
+// player is ever interactive headless. Replaced in OpenSMAC by src/ui/console.cpp.
 #include "engine/ui_bridge.h"
 
 // Returns at once (also the observer's "turn complete" pause).

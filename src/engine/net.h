@@ -76,7 +76,7 @@ ADDR(0x593450) void GAMEAPI synch_diplo(int32_t faction_id, int32_t faction_id_w
 // Multiplayer: sends faction_id's leader state (council promises) to the other players.
 ADDR(0x5932E0) void GAMEAPI synch_leader(int32_t faction_id);
 
-// ---- the transport (Net_*, netlib 0x62D6A0..): DirectPlay in the original, smacx's TCP transport
+// ---- the transport (Net_*, netlib 0x62D6A0..): DirectPlay in the original, OpenSMAC's TCP transport
 // (platform/net_tcp) in native builds (engine/net_link.cpp). The NetDaemon object NetState begins
 // with the Net object: +0x760 the own player id (pid), +0x764 the host's, and the AlphaNet player
 // slots (1..7, 0x19C bytes each from +0x76C: the name, +0x20 the pid, +0x24 the faction).
@@ -92,12 +92,12 @@ ADDR_NATIVE(0x62E010) void THISCALL Net_close(uint8_t* net);
 ADDR_NATIVE(0x632DB0) void THISCALL Net_handle_sys_msg(uint8_t* net);
 ADDR(0x52E160) void THISCALL NetDaemon_on_player_added(uint8_t* net, const char* name, int32_t pid);
 ADDR(0x52E370) void THISCALL NetDaemon_on_player_deleted(uint8_t* net, int32_t a1, int32_t pid);
-// smacx (not original): opens the TCP session as its host (port) or joins one (address, port);
+// OpenSMAC (not original): opens the TCP session as its host (port) or joins one (address, port);
 // 0 on success, else a message is in *error. Net_close ends it.
 int32_t net_link_host(uint8_t* net, uint16_t port, const char* name, char* error, uint32_t error_size);
 int32_t net_link_join(uint8_t* net, const char* address, uint16_t port, const char* name, char* error,
                       uint32_t error_size);
-// smacx: the transport's sockets pumped (non-blocking); called from the idle tasks.
+// OpenSMAC: the transport's sockets pumped (non-blocking); called from the idle tasks.
 void net_link_pump();
 bool net_link_active();
 
@@ -174,7 +174,7 @@ void net_session_clear();
 // every player's settings (0x0F04), the session's settings (0x0F02 NetConfigValue, 0x0F03
 // NetSetupType's block) to a player index (< 0: everyone).
 ADDR(0x47B020) void GAMEAPI send_faction_data(int32_t idx);
-// smacx: the host's original-bugs setting to every player (0x0F10; net_process applies it).
+// OpenSMAC: the host's original-bugs setting to every player (0x0F10; net_process applies it).
 void net_send_original_bugs();
 ADDR(0x47B0F0) void GAMEAPI send_all_player_packets(int32_t idx);
 ADDR(0x47B260) void GAMEAPI send_session_packet(int32_t a1, int32_t idx);
@@ -201,7 +201,7 @@ void ui_diplo_closed(int32_t faction_id);                  // DIPLOCLOSE: the ch
 void ui_multiwin_draw();                                   // MultiWin_draw(0)
 const uint8_t* ui_netwin_faction_blob();                   // the NetWin's faction data (+0x772C)
 bool net_trace_enabled();
-const char* ui_user_dir();                                 // smacx: the per-user directory (received files)
+const char* ui_user_dir();                                 // OpenSMAC: the per-user directory (received files)
 bool ui_escape_pressed();                                  // GetAsyncKeyState(VK_ESCAPE) high bit
 void ui_net_close_windows();                               // net_upkeep: GraphicWin_close
 void ui_console_set_ai(int32_t faction_id);                // Console_set_ai
@@ -209,8 +209,8 @@ void ui_console_set_view();                                // Console_set_view(M
 void ui_net_end_of_turn();                                 // BaseWin_exit (when shown), go_reset
 void ui_net_center(int32_t x, int32_t y);                  // pfncMoveMap + Console_set_cursor
 void ui_net_clear_messages();                              // MessageWin_clear
-void ui_net_turn(const char* stage);                       // smacx: a trace line for the tests
-void ui_net_note_text(const char* text);                   // smacx: a note (stderr; WAITFOR in tests)                                  // SMACX_NETTRACE: every message logged
+void ui_net_turn(const char* stage);                       // OpenSMAC: a trace line for the tests
+void ui_net_note_text(const char* text);                   // OpenSMAC: a note (stderr; WAITFOR in tests)                                  // OPENSMAC_NETTRACE: every message logged
 
 // ---- the network turn (engine/net_turn.cpp) ----
 ADDR(0x523C60) void GAMEAPI set_time_controls();
@@ -221,5 +221,5 @@ ADDR(0x529C00) void GAMEAPI mash_planes();
 ADDR(0x529F30) void GAMEAPI net_end_of_turn();
 // The pending tasks run once (UI: timers, the session's events, redraws; headless: nothing).
 ADDR_NATIVE(0x5FC8F0) void GAMEAPI do_all_tasks();
-// The time stamp the server gives a relayed event (its seed): timeGetTime, or smacx's deterministic counter.
+// The time stamp the server gives a relayed event (its seed): timeGetTime, or OpenSMAC's deterministic counter.
 uint32_t net_stamp();

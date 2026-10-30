@@ -1,11 +1,11 @@
-# Builds the smacx release packages (Linux x86_64, macOS arm64, Windows x86_64) and publishes them
+# Builds the OpenSMAC release packages (Linux x86_64, macOS arm64, Windows x86_64) and publishes them
 # as a GitHub Release. Runs when a tag v* is pushed (git tag v1.2.3 && git push origin v1.2.3), or
 # by hand (Actions > release > Run workflow): on a tag it publishes the release, on a branch it only
 # keeps the packages as workflow artifacts.
 #
-# The packages contain smacx, the SDL2 libraries, the default ini, packaging/README.txt and the
+# The packages contain OpenSMAC, the SDL2 libraries, the default ini, packaging/README.txt and the
 # licences: never game data or anything derived from terranx.exe (packaging/package.sh checks the
-# file list). Players supply the game; smacx builds its data image from it on the first run.
+# file list). Players supply the game; OpenSMAC builds its data image from it on the first run.
 #
 # Cost: the repository is private, so the minutes are billed (macOS counts 10x, Windows 2x; the
 # Windows package is cross-compiled on Linux). One release is about 65 billed minutes, less when
@@ -26,8 +26,8 @@ concurrency:
 
 env:
   SDL_CACHE_KEY: sdl2-2.30.11-ttf-2.24.0-v1
-  # Build only the game (not smacx_headless or the smoke test).
-  SMACX_CONFIGURE: -DCMAKE_BUILD_TYPE=Release
+  # Build only the game (not opensmac_headless or the smoke test).
+  OPENSMAC_CONFIGURE: -DCMAKE_BUILD_TYPE=Release
 
 jobs:
   linux:
@@ -59,16 +59,16 @@ jobs:
       - name: Configure
         # RUNPATH $ORIGIN/lib: the SDL libraries next to the executable; libstdc++ linked in.
         run: >
-          cmake -S . -B build $SMACX_CONFIGURE -DCMAKE_PREFIX_PATH=$HOME/sdl
+          cmake -S . -B build $OPENSMAC_CONFIGURE -DCMAKE_PREFIX_PATH=$HOME/sdl
           -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON '-DCMAKE_INSTALL_RPATH=$ORIGIN/lib'
           '-DCMAKE_EXE_LINKER_FLAGS=-static-libstdc++ -static-libgcc'
       - name: Build
-        run: cmake --build build --parallel 4 --target smacx
+        run: cmake --build build --parallel 4 --target opensmac
       - name: Package
         run: packaging/package.sh linux-x86_64 build ~/sdl/lib "$VERSION" dist ~/sdl/licenses/*
       - uses: actions/upload-artifact@v4
         with:
-          name: smacx-linux-x86_64
+          name: opensmac-linux-x86_64
           path: dist/*.tar.gz
           if-no-files-found: error
 
@@ -94,14 +94,14 @@ jobs:
         if: steps.sdl-cache.outputs.cache-hit != 'true'
         run: packaging/build_sdl.sh ~/sdl $MACOS_FLAGS
       - name: Configure
-        run: cmake -S . -B build $SMACX_CONFIGURE $MACOS_FLAGS -DCMAKE_PREFIX_PATH=$HOME/sdl
+        run: cmake -S . -B build $OPENSMAC_CONFIGURE $MACOS_FLAGS -DCMAKE_PREFIX_PATH=$HOME/sdl
       - name: Build
-        run: cmake --build build --parallel 4 --target smacx
+        run: cmake --build build --parallel 4 --target opensmac
       - name: Package
         run: packaging/package.sh macos-arm64 build ~/sdl/lib "$VERSION" dist ~/sdl/licenses/*
       - uses: actions/upload-artifact@v4
         with:
-          name: smacx-macos-arm64
+          name: opensmac-macos-arm64
           path: dist/*.zip
           if-no-files-found: error
 
@@ -142,21 +142,21 @@ jobs:
       - name: Configure
         # Static C++ runtime; a GUI program (no console window).
         run: >
-          cmake -S . -B build $SMACX_CONFIGURE -DCMAKE_TOOLCHAIN_FILE=cmake/x86_64-mingw.cmake
+          cmake -S . -B build $OPENSMAC_CONFIGURE -DCMAKE_TOOLCHAIN_FILE=cmake/x86_64-mingw.cmake
           -DSDL2_DIR=$PWD/deps/SDL2-2.30.11/x86_64-w64-mingw32/lib/cmake/SDL2
           -DSDL2_ttf_DIR=$PWD/deps/SDL2_ttf-2.24.0/x86_64-w64-mingw32/lib/cmake/SDL2_ttf
-          -DSMACX_WIN32_GUI=ON
+          -DOPENSMAC_WIN32_GUI=ON
       - name: Build
-        run: cmake --build build --parallel 4 --target smacx
+        run: cmake --build build --parallel 4 --target opensmac
       - name: Package
         run: |
-          tools/$LLVM_MINGW/bin/llvm-strip build/smacx.exe
+          tools/$LLVM_MINGW/bin/llvm-strip build/opensmac.exe
           packaging/package.sh windows-x86_64 build \
             deps/SDL2-2.30.11/x86_64-w64-mingw32/bin:deps/SDL2_ttf-2.24.0/x86_64-w64-mingw32/bin "$VERSION" dist \
             deps/SDL2-2.30.11 deps/SDL2_ttf-2.24.0 deps/src/SDL2_ttf-2.24.0
       - uses: actions/upload-artifact@v4
         with:
-          name: smacx-windows-x86_64
+          name: opensmac-windows-x86_64
           path: dist/*.zip
           if-no-files-found: error
 
@@ -184,6 +184,6 @@ jobs:
           else
             pre=()
             [[ "$TAG" == *-* ]] && pre=(--prerelease)  # v1.0.0-rc1
-            gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --title "smacx $TAG" \
+            gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --title "OpenSMAC $TAG" \
               --generate-notes --verify-tag "${pre[@]}"
           fi

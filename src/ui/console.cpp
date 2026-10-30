@@ -1430,7 +1430,7 @@ void THISCALL pfncProcZoomKey(uint8_t*, int32_t command, int32_t index) {
                 if (index >= 0 || map_win(w).zoom >= 0) return;
                 // The window's size from its GraphicWin at the virtual base (0x515222..0x515234;
                 // the main view's at +0x23D94). The original takes the mouse relative to the
-                // window (Win_get_mouse_pos 0x5EC8A0); smacx's map windows are at the screen's
+                // window (Win_get_mouse_pos 0x5EC8A0); OpenSMAC's map windows are at the screen's
                 // origin, so the screen position is the same.
                 MapWinNative* native = ui_mapwin_native(w);
                 if (!native) return;

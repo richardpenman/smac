@@ -62,7 +62,7 @@ void flog(const char* fmt, ...) {
  * golden.tsv: "STATE <turn> <state hash>" at each recorded hook, then one line per call of a
  * function that changes no game memory (no FC_MUTATES, no FC_PATHS):
  * <name> <turn> <args> <return> <outputs> <crt state> <game state> (tab-separated), the original's
- * results. src/tools/golden.py imports the file into tests/golden/; smacx_headless --golden
+ * results. src/tools/golden.py imports the file into tests/golden/; opensmac_headless --golden
  * replays it. */
 bool golden_eligible(const FcFunc& f) { return !(f.flags & (FC_MUTATES | FC_PATHS)); }
 void gput(const char* fmt, ...) {

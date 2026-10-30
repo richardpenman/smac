@@ -21,7 +21,7 @@ ADDR(0x561080) void GAMEAPI enemy_strategy(int32_t faction_id);
 
 // ---- AI strategy part 1 (enemy_move itself: see ai_move.cpp) -----------------------------------
 
-// Harness hook (not original): enemy_turn -> enemy_veh (smacx_headless's trace).
+// Harness hook (not original): enemy_turn -> enemy_veh (opensmac_headless's trace).
 extern int32_t (*g_harness_enemy_veh)(int32_t veh_id);
 
 // AI move of one unit: 1 if the unit is done for the turn.

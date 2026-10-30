@@ -3,16 +3,16 @@
 # several turns with the handovers, a treaty and energy traded between the humans in the DiploWin,
 # SAVE AND EXIT, and the save reloaded from the HOTSEAT menu.
 #
-#   tests/hotseat/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/mp-native/smacx)
+#   tests/hotseat/run.sh [OUTDIR]        (OPENSMAC=path/to/opensmac, default build/mp-native/opensmac)
 #
-# Each case runs smacx with scripted keys (hidden, SDL dummy video) and checks its log. Exit status
+# Each case runs OpenSMAC with scripted keys (hidden, SDL dummy video) and checks its log. Exit status
 # 0 when every check passes.
 set -u
-# Animated by default (smacx --animate); TEST_FAST=1 runs unattended (skips the animations).
-if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
+# Animated by default (opensmac --animate); TEST_FAST=1 runs unattended (skips the animations).
+if [ "${TEST_FAST:-0}" = 1 ]; then export OPENSMAC_ANIMATE=0; else export OPENSMAC_ANIMATE=1; fi
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SMACX="$(realpath "${SMACX:-$ROOT/build/mp-native/smacx}")"
+OPENSMAC="$(realpath "${OPENSMAC:-$ROOT/build/mp-native/opensmac}")"
 OUT="$(realpath -m "${1:-$ROOT/work/hotseat_test}")"
 rm -rf "$OUT"
 mkdir -p "$OUT"
@@ -28,7 +28,7 @@ FAIL=0
 run() {  # run CASE ARGS... : log in OUT/CASE.log
     local name="$1"; shift
     mkdir -p "$OUT/$name"
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 900 "$SMACX" --hidden --ini "${INI:-$OUT/hotseat.ini}" --outdir "$OUT/$name" \
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 900 "$OPENSMAC" --hidden --ini "${INI:-$OUT/hotseat.ini}" --outdir "$OUT/$name" \
         "$@" > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
@@ -96,7 +96,7 @@ cp "$OUT/game/saves/hs.SAV" "$OUT/reload/saves/" 2>/dev/null
 run reload --keys "DOWN,DOWN,DOWN,DOWN,ENTER,ENTER,DOWN,DOWN,ENTER,h,s,ENTER,ENTER,ENTER,ENTER,DIPLOSTATE,$END,\
 a,b,ENTER,FACTIONSTATE,SHOT:reload.bmp,QUIT"
 check reload "loaded" "^filebox: saves.hs.SAV"
-check reload "the save's setting: the original bugs" "^smacx: this game plays with the original bugs \\(the save's setting\\)"
+check reload "the save's setting: the original bugs" "^opensmac: this game plays with the original bugs \\(the save's setting\\)"
 check reload "Pirates' handover" "^hotseat: switching to faction 2 \\(no password\\)"
 check reload "the treaty kept" "^diplo 1 status 00000002"
 check reload "University's password asked" "^hotseat: switching to faction 1 \\(password\\)"

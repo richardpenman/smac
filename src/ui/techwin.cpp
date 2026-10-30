@@ -24,7 +24,7 @@
 // tech with that initial, Enter / space choose, H / F1 open the datalinks; the mouse selects, a
 // click chooses, a right click opens the tech's datalinks page. The window cannot be cancelled. Not
 // reconstructed: the panels' pixel-exact layout is the original's arithmetic but the glyphs are
-// smacx's (font_text.h); the tutorial popups are shown as the original's (popt).
+// OpenSMAC's (font_text.h); the tutorial popups are shown as the original's (popt).
 //
 // Console_set_tech (0x515010): TECHCHANGE when research is under way (half the accumulated
 // points are lost when the goal changes), tech_pick, synch_research. Console_set_ai (0x514F50):

@@ -3,10 +3,10 @@
 // ui module 0x47B380..0x483840: the players, their factions, ready / start) and the network game's
 // UI hooks of the engine's NetDaemon (engine/net.h: the chat lines, MultiWin_draw, ...).
 //
-// SELECTSERVICE (jackal.txt) lists smacx's one network service, "Internet (TCP/IP)", and the
+// SELECTSERVICE (jackal.txt) lists OpenSMAC's one network service, "Internet (TCP/IP)", and the
 // original's hotseat/email item (label 0x1128, id 9999: PbemActive). The original's DirectPlay
 // services, sessions list (NETCONNECT_SESSIONS) and the service provider's own address dialog are
-// replaced by smacx's TCPHOST / TCPJOIN popups (smacxnet.txt, written next to the per-user files):
+// replaced by OpenSMAC's TCPHOST / TCPJOIN popups (opensmacnet.txt, written next to the per-user files):
 // the player's name, the host's address and the port (prefs "Net Name", "Net Address",
 // "Net Port"). Then NETCONNECT_JOIN_OR_CREATE (Host / Join) as the original.
 //
@@ -88,7 +88,7 @@ int32_t g_start = 0;  // NetWin +0x7614: > 0 start, -1 cancelled
 std::vector<std::string> g_chat;
 std::vector<int32_t> g_chat_idx;  // each line's player (its colour)
 bool g_visible = false;
-bool g_trace = std::getenv("SMACX_NETTRACE") != nullptr;
+bool g_trace = std::getenv("OPENSMAC_NETTRACE") != nullptr;
 
 const char* kTexts =
     "#TCPHOST\r\n#xs 440\r\n#caption Host Internet Game (TCP/IP)\r\n#editbox\r\n#itemlist\r\n"
@@ -102,12 +102,12 @@ void write_texts() {
     static bool done = false;
     if (done) return;
     done = true;
-    std::string path = g_ui_outdir + "/smacxnet.txt";
+    std::string path = g_ui_outdir + "/opensmacnet.txt";
     if (FILE* f = std::fopen(path.c_str(), "wb")) {
         std::fputs(kTexts, f);
         std::fclose(f);
     }
-    platform::set_builtin_file("smacxnet.txt", path.c_str());
+    platform::set_builtin_file("opensmacnet.txt", path.c_str());
 }
 }  // namespace
 
@@ -937,7 +937,7 @@ void NetWin_pick_map() {
     bool loaded = false;
     BasePop* pop = popup_new();
     int32_t r = -1;
-    if (!Popup_start(pop, "smacxnet", "NETPICK", -1, nullptr, 0)) {
+    if (!Popup_start(pop, "opensmacnet", "NETPICK", -1, nullptr, 0)) {
         BasePop_item(pop, lab(0x107C).c_str(), 0);
         BasePop_item(pop, lab(0xFD8).c_str(), 1);
         BasePop_item(pop, lab(0xFDC).c_str(), 2);
@@ -1066,7 +1066,7 @@ void NetWin_pick(int32_t index) {
         BasePop_set_active(pop, v[3]);
         run();
         if (r >= 0) v[3] = (uint8_t)r;
-    } else if (!Popup_start(pop, "smacxnet", "NETPICK", -1, nullptr, 0)) {
+    } else if (!Popup_start(pop, "opensmacnet", "NETPICK", -1, nullptr, 0)) {
         int32_t first = 0;
         if (index == 1) {
             for (int32_t n = 2; n < 8; n++) BasePop_item(pop, std::to_string(n).c_str(), n);
@@ -1108,7 +1108,7 @@ void NetWin_pick(int32_t index) {
 void NetWin_pick_diff(int32_t idx) {
     BasePop* pop = popup_new();
     int32_t r = -1;
-    if (!Popup_start(pop, "smacxnet", "NETPICK", -1, nullptr, 0)) {
+    if (!Popup_start(pop, "opensmacnet", "NETPICK", -1, nullptr, 0)) {
         for (int32_t d = 0; d < 6; d++) BasePop_item(pop, Difficulty[d] ? Difficulty[d] : "", d);
         BasePop_set_active(pop, cfg(idx)[2]);
         r = BasePop_exec_3(pop, 0, 0x483240);
@@ -1273,7 +1273,7 @@ int32_t pick_service() {
     BasePop* pop = popup_new();
     int32_t r = 1;
     if (BasePop_start(pop, "jackal", "SELECTSERVICE", -1, nullptr, 0x42, nullptr) == 0) {
-        // (The original lists its DirectPlay services first; smacx lists the hotseat/email item
+        // (The original lists its DirectPlay services first; OpenSMAC lists the hotseat/email item
         // first so that it stays the default choice, as with no network service installed.)
         BasePop_item(pop, label_get(0x1128 / 4), 9999);
         BasePop_item(pop, "Internet (TCP/IP)", 0);
@@ -1298,7 +1298,7 @@ int32_t ask(const char* label, int32_t fields) {
     write_texts();
     BasePop* pop = popup_new();
     int32_t r = -1;
-    if (!Popup_start(pop, "smacxnet", label, -1, nullptr, 0)) r = BasePop_exec_3(pop, 0, 0);
+    if (!Popup_start(pop, "opensmacnet", label, -1, nullptr, 0)) r = BasePop_exec_3(pop, 0, 0);
     popup_delete(pop);
     (void)fields;
     return r;
@@ -1308,7 +1308,7 @@ void failed(const char* error) {
     write_texts();
     parse_says(0, error, -1, -1);
     BasePop* pop = popup_new();
-    if (!Popup_start(pop, "smacxnet", "TCPFAILED", -1, nullptr, 0)) BasePop_exec_3(pop, 0, 0);
+    if (!Popup_start(pop, "opensmacnet", "TCPFAILED", -1, nullptr, 0)) BasePop_exec_3(pop, 0, 0);
     popup_delete(pop);
 }
 
@@ -1365,7 +1365,7 @@ int32_t THISCALL AlphaNet_setup(uint8_t* net, int32_t lobby) {
     *reinterpret_cast<int32_t*>(net + 0x768) = 0;
     Net_close(net);
     PbemActive = 0;
-    if (lobby) return 1;  // (no lobby launch in smacx)
+    if (lobby) return 1;  // (no lobby launch in OpenSMAC)
     if (pick_service()) return 1;
     if (PbemActive) {
         Net_close(net);
@@ -1492,7 +1492,7 @@ int32_t GAMEAPI multiplayer_init(int32_t lobby) {
             } else {
                 FactionStatus[0] = 0;
                 for (int32_t i = 1; i <= players(); i++) FactionStatus[0] |= (uint8_t)(1 << ((&NetState)[0x790 + i * 0x19C] & 31));
-                net_send_original_bugs();  // smacx: the players play with the host's setting
+                net_send_original_bugs();  // OpenSMAC: the players play with the host's setting
                 NetDaemon_send_rules(&NetState);
                 NetDaemon_send_game(&NetState);
             }

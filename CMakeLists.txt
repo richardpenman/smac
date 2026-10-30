@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.20)
-project(smacx LANGUAGES C CXX)
+project(opensmac LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(SMACX_HYBRID "Build oracle.dll (32-bit, injected into the original terranx.exe)" OFF)
-option(SMACX_SANITIZE "Native only: build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
-option(SMACX_COVERAGE "Native only: build with gcov coverage (tools/coverage_report.py)" OFF)
+option(OPENSMAC_HYBRID "Build oracle.dll (32-bit, injected into the original terranx.exe)" OFF)
+option(OPENSMAC_SANITIZE "Native only: build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(OPENSMAC_COVERAGE "Native only: build with gcov coverage (tools/coverage_report.py)" OFF)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -35,26 +35,26 @@ else()
   add_compile_options(-Wall -Wextra -Wno-unused-parameter -fwrapv -fno-strict-aliasing -fsigned-char
                       -ffp-contract=off)
   include(CheckCXXCompilerFlag)
-  check_cxx_compiler_flag(-fno-aggressive-loop-optimizations SMACX_HAS_NO_AGGRESSIVE_LOOP_OPT)
-  if(SMACX_HAS_NO_AGGRESSIVE_LOOP_OPT)  # GCC only
+  check_cxx_compiler_flag(-fno-aggressive-loop-optimizations OPENSMAC_HAS_NO_AGGRESSIVE_LOOP_OPT)
+  if(OPENSMAC_HAS_NO_AGGRESSIVE_LOOP_OPT)  # GCC only
     add_compile_options(-fno-aggressive-loop-optimizations)
   endif()
 endif()
-if(NOT SMACX_HYBRID AND SMACX_SANITIZE)
+if(NOT OPENSMAC_HYBRID AND OPENSMAC_SANITIZE)
   # Overflow checks stay off: -fwrapv makes signed wrapping defined, as in the original.
   add_compile_options(-fsanitize=address,undefined -fno-sanitize=signed-integer-overflow
                       -fno-omit-frame-pointer)
   add_link_options(-fsanitize=address,undefined)
 endif()
-if(NOT SMACX_HYBRID AND SMACX_COVERAGE)
+if(NOT OPENSMAC_HYBRID AND OPENSMAC_COVERAGE)
   add_compile_options(--coverage -O0)
-  add_compile_definitions(SMACX_COVERAGE)
+  add_compile_definitions(OPENSMAC_COVERAGE)
   add_link_options(--coverage)
 endif()
 
 # --- engine sources and generated bindings ----------------------------------------------------
 file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS src/engine/*.cpp src/platform/*.cpp)
-list(FILTER ENGINE_SOURCES EXCLUDE REGEX "/src/platform/sdl/")  # native UI backend (smacx only)
+list(FILTER ENGINE_SOURCES EXCLUDE REGEX "/src/platform/sdl/")  # native UI backend (OpenSMAC only)
 file(GLOB_RECURSE ENGINE_HEADERS CONFIGURE_DEPENDS src/engine/*.h src/platform/*.h)
 file(GLOB HEADLESS_SOURCES_FOR_GEN CONFIGURE_DEPENDS src/headless/*.cpp)
 # gen_bindings also reads the UI's declarations and definitions (src/ui: ADDR_NATIVE functions).
@@ -66,33 +66,33 @@ add_custom_command(
   DEPENDS ${ENGINE_SOURCES} ${ENGINE_HEADERS} ${HEADLESS_SOURCES_FOR_GEN} ${UI_FILES_FOR_GEN} ${CMAKE_SOURCE_DIR}/src/tools/gen_bindings.py
   COMMENT "Generating original-function bindings")
 
-if(SMACX_HYBRID)
+if(OPENSMAC_HYBRID)
   # The oracle (oracle.dll and its launcher), which records the references of the original. Since
   # the hybrid freeze (docs/CLEANUP_PLAN.md section 2, cleanup step 20) the game state is native
   # objects and hybrid.dll (the reconstruction patched into terranx.exe, fcompare, golden
   # recording) is built from the freeze commit only: see docs/DEVELOPMENT.md.
   add_library(oracle SHARED harness/oracle/oracle.cpp)
   target_include_directories(oracle PRIVATE harness/oracle harness src)
-  target_compile_definitions(oracle PRIVATE SMACX_HYBRID)  # rules_dump.h binds engine globals
+  target_compile_definitions(oracle PRIVATE OPENSMAC_HYBRID)  # rules_dump.h binds engine globals
   target_link_options(oracle PRIVATE -static)
   set_target_properties(oracle PROPERTIES PREFIX "")
   add_executable(oracle_launch harness/oracle/launch.c)
   target_link_options(oracle_launch PRIVATE -static)
 else()
-  add_library(smacx_engine STATIC ${ENGINE_SOURCES} ${GEN_DIR}/native_stubs.cpp)
-  target_include_directories(smacx_engine PUBLIC src)
+  add_library(opensmac_engine STATIC ${ENGINE_SOURCES} ${GEN_DIR}/native_stubs.cpp)
+  target_include_directories(opensmac_engine PUBLIC src)
   if(WIN32)
-    target_link_libraries(smacx_engine PUBLIC ws2_32)  # the online transport (platform/net_tcp)
+    target_link_libraries(opensmac_engine PUBLIC ws2_32)  # the online transport (platform/net_tcp)
   endif()
   # The headless UI (src/headless) is the default implementation of the engine's UI bridge
   # (engine/ui_bridge.h): a static library with one object file per UI area, linked after the
-  # executable's own objects. An executable that defines every function of an area (smacx: src/ui)
+  # executable's own objects. An executable that defines every function of an area (OpenSMAC: src/ui)
   # replaces it, as the linker then never pulls that object in; replacing an area only in part is
   # a duplicate-symbol link error. Engine and headless UI call each other (static library cycle).
   file(GLOB HEADLESS_SOURCES CONFIGURE_DEPENDS src/headless/*.cpp)
-  add_library(smacx_ui_headless STATIC ${HEADLESS_SOURCES})
-  target_link_libraries(smacx_ui_headless PUBLIC smacx_engine)
-  target_link_libraries(smacx_engine PUBLIC smacx_ui_headless)
+  add_library(opensmac_ui_headless STATIC ${HEADLESS_SOURCES})
+  target_link_libraries(opensmac_ui_headless PUBLIC opensmac_engine)
+  target_link_libraries(opensmac_engine PUBLIC opensmac_ui_headless)
   # Golden records (src/app/golden.cpp): the replay table of the functions fcompare records.
   add_custom_command(
     OUTPUT ${GEN_DIR}/golden_funcs.h
@@ -100,26 +100,26 @@ else()
     DEPENDS ${CMAKE_SOURCE_DIR}/harness/oracle/fcompare_table.h ${CMAKE_SOURCE_DIR}/re/original_names.tsv
             ${CMAKE_SOURCE_DIR}/src/tools/golden.py
     COMMENT "Generating the golden replay table")
-  add_executable(smacx_headless src/app/headless.cpp src/app/golden.cpp ${GEN_DIR}/golden_funcs.h)
-  target_link_libraries(smacx_headless PRIVATE smacx_engine)
-  target_include_directories(smacx_headless PRIVATE harness ${GEN_DIR})
-  # Portability smoke test (no game data needed): ctest, or run smacx_smoke.
+  add_executable(opensmac_headless src/app/headless.cpp src/app/golden.cpp ${GEN_DIR}/golden_funcs.h)
+  target_link_libraries(opensmac_headless PRIVATE opensmac_engine)
+  target_include_directories(opensmac_headless PRIVATE harness ${GEN_DIR})
+  # Portability smoke test (no game data needed): ctest, or run opensmac_smoke.
   enable_testing()
-  add_executable(smacx_smoke tests/smoke.cpp)
-  target_link_libraries(smacx_smoke PRIVATE smacx_engine)
-  add_test(NAME smoke COMMAND smacx_smoke WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-  # Unit tests (doctest, no game data needed): ctest, or run smacx_unit (doctest options, e.g. -s).
+  add_executable(opensmac_smoke tests/smoke.cpp)
+  target_link_libraries(opensmac_smoke PRIVATE opensmac_engine)
+  add_test(NAME smoke COMMAND opensmac_smoke WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+  # Unit tests (doctest, no game data needed): ctest, or run opensmac_unit (doctest options, e.g. -s).
   file(GLOB UNIT_SOURCES CONFIGURE_DEPENDS tests/unit/*.cpp)
-  add_executable(smacx_unit ${UNIT_SOURCES})
-  target_include_directories(smacx_unit PRIVATE third_party tests/unit)
-  target_link_libraries(smacx_unit PRIVATE smacx_engine)
-  add_test(NAME unit COMMAND smacx_unit WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+  add_executable(opensmac_unit ${UNIT_SOURCES})
+  target_include_directories(opensmac_unit PRIVATE third_party tests/unit)
+  target_link_libraries(opensmac_unit PRIVATE opensmac_engine)
+  add_test(NAME unit COMMAND opensmac_unit WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
   # Golden records (tests/golden, harness/README.md "Golden records"): the original's results of
   # functions, replayed on the states of their scenarios. Need the game's data (game/,
   # src/data/data_image.bin; late140 also its saved game): skipped without them.
   foreach(scenario tiny20 late140)
     add_test(NAME golden_${scenario}
-             COMMAND smacx_headless harness/scenarios/${scenario}.cmd --golden tests/golden
+             COMMAND opensmac_headless harness/scenarios/${scenario}.cmd --golden tests/golden
                      --outdir ${CMAKE_BINARY_DIR}/golden_out/${scenario}
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(golden_${scenario} PROPERTIES SKIP_RETURN_CODE 77 LABELS data)
@@ -139,18 +139,18 @@ else()
          CONTENT "// Generated from harness/oracle/runtime/Alpha Centauri.Ini.\nstatic const unsigned char kDefaultIni[] = {${ini_bytes}};\n")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
                  "${CMAKE_SOURCE_DIR}/harness/oracle/runtime/Alpha Centauri.Ini")
-    add_executable(smacx src/app/smacx.cpp src/app/gamedata.cpp ${UI_SOURCES})
-    target_include_directories(smacx PRIVATE ${GEN_DIR})
-    target_link_libraries(smacx PRIVATE smacx_engine SDL2::SDL2 SDL2_ttf::SDL2_ttf)
+    add_executable(opensmac src/app/opensmac.cpp src/app/gamedata.cpp ${UI_SOURCES})
+    target_include_directories(opensmac PRIVATE ${GEN_DIR})
+    target_link_libraries(opensmac PRIVATE opensmac_engine SDL2::SDL2 SDL2_ttf::SDL2_ttf)
     if(WIN32)
-      target_link_libraries(smacx PRIVATE shell32 ole32)
+      target_link_libraries(opensmac PRIVATE shell32 ole32)
       # Releases: a GUI-subsystem program (no console window; messages go to message boxes).
-      option(SMACX_WIN32_GUI "Windows: build smacx without a console window" OFF)
-      if(SMACX_WIN32_GUI)
-        set_target_properties(smacx PROPERTIES WIN32_EXECUTABLE ON)
+      option(OPENSMAC_WIN32_GUI "Windows: build OpenSMAC without a console window" OFF)
+      if(OPENSMAC_WIN32_GUI)
+        set_target_properties(opensmac PROPERTIES WIN32_EXECUTABLE ON)
       endif()
     endif()
   else()
-    message(STATUS "SDL2 or SDL2_ttf not found: smacx (native UI) is not built")
+    message(STATUS "SDL2 or SDL2_ttf not found: OpenSMAC (native UI) is not built")
   endif()
 endif()

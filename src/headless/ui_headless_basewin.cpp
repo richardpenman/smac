@@ -1,5 +1,5 @@
 // Headless implementations of the base window (BaseWin) functions the engine calls
-// (engine/ui_bridge.h), and of the window visibility / redraw requests they depend on. smacx
+// (engine/ui_bridge.h), and of the window visibility / redraw requests they depend on. OpenSMAC
 // replaces this area (src/ui/basewin*.cpp).
 #include "engine/ui_bridge.h"
 

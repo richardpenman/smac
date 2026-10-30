@@ -1,5 +1,5 @@
 // Headless UI area "popup": popups and message boxes (engine/ui_bridge.h). Nothing is shown; each
-// returns the default choice (0), like the oracle's forced no-display path. Replaced in smacx by
+// returns the default choice (0), like the oracle's forced no-display path. Replaced in OpenSMAC by
 // src/ui/win_popup.cpp and src/ui/popup_menus.cpp (the reconstructed BasePop / Popup, popup.h).
 #include "engine/crt.h"
 #include "engine/ui_bridge.h"

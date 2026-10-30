@@ -11,7 +11,7 @@
 // part (flag 2: the iface_down / iface_up picture at +0xD3C, MiSlideState).
 // Not reconstructed: native life's pictures in the emblem boxes (the sprites at 0x76DC30.. are
 // not loaded: none drawn), the show / hide of the menu, commlink and globe buttons around the report
-// (they stay as they are), the arms' slide of slide_show's window part. SMACX_BATTLE_SHOT=FILE: a
+// (they stay as they are), the arms' slide of slide_show's window part. OPENSMAC_BATTLE_SHOT=FILE: a
 // screenshot after each report (test aid).
 #include <cstdio>
 #include <cstdlib>
@@ -362,7 +362,7 @@ void THISCALL BattleWin_battle_report(uint8_t*, int32_t atk, int32_t def, int32_
     do_non_input();
     g_deadline = g_ui_unattended ? 0 : platform::ticks_ms() + 5000;  // Time_pulse
     std::fprintf(stderr, "battle report: %d (%s) vs %d (%s) strength %d / %d\n", atk, ua.name, def, ud.name, off, dstr);
-    if (const char* shot = std::getenv("SMACX_BATTLE_SHOT")) ui_screenshot(g_ui_outdir + "/" + shot);  // test aid
+    if (const char* shot = std::getenv("OPENSMAC_BATTLE_SHOT")) ui_screenshot(g_ui_outdir + "/" + shot);  // test aid
     Font_dtor(&fn);  // the locals' destructors
     Font_dtor(&fi);
     Font_dtor(&fb);

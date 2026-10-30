@@ -2,7 +2,7 @@
 # Differential verification against cached oracle references.
 #
 #   harness/verify.sh hybrid [patch-spec] [scenario...]   original + reconstructed functions
-#   harness/verify.sh native [scenario...]                pure reconstruction (smacx_headless)
+#   harness/verify.sh native [scenario...]                pure reconstruction (opensmac_headless)
 #   harness/verify.sh fcompare [spec] [scenario...]       original vs reconstruction, per function
 #
 # patch-spec is passed to the hybrid `patch` command (default "all"; e.g. "none +world_build").
@@ -59,7 +59,7 @@ for s in $SCEN; do
   if [ "$MODE" = hybrid ]; then
     PATCH_SPEC="$SPEC" ORACLE_DLL=hybrid "$ROOT/harness/run_oracle.sh" "$CMD" "$OUT" "${ORACLE_TIMEOUT:-1800}" >/dev/null
   else
-    BIN="${NATIVE_BUILD:-$ROOT/build/native}/smacx_headless"
+    BIN="${NATIVE_BUILD:-$ROOT/build/native}/opensmac_headless"
     (cd "$ROOT" && "$BIN" "$CMD" --outdir "$OUT" --original-bugs > "$OUT/headless.log" 2>&1)
   fi
   echo "[$s]"

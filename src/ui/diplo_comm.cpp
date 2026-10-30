@@ -7,7 +7,7 @@
 // their offset from ebp) where the original reuses one slot for several purposes.
 // Game state changes go through the engine (net_* in single player call the plain functions).
 // Multiplayer paths: the inlined "diplomatic lock" and message sending are the engine's net_*
-// functions (identical in single player); smacx plays single player games only.
+// functions (identical in single player); OpenSMAC plays single player games only.
 #include <cstring>
 
 #include "engine/action.h"

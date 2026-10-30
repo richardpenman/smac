@@ -1,4 +1,4 @@
-// Headless implementation of boom, the combat animation (engine/battle.h). smacx replaces this area
+// Headless implementation of boom, the combat animation (engine/battle.h). OpenSMAC replaces this area
 // (src/ui/sound.cpp: its sounds).
 #include "engine/battle.h"
 

@@ -644,7 +644,7 @@ static void install_call_hooks() {
 }
 
 /* logsound <turn>: log the calls of the sound layer (FX, voices, ambience, music, movies) from that
- * turn on as "SOUND T<turn> <name> <args>" (tests/sound: compared with smacx's SMACX_SOUNDLOG).
+ * turn on as "SOUND T<turn> <name> <args>" (tests/sound: compared with OpenSMAC's OPENSMAC_SOUNDLOG).
  * The thunks keep ECX (thiscall functions): push ecx; push idx; call log_sound; add esp,4; pop ecx;
  * jmp trampoline (prologue copy). */
 struct SoundHook {
@@ -1026,7 +1026,7 @@ static int __cdecl hook_observer_pause() { return 0; }
  * and the GraphicWin's 8-bit Buffer written with the game palette. The viewer is restored after
  * each dump; the game state is not changed otherwise (the random generators are saved around
  * the redraw). File: "SMXMAP1\0", int32 width, height, viewer, zoom, center x, center y, turn,
- * map tiles address (paTiles: seeds the tile variants); 256 x RGB (Palette 0x94C590); width * height pixels, top-down. smacx --dump writes the same
+ * map tiles address (paTiles: seeds the tile variants); 256 x RGB (Palette 0x94C590); width * height pixels, top-down. opensmac --dump writes the same
  * format (work/ui/mapcmp.py compares them). */
 struct MapDump {
     std::string file;

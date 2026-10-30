@@ -1,7 +1,7 @@
-// Replay of golden records (smacx_headless --golden DIR; harness/README.md "Golden records").
+// Replay of golden records (opensmac_headless --golden DIR; harness/README.md "Golden records").
 //
 // The records (tests/golden, src/tools/golden.py) hold the original's results of functions that
-// change no game memory, called by fcompare on the states of a harness scenario. smacx_headless
+// change no game memory, called by fcompare on the states of a harness scenario. opensmac_headless
 // plays the same scenario and, at the turn_upkeep hook of each recorded turn, checks that the game
 // state is the recorded one (state hash) and calls the reconstructed functions with the recorded
 // arguments: return value, out-parameters, strings, buffers and random generator states must equal

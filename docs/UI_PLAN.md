@@ -78,8 +78,8 @@ them; native builds bind them to src/headless (unattended observer behaviour).
 src/engine        reconstructed game logic (unchanged by UI work)
 src/ui            reconstructed UI classes, original names/addresses (ADDR_NATIVE), portable C++
 src/platform      ui_platform.h: what the UI needs from the OS (no SDL types)
-src/platform/sdl  SDL2 + SDL2_ttf backend (smacx only; excluded from the engine library)
-src/app/smacx.cpp the native game executable
+src/platform/sdl  SDL2 + SDL2_ttf backend (OpenSMAC only; excluded from the engine library)
+src/app/opensmac.cpp the native game executable
 ```
 
 * **Platform layer** replaces DirectDraw/GDI/user32/WinMM: present an 8-bit frame with its palette
@@ -97,13 +97,13 @@ src/app/smacx.cpp the native game executable
   Pointer-holding parts (canvas, caches, fonts' handles are ints) live in native side structures.
 * **Bridge switch (UI areas)**: the engine calls the UI through the bridge (`ADDR_NATIVE`
   declarations). Hybrid builds bind them to the original (gen_bindings.py forwarders). Native builds
-  link `smacx_ui_headless`, a static library built from src/headless with one object file per UI
-  area (`ui_headless_<area>.cpp`); it is the default implementation and smacx_headless uses all of
-  it. smacx defines the functions of the areas its SDL UI implements in its own objects (src/ui),
+  link `opensmac_ui_headless`, a static library built from src/headless with one object file per UI
+  area (`ui_headless_<area>.cpp`); it is the default implementation and opensmac_headless uses all of
+  it. OpenSMAC defines the functions of the areas its SDL UI implements in its own objects (src/ui),
   so the linker never pulls those areas' objects from the library; an area replaced only in part
-  is a duplicate-symbol link error. Areas replaced by smacx today:
+  is a duplicate-symbol link error. Areas replaced by OpenSMAC today:
 
-  | Area (src/headless) | Functions | smacx (src/ui) |
+  | Area (src/headless) | Functions | OpenSMAC (src/ui) |
   | --- | --- | --- |
   | `mapview` | draw_map, draw_tile(s), draw_radius, draw_tile_fixup(_2), pfncRedrawMap, pfncMoveMap, MapWin_focus, MapWin_main_caption, MapWin_clear_alt/terrain, ui_mapwins_* | mapwin.cpp, win_mapview.cpp |
   | `console` | Console_human_turn, Console_focus, Console_ready_search, Console_set_move, Console_cursor_next, Console_update_data | console.cpp |
@@ -127,16 +127,16 @@ src/app/smacx.cpp the native game executable
   | `action` | TutWin_tut_map, ReportIf_on_redraw | tutwin.cpp |
 
   To replace another function: move its headless definition into an area file of its own (or
-  into the area it belongs to, if smacx implements the whole area), then define it in src/ui
+  into the area it belongs to, if OpenSMAC implements the whole area), then define it in src/ui
   under its original name. Functions only the UI calls are declared `ADDR_NATIVE` in src/ui
   headers: gen_bindings.py gives them hybrid forwarders (never used: src/ui is not part of the
   hybrid build) and, while they have no definition, aborting native stubs. A function declared
   with `ADDR` in an engine header must be defined in the engine (src/engine), never only in
   src/ui (hybrid builds would patch it with code they do not link).
   The probe and diplomacy menus (`ui_probe_*`, `ui_diplo_menu_*`) have their unattended defaults
-  in engine objects (engine/ui_bridge_probe.cpp, ui_bridge_diplomacy.cpp); smacx defines every function of each of those objects (popup_menus.cpp), so the linker
+  in engine objects (engine/ui_bridge_probe.cpp, ui_bridge_diplomacy.cpp); OpenSMAC defines every function of each of those objects (popup_menus.cpp), so the linker
   does not pull them.
-* **WinMain state**: `ScreenWidth/ScreenHeight` (GetSystemMetrics) are not set natively; smacx sets
+* **WinMain state**: `ScreenWidth/ScreenHeight` (GetSystemMetrics) are not set natively; OpenSMAC sets
   them from the window size. Engine-visible, so harness native runs should set the oracle's value
   (1024x768) too.
 
@@ -144,7 +144,7 @@ src/app/smacx.cpp the native game executable
 
 | Phase | Content | Verification |
 | --- | --- | --- |
-| 1 (this slice) | platform layer; Buffer/Palette/Font/Sprite/Texture subset; MapWin geometry (zoom, tile<->point, corner heights, lighting); terrain base textures, water, rocky, fungus, forest, improvements, grid; bases (base_draw), base names; placeholder units; turn stepping (AI) | oracle screenshots vs smacx for saves (section 4) |
+| 1 (this slice) | platform layer; Buffer/Palette/Font/Sprite/Texture subset; MapWin geometry (zoom, tile<->point, corner heights, lighting); terrain base textures, water, rocky, fungus, forest, improvements, grid; bases (base_draw), base names; placeholder units; turn stepping (AI) | oracle screenshots vs OpenSMAC for saves (section 4) |
 | 2 | complete `MapWin_gen_terrain_poly`: coasts/beaches (Texture_draw_coast), rivers, roads/mag tubes, landmarks textures and sprites, territory borders, resources/pods/monolith, jungle; bit-exact Texture_draw_* stepping; `pfncPtToTile`; scrolled redraws (`pfncRedrawMap` partial copy) | pixel diff per tile class |
 | 3 | units: load_vehicles, flags, Units.pcx natives, voxel renderer (cvr) or pre-rendered sprite cache; veh_draw with stacks, health, animation (vehdraw_*) | unit close-ups vs oracle |
 | 4 | Win/GraphicWin/z-order/message pump/modal loops on the platform events; MainInterface (console frame), StatusWin, InfoWin, WorldWin (mini map), MessageWin; Console key handling and `Console_human_turn`: a human player can move units and end turns | scripted key sequences, state compare with oracle (same keys) |
@@ -156,7 +156,7 @@ src/app/smacx.cpp the native game executable
 | 10 (done, section 12) | sound (FX, voices, music), movies (WVE: opening, faction, secret project, defeat and victory movies), the menu column's slide, monument.flc | tests/sound/run.sh; tests/sound/compare.sh vs the original (oracle `logsound`) |
 | 11 (placeholder sweep, section 13) | right-click menu (PullDown), landmarks, go-to path preview and destination lines, the build picker grid, garrison menu, support map, Console_menu_proc, the status and world panes, the map cursor; the remaining work table | tests/placeholders/run.sh; tests/placeholders/compare.sh vs the original |
 
-Each phase replaces the corresponding headless stubs in smacx; `smacx_headless` and the hybrid
+Each phase replaces the corresponding headless stubs in OpenSMAC; `opensmac_headless` and the hybrid
 builds stay unchanged.
 
 ## 4. Verification against the original
@@ -166,7 +166,7 @@ builds stay unchanged.
   runs (`load SAVE`, optional `viewer N`, `turns 1`). The first map frame after load is the
   desktop_init redraw: same save, same view centre (the map cursor), no bases/units yet
   (`ControlTurnStarted` is still 0); later frames show the turn.
-* **Native screenshots**: `smacx --save SAVE [--viewer N] [--center X,Y] --hidden --shot out.bmp`
+* **Native screenshots**: `opensmac --save SAVE [--viewer N] [--center X,Y] --hidden --shot out.bmp`
   with `SDL_VIDEODRIVER=dummy` renders offscreen; `--turns N` first plays N turns.
 * **Compare**: `work/ui/compare.py` (stacked image), `work/ui/score.py` (fraction of pixels within
   a colour tolerance; the console area is excluded).
@@ -175,21 +175,21 @@ builds stay unchanged.
     `load_faction_art(1..7)` and `load_flags` (as `load_game` does), so references made with it
     show the save's base sprites, faction colours and flags.
   * Viewer 0 (observer) shows the landmark word as "items" (visible_items[-1] is the landmarks
-    field): condensers and boreholes everywhere. smacx reproduces it; use `viewer N` for
+    field): condensers and boreholes everywhere. OpenSMAC reproduces it; use `viewer N` for
     realistic references.
   * With a real viewer the oracle stops in modal windows (monuments, new tech) after a while;
     only the first frames are usable.
 * **Exact map references**: the oracle's `mapdump` command (harness/README.md, "Map view
   dumps") dumps the main view's canvas after a full or scrolled redraw for a given viewer, zoom
-  and centre; `smacx --like REF --dump OUT [--scroll-from X,Y]` draws the same view and
+  and centre; `opensmac --like REF --dump OUT [--scroll-from X,Y]` draws the same view and
   `work/ui/mapcmp.py` scores it. Terrain, coasts, rivers, roads, borders, bases, base names,
   landmarks, unit sprites, flags, health bars, order letters and the 3D unit models (section 7)
   match pixel for pixel.
 
 ## 5. The human turn (phase 4, first part)
 
-smacx plays a faction as a human: `smacx --new [newgame keys] --human N` (default faction 1) or
-`smacx --save FILE --human N`. The engine runs `control_game` / `control_turn` as in the original;
+OpenSMAC plays a faction as a human: `opensmac --new [newgame keys] --human N` (default faction 1) or
+`opensmac --save FILE --human N`. The engine runs `control_game` / `control_turn` as in the original;
 the human faction's turns run the reconstructed `Console_human_turn` (src/ui/console.cpp), the
 computer players move with the engine.
 
@@ -247,11 +247,11 @@ computer players move with the engine.
   a simple file box (console_filebox.cpp): a name field, a list of saves; original naming.
 * **Placeholders** (src/ui/console_placeholders.cpp): at first the scenario editor, time controls,
   assemble and the tutorial hints log said "not reconstructed" (all done since: section 13).
-  Multiplayer (hotseat, PBEM, online play between smacx copies): docs/MULTIPLAYER.md.
+  Multiplayer (hotseat, PBEM, online play between OpenSMAC copies): docs/MULTIPLAYER.md.
 * **Testing**: `--keys` scripts input (characters, `C-`/`S-`/`A-` modifiers, `ALT`, `CLICK:XxY`,
   `RCLICK:XxY`, `MOVE:XxY`, `DRAG:X1xY1:X2xY2` (a held left button: the go-to drag), `PRESS:XxY` / `RELEASE:XxY` (the left button held: a scroll bar's
   button pressed, its thumb dragged with `MOVE:XxY`), `CLOSE` (the window's close
-  button: smacx's own, the original's window has none; it quits at once before a game runs and in
+  button: OpenSMAC's own, the original's window has none; it quits at once before a game runs and in
   observer mode, asks REALLYQUIT / REALLYWIMPOUT from a game's main screen and is ignored while a
   popup or modal window is up), KP1..KP9, named keys, and
   the commands `SHOT[:file]`, `SAVE:file` (also writes `file.rng`), `UNITS`, `QUIT`);
@@ -261,21 +261,21 @@ computer players move with the engine.
   reproducible here by itself: game_init seeds the CRT generator (`srand`) and the game LCG from
   timeGetTime(), and load_daemon reseeds `srand` only under GameRules 0x400, so after a load the
   engine's `rand()` calls (e.g. the human faction's turn_upkeep: fungus growth, events) depend on
-  the boot time. smacx therefore pins the generators as the harness's `seed` command does for
+  the boot time. OpenSMAC therefore pins the generators as the harness's `seed` command does for
   the oracle: `--seed CRT,GAME` defaults to 0,0 for scripted or hidden runs (--keys, --hidden; interactive play seeds from the clock) (before the load or the new game; the logic clock
   starts at 0); `--seed clock` seeds from the clock as the original. This was the flakiness of
   tests/basewin (late120 / late147: the turn's FUNGUSGROWS2 popup took the scripted keys in some
   runs, turn_300's popups came in a different order). The engine's timeGetTime() randomness reads
-  use the logic clock (engine/clock.h, smacx runs the engine in deterministic mode). Scripted
+  use the logic clock (engine/clock.h, OpenSMAC runs the engine in deterministic mode). Scripted
   input never depends on real time: wait_task / ui_wait_key / ui_wait_input take a scripted key
   before pumping real input, and the go-to drag timer (console_ui_tick) is checked only when the
   script is empty. The remaining real-time reads are cosmetic: presentation pacing, the double
   click of real mouse input, the citizens' faces of the base window (the original's
   `Random_reseed(timeGetTime())` there is UI code, which the oracle's hook leaves on real time),
-  so screenshots of those faces may differ between runs. `SMACX_TRACE=1` logs the generators and
+  so screenshots of those faces may differ between runs. `OPENSMAC_TRACE=1` logs the generators and
   the logic clock at every scripted key and popup (compare the logs of two runs).
   Checks done:
-  * observer mode (`--human 0`) with every smacx area replaced matches the oracle references
+  * observer mode (`--human 0`) with every OpenSMAC area replaced matches the oracle references
     (harness/compare.py): tiny20, small12, std8 (new games), late140 (load);
   * tests/console/run.sh: orders by key, go-to list and drag, menus, save / load, late saves;
   * a human game played with scripted keys for several turns, saved at the start of a human turn
@@ -292,7 +292,7 @@ computer players move with the engine.
 ## 6. Popups (phase 6)
 
 The script-driven popups are reconstructed (src/ui/popup.{h,cpp}, font_text.{h,cpp},
-win_popup.cpp, popup_menus.cpp); every engine popup call opens the original's dialog in smacx.
+win_popup.cpp, popup_menus.cpp); every engine popup call opens the original's dialog in OpenSMAC.
 
 * **BasePop / Popup** (one native class, popup.cpp; the original's field offsets are noted):
   `BasePop_start` reads a script section (`#xs #ys #x #y #col #caption #checkbox #editbox #listbox
@@ -307,7 +307,7 @@ win_popup.cpp, popup_menus.cpp); every engine popup call opens the original's di
   with the default text selected) and FlatButton bars (interface.pcx rows 6..8). Position: in the
   main interface's frame as Popup_show (x = (width of screen - width + 32) / 2, bottom on the
   console), else `#x/#y` (0x1000 centred, negative from the right/bottom).
-* **Input** (BasePop_exec_3's modal loop on smacx's pump, `ui_wait_input`): Enter = OK
+* **Input** (BasePop_exec_3's modal loop on OpenSMAC's pump, `ui_wait_input`): Enter = OK
   (Win_key_click_event -> BasePop_on_button_clicked(-1)), Esc = cancel (-2: -1 with a Cancel
   button, else the selected item, as the original), arrows/keypad move the selection
   (RadioButton_on_key_down), space toggles a check box, typing edits the field; mouse: click
@@ -325,15 +325,15 @@ win_popup.cpp, popup_menus.cpp); every engine popup call opens the original's di
   `~` colour runs, sprite boxes (popups with several pictures), NetMsg's timed message window
   (multiplayer), the full-screen windows (they are not popups: sections 8 and 9).
 * **Observer mode** (no human player): popups take BasePop_exec_3's no-display path, as the
-  oracle forces it, so observer games play as the oracle's (`smacx_headless` is unchanged).
+  oracle forces it, so observer games play as the oracle's (`opensmac_headless` is unchanged).
 * **Testing**: `--keys` takes `CLICK:XxY` (a left click) and `POPUP:FILE/LABEL[/FLAGS[/PCX]]` (shows
   that popup; FILE `SCRIPT` is the main script, `tutor` shows in the tutorial style);
-  `SMACX_POPUP_SHOTS=DIR` writes a screenshot of every popup when it opens. tests/popups/run.sh
+  `OPENSMAC_POPUP_SHOTS=DIR` writes a screenshot of every popup when it opens. tests/popups/run.sh
   checks the answers of scripted popups (new game: base name, end of turn, quit, check boxes, edit
   field with Cancel, council menu; mouse clicks; three turns of late saves as a human faction).
   tests/popups/compare.sh drives the plain original (terranx.exe without the oracle, Wine + Xvfb,
   XTEST keys: tests/popups/orig_drive.py, orig_quickstart.steps) through QUICK START to its first
-  popups and stacks them with smacx's (tests/popups/cmp.py). The frames, boxes, text and its line
+  popups and stacks them with OpenSMAC's (tests/popups/cmp.py). The frames, boxes, text and its line
   breaks are the same; what differs is the game (the quick start's faction) and the item under
   the original's mouse.
 * **Text** (platform/sdl/ui_platform_sdl.cpp, as GDI draws on the game's 8-bit DIBs): the faces
@@ -444,7 +444,7 @@ F10 hall of fame, F11 menu detail, F12 the commlink panel (MainInterface_on_ifac
   it beside the map). tests/placeholders case 30.
 * **Testing**: tests/reports/run.sh (SCREENSTATE / FACTIONSTATE dumps, saves reloaded);
   tests/reports/compare.sh drives the plain original (orig_reports.steps, Difficulty=2) through
-  QUICK START and the same keys and scores each screen against smacx's.
+  QUICK START and the same keys and scores each screen against OpenSMAC's.
 
 
 ## 9. Research, new technologies, design workshop and datalinks (phase 7)
@@ -460,8 +460,8 @@ F10 hall of fame, F11 menu detail, F12 the commlink panel (MainInterface_on_ifac
   FUN_00484C60 lays them out; keys / letters / mouse / right click (datalinks) as FUN_00486170,
   FUN_00485FC0, FUN_004860B0, FUN_00486110. Console_set_tech: TECHCHANGE, half the points lost on a
   change, synch_research. shift+R runs Console_set_ai under blind research.
-  smacx_headless's tech_pick (src/headless/ui_headless_techwin.cpp, unchanged) does not make the
-  game_random draws; smacx's does, as the original (they only matter for free / stolen picks of
+  opensmac_headless's tech_pick (src/headless/ui_headless_techwin.cpp, unchanged) does not make the
+  game_random draws; OpenSMAC's does, as the original (they only matter for free / stolen picks of
   computer players and for the human's dialog).
 * **New technology window** (techwin.cpp: NewTechWin_exec 0x483F90, FUN_00483950): the 550 x 600
   window with its title (breakthrough / acquired), the tech's name and picture, help_tech_info's
@@ -496,10 +496,10 @@ F10 hall of fame, F11 menu detail, F12 the commlink panel (MainInterface_on_ifac
   workshop on turn_147: a new prototype through the weapon picker and DONE, a preset with RENAME
   and APPLY, OBSOLETE, UPGRADE, saves reloaded; turn_100 / turn_300 open and cancel; the base
   window's build menu) and tests/datalinks/run.sh (browsing, links, BACK, categories, the labs
-  report's DATALINKS, faction profiles); test tokens TECHSTATE and PROTOSTATE (src/app/smacx.cpp).
+  report's DATALINKS, faction profiles); test tokens TECHSTATE and PROTOSTATE (src/app/opensmac.cpp).
   tests/design/compare.sh drives the plain original through QUICK START (orig_design.steps) to the
   design workshop (u), the datalinks (F1) and the research priorities (shift+R) and scores them
-  against smacx's: 0.866, 0.846 and 0.767 of the pixels within tolerance (a random faction and
+  against OpenSMAC's: 0.866, 0.846 and 0.767 of the pixels within tolerance (a random faction and
   map in the original; differences: the component boxes' headers and models, the original's DATA
   column, list fonts, the labs tree of a tech entry, popup text glyphs as in section 6). The
   research window and the new technology window are not reached by the original's QUICK START
@@ -573,8 +573,8 @@ F10 hall of fame, F11 menu detail, F12 the commlink panel (MainInterface_on_ifac
 
 ## 11. The opening screens, file dialogs and preferences (phase 9)
 
-`smacx` without `--new` / `--save` runs the original's main menu: control_game calls top_menu as the
-original does (smacx's main_menu only adds the seeding and the human player for its harness parts).
+`opensmac` without `--new` / `--save` runs the original's main menu: control_game calls top_menu as the
+original does (OpenSMAC's main_menu only adds the seeding and the human player for its harness parts).
 
 * **Desktop and menu column** (src/ui/topmenu.cpp): the desktop (TopMenuWin, change_opening /
   close_opening) shows xopeninga.pcx (xopeningb.pcx at 800 x 600) through the picture's own palette.
@@ -644,7 +644,7 @@ original does (smacx's main_menu only adds the seeding and the human player for 
   list in the dialogs' default font, ListBox_draw_item's item rectangle); the name popup over the
   picker 0.999 (its button reads CANCEL in the original); PLANETFALL 1.000; the preferences 0.871
   (the window is placed 8 pixels further right, and its check boxes reflect different
-  preferences); the save FileBox in a game 0.848 (smacx's own file box, 2 pixels lower; the
+  preferences); the save FileBox in a game 0.848 (OpenSMAC's own file box, 2 pixels lower; the
   original's base window behind it).
   The credits (animated) and the multiplayer setup window (the original opens it only inside a
   DirectPlay session) are not scored.
@@ -652,7 +652,7 @@ original does (smacx's main_menu only adds the seeding and the human player for 
 ## 12. Sound, music and movies (phase 10)
 
 The original plays its sounds through soundx.dll (DirectSound, and the ACM MP3 codec for the
-voices) and its movies through EA's player library (video module). smacx replaces both: the platform
+voices) and its movies through EA's player library (video module). OpenSMAC replaces both: the platform
 layer has an audio mixer (src/platform/sdl/audio_sdl.cpp: sample voices with gain, pan, pitch, loop
 and fade-out, and generator streams, on one SDL audio device; `--nosound` opens none,
 SDL_AUDIODRIVER chooses it, the tests use `dummy`) and true-colour frames
@@ -662,7 +662,7 @@ other Wave objects are never written; the fcompare ignore list names them), it r
 never the logic clock or a game generator, and a call's choices that depend on a sound playing
 (wave_it, ambience_veh) only decide what is heard. The headless areas `sound` (FX, voices, Wave_*,
 ambience, release_sound, desktop_init), `movie` (amovie_project*), `boom` and `scoot` (veh_scoot)
-are replaced by smacx (src/ui/sound.cpp, music.cpp, movie.cpp).
+are replaced by OpenSMAC (src/ui/sound.cpp, music.cpp, movie.cpp).
 
 * **Sound effects** (src/ui/sound.cpp, from the disassembly): FX_init's table (the file, flags and
   sound group of each slot; slot = offset / 0x6C: 0 psi attack, 1 energy1, 2/3 projectiles, 4 laser
@@ -715,7 +715,7 @@ are replaced by smacx (src/ui/sound.cpp, music.cpp, movie.cpp).
   with their sound while the other sounds are off; Enter, Esc, space or a click end them. The
   engine calls them for the opening (openingx), the factions' planetfall movies, secret projects,
   theyTranscend, defeat (losealien / loseman / losewoman) and victory (close_ct / close_us).
-  Unattended runs decode only SMACX_MOVIE_FRAMES frames (default none).
+  Unattended runs decode only OPENSMAC_MOVIE_FRAMES frames (default none).
 * **Animations**: the menu column slides in and out (frames 0-5 / 6-11 of openitem.flc, 10 ms
   each, not in unattended runs); the monuments' background is monument.flc's frame of the
   number of monuments (MonuWin_init).
@@ -725,7 +725,7 @@ are replaced by smacx (src/ui/sound.cpp, music.cpp, movie.cpp).
   combat animation itself, Popup_show's slide sound, the interlude windows (text, no movie in the
   original), Console_show_movies (its SHOWMOVIES section is missing from the GOG scripts), the
   8BitMovieSound option.
-* **Testing**: `SMACX_SOUNDLOG=1` logs every call ("sound: T<turn> FX_play 15") before the
+* **Testing**: `OPENSMAC_SOUNDLOG=1` logs every call ("sound: T<turn> FX_play 15") before the
   preferences or the device are looked at, so logs are the same with or without a device. The
   oracle's `logsound` command (harness/oracle/oracle.cpp) hooks the same functions in terranx.exe
   (thunks keeping ECX for the thiscall ones) and logs "SOUND T<turn> name args". tests/sound/run.sh:
@@ -735,7 +735,7 @@ are replaced by smacx (src/ui/sound.cpp, music.cpp, movie.cpp).
   logic clock); scripted human actions make the triggers the original's code makes (startup, unit
   selection, base window, main menu); the audio page; an MP3 voice decoded and the mixer's output
   not silent (SDL disk driver); 30 s of music rendered (MUSICRENDER); a movie's frames decoded
-  (MOVIE, SMACX_MOVIE_FRAMES; frame 100 a picture). tests/sound/compare.sh runs the oracle again
+  (MOVIE, OPENSMAC_MOVIE_FRAMES; frame 100 a picture). tests/sound/compare.sh runs the oracle again
   and compares (--update refreshes the reference). Human-input sounds cannot be logged in the
   original under the oracle (it plays observer games only); their triggers come from the
   disassembly.
@@ -769,7 +769,7 @@ tests/placeholders/compare.sh (orig_rmenu.steps; orig_basewin.steps by eye).
 | City map cursor texture | pfncDrawCityMap's Texture_draw_trans_3 | done | — |
 | Menu commands | Console_menu_proc, Console_next_cursor, the display toggles and their keys | done (console_menu.cpp) | — |
 | Menu items without a function | Console_survey, Console_zoom_to_upkeep_base, Console_show_scen_objectives, Console_corner_the_market | done | — |
-| Menu bar look and item visibility | Menu_on_redraw, PullDown_pulldown_update, pfncMainMenuUpdateVisible | done: item visibility (menu.cpp: pfncMainMenuUpdateVisible's shown / hidden / disabled items, the terraforming orders renamed with their turns); the look and behaviour from the asm, compared with the original's screenshots (terranx.exe under Wine, its MENU button clicked; its Alt does not reach the game under XTEST): the main view's menus are AlphaMenu's (the Menu subclass overriding Menu_on_redraw: AlphaMenu_init / compute / on_redraw / adjust), a column of menu2.pcx buttons (menu.pcx at 800) above the console, all nine menus in MainMenu_menu_init's order (nothing hides a whole menu: NETWORK, SCENARIO and EDIT MAP are shown in a single-player game too), titles in capitals in text.pcx's colours, the open button's and the hovered button's states. The MENU button (MainInterface_on_iface_button_clicked 0x3EB) shows / hides the column with AlphaMenu_show / AlphaMenu_hide (fx\\amenu2.wav, the six-frame slide in / out); a button opens its pull-down (the reconstructed PullDown with AlphaMenu_fill_func / backfill_func) at the column's right, level with the button plus 13 (AlphaMenu_on_adjust_pulldown_pos and PullDown_show's +1; the offset measured on the original's screenshot); the open button again, Esc, Alt or a press outside close the pull-down; a chosen item closes it and the column stays (AlphaMenu's flags 5: no menu switch on hover, kept shown); with the column shown and no pull-down the map and the console keep the mouse and the keys. Keys (Menu_on_key_click): Alt+letter the menu (in the column's order: Alt+H is HQ), Left / Right the previous / next menu, Up / Down / Enter / the items' letters. smacx's choices: Alt alone shows the column (letters and arrows then open the menus), Esc on the column hides it. tests/alphamenu (windowed, animated), tests/placeholders case 20. The pull-down's rows are 20 pixels high, as the original's (Arial Narrow's GDI metrics) | — |
+| Menu bar look and item visibility | Menu_on_redraw, PullDown_pulldown_update, pfncMainMenuUpdateVisible | done: item visibility (menu.cpp: pfncMainMenuUpdateVisible's shown / hidden / disabled items, the terraforming orders renamed with their turns); the look and behaviour from the asm, compared with the original's screenshots (terranx.exe under Wine, its MENU button clicked; its Alt does not reach the game under XTEST): the main view's menus are AlphaMenu's (the Menu subclass overriding Menu_on_redraw: AlphaMenu_init / compute / on_redraw / adjust), a column of menu2.pcx buttons (menu.pcx at 800) above the console, all nine menus in MainMenu_menu_init's order (nothing hides a whole menu: NETWORK, SCENARIO and EDIT MAP are shown in a single-player game too), titles in capitals in text.pcx's colours, the open button's and the hovered button's states. The MENU button (MainInterface_on_iface_button_clicked 0x3EB) shows / hides the column with AlphaMenu_show / AlphaMenu_hide (fx\\amenu2.wav, the six-frame slide in / out); a button opens its pull-down (the reconstructed PullDown with AlphaMenu_fill_func / backfill_func) at the column's right, level with the button plus 13 (AlphaMenu_on_adjust_pulldown_pos and PullDown_show's +1; the offset measured on the original's screenshot); the open button again, Esc, Alt or a press outside close the pull-down; a chosen item closes it and the column stays (AlphaMenu's flags 5: no menu switch on hover, kept shown); with the column shown and no pull-down the map and the console keep the mouse and the keys. Keys (Menu_on_key_click): Alt+letter the menu (in the column's order: Alt+H is HQ), Left / Right the previous / next menu, Up / Down / Enter / the items' letters. OpenSMAC's choices: Alt alone shows the column (letters and arrows then open the menus), Esc on the column hides it. tests/alphamenu (windowed, animated), tests/placeholders case 20. The pull-down's rows are 20 pixels high, as the original's (Arial Narrow's GDI metrics) | — |
 | Status panes | StatusWin_draw_status, StatusWin_draw_active, say_morale, StatusWin_set_loc / redraw / reset | done (maininfc.cpp) | — |
 | World map pane | WorldWin_on_redraw, MapWin_gen_bases_only, WorldWin_draw_box, WorldWin_tile_to_pixel | done (nearest-pixel stretch for maps larger than the pane) | — |
 | Date box, TURN COMPLETE, globe buttons | MainInterface_set_date, MainInterface_redraw_complete, MainInterface_init's geometry | done (maininfc.cpp: turn.flc at spot 5's top left, MainInterface_init's FUN_00629E50, its raw indices; its first frame while the turn goes on, its frames in turn once the turn's end waits (GameState 2 with the console waiting), advanced by blink2_timer every 100 ms (console_ui_tick); the text in MainInterface_init's Arial 14 bold. Compared with the original under Wine: the same box and frames (45 text pixels differ, the rasteriser's); tests/placeholders turncomplete. Approximated: the original also advances a frame at each MainInterface_on_redraw) | — |
@@ -779,7 +779,7 @@ tests/placeholders/compare.sh (orig_rmenu.steps; orig_basewin.steps by eye).
 | Labs report and the Datalinks tech tree | ReportWin_draw_labs (9.9 KB), ReportWin_labs_line, ReportWin_on_button_passover, ReportWin_on_button_clicked 0x379..0x37E, ReportIf_draw_labs (5.2 KB), labs_write | done (labs.cpp: one function for both, the report's research box, progress bar and breakthrough lines, the tree's buttons, lines, arrows and centre box with what the technology allows (links in the Datalinks), the highlight under the mouse; reports.cpp: the TECHNOLOGY / BASES list, the summary, the progress per category. Approximated: the list box's look, the faction logo of the centre pane) | — |
 | Energy report's two columns | ReportWin_draw_energy, ReportWin_on_selected, ReportIf_draw_energy, ReportIf_on_iface_selected | done (reports.cpp: the summary with sanctions, FACTENERGY and the loans, the right column's budget of a base or of a facility in every base (a click switches), BASE EXPENDITURES and MAINTENANCE COSTS. Approximated: the subject is reset when the report opens or switches, not at every full redraw) | — |
 | Base locator map, report pictures, satellite FLC, hover help | ReportWin_draw_ops / sat, ReportIf_* | done (reports.cpp): the base locator (WorldWin_show_all: the world map pane in base operations and secret projects; ReportIf_bl_anim's dot0..3.pcx animation, 150 ms steps, after a single base is selected or a project clicked), the production pictures of base operations (facility / project pictures in their mandate's colour, the units' models), the satellites report's two views (0xD3C / 0xD3D) with ReportWin_draw_sat's animation (satellite.flc, sixteen spring orbits, ReportWin_sat_anim every 4000 ms), the report buttons' help bubbles (a right click: BaseButton_set_bubble_text; generic for the screens' buttons) (tests/reports cases 5c, 5d); the citizens view's pictures (ReportWin_draw_ops 0x8B4: the small faces and specialists right to left with its step, the UI generator's looks; compared with the original: the same), the satellites' table (ReportWin_draw_sat: every faction, the five columns' colours, the ODPs left / all; compared: the same) and the main interface's panes (ReportIf_draw_sat: SAT0 / SAT1; the ORBITAL ATTACK VIEW's target and kind buttons), the orbital attack (ATTACK 0xD3E: sat_attack's checks and popups, NOKILLERS / KILLERSDEPLOYED / WHICHGSP, break_treaty; ReportWin_start_attack: a satellite fewer and XI.PCX's explosion frames every 50 ms, then action_sat_attack), sat_edit (a right click on a cell in the editor's omniscient view) (tests/reports case 5e) | — |
-| Scroll bars | Scroll (ctor, init, on_redraw, compute_thumb_rect, the buttons and the track), scroll_normal / scroll_small, load_icons' ICONS.PCX sprites | done (scroll.cpp: vertical bars with their buttons and thumb; the reports' list boxes, the Datalinks list, the build picker, the base window's facilities and units supported panes, the list popups, the file box; the info pane's message list; a button moves a line, the track a page. The left button held on a bar (scroll_press / scroll_motion / scroll_release, from Scroll_on_left_down / on_mouse_move / on_left_up and BaseButton_on_left_down): a button drawn pressed (ICONS.PCX's third sprite) while the mouse is over it, its line at the release over it; the thumb dragged, centred on the mouse ((y - w - w/2) (max - min) / (h - 3w) + min, Scroll_compute_thumb_rect's +0xA3C), no click after a drag; ScreenWins register their bars (sw_scroll_bar) and sw_run holds them; the popups' track moves a page at the press, as the original. The popups' bar height is Popup_on_listbox_scroll_create's (scroll_bar_height). Compared with the original under Wine (tests/placeholders/orig_scroll.steps: the datalinks' down button pressed, the thumb dragged): the same. Tests: tests/placeholders scrollhold, scrollhold2, msgbar; tests/menu gammadrag; `PRESS:` / `RELEASE:` script tokens. Approximated: colours 7 / 247 / 248 / 255 drawn black as the original shows them (smacx's palette has Windows static colours there); not done: the buttons' hover sprite (the second), the repeat while a button or the track is held (BaseButton's timer, Scroll_on_button_pressed: the original scrolls on while held), a dropped thumb kept where it was dropped (here back at its position's place)) | — |
+| Scroll bars | Scroll (ctor, init, on_redraw, compute_thumb_rect, the buttons and the track), scroll_normal / scroll_small, load_icons' ICONS.PCX sprites | done (scroll.cpp: vertical bars with their buttons and thumb; the reports' list boxes, the Datalinks list, the build picker, the base window's facilities and units supported panes, the list popups, the file box; the info pane's message list; a button moves a line, the track a page. The left button held on a bar (scroll_press / scroll_motion / scroll_release, from Scroll_on_left_down / on_mouse_move / on_left_up and BaseButton_on_left_down): a button drawn pressed (ICONS.PCX's third sprite) while the mouse is over it, its line at the release over it; the thumb dragged, centred on the mouse ((y - w - w/2) (max - min) / (h - 3w) + min, Scroll_compute_thumb_rect's +0xA3C), no click after a drag; ScreenWins register their bars (sw_scroll_bar) and sw_run holds them; the popups' track moves a page at the press, as the original. The popups' bar height is Popup_on_listbox_scroll_create's (scroll_bar_height). Compared with the original under Wine (tests/placeholders/orig_scroll.steps: the datalinks' down button pressed, the thumb dragged): the same. Tests: tests/placeholders scrollhold, scrollhold2, msgbar; tests/menu gammadrag; `PRESS:` / `RELEASE:` script tokens. Approximated: colours 7 / 247 / 248 / 255 drawn black as the original shows them (OpenSMAC's palette has Windows static colours there); not done: the buttons' hover sprite (the second), the repeat while a button or the track is held (BaseButton's timer, Scroll_on_button_pressed: the original scrolls on while held), a dropped thumb kept where it was dropped (here back at its position's place)) | — |
 | Combat animation | boom, BattleWin_* (battle report in the status pane), XI.PCX / XF.PCX frames | done (boom.cpp: shots, explosions, the planet buster; battlewin.cpp: the report, interface mode 10, its 5 s timer. Approximated: a destroyed unit's tile drawn again by a full redraw, the buster's scaling; native life's pictures in the report not drawn) | — |
 | Move / turn animations | vehdraw_turn*, veh_scoot (sliding) | done (scoot.cpp: the saved background is the union of both tiles' MapWin_compute_clip a quarter larger each way, restored around the unit each frame; the slide's float point stepped per frame; vehdraw.cpp: vehdraw_scoot_start's tilt from the tile's facets to the shared edge's (or corner's) facets in the first half and on to the next tile's, stepped per frame as vehdraw_scoot) | — |
 | Interface arms, slide sounds | slide_show, slide_hide, scroll_show / scroll_hide | slide_show / slide_hide done for the base window, the console's slide (battle), the screens (screenwin.cpp's `slide`: the datalinks, reports, design workshop, social engineering, preferences) and the council window (FUN_00426FA0); scroll_show / scroll_hide done (slide.cpp: MainInterface_init's rail art of console_x2_A.pcx, the outer right arm rising beside the window and the rail sliding in, 10 ms frames, the rail and the arm then in the window's canvas; scroll_hide the reverse): the list popups (Popup_on_listbox_scroll_create: the scroll bar on the rail with its height formula) and the window's scroll bar of base operations, secret projects and the security nexus (ReportIf_report's Scroll 0x882584, its clicks; tests/placeholders case 19). DiploPop's window and its slide (diplowin.cpp: DiploPop_init's 700 x 0x1C2 window above the console with box 9, slide_show flag 2 with the console's lid when the dialog starts, slide_hide at its end; the dialog's popups, flag 0x100000, drawn into it: BasePop_set_def_external_window, Popup_calculate_dimensions' / Popup_on_draw_background's DiploPop branches in popup.cpp: the window's origin and size, DiploPop's text colours, the frame, caption and text boxes, the buttons 0x1E above its bottom; tests/diplo case 6, compared with the original's diplomacy dialog: the same frame, caption, picture, text and OK button). The slides' frames checked against the asm: the picture and the arms clipped to the window's place, the main interface's top 0x39 rows drawn over them each frame (the window passes behind the console's upper edge). Approximated: the external popups' item group is not given the window's height (the original's 450 rows fall under the buttons, unseen) | — |
@@ -792,9 +792,9 @@ tests/placeholders/compare.sh (orig_rmenu.steps; orig_basewin.steps by eye).
 | Base window details | help bubbles (right clicks on panes: BaseWin_click / BaseWin_iface_click, Win_set_bubble_text, pfncPaintMain's bubble), the panes' scroll arrows, the production pane's 3D model | done (basewin_cmd.cpp: the panes' bubbles, drawn by win.cpp (find_font(12), black on a white frame), cleared by a mouse move; the right button's clicks reach the window; the units present pane's stack arrows (MainInfc 0x3F0 / 0x3F2) with their clicks; basewin_draw.cpp: the production's voxel model with BaseWin_init's camera. Approximated: the production pane's bubble (the original passes an uninitialised text)) | — |
 | Diplomacy panes | DiploPop_draw_info, DiploPop_draw_hq, DiploPop's popup look | done: DiploPop_draw_info (diplowin.cpp: the two faction boxes); DiploPop's buttons DATALINKS (the faction's datalink entry), PROFILE (report_intel) and HQINFO (DiploPop +0x4208, set by DiploPop_on_status when the mode starts: DiploPop_draw_hq's pane, the HQ base's name and the faction's picture 30, in place of the world map; a globe button shows the map again), clickable while the dialog's popups are open (DiploPop_set_modal; tests/diplo case 5). The dialog's popups are drawn in DiploPop's window (see Interface arms); the globe buttons (DiploPop_on_iface_group_clicked; in the main interface MainInterface_on_iface_group_clicked): 0x3EF the detail map (detailmap.cpp: WorldWin_set_detail_map / _set_world_map, MapWins[1] over the world map pane at zoom -8; tests/diplo case 6, compared with the original's). The detail map is MapWins[1] with its own display options (0x40010EE3, MapWin_init_2) and moves only where the original moves it (detailmap.cpp) | — |
 | Monuments / hall of fame | the new entry (FUN_0044A660), decorations, background FLC | done (monuwin.cpp): the new entry at the end of the game (FUN_0044A660 / FUN_0044AC10: the slot by rating, the lower entries and their pictures moved down, the entry's fields and "best of" marks, the world map pane written as hof_<f>_<n>.pcx by Buffer_write_pcx, in --outdir as hallfame.jhh) and the hall of fame's WORLD MAP picture (FUN_00448D90); the monuments' background (monument.flc advanced to the number of monuments, as MonuWin_init) and MonuWin_init's decorations: the viewer's emblem above the centre, the victory picture or an eliminated leader in the centre, the eliminated leaders' portraits with the pillars for their number (tests/reports case 5b). The hall of fame's other panels (FUN_00448400 / FUN_00448D90, monuwin.cpp: the panel at (0x77, 0x50), the six categories' buttons pressed for the analysed entry's marks, the factions' emblems (their PCX's 0x2BD sprites, the selected one pressed), the faction's logo under WORLD MAP, SCORE ANALYSIS (the marks, how the game was won, the score lines), the banner of the first mark, the column titles, TOP 5 SCORES with the analysed entry in colour 0x9B, CLOSE with boxes 45..47; compared with the original's empty hall: the same but the factions). The eliminations' pillars and portraits are not exercised by the test saves (no faction eliminated another) | — |
-| Map view | partial and scrolled redraws (MapWin_gen_radius), MapWin_draw_wars / legend / overlays, pfncProcZoomKey's mouse position, palette cycling | done. base_draw: the base's art by its founder (faction_id_former) and the drone riot icon (pixel-exact against the oracle's mapdump of turn_300, tests/placeholders case 13); pfncProcZoomKey's mouse position (console.cpp); mapwin_radius.cpp: MapWin_compute_clip, MapWin_gen_radius, MapWin_draw_vehicles_2, MapWin_draw_radius / draw_tile and the engine's draw_tile, draw_tiles, draw_radius, draw_tile_fixup(_2) (the changed tiles redrawn at once on every open map window, as the original; boom's MapWin_draw_tile), MapWin_gen_overlays (AI goals, option 0x2000), MapWin_draw_legend (0x20000), MapWin_draw_wars (0x100000) in pfncDrawMap and the partial redraws: pixel-exact against the oracle's mapdump options= / radius= (case 17; the legend's bold digits differ in 10 pixels, the font rasteriser's); scrolled redraws (pfncRedrawMap's scroll path) pixel-exact against the oracle's mapdump scrollfrom= (turn_300 scrolled to 1,13 from 60,9 and from 7,17, case 17; the edge unit's difference was smacx's: vehdraw_draw / vehdraw_scoot took the camera yaw of the last unit drawn, the original computes the unit's camera before its rotation; the original has no dependency on its terrain cache there: its full and scrolled pictures from 60,9 are the same); palette cycling (gfx.cpp: Palette_init_cycle / start_cycle / timer_callback, the nearest-colour searches skip the cycles' entries; the shipped system.txt has no #CYCLING entries, so the original animates no colours: case 18 checks a game directory with three). Approximated: the cursor texture MapWin_draw_radius draws again (drawn over the view at each presentation), do_all_draws after a partial redraw (the next frame) | — |
+| Map view | partial and scrolled redraws (MapWin_gen_radius), MapWin_draw_wars / legend / overlays, pfncProcZoomKey's mouse position, palette cycling | done. base_draw: the base's art by its founder (faction_id_former) and the drone riot icon (pixel-exact against the oracle's mapdump of turn_300, tests/placeholders case 13); pfncProcZoomKey's mouse position (console.cpp); mapwin_radius.cpp: MapWin_compute_clip, MapWin_gen_radius, MapWin_draw_vehicles_2, MapWin_draw_radius / draw_tile and the engine's draw_tile, draw_tiles, draw_radius, draw_tile_fixup(_2) (the changed tiles redrawn at once on every open map window, as the original; boom's MapWin_draw_tile), MapWin_gen_overlays (AI goals, option 0x2000), MapWin_draw_legend (0x20000), MapWin_draw_wars (0x100000) in pfncDrawMap and the partial redraws: pixel-exact against the oracle's mapdump options= / radius= (case 17; the legend's bold digits differ in 10 pixels, the font rasteriser's); scrolled redraws (pfncRedrawMap's scroll path) pixel-exact against the oracle's mapdump scrollfrom= (turn_300 scrolled to 1,13 from 60,9 and from 7,17, case 17; the edge unit's difference was OpenSMAC's: vehdraw_draw / vehdraw_scoot took the camera yaw of the last unit drawn, the original computes the unit's camera before its rotation; the original has no dependency on its terrain cache there: its full and scrolled pictures from 60,9 are the same); palette cycling (gfx.cpp: Palette_init_cycle / start_cycle / timer_callback, the nearest-colour searches skip the cycles' entries; the shipped system.txt has no #CYCLING entries, so the original animates no colours: case 18 checks a game directory with three). Approximated: the cursor texture MapWin_draw_radius draws again (drawn over the view at each presentation), do_all_draws after a partial redraw (the next frame) | — |
 | Music | soundx.dll's ambient engine | approximated (music.cpp); not made more faithful: soundx.dll was decompiled (Ghidra, 1482 functions) and its .amb loader found (FUN_10003A30: chnl / trak / glbl / prgm / kmap chunks, then the MIDI file; glbl entries of 0x38 bytes kept in a list sorted by their second field, FUN_1001E820), but its sequencer is a large C++ engine driven through vtables (the tick FUN_1001B920, 16 channel slots of 0x428 bytes each with 128 random values pre-drawn in a [min, max] range, the patterns' own two random tables, FUN_1001DDF0), and every random table is reseeded from timeGetTime (FUN_1001C300 / C420 / C750 / CB60 / E040): the original's choices cannot be reproduced, and how the slots' values map to track, timing and pitch choices could not be settled without reconstructing most of the engine | L |
-| Multiplayer | multiplayer_init, config_game's HOTSEATADD, control_turn's handovers, the tamper checks, NetDaemon, NetWin, NetMsg, MultiWin, the DiploWin | done (docs/MULTIPLAYER.md): hotseat (setup, handovers, passwords, DiploWin; tests/hotseat), PBEM (SAVE AND EXIT, the tamper checks, passwords on load; tests/pbem) and online play between smacx copies over TCP (NetDaemon's messages and synch blocks, the setup window NetWin, NetMsg, MultiWin's panel and chat, time controls, the DiploWin between players, players dropping, saved games and scenarios; tests/online, tests/online2). Approximated: NetWin_pick_player (the own row's names, CUSTOMNAMES) not reconstructed; NetWin's drop-down menus (PopMenu) shown as popup lists; the session's title empty (DirectPlay's session name); no play with the original (smacx to smacx only, no DirectPlay) | — |
+| Multiplayer | multiplayer_init, config_game's HOTSEATADD, control_turn's handovers, the tamper checks, NetDaemon, NetWin, NetMsg, MultiWin, the DiploWin | done (docs/MULTIPLAYER.md): hotseat (setup, handovers, passwords, DiploWin; tests/hotseat), PBEM (SAVE AND EXIT, the tamper checks, passwords on load; tests/pbem) and online play between OpenSMAC copies over TCP (NetDaemon's messages and synch blocks, the setup window NetWin, NetMsg, MultiWin's panel and chat, time controls, the DiploWin between players, players dropping, saved games and scenarios; tests/online, tests/online2). Approximated: NetWin_pick_player (the own row's names, CUSTOMNAMES) not reconstructed; NetWin's drop-down menus (PopMenu) shown as popup lists; the session's title empty (DirectPlay's session name); no play with the original (OpenSMAC to OpenSMAC only, no DirectPlay) | — |
 
 ## 14. Screen sizes, fullscreen and HiDPI
 
@@ -828,9 +828,9 @@ harness/run_oracle.sh `ORACLE_SCREEN`). Its layout at 1280 x 1024, 1366 x 768 an
   credits picture (`wide_credits_picture`), the base window's help bubbles of one energy pane
   missing above 1024 pixels (BaseWin_click tests `ScreenWidth == 1024`: `wide_base_bubbles`).
   The original under Wine also crashed at 1366 x 768 (while loading a game) and at 1920 x 1080
-  (closing the design workshop); not investigated (nothing in smacx corresponds).
+  (closing the design workshop); not investigated (nothing in OpenSMAC corresponds).
 
-**smacx.** The windows were already placed by the original's formulas (`ScreenWidth == 800`
+**OpenSMAC.** The windows were already placed by the original's formulas (`ScreenWidth == 800`
 tests, centring); what assumed a 1024-pixel screen: the main interface spanned the screen's
 width from x = 0 (basewin.cpp mi_init: now centred as MainInterface_init), change_opening copied
 the picture unstretched (topmenu.cpp stretch_copy), the preferences' height test (`== 768`). By
@@ -857,10 +857,10 @@ applies at the next start.
 2560 x 1440 the console's bottom rows equal the 1024 x 768 run's (centred), the strips beside it
 show the map (and are black with --original-bugs), clicks on MENU (the column at the console's
 left), the info pane's M / I buttons, the base window's OK and the quit question's row land; the
-opening picture is the 1024 x 768 one stretched; the display computation (smacx_unit); an
+opening picture is the 1024 x 768 one stretched; the display computation (opensmac_unit); an
 interactive start on a 3840 x 2160 Xvfb (1920 x 1080 at 2, every pixel a 2 x 2 block, a click at
 twice a popup row's place answers it, Alt+Enter saves Fullscreen=0). tests/screen/compare.sh: the
-original under Wine against smacx --original-bugs at 1280 x 1024 and 1920 x 1080: the opening
+original under Wine against opensmac --original-bugs at 1280 x 1024 and 1920 x 1080: the opening
 screen equal (100%), the strips equal (black), the console's frame in the same place (its top
 band 71-78%: the map seen through the frame's gaps differs, the games differ), the quit question
 at the same place and size (92%: the original's rails beside it, the row under the mouse).

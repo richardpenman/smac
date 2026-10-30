@@ -17,7 +17,7 @@
 // centre, the victory picture or an eliminated leader in the centre.
 //
 // hall_of_fame(add): reads hallfame.jhh (7 factions x 5 entries of 0x8C bytes, 0x9A3840),
-// shows the viewer's faction's top five, and writes the table back. smacx reads and writes the
+// shows the viewer's faction's top five, and writes the table back. OpenSMAC reads and writes the
 // file in --outdir (the original: the game directory), so tests never change the game data.
 // The finished game's entry (add != 0, end of game: FameWin_add_entry (0x44A660)) is added (fame_add) with its world
 // map picture hof_<faction>_<slot>.pcx (also in --outdir).

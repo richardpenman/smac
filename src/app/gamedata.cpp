@@ -1,4 +1,4 @@
-// smacx's start-up as a distributed game (gamedata.h).
+// OpenSMAC's start-up as a distributed game (gamedata.h).
 #include "app/gamedata.h"
 
 #include <SDL.h>
@@ -17,14 +17,15 @@
 #include <io.h>
 #include <windows.h>
 #include <shlobj.h>
-#define SMACX_ISATTY(fd) _isatty(fd)
+#define OPENSMAC_ISATTY(fd) _isatty(fd)
 #else
 #include <sys/wait.h>
 #include <unistd.h>
-#define SMACX_ISATTY(fd) isatty(fd)
+#define OPENSMAC_ISATTY(fd) isatty(fd)
 #endif
 
 #include "default_ini.h"  // generated: kDefaultIni, the bundled default ini (harness/oracle/runtime)
+#include "platform/userdir.h"
 #include "platform/win32.h"
 
 namespace fs = std::filesystem;
@@ -276,8 +277,8 @@ void standard_locations(std::vector<fs::path>* direct, std::vector<fs::path>* ro
 #endif
 }
 
-// ---- remembered folder (user_dir/smacx.cfg: key=value lines) ----
-std::string config_path(const std::string& udir) { return udir + "smacx.cfg"; }
+// ---- remembered folder (user_dir/opensmac.cfg: key=value lines) ----
+std::string config_path(const std::string& udir) { return udir + userdir::kConfig; }
 
 std::string config_get(const std::string& udir, const std::string& key) {
     std::ifstream f(config_path(udir));
@@ -371,7 +372,7 @@ Pick native_pick(std::string* out) {
 
 // A path typed on the terminal ("" at the end of input or an empty line).
 bool typed_path(std::string* out) {
-    if (!SMACX_ISATTY(0)) return false;
+    if (!OPENSMAC_ISATTY(0)) return false;
     std::fprintf(stderr, "Enter the folder that contains terranx.exe (empty to quit): ");
     std::string line;
     if (!std::getline(std::cin, line)) return false;
@@ -381,17 +382,17 @@ bool typed_path(std::string* out) {
 }
 
 std::string ask_game_dir(const std::string& reason) {
-    std::string answer = env("SMACX_GAMEDIR");  // the answer given in advance (tests, scripts)
+    std::string answer = env("OPENSMAC_GAMEDIR");  // the answer given in advance (tests, scripts)
     if (!answer.empty()) {
         std::string why;
         if (check_game_dir(answer, &why)) return answer;
-        show_error("SMACX_GAMEDIR: " + why);
+        show_error("OPENSMAC_GAMEDIR: " + why);
         return "";
     }
     std::string text = reason;
     for (;;) {
         int box = ask_box(text +
-                              "\n\nsmacx plays the game with the files of an installed copy of Sid Meier's "
+                              "\n\nOpenSMAC plays the game with the files of an installed copy of Sid Meier's "
                               "Alpha Centauri (v2.0 with Alien Crossfire, e.g. GOG's Planetary Pack). "
                               "Choose the folder that contains terranx.exe.",
                           "Choose folder...", "Quit");
@@ -403,12 +404,14 @@ std::string ask_game_dir(const std::string& reason) {
         if (pick == Pick::unavailable) {
             std::fprintf(stderr, "%s\n", text.c_str());
             if (!typed_path(&dir)) {
-                std::string msg = text +
-                                  "\n\nStart smacx with --gamedir FOLDER (or set SMACX_GAMEDIR) to give the folder "
-                                  "that contains terranx.exe.";
+                std::string msg =
+                    text +
+                    "\n\nStart OpenSMAC with --gamedir FOLDER (or set OPENSMAC_GAMEDIR) to give the folder "
+                    "that contains terranx.exe.";
                 if (box == 1) ask_box(msg, "OK", "Quit");
-                std::fprintf(stderr,
-                             "smacx: no game folder: start smacx with --gamedir FOLDER (or set SMACX_GAMEDIR)\n");
+                std::fprintf(
+                    stderr,
+                    "opensmac: no game folder: start OpenSMAC with --gamedir FOLDER (or set OPENSMAC_GAMEDIR)\n");
                 return "";
             }
         }
@@ -497,7 +500,7 @@ bool check_game_dir(const std::string& dir, std::string* why) {
     std::string md5 = md5_file(exe);
     if (md5 != kExeMd5) {
         *why = "\"" + exe + "\" is not the supported version (md5 " + (md5.empty() ? "unreadable" : md5) +
-               "). smacx needs terranx.exe v2.0 (md5 " + kExeMd5 +
+               "). OpenSMAC needs terranx.exe v2.0 (md5 " + kExeMd5 +
                "), the version of GOG's Planetary Pack; update the game to v2.0 (Alien Crossfire 2.0 patch).";
         return false;
     }
@@ -505,13 +508,30 @@ bool check_game_dir(const std::string& dir, std::string* why) {
 }
 
 std::string user_dir() {
-    char* p = SDL_GetPrefPath("", "smacx");
+    char* p = SDL_GetPrefPath("", userdir::app_name());
     if (!p) {
-        std::fprintf(stderr, "smacx: no per-user directory: %s\n", SDL_GetError());
+        std::fprintf(stderr, "opensmac: no per-user directory: %s\n", SDL_GetError());
         return "";
     }
     std::string dir = p;
     SDL_free(p);
+    // A player of a copy from before the rename (smacx) keeps the files of its directory.
+    std::string old = userdir::legacy_dir(dir), error;
+    switch (userdir::migrate_dir(old, dir, &error)) {
+    case userdir::Migrated::kMoved:
+        std::fprintf(stderr, "opensmac: moved the per-user folder %s to %s\n", old.c_str(), dir.c_str());
+        break;
+    case userdir::Migrated::kCopied:
+        std::fprintf(stderr, "opensmac: copied the per-user folder %s to %s (the old one can be deleted)\n",
+                     old.c_str(), dir.c_str());
+        break;
+    case userdir::Migrated::kFailed:
+        std::fprintf(stderr, "opensmac: could not move the per-user folder %s to %s: %s\n", old.c_str(), dir.c_str(),
+                     error.c_str());
+        break;
+    case userdir::Migrated::kNothing: break;
+    }
+    userdir::migrate_files(dir);
     return dir;
 }
 
@@ -520,7 +540,7 @@ std::string find_game_dir(const std::string& udir) {
     std::string remembered = config_get(udir, "gamedir");
     if (!remembered.empty()) {
         if (check_game_dir(remembered, &why)) return remembered;
-        std::fprintf(stderr, "smacx: the remembered game folder is no longer usable: %s\n", why.c_str());
+        std::fprintf(stderr, "opensmac: the remembered game folder is no longer usable: %s\n", why.c_str());
         first_problem = why;
     }
     std::vector<fs::path> direct, roots;
@@ -532,11 +552,11 @@ std::string find_game_dir(const std::string& udir) {
     }
     for (const fs::path& d : direct) {
         if (check_game_dir(d.string(), &why)) {
-            std::fprintf(stderr, "smacx: game found in %s\n", d.string().c_str());
+            std::fprintf(stderr, "opensmac: game found in %s\n", d.string().c_str());
             config_set(udir, "gamedir", d.string());
             return d.string();
         }
-        std::fprintf(stderr, "smacx: skipping %s: %s\n", d.string().c_str(), why.c_str());
+        std::fprintf(stderr, "opensmac: skipping %s: %s\n", d.string().c_str(), why.c_str());
         if (first_problem.empty()) first_problem = why;
     }
     std::string dir = ask_game_dir(
@@ -561,7 +581,7 @@ std::string data_image(const std::string& gamedir, const std::string& udir) {
         show_error("Cannot write " + path + ".");
         return "";
     }
-    std::fprintf(stderr, "smacx: data image built from %s (%zu bytes, %s)\n", exe_path.c_str(), image.size(),
+    std::fprintf(stderr, "opensmac: data image built from %s (%zu bytes, %s)\n", exe_path.c_str(), image.size(),
                  path.c_str());
     return path;
 }
@@ -598,7 +618,7 @@ static void default_sliding_windows_off(const std::string& path) {
     win32::WritePrivateProfileStringA("Alpha Centauri", "Preferences", bits.c_str(), path.c_str());
 }
 
-// smacx's own key: "Original Bugs" (0: the original's bugs fixed, the default; 1: played as in the
+// OpenSMAC's own key: "Original Bugs" (0: the original's bugs fixed, the default; 1: played as in the
 // original, engine/compat.h), written with its default when missing so that players find it.
 static void original_bugs_key(const std::string& path) {
     char buf[16] = "";
@@ -608,14 +628,14 @@ static void original_bugs_key(const std::string& path) {
 
 void seed_ini(const std::string& path, const std::string& udir) {
     std::error_code ec;
-    // An ini from before this default loses "Sliding windows" once (smacx.cfg records it), so a
+    // An ini from before this default loses "Sliding windows" once (opensmac.cfg records it), so a
     // player who turns them on again keeps them.
     const char* kMigrated = "sliding_windows_off";
     if (fs::exists(path, ec)) {
         if (config_get(udir, kMigrated).empty()) {
             default_sliding_windows_off(path);
             config_set(udir, kMigrated, "1");
-            std::fprintf(stderr, "smacx: \"Sliding windows\" turned off in %s (once)\n", path.c_str());
+            std::fprintf(stderr, "opensmac: \"Sliding windows\" turned off in %s (once)\n", path.c_str());
         }
         original_bugs_key(path);
         return;
@@ -633,7 +653,7 @@ void seed_ini(const std::string& path, const std::string& udir) {
 }
 
 void show_error(const std::string& text) {
-    std::fprintf(stderr, "smacx: %s\n", text.c_str());
+    std::fprintf(stderr, "opensmac: %s\n", text.c_str());
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, kTitle, text.c_str(), nullptr);
 }
 

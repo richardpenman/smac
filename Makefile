@@ -1,12 +1,12 @@
-# Convenience wrapper around CMake for building and playing smacx (macOS, Linux, Windows/MSYS2).
+# Convenience wrapper around CMake for building and playing OpenSMAC (macOS, Linux, Windows/MSYS2).
 #
-#   make            configure (first time) and build smacx, smacx_headless and the tests
+#   make            configure (first time) and build opensmac, opensmac_headless and the tests
 #   make run        build, then start the game (it finds the game files or asks for them)
 #   make test       build, then run the unit and smoke tests
 #   make clean      remove the build directory
 #
 # Variables: BUILD=dir (default build/native), JOBS=n, CMAKE_ARGS="..." (extra configure options).
-# CMake 3.20+ and a C++17 compiler are needed; smacx also needs SDL2 and SDL2_ttf
+# CMake 3.20+ and a C++17 compiler are needed; OpenSMAC also needs SDL2 and SDL2_ttf
 # (macOS: brew install cmake sdl2 sdl2_ttf; Debian/Ubuntu: apt install cmake libsdl2-dev libsdl2-ttf-dev).
 
 BUILD ?= build/native
@@ -30,11 +30,11 @@ $(BUILD)/CMakeCache.txt:
 
 build: $(BUILD)/CMakeCache.txt
 	$(CMAKE) --build $(BUILD) -j $(JOBS)
-	@if [ ! -e $(BUILD)/smacx ] && [ ! -e $(BUILD)/smacx.exe ]; then \
-	    echo "make: smacx was not built: install SDL2 and SDL2_ttf, then 'make clean && make'"; exit 1; fi
+	@if [ ! -e $(BUILD)/opensmac ] && [ ! -e $(BUILD)/opensmac.exe ]; then \
+	    echo "make: OpenSMAC was not built: install SDL2 and SDL2_ttf, then 'make clean && make'"; exit 1; fi
 
 run: build
-	$(BUILD)/smacx
+	$(BUILD)/opensmac
 
 test: build
 	cd $(BUILD) && ctest --output-on-failure

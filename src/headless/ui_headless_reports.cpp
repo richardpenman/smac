@@ -1,4 +1,4 @@
-// Headless reports and monuments (engine/ui_bridge.h; smacx: src/ui/reports.cpp, monuwin.cpp).
+// Headless reports and monuments (engine/ui_bridge.h; OpenSMAC: src/ui/reports.cpp, monuwin.cpp).
 #include "engine/ui_bridge.h"
 
 // No windows: nothing is shown.

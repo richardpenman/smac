@@ -8,10 +8,10 @@ on the same scripted scenario, and compares the game state turn by turn.
 | `oracle/oracle.cpp` → `oracle.dll` | Makes the original scriptable and deterministic. |
 | `oracle/oracle.cpp` → `hybrid.dll` | Same, plus the reconstructed engine jump-patched over original functions. Built from the freeze commit only (`hybrid-final`, docs/DEVELOPMENT.md "The hybrid build after the freeze"): native builds keep the game state in native objects since cleanup step 20. |
 | `oracle/launch.c` → `oracle_launch.exe` | Starts terranx.exe suspended and injects the DLL. |
-| `../src/app/headless.cpp` → `smacx_headless` | Runs the same scripts on the pure reconstruction. |
+| `../src/app/headless.cpp` → `opensmac_headless` | Runs the same scripts on the pure reconstruction. |
 | `run_oracle.sh` | One isolated oracle/hybrid run (own run dir, pristine ini, own X display). |
 | `wine_env.sh` | The prefix and text setup every run of the original uses (fonts, FreeType; see below). |
-| `verify.sh` | Run scenarios in hybrid or native mode and compare with cached oracle references (`smacx_headless --original-bugs`: the reconstruction plays with the original's bugs, engine/compat.h; hybrid.dll always does). |
+| `verify.sh` | Run scenarios in hybrid or native mode and compare with cached oracle references (`opensmac_headless --original-bugs`: the reconstruction plays with the original's bugs, engine/compat.h; hybrid.dll always does). |
 | `compare.py` | Field-level diff of two snapshot directories. |
 | `golden.sh` | Records the original's results of functions (`tests/golden`) and replays them on the reconstruction (see "Golden records"). |
 | `state_hash.h` | Hash of the compared state regions (golden records). |
@@ -27,7 +27,7 @@ bold Arial Narrow by emboldening the regular face) and sets FreeType's v35 TrueT
 With the default v40 interpreter Wine's GetTextExtentPoint32 sums unhinted advances while its
 TextOut on the game's 8-bit DIBs draws with the hinted (hdmx) ones, so the original measured text
 differently from how it drew it and from Windows. With v35 both use the hinted widths, as Windows
-does, and smacx's text (platform/sdl/ui_platform_sdl.cpp: GDI's VDMX metrics, glyphs placed at
+does, and OpenSMAC's text (platform/sdl/ui_platform_sdl.cpp: GDI's VDMX metrics, glyphs placed at
 the hinted advances) matches the original's pixel for pixel. Text-dependent references made
 before this setup (map and base window dumps, screenshots) do not match it.
 
@@ -88,7 +88,7 @@ random stream, and some engine code uses `timeGetTime()` as randomness. The orac
 `control_game` and `control_turn` are reconstructed; the harness reaches them through hooks
 (`g_harness_*` in `src/engine/turn.h`). The reconstructed `enemy_turn`/`enemy_veh` call `g_harness_enemy_veh` and
 `g_harness_enemy_veh_pump` (`src/engine/ai.h`) at the call sites the oracle patches in the original
-(enemy_turn -> enemy_veh, and enemy_veh's message pump), so stack poisoning happens there too. `smacx_headless` runs `control_game`, which calls the
+(enemy_turn -> enemy_veh, and enemy_veh's message pump), so stack poisoning happens there too. `opensmac_headless` runs `control_game`, which calls the
 command script in place of the main menu; hybrid.dll sets the same hooks to the oracle's call-site
 hooks (snapshots, fcompare, stack poisoning, observer pause, script), so the patched loops behave
 like the original ones under the oracle.
@@ -155,7 +155,7 @@ boots, so reconstructed boot code runs too.
 
 AI-only observer games never reach large parts of the game logic (human-only unit actions, probe
 actions chosen by a human, AI paths that need rare states). The setup commands edit the game
-state between turns, identically in the oracle, hybrid.dll and `smacx_headless`, so the edited
+state between turns, identically in the oracle, hybrid.dll and `opensmac_headless`, so the edited
 state is a fair start state and the following turns are compared as usual
 (`harness/scenarios/cov_*.cmd` use them):
 
@@ -167,8 +167,8 @@ state is a fair start state and the following turns are compared as usual
 * `call <function> [args]` calls one of the engine functions listed in `harness/script_calls.h`
   (cdecl, up to 8 integer arguments) and logs the result (`call veh_init (4 args) -> 263`; void
   functions log no result). The oracle calls the original address, so hybrid.dll runs the
-  reconstruction when the function is patched; `smacx_headless` calls the reconstruction. Add
-  functions to the table as needed (`smacx_headless` checks the result flag at compile time).
+  reconstruction when the function is patched; `opensmac_headless` calls the reconstruction. Add
+  functions to the table as needed (`opensmac_headless` checks the result flag at compile time).
   Examples: `call veh_init <unit> <faction> <x> <y>` creates a unit, `call probe <veh> <base> -1 1`
   lets a probe team act, `call action_arty <veh> <x> <y>`. The argument `$veh` is the id the last
   `call veh_init` returned (`call action_arty $veh 8 22` right after creating the artillery); both
@@ -198,7 +198,7 @@ turn_upkeep hook (after the snapshot; `turns 0` exits right after) the oracle se
 (MapWin at MainConsole) to the given viewer, zoom and centre, calls pfncRedrawMap (0x46A550) and
 writes `<file>`: `"SMXMAP1\0"`, int32 width, height, viewer, zoom, centre x, centre y, turn and
 the address of the tile array (the original seeds each tile's texture variant with
-`Random_reseed(tile address)`; smacx reads it back), then 256 RGB palette entries (0x94C590) and
+`Random_reseed(tile address)`; OpenSMAC reads it back), then 256 RGB palette entries (0x94C590) and
 the 8-bit pixels. Two side files: `<file>.pt` (pfncPtToTile at every 4th pixel) and `<file>.co`
 (pfncMapGetCornerYOffset of every tile, corners 0..4). With `scrollfrom=X,Y` the view is first
 fully drawn centred on X,Y and then moved with pfncMoveMap (the scrolled, partial redraw). With
@@ -209,13 +209,13 @@ partial redraw of draw_tile / draw_radius) on the canvas cleared to 0: the dump 
 game RNG and the viewer are restored afterwards. Defaults: the current viewer, zoom and centre.
 Dumps of one run share the map window's terrain cache (the outline of an unexplored tile reads
 cached corner heights that earlier redraws left), so a later dump can differ from a single-dump
-run on such outlines; smacx reproduces the single-dump sequence (first a redraw of the save's own
+run on such outlines; OpenSMAC reproduces the single-dump sequence (first a redraw of the save's own
 view, then the dump's view).
 
-smacx reproduces a dump with `smacx --save SAVE --hidden --like REF.smxmap --dump OUT.smxmap
+OpenSMAC reproduces a dump with `opensmac --save SAVE --hidden --like REF.smxmap --dump OUT.smxmap
 [--scroll-from X,Y]` (same canvas size, view and redraw sequence), and
 `tools/venv/bin/python work/ui/mapcmp.py REF OUT diff.png [--grid N]` prints the share of
-matching pixels and writes oracle | smacx | difference side by side.
+matching pixels and writes oracle | OpenSMAC | difference side by side.
 
 ## Base window dumps
 
@@ -228,13 +228,13 @@ panes the base window draws into) int32 width, height and the 8-bit pixels top-d
 only there) and `<file>.obj` (the data segment 0x682000..0x9CA000 while the window is open). The
 window is closed with BaseWin_exit (0x41A4C0); viewer and generators are restored. The log line
 `basedump FILE base=N viewer=V tiles=ADDR` gives the tile array address (terrain variants).
-smacx draws the same with `smacx --save SAVE --hidden --basedump N:OUT.smxbase:ADDR`;
+OpenSMAC draws the same with `opensmac --save SAVE --hidden --basedump N:OUT.smxbase:ADDR`;
 `tests/basewin/compare.sh` runs both and scores them with `tests/basewin/cmp.py`.
 
 ## Snapshot files
 
 * `NAME.state` — records `{u32 addr, u32 size, bytes}` for every region in `state_regions.h`. The
-  oracle copies the regions from the original's memory; smacx and `smacx_headless` serialise them
+  oracle copies the regions from the original's memory; OpenSMAC and `opensmac_headless` serialise them
   from the game's records (`src/engine/state_io.h`, the same field lists that write savegames), so
   both hold the original's byte layout.
 * `NAME.rng` — `crt`, `game`, `clock`, `turn`.
@@ -283,7 +283,7 @@ human viewers keep the original modal loop. Each session is logged in `oracle.lo
 `council` must reproduce this: AI votes, the extra three `council_get_vote` passes, the tally and
 `council_action` when passed. The reconstruction (engine/council.cpp) runs the modal loop through
 `ui_councilwin_modal`: hybrid builds call the oracle's hook there (`g_harness_council_modal`),
-`smacx_headless` does the same two steps itself.
+`opensmac_headless` does the same two steps itself.
 
 ## End of game
 
@@ -296,7 +296,7 @@ the main menu. All of these are UI with modal loops; `report_score` even crashes
 (ReportIf_on_status, 0x4A5C7E, calls a per-faction button indexed by faction 0). The oracle
 replaces the first four with no-ops and, when `show_replay` is called, writes the snapshot
 `game_end` (state after the victory processing, `GameState` with STATE_GAME_DONE) and exits with
-code 0. The `turns` limit is then not reached; the run ends at the game's end. `smacx_headless`
+code 0. The `turns` limit is then not reached; the run ends at the game's end. `opensmac_headless`
 does the same: its `show_replay` calls `g_harness_game_end` (engine/turn.h), which writes
 `game_end` and exits; the other end screens are no-ops headless. `compare.py` compares `game_end`
 after the turn snapshots.
@@ -373,7 +373,7 @@ states of harness scenarios and replayed on the reconstruction without Wine.
   and `tests/golden/<function>.tsv` (format in its docstring), replacing that scenario's earlier
   rows. fcompare's own comparison runs at the same time; the records are the original's results
   either way.
-* Replay: `smacx_headless <scenario.cmd> --golden tests/golden` (implies `--original-bugs`)
+* Replay: `opensmac_headless <scenario.cmd> --golden tests/golden` (implies `--original-bugs`)
   plays the scenario and, at the turn_upkeep hook of each recorded turn, checks the state hash
   (the game is where the records were made) and calls each function with the recorded arguments,
   as fcompare does (generators and logic clock reset before each call; `FC_SETBASE` sets the base,

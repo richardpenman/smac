@@ -29,7 +29,7 @@ constexpr uint32_t kSprUnits = 0x7777A0;  // [19 * 8] UNITS.PCX unit sprites [in
 constexpr uint32_t kSprFlags = 0x78B778;  // [8 * 14] flags [faction * 14 + morale * 2 + moved]
 
 ADDR_NATIVE(0x454270) void GAMEAPI load_vehicles();
-// load_flags (engine/ui_bridge.h; replaces the headless "art" area in smacx).
+// load_flags (engine/ui_bridge.h; replaces the headless "art" area in OpenSMAC).
 void GAMEAPI load_flags();
 // The unit of a stack that is drawn: the selected unit, else the one with the highest
 // triad + 4 (own units) value, bottom of the stack first.

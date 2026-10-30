@@ -1,4 +1,4 @@
-// The engine's popup calls in smacx (the headless "popup" area replaced; see win.h and popup.h):
+// The engine's popup calls in OpenSMAC (the headless "popup" area replaced; see win.h and popup.h):
 // popp, popt, popb, POP2, POP3, the X_pop* / X_pops* wrappers of the veh module with the pop module
 // they call (pop_9, pops_18, pop_ask_6), NetMsg_pop / NetMsg_close, and the crash landing's base
 // naming. Each builds a Popup from a section of a script file (BasePop_start), shows it
@@ -269,7 +269,7 @@ int32_t GAMEAPI POP3(const char* label, int32_t, int32_t, int32_t, int32_t) {
 // label 0x36C) shown without waiting: the previous one hidden first, hidden again after `delay`
 // ms (a positive delay: the timer) or by NetMsg_close. Each network message is also a note
 // ("netmsg LABEL: text") for the tests' WAITFOR.
-// Kept as smacx had it in single player (the modeless box is a network game's: single player
+// Kept as OpenSMAC had it in single player (the modeless box is a network game's: single player
 // shows every NetMsg_pop modal).
 namespace {
 BasePop* g_netmsg = nullptr;

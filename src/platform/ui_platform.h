@@ -24,7 +24,7 @@ struct Rgb {
 // Creates the game window with a client area of width x height pixels. hidden: no visible window
 // (offscreen rendering for screenshots/tests; use SDL_VIDEODRIVER=dummy without a display).
 bool video_init(const char* title, int32_t width, int32_t height, bool hidden);
-// Interactive play (smacx's display settings, platform/display.h): the window or the desktop's
+// Interactive play (OpenSMAC's display settings, platform/display.h): the window or the desktop's
 // fullscreen sized for the display, the logical screen chosen by display::choose from its pixels
 // (HiDPI: the drawable's pixels, not the window's points) and returned in *width x *height, shown
 // at a whole multiple of its size when it fits (nearest pixel, centred on black). Alt+Enter

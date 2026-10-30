@@ -110,8 +110,8 @@ void frame(const std::vector<uint8_t>& screen, Buffer* scr, const Buffer* win, i
 }
 
 void wait_frame(uint32_t start) {
-    // SMACX_SLIDELOG=1: each frame's start and the time its drawing and present took (profiling).
-    static const bool log = std::getenv("SMACX_SLIDELOG") != nullptr;
+    // OPENSMAC_SLIDELOG=1: each frame's start and the time its drawing and present took (profiling).
+    static const bool log = std::getenv("OPENSMAC_SLIDELOG") != nullptr;
     if (log) std::fprintf(stderr, "slide frame at %u ms: drawn in %u ms\n", start, platform::ticks_ms() - start);
     while ((int32_t)(platform::ticks_ms() - start) < *reinterpret_cast<int32_t*>(mem::host(0x691AF8)))
         platform::delay_ms(1);

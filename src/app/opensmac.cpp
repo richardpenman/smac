@@ -1,6 +1,6 @@
-// smacx: the native game with the SDL2 UI.
+// OpenSMAC: the native game with the SDL2 UI.
 //
-//   smacx [--new [k=v ...] | --save FILE.sav] [--human N] [--viewer N] [--seed CRT,GAME|clock]
+//   opensmac [--new [k=v ...] | --save FILE.sav] [--human N] [--viewer N] [--seed CRT,GAME|clock]
 //         [--keys K1,K2,...] [--exit-after-keys] [--animate] [--turns N] [--shot FILE.bmp] [--snapshots DIR]
 //         [--rng FILE] [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR]
 //         [--gamedir DIR] [--image FILE] [--ini FILE] [--nosound] [--original-bugs]
@@ -12,7 +12,7 @@
 // 768 rows; 4K: 1920 x 1080 at 2); Alt+Enter toggles fullscreen and saves it. Every other run
 // (the tests, the harness) is 1024 x 768, or --size WxH, in a window of that size.
 //
-// The original's bugs (engine/compat.h, docs/COMPAT.md): smacx plays with them fixed unless the
+// The original's bugs (engine/compat.h, docs/COMPAT.md): OpenSMAC plays with them fixed unless the
 // ini says "Original Bugs=1" ([Alpha Centauri] section) or --original-bugs is given (the tests
 // whose references come from the original, the harness). --original-bugs also overrides the
 // setting a hotseat or PBEM save carries; in an online game the host's setting applies.
@@ -20,9 +20,9 @@
 // Files. Played as a game (no --outdir): the settings (Alpha Centauri.Ini, seeded from the default
 // ini next to the executable), saves (the game's "saves" folder), the hall of fame, screenshots and
 // the data image built from terranx.exe go to the per-user directory (SDL_GetPrefPath: Linux
-// ~/.local/share/smacx, macOS ~/Library/Application Support/smacx, Windows %APPDATA%\smacx); the
+// ~/.local/share/opensmac, macOS ~/Library/Application Support/OpenSMAC, Windows %APPDATA%\OpenSMAC); the
 // game folder is found at start-up (app/gamedata.h: the remembered folder, the standard install
-// locations, else the player is asked) and remembered in smacx.cfg there. --gamedir, --image and
+// locations, else the player is asked) and remembered in opensmac.cfg there. --gamedir, --image and
 // --ini replace each of these. With --outdir (tests, the harness) nothing is looked for: the
 // defaults are the repository's (game, src/data/data_image.bin,
 // harness/oracle/runtime/Alpha Centauri.Ini), everything is written below --outdir and the game's
@@ -74,18 +74,18 @@
 // scripted input for MS ms: the waiting loop runs its timers and animations as for a player who
 // waits), QUIT. --exit-after-keys (default with --hidden) quits when they run out.
 // Such unattended runs skip the animations (window slides, unit moves, booms, battle reports,
-// movies); --animate (or SMACX_ANIMATE=1) plays them all with their waits as an interactive game
+// movies); --animate (or OPENSMAC_ANIMATE=1) plays them all with their waits as an interactive game
 // does and still quits at the end of the keys (the test suites' default; TEST_FAST=1: unattended).
-// Environment: SMACX_KEYLOG=1 logs every key dispatched to the console; SMACX_ALLUNITS=1 makes
+// Environment: OPENSMAC_KEYLOG=1 logs every key dispatched to the console; OPENSMAC_ALLUNITS=1 makes
 // UNITS list every faction's units.
 // --seed CRT,GAME: the generators' seeds (the harness's seed command); default 0,0 with --keys or
 // --hidden, otherwise the clock. The original
 // seeds both from the clock (game_init: timeGetTime), and a loaded save keeps the CRT generator's
 // state from that seed (load_daemon reseeds it only under GameRules 0x400): without a fixed seed
 // the same save and keys play differently. --seed clock seeds from the clock as the original.
-// SMACX_TRACE=1 logs the generators and the logic clock at every scripted key and popup.
-// SMACX_PREFS_SET=BITS: GamePreferences bits set after the test preferences (e.g. 0x20 tutorial hints).
-// SMACX_SOUNDLOG=1 logs the sound, voice, music and movie calls ("sound: T<turn> FX_play 15"; ui/sound.h).
+// OPENSMAC_TRACE=1 logs the generators and the logic clock at every scripted key and popup.
+// OPENSMAC_PREFS_SET=BITS: GamePreferences bits set after the test preferences (e.g. 0x20 tutorial hints).
+// OPENSMAC_SOUNDLOG=1 logs the sound, voice, music and movie calls ("sound: T<turn> FX_play 15"; ui/sound.h).
 // --nosound: no audio device (the calls still run and are logged); SDL_AUDIODRIVER chooses the
 // device otherwise (the test scripts use "dummy").
 // --snapshots DIR: turn_NNN.state/.rng/.sav before every turn_upkeep, as the harness writes them
@@ -213,9 +213,9 @@ void apply_observer_prefs() {
         GamePreferences |= PREF_BSC_PAUSE_END_TURN;
         AlphaIniPrefs.preferences |= 1;
     }
-    // Test aid: SMACX_PREFS_SET=BITS sets GamePreferences bits afterwards (e.g. 0x20 the tutorial
+    // Test aid: OPENSMAC_PREFS_SET=BITS sets GamePreferences bits afterwards (e.g. 0x20 the tutorial
     // hints).
-    if (const char* e = std::getenv("SMACX_PREFS_SET")) {
+    if (const char* e = std::getenv("OPENSMAC_PREFS_SET")) {
         uint32_t bits = (uint32_t)std::strtoul(e, nullptr, 0);
         GamePreferences = (int32_t)((uint32_t)GamePreferences | bits);
         AlphaIniPrefs.preferences = (int32_t)((uint32_t)AlphaIniPrefs.preferences | bits);
@@ -306,7 +306,7 @@ void observer_pause() {
         case VKEY_F12:
         case 'S': {
             char name[64];
-            std::snprintf(name, sizeof(name), "smacx_%03d.bmp", g_ui_shots++);
+            std::snprintf(name, sizeof(name), "opensmac_%03d.bmp", g_ui_shots++);
             ui_screenshot((fs::path(g_opt.outdir) / name).string());
             break;
         }
@@ -423,7 +423,7 @@ void apply_seed() {
     engine_set_logic_clock_state(0);
 }
 
-// The game's main view once a game exists (desktop_init's part that smacx does: the art of the
+// The game's main view once a game exists (desktop_init's part that OpenSMAC does: the art of the
 // factions, the main view reset and centred on the cursor, its display options).
 void show_game() {
     for (int32_t f = 1; f < 8; f++) load_faction_art(f);
@@ -727,13 +727,13 @@ bool parse_key(std::string tok, ScriptedKey* out) {
 int usage() {
     std::fprintf(
         stderr,
-        "usage: smacx [--new [k=v ...] | --save FILE.sav] [--human N] [--viewer N] [--seed CRT,GAME|clock]\n"
-        "             [--keys K1,K2,..] [--exit-after-keys] [--animate] [--turns N] [--shot FILE.bmp] [--snapshots DIR] [--rng "
-        "FILE]\n"
-        "             [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR] [--gamedir DIR]\n"
-        "             [--image FILE] [--ini FILE] [--dump FILE.smxmap [--like REF.smxmap] [--scroll-from X,Y]\n"
-        "             [--dump-options HEX] [--dump-radius X,Y,R]]\n"
-        "             [--nosound] [--original-bugs]\n");
+        "usage: opensmac [--new [k=v ...] | --save FILE.sav] [--human N] [--viewer N] [--seed CRT,GAME|clock]\n"
+        "                [--keys K1,K2,..] [--exit-after-keys] [--animate] [--turns N] [--shot FILE.bmp]\n"
+        "                [--snapshots DIR] [--rng FILE]\n"
+        "                [--zoom Z] [--center X,Y] [--size WxH] [--hidden] [--outdir DIR] [--gamedir DIR]\n"
+        "                [--image FILE] [--ini FILE] [--dump FILE.smxmap [--like REF.smxmap] [--scroll-from X,Y]\n"
+        "                [--dump-options HEX] [--dump-radius X,Y,R]]\n"
+        "                [--nosound] [--original-bugs]\n");
     return 2;
 }
 
@@ -911,7 +911,7 @@ int main(int argc, char** argv) {
     ui_screen_init(g_opt.width, g_opt.height);
     g_ui_outdir = g_opt.outdir;
     g_ui_exit_when_script_done = g_opt.exit_after_keys || g_opt.hidden;
-    if (const char* e = std::getenv("SMACX_ANIMATE")) g_opt.animate |= std::atoi(e) != 0;
+    if (const char* e = std::getenv("OPENSMAC_ANIMATE")) g_opt.animate |= std::atoi(e) != 0;
     g_ui_unattended = g_ui_exit_when_script_done && !g_opt.animate;
     diplowin_set_animate(!g_opt.seeded || g_opt.animate);
     ui_script_keys(g_opt.keys);
@@ -928,9 +928,9 @@ int main(int argc, char** argv) {
             std::fprintf(f, "crt %u\ngame %u\nturn %d\n", crt_rand_state(), game_random_state(), CurrentTurn);
             std::fclose(f);
         }
-        // SMACX_NET_DESYNC=TURN (test aid): this copy's last unit changes its morale at that turn, a desync
+        // OPENSMAC_NET_DESYNC=TURN (test aid): this copy's last unit changes its morale at that turn, a desync
         // the other players' checksums find.
-        const char* d = std::getenv("SMACX_NET_DESYNC");
+        const char* d = std::getenv("OPENSMAC_NET_DESYNC");
         if (d && std::atoi(d) == CurrentTurn && VehCount > 0) {
             Vehs[VehCount - 1].morale ^= 1;
             std::fprintf(stderr, "net: desync provoked (unit %d, turn %d)\n", VehCount - 1, CurrentTurn);

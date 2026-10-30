@@ -5,7 +5,7 @@
 // source) is behind a named flag of struct Compat: true plays the original's behaviour, false the
 // fix. The player chooses only between two settings (compat_set_original_bugs): the fixes (the
 // default: every flag at its default value below, false for a fixed bug) or the original bugs
-// (smacx --original-bugs, or "Original Bugs=1" in the ini: every flag true, the game exactly as
+// (opensmac --original-bugs, or "Original Bugs=1" in the ini: every flag true, the game exactly as
 // terranx.exe plays it). Everything compared with the original (the harness, the frozen baseline,
 // the scripted suites whose references come from the original) runs with the original bugs.
 // The single flags exist for the code and the tests (a test can switch one fix).
@@ -370,7 +370,7 @@ struct Compat {
     // read error), so the save cannot be loaded. Fix: an empty text is not read.
     bool empty_text_fails_load = false;
     // Saving writes the old-format preferences block from uninitialised memory (only its version field is used when
-    // loading). Fix: the block is written as zeros (with the version, and smacx's own mark of the save's
+    // loading). Fix: the block is written as zeros (with the version, and OpenSMAC's own mark of the save's
     // original-bugs setting). The reconstruction wrote zeros already, so both settings play alike.
     bool legacy_prefs_uninit = false;
     // Loading the map of a savegame (the scenario editor's map loading from a .SAV) skips the blocks before the map
@@ -595,7 +595,7 @@ inline Compat g_compat;
 
 // The setting the game plays with: true the original bugs, false the fixes (the default).
 inline bool g_original_bugs = false;
-// The setting was given on the command line (smacx --original-bugs, smacx_headless
+// The setting was given on the command line (opensmac --original-bugs, opensmac_headless
 // --original-bugs): a loaded multiplayer save does not change it. (An online game's host
 // always decides for its players.)
 inline bool g_original_bugs_forced = false;

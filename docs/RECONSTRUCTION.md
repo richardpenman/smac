@@ -256,12 +256,12 @@ class, and add a headless implementation to src/headless that behaves as for an 
 observer: no drawing, popups return the default/first choice (document the value). If a UI
 function also changes game state, reconstruct that part faithfully or flag it.
 
-src/headless is the static library `smacx_ui_headless`, one object file per UI area
-(`ui_headless_<area>.cpp`; general functions in `ui_headless.cpp`). smacx_headless uses all of it;
-smacx (the SDL UI, src/ui) replaces whole areas by defining their functions under the original
+src/headless is the static library `opensmac_ui_headless`, one object file per UI area
+(`ui_headless_<area>.cpp`; general functions in `ui_headless.cpp`). opensmac_headless uses all of it;
+OpenSMAC (the SDL UI, src/ui) replaces whole areas by defining their functions under the original
 names in its own objects, so the linker does not pull those areas' objects (docs/UI_PLAN.md,
-"Bridge switch"). Put a new headless function into the file of its area; if smacx already
-replaces that area, smacx must define it too (otherwise the link fails with duplicate symbols).
+"Bridge switch"). Put a new headless function into the file of its area; if OpenSMAC already
+replaces that area, OpenSMAC must define it too (otherwise the link fails with duplicate symbols).
 A function declared with `ADDR` (not `ADDR_NATIVE`) in an engine header must be defined in
 src/engine: gen_bindings.py counts a definition anywhere under src/, and hybrid builds do not
 compile src/ui.
@@ -317,17 +317,17 @@ scenarios rarely reach, and it is not disturbed by the stack-content effects tha
 hybrid games diverge (see harness/README.md). Report the per-function call counts of functions that
 were never called (empty domains). Details: harness/README.md, "Function comparison".
 
-**Native verification** (`harness/verify.sh native`) runs `smacx_headless` against the same
+**Native verification** (`harness/verify.sh native`) runs `opensmac_headless` against the same
 references once the native code path is complete.
 
-**Native checking builds.** Two configure options instrument `smacx_headless` (native only):
+**Native checking builds.** Two configure options instrument `opensmac_headless` (native only):
 
 ```sh
-cmake -S . -B build/asan-native -DSMACX_SANITIZE=ON   # AddressSanitizer + UndefinedBehaviorSanitizer
-cmake -S . -B build/cov-native -DSMACX_COVERAGE=ON    # gcov coverage
+cmake -S . -B build/asan-native -DOPENSMAC_SANITIZE=ON   # AddressSanitizer + UndefinedBehaviorSanitizer
+cmake -S . -B build/cov-native -DOPENSMAC_COVERAGE=ON    # gcov coverage
 ```
 
-* Run any scenarios with the sanitized build (`build/asan-native/smacx_headless
+* Run any scenarios with the sanitized build (`build/asan-native/opensmac_headless
   harness/scenarios/std8.cmd --outdir work/x`). An `AddressSanitizer` or `runtime error` line is a
   bug in the reconstruction (an overlapping `std::memcpy`, an unaligned cast, an out-of-bounds
   native array) unless it is an original out-of-bounds read, which must then go through the memory

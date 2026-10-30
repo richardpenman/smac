@@ -1,13 +1,14 @@
 #!/bin/bash
 # Native against a frozen baseline (docs/CLEANUP_PLAN.md section 2, increment 18): plays the same
-# games with a baseline build of smacx_headless and with the build under test, and compares their
+# games with a baseline build of opensmac_headless and with the build under test, and compares their
 # snapshots (harness/compare.py: every turn's state, generators, game_end). No Wine, so any number
 # of new seeds and saved games can be played, beyond the 29 references of work/ref.
 #
 #   src/tools/diffnative.sh [options]
 #
-#   --baseline REV|DIR  the baseline: a directory holding smacx_headless, or a git revision built
-#                       (smacx_headless only, -j$JOBS) into build/baseline-<commit> on first use
+#   --baseline REV|DIR  the baseline: a directory holding opensmac_headless (smacx_headless before
+#                       the rename to OpenSMAC), or a git revision built (that target only,
+#                       -j$JOBS) into build/baseline-<commit> on first use
 #                       (default: the tag hybrid-final)
 #   --build DIR         the build under test (default build/native)
 #   --seeds N           N new games (default 6), each with its own seeds, map size (0-2),
@@ -59,10 +60,15 @@ done
 [ "$SCENARIOS" = all ] && SCENARIOS="$(ls harness/scenarios/*.cmd | xargs -n1 basename | sed 's/\.cmd$//' | tr '\n' ' ')"
 
 # ---- the two builds ----
-NEW="$(realpath "$BUILD")/smacx_headless"
+# The headless binary in a build directory: opensmac_headless, or smacx_headless in a build of a
+# revision before the rename to OpenSMAC (the tag hybrid-final is one).
+headless_in() {  # headless_in DIR
+    if [ -x "$1/opensmac_headless" ]; then echo "$1/opensmac_headless"; else echo "$1/smacx_headless"; fi
+}
+NEW="$(realpath "$BUILD")/opensmac_headless"
 [ -x "$NEW" ] || { echo "diffnative.sh: no $NEW (build it first)"; exit 2; }
-if [ -x "$BASELINE/smacx_headless" ]; then
-    BASE="$(realpath "$BASELINE")/smacx_headless"
+if [ -x "$(headless_in "$BASELINE")" ]; then
+    BASE="$(headless_in "$(realpath "$BASELINE")")"
 else
     COMMIT="$(git rev-parse --verify --quiet "$BASELINE^{commit}")" || {
         echo "diffnative.sh: $BASELINE is neither a build directory nor a git revision"
@@ -70,18 +76,21 @@ else
         exit 2
     }
     BDIR="$ROOT/build/baseline-${COMMIT:0:12}"
-    BASE="$BDIR/smacx_headless"
+    BASE="$(headless_in "$BDIR")"
     if [ ! -x "$BASE" ]; then
         SRC="$ROOT/work/baseline-src-${COMMIT:0:12}"
         echo "building the baseline ${COMMIT:0:12} ($BASELINE) into $BDIR ..."
         rm -rf "$SRC"
         git worktree add --detach "$SRC" "$COMMIT" > /dev/null 2>&1 || { echo "diffnative.sh: git worktree add failed"; exit 2; }
+        target=opensmac_headless
+        grep -q "opensmac_headless" "$SRC/CMakeLists.txt" || target=smacx_headless  # before the rename
         if ! { cmake -S "$SRC" -B "$BDIR" -DCMAKE_BUILD_TYPE=RelWithDebInfo &&
-               cmake --build "$BDIR" -j"$JOBS" --target smacx_headless; } > "$ROOT/work/baseline-${COMMIT:0:12}.log" 2>&1; then
+               cmake --build "$BDIR" -j"$JOBS" --target "$target"; } > "$ROOT/work/baseline-${COMMIT:0:12}.log" 2>&1; then
             echo "diffnative.sh: the baseline build failed (work/baseline-${COMMIT:0:12}.log)"
             git worktree remove --force "$SRC"; exit 2
         fi
         git worktree remove --force "$SRC"
+        BASE="$(headless_in "$BDIR")"
     fi
 fi
 [ "$BASE" -ef "$NEW" ] && echo "diffnative.sh: warning: the baseline and the build under test are the same binary"

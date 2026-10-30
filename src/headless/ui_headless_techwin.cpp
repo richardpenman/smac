@@ -1,5 +1,5 @@
 // Headless implementations of the research dialog and the new technology window (tech module's
-// UI calls, engine/ui_bridge.h; smacx replaces this area: src/ui/techwin.cpp).
+// UI calls, engine/ui_bridge.h; OpenSMAC replaces this area: src/ui/techwin.cpp).
 #include "engine/game_state.h"
 #include "engine/tech.h"
 #include "engine/ui_bridge.h"

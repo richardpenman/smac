@@ -2,27 +2,30 @@
 
 Details for working on the reconstruction. The README covers playing and building.
 
-## First run of smacx
+## First run of OpenSMAC
 
-1. **Finding the game.** smacx uses the folder it remembered (`smacx.cfg` in the per-user
+1. **Finding the game.** OpenSMAC uses the folder it remembered (`opensmac.cfg` in the per-user
    directory), else looks in the standard install locations: on Windows GOG's registry entries,
    `C:\GOG Games`, `Program Files`, GOG Galaxy and Steam folders; on macOS GOG's Mac app (a Wineskin
    wrapper: `*.app/Contents/Resources/drive_c/...`) in `/Applications` and `~/Applications`,
    `~/GOG Games`, CrossOver bottles; on Linux `~/GOG Games`, `~/Games` (Lutris, Heroic), Wine prefixes
    (`$WINEPREFIX`, `~/.wine`), Heroic and Bottles prefixes, Steam/Proton. A folder qualifies when it
    has `terranx.exe` v2.0 and the game's data files; another version of `terranx.exe` is reported
-   with its md5. If none is found, smacx asks: a message box, then the platform's folder picker
+   with its md5. If none is found, OpenSMAC asks: a message box, then the platform's folder picker
    (Windows: the shell's folder dialog; macOS: `osascript` choose folder; Linux: `zenity` or
    `kdialog` when installed), else a path typed on the terminal. The answer is checked and
    remembered. Without a display or a terminal it exits with status 3 and a message;
-   `SMACX_GAMEDIR=DIR` gives the answer in advance, `--gamedir DIR` skips the search.
-2. **The data image.** smacx builds the engine's initial data image from the player's
+   `OPENSMAC_GAMEDIR=DIR` gives the answer in advance, `--gamedir DIR` skips the search.
+2. **The data image.** OpenSMAC builds the engine's initial data image from the player's
    `terranx.exe` (the C++ port of `src/tools/gen_data_image.py`, byte-identical output) and
    caches it as `data_image.bin` in the per-user directory (`--image` overrides).
 3. **Per-user files.** The ini (`Alpha Centauri.Ini`, seeded from the default ini shipped next to
    the executable), saved games (the game's `saves` folder), the Hall of Fame and screenshots go to
-   the per-user directory: `%APPDATA%\smacx` (Windows), `~/Library/Application Support/smacx`
-   (macOS), `~/.local/share/smacx` (Linux). The game folder is only read.
+   the per-user directory: `%APPDATA%\OpenSMAC` (Windows), `~/Library/Application Support/OpenSMAC`
+   (macOS), `~/.local/share/opensmac` (Linux). The game folder is only read. A copy from before
+   the rename to OpenSMAC (v0.2.x, called smacx) used `smacx` there: when the new directory is
+   missing or empty, the old one is moved to it (copied when a rename fails) and its `smacx.cfg`
+   renamed to `opensmac.cfg` (src/platform/userdir.h).
 
 With `--outdir DIR` (the tests and the harness) none of this happens: the defaults are the
 repository's (`game/`, `src/data/data_image.bin`, `harness/oracle/runtime/Alpha Centauri.Ini`),
@@ -50,7 +53,7 @@ allow-list, so no game data or anything derived from `terranx.exe` can ship.
 | `tools/` | Downloaded tooling: Ghidra, llvm-mingw (Windows cross compiler), Python venv. |
 | `re/` | Analysis: Ghidra project, symbol map, exported decompilation (`re/out/functions.jsonl`). |
 | `src/` | The reconstructed game. |
-| `tests/` | Portability smoke test (`smacx_smoke`, no game data needed). |
+| `tests/` | Portability smoke test (`opensmac_smoke`, no game data needed). |
 | `harness/` | Differential harness: `oracle/` (DLL injected into the original), comparison tools. |
 | `work/` | Scratch run directories, Wine prefix. Disposable. |
 
@@ -81,9 +84,9 @@ allow-list, so no game data or anything derived from `terranx.exe` can ship.
 ## Building with CMake directly
 
 The native build needs CMake 3.20+, Python 3 (it generates the original-function bindings) and a
-C++17 compiler with `<filesystem>`. Game data is only needed at run time: `smacx` finds the game
-itself; `smacx_headless` reads `game/` and `src/data/data_image.bin` (see "Getting started").
-`smacx_smoke` (`ctest`) is a portability self-test that needs no game data; `smacx_unit` (`ctest`,
+C++17 compiler with `<filesystem>`. Game data is only needed at run time: `opensmac` finds the game
+itself; `opensmac_headless` reads `game/` and `src/data/data_image.bin` (see "Getting started").
+`opensmac_smoke` (`ctest`) is a portability self-test that needs no game data; `opensmac_unit` (`ctest`,
 doctest) holds the engine's unit tests. ctest's `golden_*` tests replay the original's recorded
 results of 197 functions (`tests/golden`, harness/README.md "Golden records") and need the game's
 data (skipped without it); `names_table` checks that `re/original_names.tsv` matches the `ADDR`
@@ -95,7 +98,7 @@ The oracle used by the comparison harness (Linux): `oracle.dll`, injected into t
 
 ```sh
 cmake -S . -B build/native -DCMAKE_BUILD_TYPE=RelWithDebInfo && cmake --build build/native -j8
-cmake -S . -B build/hybrid -DSMACX_HYBRID=ON -DCMAKE_TOOLCHAIN_FILE=cmake/i686-mingw.cmake
+cmake -S . -B build/hybrid -DOPENSMAC_HYBRID=ON -DCMAKE_TOOLCHAIN_FILE=cmake/i686-mingw.cmake
 cmake --build build/hybrid -j8                                         # oracle.dll, oracle_launch.exe
 ```
 
@@ -105,7 +108,8 @@ cmake --build build/hybrid -j8                                         # oracle.
 `fcompare`, and the recording of golden records, `harness/golden.sh record`) needs the game state
 at the original's addresses. Since cleanup step 20 native builds keep it in native objects
 (src/engine/state.h), so main builds only the oracle; the hybrid is built from the freeze commit,
-tagged `hybrid-final` (docs/CLEANUP_PLAN.md section 2), in a worktree of its own:
+tagged `hybrid-final` (docs/CLEANUP_PLAN.md section 2), in a worktree of its own (the freeze
+predates the rename to OpenSMAC, so its option is still `SMACX_HYBRID`):
 
 ```sh
 git worktree add work/hybrid-final hybrid-final
@@ -122,14 +126,14 @@ original's results of 197 functions.
 On Windows with MSYS2, add `-G Ninja -DCMAKE_EXE_LINKER_FLAGS=-static` to the configure step.
 
 Cross-compiling from Linux with the local llvm-mingw: `-DCMAKE_TOOLCHAIN_FILE=cmake/x86_64-mingw.cmake`
-(64-bit) or `cmake/i686-mingw.cmake` without `SMACX_HYBRID` (32-bit native, runs under 32-bit Wine).
-The 64-bit `smacx.exe` (the release's) runs under a 64-bit Wine: with only Debian's `wine32`
+(64-bit) or `cmake/i686-mingw.cmake` without `OPENSMAC_HYBRID` (32-bit native, runs under 32-bit Wine).
+The 64-bit `opensmac.exe` (the release's) runs under a 64-bit Wine: with only Debian's `wine32`
 installed, `apt-get download wine64 libwine:amd64 libz-mingw-w64` and `dpkg -x` them into a folder
 of `work/`, point its `usr/lib/wine/wineserver` script at the `wineserver64` beside it (the script
 names `/usr/lib/wine`), and copy the x86-64 `zlib1.dll` into the prefix's `system32`; then
-`WINEARCH=win64 WINEPREFIX=... .../usr/lib/wine/wine64 smacx.exe` (a game folder in the prefix's
-`C:\GOG Games` is found at the first start). The cross-built `smacx_unit.exe` runs the same way.
-Run `smacx_headless` from the repository root (or pass `--gamedir`, `--image`, `--ini`).
+`WINEARCH=win64 WINEPREFIX=... .../usr/lib/wine/wine64 opensmac.exe` (a game folder in the prefix's
+`C:\GOG Games` is found at the first start). The cross-built `opensmac_unit.exe` runs the same way.
+Run `opensmac_headless` from the repository root (or pass `--gamedir`, `--image`, `--ini`).
 
 ## Compilers
 
@@ -146,36 +150,36 @@ GCC also `-fno-aggressive-loop-optimizations`). Targets must be little-endian (x
 | Apple clang | macOS arm64 / x86-64 | built and smoke-tested in CI |
 | MSVC (cl.exe) | Windows x86-64 | experimental (CI, allowed to fail); not verified against the original |
 
-CI (`.github/workflows/build.yml`) builds `smacx_headless` and runs `smacx_smoke` on all of these.
+CI (`.github/workflows/build.yml`) builds `opensmac_headless` and runs `opensmac_smoke` on all of these.
 
 ## The scripted UI suites
 
 Everything compared with the original runs with the original's bugs (`--original-bugs`,
-engine/compat.h, docs/COMPAT.md): `harness/verify.sh` passes it to `smacx_headless`, the gate's
-observer and ASan steps to smacx and `smacx_headless`, and hybrid.dll always has them (patched
+engine/compat.h, docs/COMPAT.md): `harness/verify.sh` passes it to `opensmac_headless`, the gate's
+observer and ASan steps to OpenSMAC and `opensmac_headless`, and hybrid.dll always has them (patched
 functions inside terranx.exe must behave as the original's). The game itself plays with the bugs
 fixed; the gate's `fixes` step plays scenarios that way under ASan (no comparison).
 
-`tests/*/run.sh` drive smacx with scripted keys (SDL dummy video and audio, fixed seeds). Their
+`tests/*/run.sh` drive OpenSMAC with scripted keys (SDL dummy video and audio, fixed seeds). Their
 expectations come from games played with the original's rules, so every suite passes
 `--original-bugs`, except the multiplayer ones, which check that the setting travels: tests/hotseat
 and tests/pbem set it up with `Original Bugs=1` in the first game's ini and check that the later
 runs (ini default) play with the save's setting; tests/online's host has it in its ini and the
 client takes the host's; tests/online2 plays with the fixes on both machines (the copies must
 agree in that mode too). `tests/long/session.sh` (manual) plays with the fixes. They run
-**animated** by default (`SMACX_ANIMATE=1`, i.e. `smacx --animate`): the window slides, the menu
+**animated** by default (`OPENSMAC_ANIMATE=1`, i.e. `opensmac --animate`): the window slides, the menu
 column's slide, unit moves, combat booms, battle reports and movies play with their real waits, as
 in an interactive game, and the run still quits when its keys end. `TEST_FAST=1` runs them
 unattended instead (those animations skipped or drawn without waiting). `WAIT:MS` in a script lets
 real time pass with no input (timers and animations run meanwhile). Timings (the twelve suites
 one after another, before tests/hotseat): animated about 220 s, fast about 145 s; the slowest suite is placeholders.
-`src/tools/gate.sh`'s `ui` step runs them with the native smacx and again with the ASan build.
+`src/tools/gate.sh`'s `ui` step runs them with the native OpenSMAC and again with the ASan build.
 
 `tests/long/session.sh [OUTDIR] [SEED...]` is a manual test, not one of the suites (it is not a
 `run.sh`, so neither the suites' loops nor the gate pick it up): a new game played for about 45
 turns from `tests/long/long.keys` (moves, go-to drags, the base window, menus, reports, combat,
-end of turn) with animations on, by default against the ASan build (`build/bug-asan/smacx`; any
-smacx with `SMACX=`). Each seed is one game; a sanitizer report or an abnormal end fails it.
+end of turn) with animations on, by default against the ASan build (`build/bug-asan/opensmac`; any
+OpenSMAC with `OPENSMAC=`). Each seed is one game; a sanitizer report or an abnormal end fails it.
 About 5-10 minutes per seed under ASan.
 
 ## Recreating what is not in the repository

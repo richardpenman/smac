@@ -1,4 +1,4 @@
-// The save / load file dialogs of save_game, load_game and load_map (smacx's replacement of the
+// The save / load file dialogs of save_game, load_game and load_map (OpenSMAC's replacement of the
 // headless "filebox" area: FileDialog, FileBox, FileList; engine/ui_bridge.h).
 //
 // FileBox (ui 0x407350..0x407BE0) and its FileList (gfx2 0x613900..0x614C50), as the original lays

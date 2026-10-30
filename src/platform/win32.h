@@ -48,9 +48,9 @@ bool host_stat(const char* path, bool* is_dir, uint64_t* size);
 // _mkdir: true if the directory was created (false if it exists or cannot be created).
 bool host_mkdir(const char* path);
 // Redirects the game directory's "saves" folder: resolve_path maps a relative path whose first
-// component is "saves" (any case) into dir (smacx's per-user directory; empty: no redirect).
+// component is "saves" (any case) into dir (OpenSMAC's per-user directory; empty: no redirect).
 void set_saves_dir(const char* dir);
-// A file smacx provides (e.g. its own script texts): a path ending in `name` (any directory, any
+// A file OpenSMAC provides (e.g. its own script texts): a path ending in `name` (any directory, any
 // case) that does not exist resolves to host_path.
 void set_builtin_file(const char* name, const char* host_path);
 }  // namespace platform

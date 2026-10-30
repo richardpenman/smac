@@ -315,12 +315,12 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
     // stack buffer (BUG(original): the file gets 0x31C bytes of stack contents, and a version
     // field below 11 there would even be copied into the preferences when saving). The
     // reconstruction writes zeros with SaveFileVersion = 12, which the original reads as a
-    // current savegame, in both settings (compat legacy_prefs_uninit), plus smacx's mark (save.h).
+    // current savegame, in both settings (compat legacy_prefs_uninit), plus OpenSMAC's mark (save.h).
     LegacyGamePrefs legacy;
     std::memset(&legacy, 0, sizeof(legacy));
     legacy.SaveFileVersion = kSaveFileVersion;
-    // smacx's mark and setting (save.h), in bytes the original never reads in a current savegame.
-    uint32_t mark[2] = {kSmacxSaveMark, g_original_bugs ? 1u : 0u};
+    // OpenSMAC's mark and setting (save.h), in bytes the original never reads in a current savegame.
+    uint32_t mark[2] = {kOpenSmacSaveMark, g_original_bugs ? 1u : 0u};
     if (write) std::memcpy(&legacy, mark, sizeof(mark));
     SaveFileWrite = write;
     SaveFileEncrypt = 0;
@@ -330,7 +330,8 @@ int32_t GAMEAPI game_data(CrtFile* file, int32_t write) {
     }
     if (!write) {
         std::memcpy(mark, &legacy, sizeof(mark));
-        g_save_original_bugs = legacy.SaveFileVersion >= 0xB && mark[0] == kSmacxSaveMark ? (int32_t)(mark[1] & 1) : -1;
+        g_save_original_bugs =
+            legacy.SaveFileVersion >= 0xB && mark[0] == kOpenSmacSaveMark ? (int32_t)(mark[1] & 1) : -1;
     }
     if (legacy.SaveFileVersion < 0xB) {
         Writer prefs = write_records(&cs, 1);  // the legacy block over the first 0x31C bytes
@@ -737,12 +738,12 @@ int32_t GAMEAPI load_daemon(const char* filename, int32_t relinearize) {
                 } else {
                     PbemActive = 0;
                 }
-                // smacx: a hotseat, PBEM or online game plays with the setting it was saved with
+                // OpenSMAC: a hotseat, PBEM or online game plays with the setting it was saved with
                 // (save.h), unless the setting was forced (--original-bugs).
                 if ((PbemActive || MultiplayerActive) && g_save_original_bugs >= 0 && !g_original_bugs_forced &&
                     (g_save_original_bugs != 0) != g_original_bugs) {
                     compat_set_original_bugs(g_save_original_bugs != 0);
-                    std::fprintf(stderr, "smacx: this game plays with %s (the save's setting)\n",
+                    std::fprintf(stderr, "opensmac: this game plays with %s (the save's setting)\n",
                                  g_original_bugs ? "the original bugs" : "the fixes");
                 }
                 GameDrawState |= 4;

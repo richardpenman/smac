@@ -5,7 +5,7 @@
 #
 #   harness/golden.sh record [scenario...]   run the original (hybrid.dll, no patches, Wine) with
 #                                            fcompare's golden mode and import the records
-#   harness/golden.sh replay [scenario...]   replay them on the reconstruction (smacx_headless
+#   harness/golden.sh replay [scenario...]   replay them on the reconstruction (opensmac_headless
 #                                            --golden; what ctest's golden_* tests run)
 #
 # Scenarios default to tiny20 late140. Recorded: the functions of fcompare_table.h that change no
@@ -47,7 +47,7 @@ record)
   done
   ;;
 replay)
-  BIN="${NATIVE_BUILD:-$ROOT/build/native}/smacx_headless"
+  BIN="${NATIVE_BUILD:-$ROOT/build/native}/opensmac_headless"
   for s in $SCEN; do
     OUT="$(mktemp -d "$ROOT/work/golden.XXXXXX")"
     echo "[$s]"

@@ -12,8 +12,8 @@
 //   map, the message lists and the canvas size) are encrypted (encrypt_write).
 // The game-state blocks are written and read through the records' serialisation
 // (engine/state_io.h): the original's byte layout, whatever the records' types in memory.
-// smacx marks its saves in the legacy preferences block, which the original ignores in a current
-// savegame (it writes uninitialised stack bytes there): kSmacxSaveMark at offset 0, then a dword
+// OpenSMAC marks its saves in the legacy preferences block, which the original ignores in a current
+// savegame (it writes uninitialised stack bytes there): kOpenSmacSaveMark at offset 0, then a dword
 // of flags (bit 0: the game plays with the original bugs, engine/compat.h). A hotseat or PBEM game
 // loaded from such a save plays with the save's setting, so every player's copy agrees.
 #pragma once
@@ -22,9 +22,9 @@
 
 // Savegame version written by save_daemon (GamePrefs.SaveFileVersion).
 constexpr int32_t kSaveFileVersion = 12;
-// "SMXB" (little-endian): the legacy block's mark of a save written by smacx.
-constexpr uint32_t kSmacxSaveMark = 0x42584D53;
-// The original-bugs setting of the save game_data read last: 1 on, 0 off, -1 no smacx mark.
+// "SMXB" (little-endian): the legacy block's mark of a save written by OpenSMAC.
+constexpr uint32_t kOpenSmacSaveMark = 0x42584D53;
+// The original-bugs setting of the save game_data read last: 1 on, 0 off, -1 no OpenSMAC mark.
 inline int32_t g_save_original_bugs = -1;
 
 // ---- globals (save module and blocks only the save module names) ----

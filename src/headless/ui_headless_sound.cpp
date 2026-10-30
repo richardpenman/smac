@@ -1,6 +1,6 @@
 // Headless implementations of the sound functions (engine/ui_bridge.h): the FX object, the voices,
 // the Wave objects, ambience, release_sound and the planet buster's wait, and desktop_init (whose
-// only native effect in smacx is load_music). smacx replaces this area (src/ui/sound.cpp, music.cpp).
+// only native effect in OpenSMAC is load_music). OpenSMAC replaces this area (src/ui/sound.cpp, music.cpp).
 #include "engine/ui_bridge.h"
 
 // No sound: every call does nothing; no wave is ever playing.

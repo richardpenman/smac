@@ -255,7 +255,7 @@ struct PickWin : ScreenWin {
     void slot_menu(int32_t slot) {
         // PopMenu of the slot's arrow: every faction, then RANDOM.
         BasePop* m = popup_new();
-        BasePop_start(m, nullptr, "SMACXPICKSLOT", -1, nullptr, 0x42, nullptr);
+        BasePop_start(m, nullptr, "OPENSMACPICKSLOT", -1, nullptr, 0x42, nullptr);
         int32_t n = (int32_t)files.size();
         for (int32_t i = 0; i < n; i++) BasePop_item(m, nouns[i].c_str(), i);
         BasePop_item(m, label_get(0x1188 / 4), n);

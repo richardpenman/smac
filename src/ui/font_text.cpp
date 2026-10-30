@@ -38,7 +38,7 @@ bool is_markup(char c, bool links) {
     return c == '{' || c == '}' || c == '[' || c == ']' || c == '$' || (links && c == '=');
 }
 
-// SMACX_TEXTCHECK=1 (a test aid): the right edge of the box Buffer_write_strings wraps its text in
+// OPENSMAC_TEXTCHECK=1 (a test aid): the right edge of the box Buffer_write_strings wraps its text in
 // (-1: none); a run whose ink passes it is reported ("text beyond its box").
 int32_t g_box_right = -1;
 
@@ -47,7 +47,7 @@ void text_out(Buffer* self, Font* font, int32_t x, int32_t baseline, const char*
     std::vector<uint8_t> mask;
     int32_t w = 0, h = 0;
     if (!platform::font_render(font->handle, text, len, &mask, &w, &h)) return;
-    static const bool check = std::getenv("SMACX_TEXTCHECK") != nullptr;
+    static const bool check = std::getenv("OPENSMAC_TEXTCHECK") != nullptr;
     if (check && g_box_right >= 0) {
         int32_t ink = -1;  // the rightmost ink column
         for (int32_t j = 0; j < h; j++)
@@ -597,7 +597,7 @@ int32_t THISCALL Buffer_write_strings(Buffer* self, const TextLine* lines, int32
                                       int32_t w, int32_t) {
     if (!lines || count <= 0) return y;
     BufferText& bt = buffer_text(self);
-    struct BoxCheck {  // SMACX_TEXTCHECK: the box of this text
+    struct BoxCheck {  // OPENSMAC_TEXTCHECK: the box of this text
         BoxCheck(int32_t right) { g_box_right = right; }
         ~BoxCheck() { g_box_right = -1; }
     } box_check(x + w);

@@ -1,4 +1,4 @@
-// smacx's start-up as a distributed game: the per-user directory, finding the installed game
+// OpenSMAC's start-up as a distributed game: the per-user directory, finding the installed game
 // (remembered folder, standard install locations, then asking the player) and the data image
 // built from the player's terranx.exe (src/tools/gen_data_image.py's format; engine/memmap.h).
 #pragma once
@@ -24,10 +24,11 @@ bool build_data_image(const std::vector<uint8_t>& exe, std::vector<uint8_t>* ima
 bool check_game_dir(const std::string& dir, std::string* why);
 
 // The per-user directory for settings, saves and caches (SDL_GetPrefPath; ends with a separator).
-// Empty when it cannot be created.
+// Empty when it cannot be created. A copy's directory from before the rename to OpenSMAC (smacx)
+// is moved there on the first start (platform/userdir.h).
 std::string user_dir();
 
-// The game folder: the remembered one (user_dir/smacx.cfg), the SMACX_GAMEDIR environment
+// The game folder: the remembered one (user_dir/opensmac.cfg), the OPENSMAC_GAMEDIR environment
 // variable, the standard install locations, else the player is asked (message box, the
 // platform's folder picker, a typed path on a terminal). The choice is remembered. Empty when
 // none was found or the player gave up (the reason is on stderr and was shown).
@@ -38,9 +39,9 @@ std::string find_game_dir(const std::string& udir);
 std::string data_image(const std::string& gamedir, const std::string& udir);
 
 // The default ini next to the executable (the release ships it), else the built-in copy, written
-// to path when path does not exist yet, with "Sliding windows" off (smacx's default for players).
-// An existing ini has them turned off once (recorded in udir's smacx.cfg).
-// The ini gets smacx's "Original Bugs=0" when it has no such key.
+// to path when path does not exist yet, with "Sliding windows" off (OpenSMAC's default for players).
+// An existing ini has them turned off once (recorded in udir's opensmac.cfg).
+// The ini gets OpenSMAC's "Original Bugs=0" when it has no such key.
 void seed_ini(const std::string& path, const std::string& udir);
 
 // Shows an error to the player (message box, and stderr).

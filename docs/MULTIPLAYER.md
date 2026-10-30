@@ -1,11 +1,11 @@
 # Multiplayer
 
-Plan for multiplayer in smacx: hotseat, then play-by-email (PBEM), then online play between smacx
+Plan for multiplayer in OpenSMAC: hotseat, then play-by-email (PBEM), then online play between OpenSMAC
 copies over TCP. Single-player behaviour does not change: every path below is taken only with
 `PbemActive` or `MultiplayerActive` set, and the differential harness (`harness/verify.sh`) and
-the scripted suites keep passing at each step. User decisions: smacx to smacx only (no DirectPlay
+the scripted suites keep passing at each step. User decisions: OpenSMAC to OpenSMAC only (no DirectPlay
 compatibility with the original). The original's bugs: every player must play with the same
-setting (engine/compat.h, docs/COMPAT.md). A hotseat or PBEM save carries it (smacx's mark in the
+setting (engine/compat.h, docs/COMPAT.md). A hotseat or PBEM save carries it (OpenSMAC's mark in the
 save's legacy preferences block, engine/save.h) and a loaded hotseat/PBEM game plays with the
 save's setting; in an online game the host sends its setting before the rules and the game
 (message 0x0F10, `net_send_original_bugs`), and every client plays with it.
@@ -90,11 +90,11 @@ MultiWin (the commlink panel) shows the players' time and lock state, its chat b
 the tamper checks (`set_tamper`, `check_tamper`, `read_tamper`; HOTTAMPER / HOTNOTAMPER), the
 council's hotseat results across saves. Mostly already in the engine's save / load code.
 
-**3. Online (TCP between smacx copies)**: `Net_*` (DirectPlay) is replaced by a small TCP transport
+**3. Online (TCP between OpenSMAC copies)**: `Net_*` (DirectPlay) is replaced by a small TCP transport
 under the original `NetDaemon` message protocol, which stays as the original's (same message
 types and payloads, same routing in `NetDaemon_send_message`, same `process_message`):
 * the host listens on a port, clients connect (NETCONNECT_JOIN_OR_CREATE: host or join; join asks
-  the host's address); the SELECTSERVICE list shows "Internet (TCP/IP, smacx)" beside the
+  the host's address); the SELECTSERVICE list shows "Internet (TCP/IP, OpenSMAC)" beside the
   hotseat/email item;
 * a `Net` replacement with the original's entry points (`Net_send(msg, len, to, guaranteed)`,
   `Net_get`, `Net_enum_players`, `Net_drop_player`, `Net_handle_sys_msg` for joins / drops),
@@ -115,8 +115,8 @@ types and payloads, same routing in `NetDaemon_send_message`, same `process_mess
   (popups shown, `FactionStatus`, the viewer per turn, the treaty in DIPLOSTATE).
 * **PBEM**: the same game saved and exited at each handover and reloaded by the next player;
   tampering provoked (a save reloaded twice).
-* **Online**: two smacx processes on localhost (one host, one client, `--keys` scripts each, run
-  one after the other's start; the machine allows only one smacx at a time for the suites, so
+* **Online**: two OpenSMAC processes on localhost (one host, one client, `--keys` scripts each, run
+  one after the other's start; the machine allows only one OpenSMAC at a time for the suites, so
   this test runs alone); the messages logged on both sides and the game states compared at each
   turn's end (`do_checksums` must agree). Unit tests for the frame codec and the message routing.
 
@@ -132,7 +132,7 @@ types and payloads, same routing in `NetDaemon_send_message`, same `process_mess
   `ui_hotseat_show`: WONLOST, the timers). The engine's `control_turn` and `hotseat_take_turn`
   were already reconstructed.
 * src/ui/diplo_hotseat.cpp: `diplo` and the DiploWin.
-* src/app/smacx.cpp, src/platform/win32.cpp: with `--outdir` the saves go to `DIR/saves`.
+* src/app/opensmac.cpp, src/platform/win32.cpp: with `--outdir` the saves go to `DIR/saves`.
 * Approximated: the players' own message lists between turns (sub_51E530), the desktop's box art
   behind SWITCHING, the DiploWin's StringBox / EditBox look.
 * Tested by tests/hotseat/run.sh (two humans; a third works the same way through HOTSEATADD1).
@@ -149,7 +149,7 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   The password asked on load is the handover's SWITCHING2 (phase 1).
 * src/ui/hotseat.cpp: `read_tamper` / `set_tamper` (0x51E000 / 0x51E090). The original keeps the
   50 tamper records in the registry (HKLM ...\DirectPlay\Applications\Sid Meier's Alpha
-  Centauri, values MVM and MVB), i.e. per machine; smacx keeps the same two values in
+  Centauri, values MVM and MVB), i.e. per machine; OpenSMAC keeps the same two values in
   `tamper.reg` in its per-user directory (the `--outdir` in tests). The stubs in src/ui/editor.cpp
   were removed.
 * Tested by tests/pbem/run.sh: two "machines" (two outdirs, each with its saves and its
@@ -158,7 +158,7 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   record's load count 2), the other player told at their next turn (HOTTAMPER2), and the save
   refused as a single-player load (PASSWORDEDLOADATTEMPT).
 
-**Phase 3 (online, TCP between smacx copies): done** (the approximations are listed per part).
+**Phase 3 (online, TCP between OpenSMAC copies): done** (the approximations are listed per part).
 * Group 1, the transport (done): src/platform/net_tcp.{h,cpp} (frames: a 16-byte header -- size,
   kind, from, to -- then the payload; the host relays; pids: the host 1, the clients 2, 3, ... in
   join order; join / leave events; non-blocking sockets, POSIX and Winsock), unit-tested by
@@ -169,7 +169,7 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   joining player becomes its NetDaemon_on_player_added calls). Hybrid builds keep DirectPlay.
 * Group 2, the setup (done): src/ui/netwin.cpp: multiplayer_init's network path, AlphaNet_setup
   (SELECTSERVICE: the hotseat/email item, then "Internet (TCP/IP)"; NETCONNECT_JOIN_OR_CREATE;
-  smacx's TCPHOST / TCPJOIN popups (smacxnet.txt) for the name, address and port, kept in the
+  OpenSMAC's TCPHOST / TCPJOIN popups (opensmacnet.txt) for the name, address and port, kept in the
   prefs Net Name / Net Address / Net Port), NetWin_config_players, NetWin_setup_faction_data,
   NetWin_fill_player, NetWin_on_button_clicked (ready / start, NOTALLREADY), NetWin_prepare_game
   (Random_reseed(1000)); the setup packets (0x0F02/03/04/0D) in the engine. The window's look
@@ -183,7 +183,7 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   SquareLock), net_turn.cpp (net_control_turn, net_upkeep and its phases, net_end_of_turn,
   net_not_my_turn, mash_planes, set_time_controls). A unit's move: NetDaemon_lock (0x2210) at the
   server, MOVE_VEH (0x2401) relayed as 0x4401 and executed by every machine with the server's
-  stamp as seed. smacx stamps relayed events with a counter of its own under its deterministic
+  stamp as seed. OpenSMAC stamps relayed events with a counter of its own under its deterministic
   clock (net_stamp; the original: timeGetTime), so the same keys give the same online game.
   NetMsg_pop (done, src/ui/win_popup.cpp): with a3 0 (or a3 > 1 and no interface window) a
   modal popup that holds the network until its OK (as the original: SIMULWHOSE, DIPLOCOMM,
@@ -269,7 +269,7 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   files in 2048-byte blocks (0x0F0B, MPSENDFILE; the player MPRECEIVEFILE, the file written at its
   last block, 0x0F0C after its last file), then 0x0F07 (3); Esc cancels; the host runs
   scenario_setup, every machine reloads its texts and art (game_reload: the scenario's alternate
-  directory) and shows the scenario's INTRO. smacx: a player's received files go below its
+  directory) and shows the scenario's INTRO. OpenSMAC: a player's received files go below its
   per-user directory at the scenario's relative path (the game folder is read-only), which
   becomes its alternate directory; the MPSENDFILE / MPRECEIVEFILE boxes are the NetMsg box.
   Kept as the original: a player answers the host's file messages through NetDaemon_send_message
@@ -284,7 +284,7 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
   original in a network game, the panel is modeless beside the map (F12 / the console's button
   toggle it, MultiWin_hide; the main loop and the network go on; the main screen's mouse over it
   goes to the panel), and closed it keeps its time and pills rows on the screen, clickable. (Single
-  player keeps smacx's modal panel.)
+  player keeps OpenSMAC's modal panel.)
 * The DiploWin between online players (done): commlink_attempt's network path (another human:
   0x1501 and DIPLOCOMM; a computer faction: NetDaemon_open_channel / NOCHANNEL, communicate, the
   commlink treaty through 0x2441), commlink_attempter's ALREADYDONE / DIPLOALREADY / input-lock
@@ -310,7 +310,7 @@ HOTSEATADD2, PASSWORDREQUIRED and LOADSECURITY are in the script but unused by t
 * tests/online/run.sh (run it alone: two processes): the setup, three turns one player at a time
   with the computer factions in lockstep, a unit moved twice through the locks, a chat line, the
   states compared each turn and no checksum difference; then a desync provoked on the client
-  (SMACX_NET_DESYNC) found by the host's checksums and its units resent; a third game has the
+  (OPENSMAC_NET_DESYNC) found by the host's checksums and its units resent; a third game has the
   two humans trade in the DiploWin (the call answered, a chat line, a treaty and 5 credits
   offered, both agree, the deal done by the host) with the treaty and credits checked on both;
   a fourth game sets custom time controls (5 s a turn, doubled the first turns), lets the host's

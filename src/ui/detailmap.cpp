@@ -51,7 +51,7 @@ bool attach() {
 void detailmap_system_init(int32_t reset) {
     uint8_t* w = dm();
     if (!w) return;
-    // (A loaded game keeps the window's saved state, active in the original's saves; smacx's
+    // (A loaded game keeps the window's saved state, active in the original's saves; OpenSMAC's
     // earlier saves hold zeros there: the window is made active as for a new game.)
     (void)reset;
     if (!attach()) return;

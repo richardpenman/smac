@@ -15,7 +15,7 @@
 // it answers 0x0F0C. When every player is done the host sends 0x0F07 (3), which ends the players'
 // wait. Esc cancels (the scenario is not started: 1).
 //
-// smacx: a player's files go below its per-user directory (the game folder is read-only), at the
+// OpenSMAC: a player's files go below its per-user directory (the game folder is read-only), at the
 // scenario's relative path, which becomes its alternate directory: a player receives the files it
 // has not received before even when its own game folder holds the scenario. No current directory
 // change (the original's SetCurrentDirectory to the scenario's directory: the paths are built
@@ -65,7 +65,7 @@ std::string host_path(const std::string& p) {
     platform::resolve_path(p.c_str(), out, sizeof(out));
     return out;
 }
-// A player's copy of the scenario's directory (smacx: below the per-user directory).
+// A player's copy of the scenario's directory (OpenSMAC: below the per-user directory).
 std::string local_dir() {
     std::string d = std::string(ui_user_dir()) + "/" + g_dir;
     for (char& c : d)

@@ -5,7 +5,7 @@
 // it). The WVE files are decoded by wve.cpp; the frames (15 per second, timed by the clock from the
 // start of the sound) fill the window keeping their aspect, the other sounds are switched off
 // meanwhile (as the player's SoundSys_off (0x4C51D0) / SoundSys_stop_all (0x4C4FC0)). Unattended
-// runs (--hidden, scripted keys) do not wait: they decode the first SMACX_MOVIE_FRAMES frames
+// runs (--hidden, scripted keys) do not wait: they decode the first OPENSMAC_MOVIE_FRAMES frames
 // (default none) and, when it is set, write the last one to OUTDIR/movie.bmp (test aid).
 #include <cstdio>
 #include <cstdlib>
@@ -83,7 +83,7 @@ bool movie_play(const char* path) {
     std::fprintf(stderr, "movie %s: %dx%d, %d frames, sound %u ms\n", path, m.width(), m.height(), m.frames(),
                  snd ? snd->ms() : 0);
     std::vector<uint32_t> rgb;
-    if (const char* e = std::getenv("SMACX_MOVIE_FRAMES")) {  // test aid: the first N frames decoded
+    if (const char* e = std::getenv("OPENSMAC_MOVIE_FRAMES")) {  // test aid: the first N frames decoded
         int32_t n = std::min(std::atoi(e), m.frames());
         int32_t good = 0;
         for (int32_t i = 0; i < n; i++) good += m.decode(i, &rgb) ? 1 : 0;
@@ -112,7 +112,7 @@ bool movie_play(const char* path) {
                 ev.type == platform::EV_LBUTTON_DOWN || ev.type == platform::EV_RBUTTON_DOWN ||
                 ev.type == platform::EV_QUIT)
                 skip = true;
-            // The close button: before a game runs (the opening movie) smacx quits; in a game
+            // The close button: before a game runs (the opening movie) OpenSMAC quits; in a game
             // the movie plays on (win.h ui_window_close_modal).
             if (ev.type == platform::EV_CLOSE && ui_window_close_modal()) skip = true;
         }

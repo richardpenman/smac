@@ -3,17 +3,17 @@
 # work"): the map's right-click menu (pulldown.cpp, mapwin_menu.cpp), landmarks, the info pane and
 # the status panes' clicks (infowin.cpp, maininfc.cpp), ...
 #
-#   tests/placeholders/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/ph-native/smacx)
+#   tests/placeholders/run.sh [OUTDIR]        (OPENSMAC=path/to/opensmac, default build/ph-native/opensmac)
 #
-# Each case runs smacx with scripted keys (hidden, SDL dummy video) and checks its log. Exit status
+# Each case runs OpenSMAC with scripted keys (hidden, SDL dummy video) and checks its log. Exit status
 # 0 when every check passes.
 set -u
-# Animated by default (smacx --animate: slides, unit moves, booms, battle reports and movies play
+# Animated by default (opensmac --animate: slides, unit moves, booms, battle reports and movies play
 # with their waits, as in an interactive game); TEST_FAST=1 runs unattended (skips them).
-if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
+if [ "${TEST_FAST:-0}" = 1 ]; then export OPENSMAC_ANIMATE=0; else export OPENSMAC_ANIMATE=1; fi
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SMACX="$(realpath "${SMACX:-$ROOT/build/ph-native/smacx}")"
+OPENSMAC="$(realpath "${OPENSMAC:-$ROOT/build/ph-native/opensmac}")"
 OUT="$(realpath -m "${1:-$ROOT/work/placeholders_test}")"
 mkdir -p "$OUT"
 FAIL=0
@@ -22,7 +22,7 @@ NEW="--new size=0 --human 1 --seed 1,2"
 run() {  # run CASE ARGS... : log in OUT/CASE.log
     local name="$1"; shift
     mkdir -p "$OUT/$name"
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --original-bugs --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$OPENSMAC" --original-bugs --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
 check() {  # check CASE DESCRIPTION REGEX: the log matches (grep -E)
@@ -129,14 +129,14 @@ check infopane "I: the info pane" "infostate mode 1001 .* hover -1/-1"
 nocrash infopane
 
 # 8. The animations (boom.cpp, scoot.cpp, battlewin.cpp, slide.cpp): a turn of the late save with
-#    the computer players' attacks and moves in view, drawn (SMACX_ANIM=1: the frames without
+#    the computer players' attacks and moves in view, drawn (OPENSMAC_ANIM=1: the frames without
 #    waiting) and not (the unattended default): the combat explosions (16 frames), the units'
 #    turns and slides, the battle report in the console; the two games end identical (the saves
 #    compared byte by byte). The base window opens with its arms (slide_show).
 if [ -f "$ROOT/work/saves_late/turn_200.sav" ]; then
     TURN="C-ENTER,DOWN,ENTER,ENTER,ENTER,ENTER"
     run anim_off --save work/saves_late/turn_200.sav --human 1 --keys "${TURN},SAVE:end.sav"
-    SMACX_ANIM=1 SMACX_BATTLE_SHOT=battle.bmp run anim_on --save work/saves_late/turn_200.sav --human 1 --keys "${TURN},SAVE:end.sav,BASE:0,SHOT:base.bmp"
+    OPENSMAC_ANIM=1 OPENSMAC_BATTLE_SHOT=battle.bmp run anim_on --save work/saves_late/turn_200.sav --human 1 --keys "${TURN},SAVE:end.sav,BASE:0,SHOT:base.bmp"
     check anim_on "explosions drawn" "boom anim: flags 0 frames 16"
     check anim_on "units turned and slid" "scoot anim: veh [0-9]+ dir [0-7] turn [0-9]+ slide 6"
     check anim_on "battle report" "battle report: [0-9]+ \\(.*\\) vs [0-9]+ \\(.*\\) strength"
@@ -145,19 +145,19 @@ if [ -f "$ROOT/work/saves_late/turn_200.sav" ]; then
     nocrash anim_off
 fi
 
-# 9. The tutorial (tutwin.cpp; SMACX_PREFS_SET=0x20: the tutorial hints preference). LANDFALL's
+# 9. The tutorial (tutwin.cpp; OPENSMAC_PREFS_SET=0x20: the tutorial hints preference). LANDFALL's
 #    TOUR button starts the first turn's tour (TutWin_tour kind 0: TOUR1 .. TOURDATEINFO,
 #    TOUROVER, each with Continue); in a second game the base window's BASECONTROL and the unit
 #    hints of Console_give_hints (the foil on a fungus sea: FUNGUSSEA).
 K=$(printf 'ENTER,%.0s' $(seq 1 16))
-SMACX_PREFS_SET=0x20 run tour $NEW --keys "ENTER,CLICK:135x735,INFOSTATE,${K}UNITS"
+OPENSMAC_PREFS_SET=0x20 run tour $NEW --keys "ENTER,CLICK:135x735,INFOSTATE,${K}UNITS"
 check tour "LANDFALL (a hint with the TOUR button)" "popup LANDFALL shown"
 check tour "the tour's first window" "tutwin TOUR1: kind 2"
 check tour "the ocean near the cursor" "tutwin TOUROCEAN: kind 2"
 check tour "the interface's windows" "tutwin TOURDATEINFO: kind 2"
 check tour "the end of the tour" "tutwin TOUROVER: kind 0"
 nocrash tour
-SMACX_PREFS_SET=0x20 run hints $NEW --keys "ENTER,ENTER,INFOSTATE,KP6,ENTER,KP6,ENTER,KP3,ENTER,KP2,ENTER,KP2,ENTER,UNITS"
+OPENSMAC_PREFS_SET=0x20 run hints $NEW --keys "ENTER,ENTER,INFOSTATE,KP6,ENTER,KP6,ENTER,KP3,ENTER,KP2,ENTER,KP2,ENTER,UNITS"
 check hints "the base window's hint" "tutwin BASECONTROL: kind 0"
 check hints "a unit hint (Console_give_hints)" "tutwin FUNGUSSEA: kind 0"
 nocheck hints "no placeholder" "not reconstructed: Console_give_hints"
@@ -278,7 +278,7 @@ nocrash bubbles
 #     its header): MapWin_draw_radius on a canvas
 #     cleared to 0 (radius 0, 2, and 1 across the map's wrap), the AI goals (options 0x2000:
 #     MapWin_gen_overlays), the keypad legend and the diplomatic table (0x20000 MapWin_draw_legend,
-#     0x100000 MapWin_draw_wars; their MD5s are smacx's: the original's differs in 10 pixels of the
+#     0x100000 MapWin_draw_wars; their MD5s are OpenSMAC's: the original's differs in 10 pixels of the
 #     legend's bold digits, the font rasteriser's); and two scrolled redraws.
 if [ -f "$ROOT/work/saves_late/turn_300.sav" ]; then
     mapcase() {  # mapcase NAME MD5 ARGS...
@@ -384,7 +384,7 @@ fi
 run menucol $NEW --keys "ENTER,A-m,DOWN,DOWN,SHOT:menu.bmp,ESC,A-h,ESC"
 check menucol "the column, MAP its fourth button" "^menu column at 0,343 \\(139x168\\): Map at 0,403"
 check menucol "HQ the second" "^menu column at 0,343 \\(139x168\\): HQ at 0,367"
-check menucol "AlphaMenu_show when the column opens (the slide skipped unattended)" "^alphamenu show \\(sound [01], slide $([ "$SMACX_ANIMATE" = 1 ] && echo 1 || echo 0)\\)"
+check menucol "AlphaMenu_show when the column opens (the slide skipped unattended)" "^alphamenu show \\(sound [01], slide $([ "$OPENSMAC_ANIMATE" = 1 ] && echo 1 || echo 0)\\)"
 nocrash menucol
 
 # 21. The scenario editor (editor.cpp): ctrl+K (SCENEDITOR yes) switches it on; '1' paints the
@@ -485,25 +485,25 @@ if [ -f "$ROOT/work/saves_late/turn_200.sav" ]; then
 fi
 
 # 26. A player's first start (no --outdir: the per-user directory, here XDG_DATA_HOME below OUT):
-#     the new Alpha Centauri.Ini has "Sliding windows" off (a deliberate default of smacx, UI_PLAN
+#     the new Alpha Centauri.Ini has "Sliding windows" off (a deliberate default of OpenSMAC, UI_PLAN
 #     section 13), so the menu column opens without its slide; the tests' ini keeps it on (case 20).
 if [ "$(uname)" = Linux ]; then
     rm -rf "$OUT/firstrun"; mkdir -p "$OUT/firstrun"
-    (cd "$ROOT" && XDG_DATA_HOME="$OUT/firstrun" SMACX_GAMEDIR="$ROOT/game" SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --original-bugs \
+    (cd "$ROOT" && XDG_DATA_HOME="$OUT/firstrun" OPENSMAC_GAMEDIR="$ROOT/game" SDL_VIDEODRIVER=dummy timeout 600 "$OPENSMAC" --original-bugs \
         --hidden $NEW --keys "ENTER,A-m,ESC" > "$OUT/firstrun.log" 2>&1; echo "$?" > "$OUT/firstrun.rc")
     check firstrun "the seeded ini's preferences without 0x8000000" "^alphamenu show \\(sound [01], slide 0\\)"
-    if grep -q "^Preferences=10110011111000011101110110110110" "$OUT/firstrun/smacx/Alpha Centauri.Ini"; then
+    if grep -q "^Preferences=10110011111000011101110110110110" "$OUT/firstrun/opensmac/Alpha Centauri.Ini"; then
         echo "PASS firstrun: the ini's Preferences"; else echo "FAIL firstrun: the ini's Preferences"; FAIL=1; fi
     nocrash firstrun
     # An ini from before that default (sliding windows on) loses them once; turned on again, they
-    # stay (smacx.cfg records the migration).
+    # stay (opensmac.cfg records the migration).
     on="10111011111000011101110110110110"
-    ini="$OUT/firstrun/smacx/Alpha Centauri.Ini"
-    rm -f "$OUT/firstrun/smacx/smacx.cfg"
+    ini="$OUT/firstrun/opensmac/Alpha Centauri.Ini"
+    rm -f "$OUT/firstrun/opensmac/opensmac.cfg"
     sed -i "s/^Preferences=.*/Preferences=$on/" "$ini"
     for pass in 1 2; do
-        (cd "$ROOT" && XDG_DATA_HOME="$OUT/firstrun" SMACX_GAMEDIR="$ROOT/game" SDL_VIDEODRIVER=dummy timeout 600 \
-            "$SMACX" --original-bugs --hidden $NEW --keys "ENTER" > "$OUT/migrate$pass.log" 2>&1)
+        (cd "$ROOT" && XDG_DATA_HOME="$OUT/firstrun" OPENSMAC_GAMEDIR="$ROOT/game" SDL_VIDEODRIVER=dummy timeout 600 \
+            "$OPENSMAC" --original-bugs --hidden $NEW --keys "ENTER" > "$OUT/migrate$pass.log" 2>&1)
         grep "^Preferences=" "$ini" > "$OUT/migrate$pass.prefs"
         sed -i "s/^Preferences=.*/Preferences=$on/" "$ini"
     done
@@ -511,6 +511,20 @@ if [ "$(uname)" = Linux ]; then
        grep -q "^Preferences=$on" "$OUT/migrate2.prefs"; then
         echo "PASS firstrun: an older ini's sliding windows turned off once"
     else echo "FAIL firstrun: an older ini's sliding windows turned off once"; FAIL=1; fi
+    # The per-user directory of a copy from before the rename to OpenSMAC (smacx): moved at the
+    # first start, the game found through its smacx.cfg (renamed opensmac.cfg).
+    rm -rf "$OUT/legacy"; mkdir -p "$OUT/legacy/smacx"
+    echo "gamedir=$ROOT/game" > "$OUT/legacy/smacx/smacx.cfg"
+    cp "$ini" "$OUT/legacy/smacx/Alpha Centauri.Ini"
+    (cd "$ROOT" && XDG_DATA_HOME="$OUT/legacy" SDL_VIDEODRIVER=dummy timeout 600 "$OPENSMAC" --original-bugs --hidden \
+        $NEW --keys "ENTER" > "$OUT/legacy.log" 2>&1; echo "$?" > "$OUT/legacy.rc")
+    check legacy "the old per-user folder moved" "^opensmac: moved the per-user folder .*/smacx/ to .*/opensmac/"
+    nocheck legacy "the remembered game folder used" "game found in|no game folder"
+    if [ -f "$OUT/legacy/opensmac/opensmac.cfg" ] && [ -f "$OUT/legacy/opensmac/Alpha Centauri.Ini" ] && \
+       [ ! -e "$OUT/legacy/opensmac/smacx.cfg" ] && [ ! -e "$OUT/legacy/smacx" ]; then
+        echo "PASS legacy: smacx/smacx.cfg is opensmac/opensmac.cfg"
+    else echo "FAIL legacy: smacx/smacx.cfg is opensmac/opensmac.cfg"; FAIL=1; fi
+    nocrash legacy
 fi
 
 # 27. Enter / space with the message list shown (M): Console_on_key_click's

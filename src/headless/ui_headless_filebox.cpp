@@ -1,6 +1,6 @@
 // Headless UI area "filebox": the save / load file dialogs (FileDialog, FileBox, FileList;
 // engine/ui_bridge.h) of save_game and load_game.
-// Replaced in smacx by src/ui/console_filebox.cpp.
+// Replaced in OpenSMAC by src/ui/console_filebox.cpp.
 #include <cstring>
 
 #include "engine/ui_bridge.h"

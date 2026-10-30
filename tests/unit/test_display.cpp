@@ -1,4 +1,4 @@
-// smacx's display settings (platform/display.h): the ini's Screen Size and UI Scale and the
+// OpenSMAC's display settings (platform/display.h): the ini's Screen Size and UI Scale and the
 // logical screen and scale chosen for a display.
 #include "platform/display.h"
 #include "unit.h"

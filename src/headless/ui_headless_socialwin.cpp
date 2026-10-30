@@ -1,4 +1,4 @@
-// Headless social engineering window (engine/ui_bridge.h; smacx: src/ui/socialwin.cpp).
+// Headless social engineering window (engine/ui_bridge.h; OpenSMAC: src/ui/socialwin.cpp).
 #include "engine/ui_bridge.h"
 
 // No dialog: the pending social choice stays as it is.

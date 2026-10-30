@@ -1409,8 +1409,8 @@ void THISCALL Console_load_proc(uint8_t* self, int32_t scenario, int32_t relinea
         if (!game_reload(1, 0)) goto shown;
         crt_exit(3);
     }
-    // desktop_init: the windows are reset for the loaded game (smacx: the faction art, flags and
-    // the main view, as smacx's start of a game).
+    // desktop_init: the windows are reset for the loaded game (OpenSMAC: the faction art, flags and
+    // the main view, as OpenSMAC's start of a game).
     desktop_init(0);
     for (int32_t f = 1; f < 8; f++) load_faction_art(f);
     load_flags();

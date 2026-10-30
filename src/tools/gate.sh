@@ -14,26 +14,26 @@
 #   static    src/tools/names.py check (no original address lost, names table current, fcompare
 #             entries name declared functions) and src/tools/compat.py check (every BUG(original)
 #             site names a declared compat flag, docs/COMPAT.md current)
-#   build     native (smacx_headless, smacx, smacx_unit), ASan native
-#   unit      ctest in the native build (smacx_smoke, smacx_unit, the golden records of
-#             tests/golden replayed by smacx_headless --golden, names.py check) and, under ASan,
-#             smacx_unit and the golden replays
+#   build     native (opensmac_headless, opensmac, opensmac_unit), ASan native
+#   unit      ctest in the native build (opensmac_smoke, opensmac_unit, the golden records of
+#             tests/golden replayed by opensmac_headless --golden, names.py check) and, under ASan,
+#             opensmac_unit and the golden replays
 #   native    harness/verify.sh native over every harness/scenarios/*.cmd
-#   observer  smacx (every UI area replaced) in observer mode (--human 0) against the oracle
+#   observer  OpenSMAC (every UI area replaced) in observer mode (--human 0) against the oracle
 #             references: tiny20 small12 std8 late140
-#   asan      the ASan smacx_headless on $GATE_ASAN_SCENARIOS (default tiny20 small12 std8 late140
+#   asan      the ASan opensmac_headless on $GATE_ASAN_SCENARIOS (default tiny20 small12 std8 late140
 #             council131; --quick: tiny20): no sanitizer report, snapshots match the references
-#   fixes     the ASan smacx_headless with the original's bugs fixed (the game's default) on
+#   fixes     the ASan opensmac_headless with the original's bugs fixed (the game's default) on
 #             $GATE_FIXES_SCENARIOS (default tiny20 late140 council131 end300; --quick: tiny20):
 #             no sanitizer report, the run ends normally (nothing is compared: the game differs)
 #   diffnative  src/tools/diffnative.sh: the native build against the frozen baseline's
-#             smacx_headless (GATE_BASELINE, default the tag hybrid-final: the hybrid freeze,
+#             opensmac_headless (GATE_BASELINE, default the tag hybrid-final: the hybrid freeze,
 #             docs/CLEANUP_PLAN.md section 2; a missing baseline fails the step) on new seeds and the
 #             harness scenarios with the original's bugs ($GATE_DIFFNATIVE_OPTS, default "--seeds 6
 #             --turns 40 --scenarios all"; --quick: "--seeds 2 --turns 20"), then with the fixes
 #             ($GATE_DIFFNATIVE_FIXES_OPTS, default "--seeds 3"; --quick: "--seeds 1 --turns 20")
-#   ui        tests/*/run.sh (scripted smacx checks, animated: slides, moves, booms, movies), each
-#             against the native smacx, then again against the ASan smacx (no sanitizer report)
+#   ui        tests/*/run.sh (scripted OpenSMAC checks, animated: slides, moves, booms, movies), each
+#             against the native OpenSMAC, then again against the ASan OpenSMAC (no sanitizer report)
 #
 # Env: GATE_PREFIX build directory prefix (default build/gate: build/gate-native, -asan);
 #      GATE_OUT output directory (default work/gate); GATE_JOBS (default 2).
@@ -114,8 +114,8 @@ if want build; then
     build "$NATIVE" "$OUT/build.log" -DCMAKE_BUILD_TYPE=RelWithDebInfo || ok=0
     what="native"
     if want asan || want unit || want ui || want fixes; then
-        build "$ASAN" "$OUT/build.log" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DSMACX_SANITIZE=ON -- \
-            smacx_headless smacx_unit smacx || ok=0
+        build "$ASAN" "$OUT/build.log" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DOPENSMAC_SANITIZE=ON -- \
+            opensmac_headless opensmac_unit opensmac || ok=0
         what="$what asan"
     fi
     if [ $ok = 1 ]; then report build PASS "$what ($PREFIX-*)"; else report build FAIL "see $OUT/build.log"; fi
@@ -125,10 +125,10 @@ fi
 if want unit; then
     ok=1
     ctest --test-dir "$NATIVE" --output-on-failure > "$OUT/unit.log" 2>&1 || ok=0
-    if [ -x "$ASAN/smacx_unit" ]; then
-        "$ASAN/smacx_unit" >> "$OUT/unit.log" 2>&1 || ok=0
+    if [ -x "$ASAN/opensmac_unit" ]; then
+        "$ASAN/opensmac_unit" >> "$OUT/unit.log" 2>&1 || ok=0
         for s in tiny20 late140; do  # the golden records (ctest's golden_*; 77: no game data)
-            ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0}" "$ASAN/smacx_headless" "harness/scenarios/$s.cmd" \
+            ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0}" "$ASAN/opensmac_headless" "harness/scenarios/$s.cmd" \
                 --golden tests/golden --outdir "$OUT/unit_golden/$s" >> "$OUT/unit.log" 2>&1
             st=$?
             [ $st = 0 ] || [ $st = 77 ] || ok=0
@@ -137,7 +137,7 @@ if want unit; then
     fi
     n=$(grep -o "test cases: *[0-9]*" "$OUT/unit.log" | head -n 1 | tr -s " ")
     g=$(grep -c "^golden PASS" "$OUT/unit.log")
-    if [ $ok = 1 ]; then report unit PASS "ctest + ASan smacx_unit ($n) and ASan golden replays ($g passed)"; else report unit FAIL "see $OUT/unit.log"; fi
+    if [ $ok = 1 ]; then report unit PASS "ctest + ASan opensmac_unit ($n) and ASan golden replays ($g passed)"; else report unit FAIL "see $OUT/unit.log"; fi
 fi
 
 # ---- native ----------------------------------------------------------------------------------
@@ -158,7 +158,7 @@ if want native; then
 fi
 
 # ---- observer --------------------------------------------------------------------------------
-smacx_args() {  # smacx_args SCENARIO: smacx options for a seed/newgame/load/turns scenario
+opensmac_args() {  # opensmac_args SCENARIO: OpenSMAC options for a seed/newgame/load/turns scenario
     awk '$1 == "seed" { printf "--seed %s,%s ", $2, $3 }
          $1 == "newgame" { $1 = ""; printf "--new%s ", $0 }
          $1 == "load" { printf "--save %s ", $2 }
@@ -174,12 +174,12 @@ if want observer; then
         mkdir -p "$d"
         echo "[$s]" >> "$OUT/observer.log"
         # shellcheck disable=SC2046
-        SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 1800 "$NATIVE/smacx" --hidden --nosound --human 0 \
-            --original-bugs --outdir "$d" --snapshots "$d/snap" $(smacx_args "$s") > "$d/smacx.log" 2>&1
+        SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 1800 "$NATIVE/opensmac" --hidden --nosound --human 0 \
+            --original-bugs --outdir "$d" --snapshots "$d/snap" $(opensmac_args "$s") > "$d/opensmac.log" 2>&1
         python3 harness/compare.py "work/ref/$s" "$d/snap" >> "$OUT/observer.log" 2>&1 || ok=0
     done
     grep -qE "DIFF|MISSING" "$OUT/observer.log" && ok=0
-    if [ $ok = 1 ]; then report observer PASS "smacx --human 0: $OBS_SCEN ($(grep -c ' OK$' "$OUT/observer.log") snapshots)"
+    if [ $ok = 1 ]; then report observer PASS "opensmac --human 0: $OBS_SCEN ($(grep -c ' OK$' "$OUT/observer.log") snapshots)"
     else report observer FAIL "see $OUT/observer.log"; fi
 fi
 
@@ -193,7 +193,7 @@ if want asan; then
         d="$OUT/asan/$s"
         mkdir -p "$d"
         echo "[$s]" >> "$OUT/asan.log"
-        ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0}" timeout 3600 "$ASAN/smacx_headless" \
+        ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0}" timeout 3600 "$ASAN/opensmac_headless" \
             "harness/scenarios/$s.cmd" --outdir "$d" --original-bugs > "$d/headless.log" 2>&1
         if grep -qE "AddressSanitizer|runtime error|LeakSanitizer" "$d/headless.log"; then
             grep -m 5 -E "AddressSanitizer|runtime error" "$d/headless.log" >> "$OUT/asan.log"; ok=0
@@ -211,7 +211,7 @@ if want fixes; then
     for s in $FIXES_SCEN; do
         d="$OUT/fixes/$s"
         mkdir -p "$d"
-        ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0}" timeout 3600 "$ASAN/smacx_headless" \
+        ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0}" timeout 3600 "$ASAN/opensmac_headless" \
             "harness/scenarios/$s.cmd" --outdir "$d" > "$d/headless.log" 2>&1
         st=$?
         n=$(ls "$d"/turn_*.state 2>/dev/null | wc -l)
@@ -235,7 +235,7 @@ if want diffnative; then
         DN_OPTS="${GATE_DIFFNATIVE_OPTS:---seeds 6 --turns 40 --scenarios all}"
         DN_FIX_OPTS="${GATE_DIFFNATIVE_FIXES_OPTS:---seeds 3}"
     fi
-    if ! [ -x "$BASELINE/smacx_headless" ] && ! git rev-parse --verify --quiet "$BASELINE^{commit}" > /dev/null; then
+    if ! [ -x "$BASELINE/opensmac_headless" ] && ! [ -x "$BASELINE/smacx_headless" ] && ! git rev-parse --verify --quiet "$BASELINE^{commit}" > /dev/null; then
         report diffnative FAIL "no baseline $BASELINE (tag hybrid-final, or GATE_BASELINE=<rev or build dir>)"
     # shellcheck disable=SC2086
     elif JOBS="$JOBS" DIFFNATIVE_OUT="$OUT/diffnative" src/tools/diffnative.sh --baseline "$BASELINE" --build "$NATIVE" \
@@ -253,16 +253,16 @@ if want ui; then
     ok=1; failed=""
     for t in tests/*/run.sh; do
         name="$(basename "$(dirname "$t")")"
-        if ! SMACX="$NATIVE/smacx" "$t" "$OUT/ui/$name" > "$OUT/ui_$name.log" 2>&1; then
+        if ! OPENSMAC="$NATIVE/opensmac" "$t" "$OUT/ui/$name" > "$OUT/ui_$name.log" 2>&1; then
             ok=0; failed="$failed $name"
         fi
     done
-    # The suites again (animated, their default) against the ASan smacx: every check and no
+    # The suites again (animated, their default) against the ASan OpenSMAC: every check and no
     # sanitizer report in any case's log.
     asan_bad=""
     for t in tests/*/run.sh; do
         name="$(basename "$(dirname "$t")")"
-        if ! ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0}" SMACX="$ASAN/smacx" "$t" "$OUT/ui_asan/$name" \
+        if ! ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0}" OPENSMAC="$ASAN/opensmac" "$t" "$OUT/ui_asan/$name" \
             > "$OUT/ui_asan_$name.log" 2>&1; then
             ok=0; failed="$failed asan:$name"
         fi

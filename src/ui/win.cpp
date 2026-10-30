@@ -1,4 +1,4 @@
-// Window layer of smacx (see win.h): screen, message pump, keyboard, placeholder console panel.
+// Window layer of OpenSMAC (see win.h): screen, message pump, keyboard, placeholder console panel.
 #include "ui/infowin.h"
 #include "ui/tutwin.h"
 #include "ui/diplowin.h"
@@ -128,7 +128,7 @@ int32_t vk_char(int32_t vk, bool shift, bool ctrl) {
 // A key press: WM_KEYDOWN with the modifier bits (Win_on_key), then its WM_CHAR.
 void dispatch_key(int32_t key) {
     int32_t vk = key & 0xFFFF;
-    static const bool log = std::getenv("SMACX_KEYLOG") != nullptr;
+    static const bool log = std::getenv("OPENSMAC_KEYLOG") != nullptr;
     if (log) {
         std::fprintf(stderr, "key %05X (turn %d, unit %d, mode %d)\n", (uint32_t)key, CurrentTurn, MapWinVehA,
                      MapWinInVehMode);
@@ -170,7 +170,7 @@ void quit_requested() {
 // manager under Wine) goes to pfncWinProc (0x5F08F4), which calls the window object's
 // on_sys_close, and the game goes on: at the main menu, in the game and through the end of the
 // turn (checked under Wine: tests/popups/orig_drive.py `close`); while a popup is up the window is
-// disabled and the close does nothing either. smacx's close button is its own: before a game runs
+// disabled and the close does nothing either. OpenSMAC's close button is its own: before a game runs
 // (the opening movie and screens, the setup dialogs: GameNotStarted) it quits at once; in a game
 // the main screen asks the quit question of Esc / ctrl+Q (Console_on_key_click: REALLYQUIT, or
 // REALLYWIMPOUT with other humans), while a popup or another modal window (the question itself
@@ -215,7 +215,7 @@ bool run_command(const std::string& cmd) {
         std::string path = arg;
         if (path.empty()) {
             char name[64];
-            std::snprintf(name, sizeof(name), "smacx_%03d.bmp", g_ui_shots++);
+            std::snprintf(name, sizeof(name), "opensmac_%03d.bmp", g_ui_shots++);
             path = name;
         }
         if (path[0] != '/') path = g_ui_outdir + "/" + path;
@@ -230,7 +230,7 @@ bool run_command(const std::string& cmd) {
         crt_set_rand_state(crt);
         game_reseed(game);
         std::fprintf(stderr, "save %s (turn %d) -> %d\n", path.c_str(), CurrentTurn, r);
-        // The generators and the logic clock as they are now (smacx --rng restores them).
+        // The generators and the logic clock as they are now (opensmac --rng restores them).
         if (FILE* f = std::fopen((path + ".rng").c_str(), "w")) {
             std::fprintf(f, "crt %u\ngame %u\nclock %u\nturn %d\n", crt_rand_state(), game_random_state(),
                          engine_logic_clock_state(), CurrentTurn);
@@ -253,7 +253,7 @@ bool run_command(const std::string& cmd) {
         // The viewer's units (scripted tests).
         for (int32_t i = 0; i < VehCount; i++) {
             const VEH& v = Vehs[i];
-            if (v.faction_id != CurrentPlayerFaction && !std::getenv("SMACX_ALLUNITS")) continue;
+            if (v.faction_id != CurrentPlayerFaction && !std::getenv("OPENSMAC_ALLUNITS")) continue;
             std::fprintf(stderr, "unit %d f%d %s (%d,%d) order %d moves %d state %08X %s\n", i, v.faction_id,
                          Units[v.unit_id].name, v.x, v.y, v.order, v.moves_spent, v.state, veh_ready(i) ? "ready" : "");
         }
@@ -687,7 +687,7 @@ int32_t ui_key_state(int32_t vk) {
 
 void ui_trace(const char* what) {
     static int on = -1;
-    if (on < 0) on = std::getenv("SMACX_TRACE") ? 1 : 0;
+    if (on < 0) on = std::getenv("OPENSMAC_TRACE") ? 1 : 0;
     if (!on) return;
     std::fprintf(stderr, "trace %s: turn %d crt %08X game %08X clock %u\n", what, CurrentTurn, crt_rand_state(),
                  game_random_state(), engine_logic_clock_state());
@@ -736,7 +736,7 @@ static bool modal_callback() {
     if (!g_modal_cb || !MultiplayerActive) return true;
     if (g_modal_cb == 0x5398E0) return pop_wait() != 0;
     if (g_modal_cb == 0x539920) return pop_expire() != 0;
-    if (g_modal_cb == 0x51F200) {  // (smacx: a modeless window of the original made modal)
+    if (g_modal_cb == 0x51F200) {  // (OpenSMAC: a modeless window of the original made modal)
         wait_loop();
         return !ControlTurnA;
     }
@@ -870,7 +870,7 @@ void GAMEAPI wait_task() {
 // bit 2), it ends the turn (Console_end_my_turn). As the original, the click's position is packed
 // wrongly ((y & 0xFF) << 8 | (x & 0xFF) as the x coordinate, 0 as the y), and starting the timer
 // makes every faction the AI's (FactionStatus[0] = 0) while stopping it makes faction 4 the human
-// (0x10). Approximated: the timer runs in smacx's input loops (the main loop, the modal popups'
+// (0x10). Approximated: the timer runs in OpenSMAC's input loops (the main loop, the modal popups'
 // and windows' loops; the turn ends only from the main loop, the original's WinModalState 0), the
 // posted key is the random byte without the original's sign extension.
 namespace {
@@ -910,7 +910,7 @@ void auto_play_tick(bool main_loop) {
         ev.type = platform::EV_KEY_DOWN;
         ev.key = c;
         std::fprintf(stderr, "auto play: key %d\n", c);
-        g_input.push_back(ev);  // (WM_KEYUP: no key-up events in smacx's queue)
+        g_input.push_back(ev);  // (WM_KEYUP: no key-up events in OpenSMAC's queue)
         return;
     }
     uint32_t x = (uint32_t)game_random(0, ScreenWidth);

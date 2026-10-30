@@ -1,6 +1,6 @@
 /* Rule tables as normalized text ("dumprules <file>" script command).
  *
- * Shared by the oracle (oracle.dll / hybrid.dll, built with SMACX_HYBRID so the engine's GLOBAL
+ * Shared by the oracle (oracle.dll / hybrid.dll, built with OPENSMAC_HYBRID so the engine's GLOBAL
  * names bind to the original process memory) and the headless runner (native storage). String
  * pointers are dereferenced, so the output does not depend on heap addresses. Header-only and
  * free of engine function calls (oracle.dll does not link the engine).

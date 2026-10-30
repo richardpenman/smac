@@ -7,7 +7,7 @@
 // (the GraphicWin canvas, the per-tile terrain cache at +4) is native: MapWinNative.
 //
 // Functions declared in engine/ui_bridge.h (pfncRedrawMap, pfncMoveMap) are defined here under
-// their own names: smacx replaces the headless "mapview" area with them (src/headless
+// their own names: OpenSMAC replaces the headless "mapview" area with them (src/headless
 // ui_headless_mapview.cpp; the rest of that area is in src/ui/win_mapview.cpp).
 #pragma once
 #include <cstdint>
@@ -99,7 +99,7 @@ struct MapDumpHeader {
 bool ui_mapdump_read_header(const char* path, MapDumpHeader* out);
 // Writes the window's canvas with the game palette.
 bool ui_mapdump_write(uint8_t* win, const char* path, int32_t viewer);
-// smacx --dump: when `like` names a dump, takes its view (canvas size, viewer, zoom, centre,
+// opensmac --dump: when `like` names a dump, takes its view (canvas size, viewer, zoom, centre,
 // tile address), redraws the window fully and writes its canvas to `path` (the viewer is
 // restored afterwards). Without `like`, dumps the current view.
 // scroll_from (x >= 0): the dumped redraw is a scrolled one, from a full redraw centred there

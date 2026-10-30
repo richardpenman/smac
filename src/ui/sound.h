@@ -10,7 +10,7 @@
 // keyed by the object's address; the image is never written (the fcompare ignore list names those
 // objects, and no game state depends on them).
 //
-// SMACX_SOUNDLOG=1 logs every FX / voice / music call on stderr ("sound: T<turn> FX_play 15"), before any
+// OPENSMAC_SOUNDLOG=1 logs every FX / voice / music call on stderr ("sound: T<turn> FX_play 15"), before any
 // test of the preferences or of the device, so the log is the same with or without sound.
 #pragma once
 #include <cstdint>
@@ -19,7 +19,7 @@
 #include "engine/memmap.h"
 #include "platform/ui_platform.h"
 
-// smacx: opens the audio device unless disabled (--nosound); the log flag.
+// OpenSMAC: opens the audio device unless disabled (--nosound); the log flag.
 void sound_startup(bool enabled);
 void sound_shutdown();
 bool sound_log_on();
@@ -96,7 +96,7 @@ void music_call(int32_t vtable_offset);
 void music_release();
 void music_set_volume(int32_t volume);
 bool music_loaded();
-// Test aid (smacx --keys MUSICRENDER:FILE:SECONDS): renders the music sequencer's next seconds into a
+// Test aid (opensmac --keys MUSICRENDER:FILE:SECONDS): renders the music sequencer's next seconds into a
 // WAV file instead of the device and logs its level.
 bool music_render(const char* path, int32_t seconds);
 

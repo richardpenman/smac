@@ -1,22 +1,22 @@
 #!/bin/bash
-# Scripted checks of the opening screens of smacx (docs/UI_PLAN.md section 11): the main menu
+# Scripted checks of the opening screens of OpenSMAC (docs/UI_PLAN.md section 11): the main menu
 # (top_menu) and its sub-menus, a new game set up through the setup dialogs (map menu, size and
 # custom planet, difficulty, rules, the faction picker, the leader's name) compared with the --new
 # game of the same parameters and seed, a save loaded through the FileBox, and a preference
 # changed in the preferences dialog (Alpha Centauri.Ini).
 #
-#   tests/menu/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/p9-native/smacx)
+#   tests/menu/run.sh [OUTDIR]        (OPENSMAC=path/to/opensmac, default build/p9-native/opensmac)
 #
 # Every run uses its own ini (OUTDIR/menu.ini: harness/oracle/runtime's with Difficulty=2) and
 # writes only below OUTDIR. Exit status 0 when every check passes.
 set -u
-# Animated by default (smacx --animate: slides, unit moves, booms, battle reports and movies play
+# Animated by default (opensmac --animate: slides, unit moves, booms, battle reports and movies play
 # with their waits, as in an interactive game); TEST_FAST=1 runs unattended (skips them).
-if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
+if [ "${TEST_FAST:-0}" = 1 ]; then export OPENSMAC_ANIMATE=0; else export OPENSMAC_ANIMATE=1; fi
 # No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SMACX="$(realpath "${SMACX:-$ROOT/build/p9-native/smacx}")"
+OPENSMAC="$(realpath "${OPENSMAC:-$ROOT/build/p9-native/opensmac}")"
 OUT="$(realpath -m "${1:-$ROOT/work/menu_test}")"
 rm -rf "$OUT"
 mkdir -p "$OUT"
@@ -25,11 +25,11 @@ echo "Difficulty=2" >> "$OUT/menu.ini"
 FAIL=0
 SEED=1001,2001
 
-run() {  # run CASE ARGS... : smacx with a fresh outdir (its own ini copy), log in OUT/CASE.log
+run() {  # run CASE ARGS... : OpenSMAC with a fresh outdir (its own ini copy), log in OUT/CASE.log
     local name="$1"; shift
     rm -rf "$OUT/$name"
     mkdir -p "$OUT/$name"
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --original-bugs --hidden --ini "$OUT/menu.ini" \
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$OPENSMAC" --original-bugs --hidden --ini "$OUT/menu.ini" \
         --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
 }
 check() {  # check NAME CONDITION-RESULT(0/1) DETAIL

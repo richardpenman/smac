@@ -233,7 +233,7 @@ void THISCALL NetDaemon_process_message(uint8_t* net, uint8_t* msg, int32_t size
     case 0x0F0C:
     case 0x0F0F: net_files_message(net, msg, size, from_pid); break;
     case 0x0F0D: ui_netwin_faction_data(msg); break;
-    case 0x0F10:  // smacx: the host's original-bugs setting (net_send_original_bugs)
+    case 0x0F10:  // OpenSMAC: the host's original-bugs setting (net_send_original_bugs)
         compat_set_original_bugs(m[4] != 0);
         ui_net_note_text(m[4] ? "net: the host plays with the original bugs" : "net: the host plays with the fixes");
         break;

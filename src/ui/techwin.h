@@ -11,9 +11,9 @@
 Sprite* tech_picture(int32_t tech_id);
 // Blind research priorities (TECHRANDOM: the faction's AI_fight / growth / tech / wealth).
 ADDR_NATIVE(0x514F50) void THISCALL Console_set_ai(uint8_t* console, int32_t faction_id);
-// Test aid (smacx --keys TECHSTATE): the viewer's research ("techstate f F research T
+// Test aid (opensmac --keys TECHSTATE): the viewer's research ("techstate f F research T
 // accumulated A cost C") and the research window's choices when it is open.
 void techwin_log_state();
-// Test aid (smacx --keys PROTOSTATE, designwin.cpp): the viewer's prototypes ("proto U name 'N'
+// Test aid (opensmac --keys PROTOSTATE, designwin.cpp): the viewer's prototypes ("proto U name 'N'
 // chassis C weapon W armor A reactor R abil X flags F obsolete O cost C").
 void designwin_log_protos();

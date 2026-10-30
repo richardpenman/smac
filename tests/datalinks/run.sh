@@ -1,33 +1,33 @@
 #!/bin/bash
 # Scripted checks of the datalinks (the help browser, src/ui/datalink.cpp, help.cpp).
 #
-#   tests/datalinks/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/p7-native/smacx)
+#   tests/datalinks/run.sh [OUTDIR]        (OPENSMAC=path/to/opensmac, default build/p7-native/opensmac)
 #
-# Plays scripted keys on late saves as a human faction (smacx --keys, hidden, SDL dummy video).
+# Plays scripted keys on late saves as a human faction (opensmac --keys, hidden, SDL dummy video).
 # SCREENSTATE logs the open browser ("datalink cat C index I sel S items N history ...", the
 # entry's "screentext title ...", "screentext text1/text2 ..." lines). Screenshots go to
 # OUTDIR/<case>/. Exit status 0 when every check passes.
 set -u
-# Animated by default (smacx --animate: slides, unit moves, booms, battle reports and movies play
+# Animated by default (opensmac --animate: slides, unit moves, booms, battle reports and movies play
 # with their waits, as in an interactive game); TEST_FAST=1 runs unattended (skips them).
-if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
-# Every wrapped text is checked against its box (SMACX_TEXTCHECK: ink right of the box is logged).
-export SMACX_TEXTCHECK=1
+if [ "${TEST_FAST:-0}" = 1 ]; then export OPENSMAC_ANIMATE=0; else export OPENSMAC_ANIMATE=1; fi
+# Every wrapped text is checked against its box (OPENSMAC_TEXTCHECK: ink right of the box is logged).
+export OPENSMAC_TEXTCHECK=1
 # No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SMACX="$(realpath "${SMACX:-$ROOT/build/p7-native/smacx}")"
+OPENSMAC="$(realpath "${OPENSMAC:-$ROOT/build/p7-native/opensmac}")"
 OUT="$(realpath -m "${1:-$ROOT/work/datalinks_test}")"
 mkdir -p "$OUT"
 FAIL=0
 # turn_147 as faction 3 and turn_300 as faction 6 start with a computer player's call (communicate):
 # DOWN,ENTER answers its COMM popup "not now".
 
-run() {  # run CASE ARGS... : runs smacx, log in OUT/CASE.log
+run() {  # run CASE ARGS... : runs OpenSMAC, log in OUT/CASE.log
     local name="$1"; shift
     mkdir -p "$OUT/$name"
     rm -f "$OUT/$name"/*.bmp
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --original-bugs --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$OPENSMAC" --original-bugs --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
 line() { grep -a "^$2" "$OUT/$1.log" | sed -n "$3p"; }

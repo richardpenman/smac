@@ -1,4 +1,4 @@
-// smacx's replacement of the headless "mapview" area: the map drawing entry points the engine calls
+// OpenSMAC's replacement of the headless "mapview" area: the map drawing entry points the engine calls
 // (engine/ui_bridge.h). pfncRedrawMap and pfncMoveMap are in mapwin.cpp, MapWin_draw_radius in
 // mapwin_radius.cpp. The engine's draw_tile family redraws the changed tiles at once on every open
 // map window (the main view and the active ones), as the original; draw_map marks the main view

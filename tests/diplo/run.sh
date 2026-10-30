@@ -2,9 +2,9 @@
 # Scripted checks of the diplomacy dialog (communicate, the human's menus, DiploPop) and the
 # Planetary Council window (src/ui/diplo_comm.cpp, diplowin.cpp, councilwin.cpp).
 #
-#   tests/diplo/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/p8-native/smacx)
+#   tests/diplo/run.sh [OUTDIR]        (OPENSMAC=path/to/opensmac, default build/p8-native/opensmac)
 #
-# Plays scripted keys (smacx --keys, hidden, SDL dummy video) on late saves as a human faction.
+# Plays scripted keys (opensmac --keys, hidden, SDL dummy video) on late saves as a human faction.
 # DIPLOSTATE logs the viewer ("diplostate fV credits C techs N bases B governor G") and every
 # other living faction ("diplo I status S agenda A friction F patience P loan BAL/PAY credits C
 # bases B techs N"); the council window's SCREENSTATE adds "councilstate proposal P candidate C
@@ -12,24 +12,24 @@
 # check that the change stays. Screenshots go to OUTDIR/<case>/. Exit status 0 when every check
 # passes.
 set -u
-# Animated by default (smacx --animate: slides, unit moves, booms, battle reports and movies play
+# Animated by default (opensmac --animate: slides, unit moves, booms, battle reports and movies play
 # with their waits, as in an interactive game); TEST_FAST=1 runs unattended (skips them).
-if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
-# Every wrapped text is checked against its box (SMACX_TEXTCHECK: ink right of the box is logged).
-export SMACX_TEXTCHECK=1
+if [ "${TEST_FAST:-0}" = 1 ]; then export OPENSMAC_ANIMATE=0; else export OPENSMAC_ANIMATE=1; fi
+# Every wrapped text is checked against its box (OPENSMAC_TEXTCHECK: ink right of the box is logged).
+export OPENSMAC_TEXTCHECK=1
 # No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SMACX="$(realpath "${SMACX:-$ROOT/build/p8-native/smacx}")"
+OPENSMAC="$(realpath "${OPENSMAC:-$ROOT/build/p8-native/opensmac}")"
 OUT="$(realpath -m "${1:-$ROOT/work/diplo_test}")"
 mkdir -p "$OUT"
 FAIL=0
 
-run() {  # run CASE ARGS... : runs smacx, log in OUT/CASE.log
+run() {  # run CASE ARGS... : runs OpenSMAC, log in OUT/CASE.log
     local name="$1"; shift
     mkdir -p "$OUT/$name"
     rm -f "$OUT/$name"/*.bmp
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --original-bugs --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$OPENSMAC" --original-bugs --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
 check() {  # check WHAT GOT WANT

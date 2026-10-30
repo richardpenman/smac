@@ -1,5 +1,5 @@
 // Headless UI area "pump": the message pump the engine runs inside long loops (engine/ui_bridge.h).
-// There is no window. Replaced in smacx by src/ui/win.cpp.
+// There is no window. Replaced in OpenSMAC by src/ui/win.cpp.
 #include "engine/ui_bridge.h"
 
 void GAMEAPI do_all_non_input() {}

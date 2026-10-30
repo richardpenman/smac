@@ -1,5 +1,5 @@
 #!/bin/bash
-# Online play (docs/MULTIPLAYER.md, phase 3): two smacx processes on localhost, a host and a client
+# Online play (docs/MULTIPLAYER.md, phase 3): two OpenSMAC processes on localhost, a host and a client
 # (SDL dummy drivers, scripted keys), set up a game through SELECTSERVICE's Internet (TCP/IP) item,
 # the TCPHOST / TCPJOIN popups and the MULTIPLAYER SETUP window, then play turns one player at a
 # time (GameMoreRules 0x10, the setup's default) with the computer factions' turns in lockstep.
@@ -9,20 +9,20 @@
 # each machine's own UI state (unit stacking order, a unit's focus bit). The original's desync check
 # runs each turn (NetDaemon_game_checksum, net_upkeep: no "checksum differs"). The host moves a unit
 # through the locks. A second game
-# provokes a desync (SMACX_NET_DESYNC=TURN: the client changes a unit's morale at that turn): the host finds
+# provokes a desync (OPENSMAC_NET_DESYNC=TURN: the client changes a unit's morale at that turn): the host finds
 # the vehicles' checksum different and resends the units; the next turn's units and bases agree.
 # A third game has the two humans make a deal in the DiploWin (a treaty and energy credits), a
 # fourth sets time controls and lets turns run out, a fifth has the host's settings picked in the
 # setup window applied on the client, a sixth has the client drop out of the game.
 #
-#   tests/online/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/net-native/smacx)
+#   tests/online/run.sh [OUTDIR]        (OPENSMAC=path/to/opensmac, default build/net-native/opensmac)
 #
-# Runs two smacx processes at once: run it alone. Exit status 0 when every check passes.
+# Runs two OpenSMAC processes at once: run it alone. Exit status 0 when every check passes.
 set -u
-if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
+if [ "${TEST_FAST:-0}" = 1 ]; then export OPENSMAC_ANIMATE=0; else export OPENSMAC_ANIMATE=1; fi
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}" SDL_VIDEODRIVER=dummy
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SMACX="$(realpath "${SMACX:-$ROOT/build/net-native/smacx}")"
+OPENSMAC="$(realpath "${OPENSMAC:-$ROOT/build/net-native/opensmac}")"
 OUT="$(realpath -m "${1:-$ROOT/work/online_test}")"
 rm -rf "$OUT"
 mkdir -p "$OUT"
@@ -73,11 +73,11 @@ game() {
     # The host plays with the original's bugs (the ini's key); the client, with the default (the
     # fixes), takes the host's setting.
     printf 'Original Bugs=1\r\n' >> "$OUT/$name.ini"
-    (cd "$ROOT" && timeout 600 "$SMACX" --hidden --seed 1001,2001 --ini "$OUT/$name.ini" --outdir "$OUT/$name-host" \
+    (cd "$ROOT" && timeout 600 "$OPENSMAC" --hidden --seed 1001,2001 --ini "$OUT/$name.ini" --outdir "$OUT/$name-host" \
         --snapshots "$OUT/$name-host/snap" --keys "$HOST" > "$OUT/$name-host.log" 2>&1; echo $? > "$OUT/$name-host.rc") &
     local hp=$!
     sleep 2
-    (cd "$ROOT" && env "$@" timeout 600 "$SMACX" --hidden --seed 1002,2002 --ini "$OUT/$name-client.ini" \
+    (cd "$ROOT" && env "$@" timeout 600 "$OPENSMAC" --hidden --seed 1002,2002 --ini "$OUT/$name-client.ini" \
         --outdir "$OUT/$name-client" --snapshots "$OUT/$name-client/snap" --keys "$CLIENT" \
         > "$OUT/$name-client.log" 2>&1; echo $? > "$OUT/$name-client.rc") &
     local cp=$!
@@ -124,7 +124,7 @@ check game-client "the host's setting: the original bugs" "^net: the host plays 
 compare game "host and client states equal each turn"
 
 # 2. A desync provoked at turn 2 on the client: the host resends the units.
-game desync SMACX_NET_DESYNC=2
+game desync OPENSMAC_NET_DESYNC=2
 check desync-client "the desync provoked" "^net: desync provoked"
 check desync-host "found by the checksums" "checksum 3 differs from faction 2's"
 # After the resynch the units and bases agree again. (The rest may keep a trace of the desync, as

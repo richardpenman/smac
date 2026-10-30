@@ -41,7 +41,7 @@ ADDR(0x425BA0) int32_t THISCALL CouncilWin_key(uint8_t* self, int32_t a1, int32_
 
 // ---- window operations (not original functions) ------------------------------------------------
 // The parts of the methods above that work on the window itself: fonts, layout, buttons, panels,
-// drawing and the modal loop. smacx: the window (src/ui/councilwin.cpp); headless: nothing, except:
+// drawing and the modal loop. OpenSMAC: the window (src/ui/councilwin.cpp); headless: nothing, except:
 // ui_councilwin_modal: the original's modal loop (Win_set_modal) returns once the viewer has voted
 // and closed the window. Headless (no human is ever interactive) does what the oracle's
 // observer does: the viewer casts the vote the window

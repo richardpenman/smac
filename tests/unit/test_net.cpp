@@ -1,6 +1,6 @@
 // The network layer's entry points in a single player game (engine/net_daemon.cpp): each returns as
 // the original does without a network game, none reaches an unreconstructed multiplayer path
-// (synch_veh once aborted smacx when an artifact was linked to a network node).
+// (synch_veh once aborted OpenSMAC when an artifact was linked to a network node).
 #include "engine/action.h"
 #include "engine/net.h"
 #include "engine/net_misc.h"

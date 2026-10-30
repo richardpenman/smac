@@ -15,7 +15,7 @@
 // their meaning with the original offsets noted; the drawing is done into the popup's own canvas
 // (its GraphicWin Buffer), which the screen composites over the main view (popup_draw_windows).
 //
-// Exec runs the modal loop (Win_set_modal) on smacx's input: keys as Win_key_down_event /
+// Exec runs the modal loop (Win_set_modal) on OpenSMAC's input: keys as Win_key_down_event /
 // Win_key_click_event deliver them (Enter: the OK button, Esc: the cancel button, arrows: the
 // item group), mouse clicks on items and buttons. The return value is the original's: the
 // selected item id (check boxes: their state bits), -1 when cancelled with a Cancel button.

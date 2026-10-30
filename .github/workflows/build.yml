@@ -1,4 +1,4 @@
-# Builds the native engine and smacx_headless on Linux, macOS and Windows, and runs the
+# Builds the native engine and opensmac_headless on Linux, macOS and Windows, and runs the
 # portability smoke test (tests/smoke.cpp). The game data and src/data/data_image.bin are not in
 # the repository, so games cannot be played or compared here (see harness/README.md for that).
 name: build
@@ -12,9 +12,9 @@ permissions:
   contents: read
 
 env:
-  # The SDL2 UI (smacx) is not built here; only the engine, smacx_headless and the smoke test.
+  # The SDL2 UI (OpenSMAC) is not built here; only the engine, opensmac_headless and the smoke test.
   CONFIGURE_FLAGS: -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=ON -DCMAKE_DISABLE_FIND_PACKAGE_SDL2_ttf=ON
-  TARGETS: smacx_headless smacx_smoke smacx_unit
+  TARGETS: opensmac_headless opensmac_smoke opensmac_unit
 
 jobs:
   unix:
@@ -74,6 +74,6 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -A x64 -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=ON -DCMAKE_DISABLE_FIND_PACKAGE_SDL2_ttf=ON
       - name: Build
-        run: cmake --build build --config RelWithDebInfo --parallel 4 --target smacx_headless smacx_smoke smacx_unit
+        run: cmake --build build --config RelWithDebInfo --parallel 4 --target opensmac_headless opensmac_smoke opensmac_unit
       - name: Smoke test
         run: ctest --test-dir build -C RelWithDebInfo --output-on-failure

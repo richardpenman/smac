@@ -11,7 +11,7 @@
 // sprite (the second); not done: the repeat while a button or the track is held (BaseButton's
 // timer, Scroll_on_button_pressed), the dragged thumb kept where it was dropped (+0xA3C: here it
 // goes back to the position's place on release).
-// Colours 7, 247, 248 and 255 are Windows static colours in smacx's palette (light grey, grey,
+// Colours 7, 247, 248 and 255 are Windows static colours in OpenSMAC's palette (light grey, grey,
 // white) but show black in the original's screenshots (tests/placeholders/compare.sh, the
 // datalinks' list): the bar draws them black (kBlack) until the palette's static entries are
 // settled.

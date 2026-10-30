@@ -1,5 +1,5 @@
-// smacx's network transport: the replacement of the original's DirectPlay layer (Net_*, netlib
-// 0x62D6A0..0x633000) for online games between smacx copies (docs/MULTIPLAYER.md, phase 3).
+// OpenSMAC's network transport: the replacement of the original's DirectPlay layer (Net_*, netlib
+// 0x62D6A0..0x633000) for online games between OpenSMAC copies (docs/MULTIPLAYER.md, phase 3).
 //
 // One TCP stream per client to the host (star topology, as DirectPlay's client/server sessions).
 // Every message travels as a length-prefixed frame (FrameHeader, little-endian, then the payload).

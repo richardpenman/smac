@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Layout facts of smacx screenshots (24-bit BMPs, tests/screen/run.sh); no third-party modules.
+"""Layout facts of OpenSMAC screenshots (24-bit BMPs, tests/screen/run.sh); no third-party modules.
 
   layout.py strips SHOT.bmp            the strips beside the console (x outside the centred 1024
                                        columns, the bottom 213 rows): "strips W H nonblack N of T"

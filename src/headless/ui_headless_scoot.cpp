@@ -1,4 +1,4 @@
-// Headless implementation of veh_scoot, the unit's sliding animation (engine/ui_bridge.h). smacx
+// Headless implementation of veh_scoot, the unit's sliding animation (engine/ui_bridge.h). OpenSMAC
 // replaces this area (src/ui/sound.cpp).
 #include "engine/game_state.h"
 #include "engine/ui_bridge.h"

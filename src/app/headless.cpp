@@ -3,8 +3,8 @@
 // Executes the same command scripts as the oracle (harness/oracle/oracle.cpp) and writes snapshots
 // in the same format, so harness/compare.py can diff the two. Usage:
 //
-//   smacx_headless <script.cmd> [--outdir DIR] [--gamedir DIR] [--image FILE] [--original-bugs]
-//                  [--golden DIR]
+//   opensmac_headless <script.cmd> [--outdir DIR] [--gamedir DIR] [--image FILE] [--original-bugs]
+//                     [--golden DIR]
 //
 // --original-bugs plays with the original's bugs (engine/compat.h), as the comparisons with the
 // original need (harness/verify.sh and the gate pass it); without it the game plays with the
@@ -462,9 +462,10 @@ int main(int argc, char** argv) {
         else script = a;
     }
     if (script.empty()) {
-        std::fprintf(stderr,
-                     "usage: smacx_headless <script.cmd> [--outdir DIR] [--gamedir DIR] [--image FILE] [--ini FILE]\n"
-                     "                      [--original-bugs] [--golden DIR]\n");
+        std::fprintf(
+            stderr,
+            "usage: opensmac_headless <script.cmd> [--outdir DIR] [--gamedir DIR] [--image FILE] [--ini FILE]\n"
+            "                         [--original-bugs] [--golden DIR]\n");
         return 2;
     }
     if (!golden_dir.empty()) {

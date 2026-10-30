@@ -1,11 +1,11 @@
-// Native frame of smacx's full-screen modal windows (not an original class): the social
+// Native frame of OpenSMAC's full-screen modal windows (not an original class): the social
 // engineering window (SocialWin), the reports (ReportWin / ReportIf), the monuments (MonuWin) and
 // the hall of fame (FameWin). In the original each is a GraphicWin over the map with, for most of
 // them, a SubInterface in the main interface (the console at the bottom of the screen), run by
 // Win_set_modal until Win_release_modal. Here a ScreenWin holds the window's canvas and position,
 // optionally a copy of the main interface's canvas (console2_A.pcx art, the pane rectangles of
 // MainInfc as basewin.cpp sets them), push buttons (BaseButton / FlatButton, basewin_internal.h)
-// and clickable spots on either canvas, and runs the modal loop on smacx's input (ui_wait_input).
+// and clickable spots on either canvas, and runs the modal loop on OpenSMAC's input (ui_wait_input).
 // The screens draw with the original's art (box sprites, PCX files), fonts (find_font) and text
 // colours; their layout follows the original's rectangles where noted, their pixels are not
 // compared with the original (each file's header says what is approximated).

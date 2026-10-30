@@ -44,7 +44,7 @@ int32_t setupwin_do_menu_2(BasePop* pop);
 int32_t setupwin_do_menu(const char* label, int32_t active);
 
 // ---- harness hooks (not original) ----
-// Called by config_game right before the world is built (world_build / setup_game): smacx reseeds
+// Called by config_game right before the world is built (world_build / setup_game): OpenSMAC reseeds
 // the generators there (--seed in a game set up from the menu, as the harness's seed command
 // before newgame).
 extern void (*g_ui_before_world_build)();

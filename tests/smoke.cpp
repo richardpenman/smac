@@ -118,9 +118,9 @@ int main() {
     check_crt();
     check_files();
     if (g_failures) {
-        std::fprintf(stderr, "smacx_smoke: %d check(s) failed\n", g_failures);
+        std::fprintf(stderr, "opensmac_smoke: %d check(s) failed\n", g_failures);
         return 1;
     }
-    std::printf("smacx_smoke: all checks passed\n");
+    std::printf("opensmac_smoke: all checks passed\n");
     return 0;
 }

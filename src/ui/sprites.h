@@ -82,6 +82,6 @@ ADDR_NATIVE(0x451C50) void GAMEAPI load_terrain();
 ADDR_NATIVE(0x455400) void GAMEAPI load_cycling();
 
 // load_faction_art (0x453710; declared in engine/ui_bridge.h; replaces the headless "art" area in
-// smacx): faction colours and base sprites from <faction>.pcx (faction.pcx when missing).
+// OpenSMAC): faction colours and base sprites from <faction>.pcx (faction.pcx when missing).
 // Portraits and logos are not loaded yet.
 void GAMEAPI load_faction_art(int32_t faction_id);

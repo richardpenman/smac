@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Compare the sound calls of the original (oracle "logsound": SOUND T<turn> <name> <args> from
-<caller>) with smacx's (SMACX_SOUNDLOG=1: sound: T<turn> <name> <args>).
+<caller>) with OpenSMAC's (OPENSMAC_SOUNDLOG=1: sound: T<turn> <name> <args>).
 
-  soundcmp.py ORACLE_LOG|REF SMACX_LOG [--names a,b,..] [--one-window]
+  soundcmp.py ORACLE_LOG|REF OPENSMAC_LOG [--names a,b,..] [--one-window]
   soundcmp.py --normalize ORACLE_LOG > REF      (the reference kept in tests/sound)
 
 --one-window: the original repeats an explosion's sound for every map window showing its tile
-(boom's loop over MapWins); smacx has one map window: an immediately repeated explosion sound
+(boom's loop over MapWins); OpenSMAC has one map window: an immediately repeated explosion sound
 (FX_play_loc 61, 62 or 90 and its Wave_play_2) of the original counts once.
 
 Both are reduced to lines "T<turn> <name> <args>" (Wave_play_2: the file's base name, lower case;
@@ -85,7 +85,7 @@ def main():
     b = read(sys.argv[2], False, names)
     if "--one-window" in sys.argv:
         a = one_window(a)
-    print("original: %d calls, smacx: %d calls" % (len(a), len(b)))
+    print("original: %d calls, OpenSMAC: %d calls" % (len(a), len(b)))
     if a == b:
         print("OK: identical sequences")
         return 0
@@ -105,7 +105,7 @@ def main():
         if sa == sb:
             continue
         bad += 1
-        print("%s differs (original %d, smacx %d):" % (t, len(sa), len(sb)))
+        print("%s differs (original %d, OpenSMAC %d):" % (t, len(sa), len(sb)))
         for d in list(difflib.unified_diff(sa, sb, lineterm="", n=0))[2:14]:
             print("   " + d)
     print("%d turns differ" % bad)

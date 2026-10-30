@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Which reconstructed original functions did native runs execute?
 
-Build with -DSMACX_COVERAGE=ON, run smacx_headless (any number of scenarios: counts accumulate in
+Build with -DOPENSMAC_COVERAGE=ON, run opensmac_headless (any number of scenarios: counts accumulate in
 the .gcda files), then:
 
     src/tools/coverage_report.py build/cov-native [--missed] [--module base]
@@ -27,7 +27,7 @@ def gcov_functions(build):
     for root, _, files in os.walk(build):
         gcdas += [os.path.join(root, f) for f in files if f.endswith(".gcda")]
     if not gcdas:
-        sys.exit(f"no .gcda files under {build}: build with -DSMACX_COVERAGE=ON and run smacx_headless")
+        sys.exit(f"no .gcda files under {build}: build with -DOPENSMAC_COVERAGE=ON and run opensmac_headless")
     counts = defaultdict(int)
     for gcda in gcdas:
         out = subprocess.run(["gcov", "--json-format", "--stdout", gcda], cwd=os.path.dirname(gcda),
@@ -47,7 +47,7 @@ def gcov_functions(build):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("build", help="native build directory configured with -DSMACX_COVERAGE=ON")
+    ap.add_argument("build", help="native build directory configured with -DOPENSMAC_COVERAGE=ON")
     ap.add_argument("--missed", action="store_true", help="list implemented functions that never ran")
     ap.add_argument("--module", help="only headers whose name contains this")
     args = ap.parse_args()

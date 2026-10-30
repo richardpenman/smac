@@ -1,9 +1,9 @@
 #!/bin/bash
 # Scripted checks of the sound layer (src/ui/sound.cpp, music.cpp, mp3.cpp, movie.cpp): which FX,
-# voices, ambience, music and movie calls the game makes (SMACX_SOUNDLOG=1), the volume page of the
+# voices, ambience, music and movie calls the game makes (OPENSMAC_SOUNDLOG=1), the volume page of the
 # preferences, the MP3 decoder, the WVE movie player and the mixer's output.
 #
-#   tests/sound/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/p10-native/smacx)
+#   tests/sound/run.sh [OUTDIR]        (OPENSMAC=path/to/opensmac, default build/p10-native/opensmac)
 #
 # 1. observer: an all-AI game (tiny20: size 0, difficulty 3, seeds 1001,2001, 20 turns) logs the
 #    same sound calls in the same order as the original under the oracle (orig_tiny20.log, made by
@@ -23,13 +23,13 @@
 # Runs 1-4 use --nosound (the same calls as with a device: every call is logged before the device
 # is used). Exit status 0 when every check passes.
 set -u
-# Animated by default (smacx --animate: slides, unit moves, booms, battle reports and movies play
+# Animated by default (opensmac --animate: slides, unit moves, booms, battle reports and movies play
 # with their waits, as in an interactive game); TEST_FAST=1 runs unattended (skips them).
-if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
+if [ "${TEST_FAST:-0}" = 1 ]; then export OPENSMAC_ANIMATE=0; else export OPENSMAC_ANIMATE=1; fi
 # No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SMACX="$(realpath "${SMACX:-$ROOT/build/p10-native/smacx}")"
+OPENSMAC="$(realpath "${OPENSMAC:-$ROOT/build/p10-native/opensmac}")"
 OUT="$(realpath -m "${1:-$ROOT/work/sound_test}")"
 PY="$ROOT/tools/venv/bin/python"
 mkdir -p "$OUT"
@@ -39,7 +39,7 @@ run() {  # run CASE ARGS... : log in OUT/CASE.log
     local name="$1"; shift
     rm -rf "$OUT/$name"
     mkdir -p "$OUT/$name"
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy SMACX_SOUNDLOG=1 timeout 900 "$SMACX" --original-bugs --hidden --outdir "$OUT/$name" "$@" \
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy OPENSMAC_SOUNDLOG=1 timeout 900 "$OPENSMAC" --original-bugs --hidden --outdir "$OUT/$name" "$@" \
         > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
@@ -133,7 +133,7 @@ check music "the music sequencer plays (30 s, level above silence)" "musicrender
 nocrash music
 
 # 7. A secret project's movie (amovie_project_name): the WVE container, its TQI frames and its sound.
-SMACX_MOVIE_FRAMES=100 run movie --new size=0 --human 1 --seed 1,2 --keys "ENTER,MOVIE:humanGenome"
+OPENSMAC_MOVIE_FRAMES=100 run movie --new size=0 --human 1 --seed 1,2 --keys "ENTER,MOVIE:humanGenome"
 check movie "movie call" "sound: T1 movie humanGenome"
 check movie "the movie's frames and sound" "movie movies.humanGenome.wve: 320x240, 422 frames, sound 28066 ms"
 check movie "100 frames decoded" "movie movies.humanGenome.wve: 100 of 100 frames decoded"

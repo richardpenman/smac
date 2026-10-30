@@ -3,9 +3,9 @@
 # the new technology window (NewTechWin) and the design workshop (DesignWin) (src/ui/techwin.cpp,
 # designwin.cpp).
 #
-#   tests/design/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/p7-native/smacx)
+#   tests/design/run.sh [OUTDIR]        (OPENSMAC=path/to/opensmac, default build/p7-native/opensmac)
 #
-# Plays scripted keys (smacx --keys, hidden, SDL dummy video) on late saves and on a new game
+# Plays scripted keys (opensmac --keys, hidden, SDL dummy video) on late saves and on a new game
 # without blind research (rules=0x180e: the late saves and the default rules research blind, where
 # the window is not shown) as a human faction. TECHSTATE logs the viewer's research ("techstate fF
 # research T accumulated A cost C ai FIGHT GROWTH TECH WEALTH rules R"), SCREENSTATE the open
@@ -13,24 +13,24 @@
 # prototypes; games saved after a change are loaded again to check that it stays. Screenshots go to
 # OUTDIR/<case>/. Exit status 0 when every check passes.
 set -u
-# Animated by default (smacx --animate: slides, unit moves, booms, battle reports and movies play
+# Animated by default (opensmac --animate: slides, unit moves, booms, battle reports and movies play
 # with their waits, as in an interactive game); TEST_FAST=1 runs unattended (skips them).
-if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
+if [ "${TEST_FAST:-0}" = 1 ]; then export OPENSMAC_ANIMATE=0; else export OPENSMAC_ANIMATE=1; fi
 # No audio device in the tests (sounds still run through the mixer); set SDL_AUDIODRIVER to override.
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SMACX="$(realpath "${SMACX:-$ROOT/build/p7-native/smacx}")"
+OPENSMAC="$(realpath "${OPENSMAC:-$ROOT/build/p7-native/opensmac}")"
 OUT="$(realpath -m "${1:-$ROOT/work/design_test}")"
 mkdir -p "$OUT"
 FAIL=0
 # turn_147 as faction 3 and turn_300 as faction 6 start with a computer player's call (communicate):
 # DOWN,ENTER answers its COMM popup "not now".
 
-run() {  # run CASE ARGS... : runs smacx, log in OUT/CASE.log
+run() {  # run CASE ARGS... : runs OpenSMAC, log in OUT/CASE.log
     local name="$1"; shift
     mkdir -p "$OUT/$name"
     rm -f "$OUT/$name"/*.bmp
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$SMACX" --original-bugs --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 600 "$OPENSMAC" --original-bugs --hidden --outdir "$OUT/$name" "$@" > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
 line() {  # line CASE PREFIX N : the Nth log line starting with PREFIX

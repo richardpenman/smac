@@ -1,7 +1,7 @@
 // The NetDaemon (original module 0x52DBA0..0x538F30) and the message / synch senders of the map
 // module (0x592E10..0x593510): the network game's message protocol, kept as the original's (message
 // types, payloads, routing, locks, the synch blocks). Only the transport below it (Net_*,
-// DirectPlay in the original) is smacx's (engine/net_link.cpp, platform/net_tcp).
+// DirectPlay in the original) is OpenSMAC's (engine/net_link.cpp, platform/net_tcp).
 //
 // The NetDaemon object NetState (0x93CD90) begins with the Net / AlphaNet object (+0x760 the own
 // player id, +0x764 the host's, +0x768 the number of players, the player slots 1..7 of 0x19C bytes
@@ -77,7 +77,7 @@ uint32_t now_ms() { return engine_real_time(); }
 }  // namespace
 
 // The time stamp of a relayed event (timeGetTime in the original): the seed every machine executes
-// the event with. With smacx's deterministic clock (engine/clock.h) a counter of its own, so that
+// the event with. With OpenSMAC's deterministic clock (engine/clock.h) a counter of its own, so that
 // the same keys give the same online game (the logic clock is not read: its reads are game state).
 uint32_t net_stamp() {
     static uint32_t counter = 0;
@@ -1085,12 +1085,12 @@ int32_t THISCALL NetDaemon_fixup_message(uint8_t* net, uint8_t* msg) {
 // bytes or applied from a received chunk (msg) ----
 
 namespace {
-// The rules tables (send_rules, synch 0x80..0x8D) are native structures in smacx (their names are
+// The rules tables (send_rules, synch 0x80..0x8D) are native structures in OpenSMAC (their names are
 // pointers): they travel in the original's 32-bit layout, pointers as zero, and the receiver copies
 // the fields the original copies from its staging buffer (0x93AD8C).
 struct RuleField {
     uint32_t orig;    // offset in the original's element
-    uint32_t native;  // offset in smacx's element
+    uint32_t native;  // offset in OpenSMAC's element
     uint32_t size;
 };
 struct RuleTable {
@@ -1695,7 +1695,7 @@ void GAMEAPI send_faction_data(int32_t idx) {
     Net_send(net, m.data(), size, idx < 0 ? 0 : fld(net, 0x78C + idx * 0x19C), 1);
 }
 
-// smacx: the host's original-bugs setting (engine/compat.h) to every player (0x0F10, not a
+// OpenSMAC: the host's original-bugs setting (engine/compat.h) to every player (0x0F10, not a
 // message of the original's), sent before the rules and the game so that every copy plays alike.
 void net_send_original_bugs() {
     uint8_t m[0x20] = {};

@@ -18,7 +18,7 @@
 // read_tamper / set_tamper (0x51E000 / 0x51E090): the PBEM tamper records (TamperIndex, value
 // "MVM", 4 bytes; TamperRecords, value "MVB", 0x4B0 bytes) are kept per machine. The original keeps
 // them in the registry (HKLM\SOFTWARE\Microsoft\DirectPlay\Applications\Sid Meier's Alpha
-// Centauri); smacx keeps the two values in the file tamper.reg of its per-user directory (the
+// Centauri); OpenSMAC keeps the two values in the file tamper.reg of its per-user directory (the
 // --outdir with tests): a missing file reads nothing, as a missing registry value.
 // Approximated: the players' own message lists (sub_51E530: each faction's messages kept between
 // its turns, the message mode then set) are not kept; the desktop's box sprites are not drawn.

@@ -1,6 +1,6 @@
 // The network transport of native builds: the original's Net_* entry points (DirectPlay, netlib
-// 0x62D6A0..0x633000) over smacx's TCP transport (platform/net_tcp.h), for online games between
-// smacx copies. Only what the NetDaemon layer uses is kept: Net_send / Net_get with the original's
+// 0x62D6A0..0x633000) over OpenSMAC's TCP transport (platform/net_tcp.h), for online games between
+// OpenSMAC copies. Only what the NetDaemon layer uses is kept: Net_send / Net_get with the original's
 // player ids (the transport's: the host 1, the clients 2, 3, ...), the player names, the session's
 // player events (DirectPlay's system messages, Net_handle_sys_msg) and Net_close. The DirectPlay
 // service enumeration, lobbies, voice, groups and packet splitting are not needed (the transport

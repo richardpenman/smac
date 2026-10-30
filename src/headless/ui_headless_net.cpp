@@ -1,4 +1,4 @@
-// Headless defaults of the network game's UI hooks (engine/net.h): no windows; smacx's
+// Headless defaults of the network game's UI hooks (engine/net.h): no windows; OpenSMAC's
 // ui/netwin.cpp replaces this area.
 #include <cstdio>
 

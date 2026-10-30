@@ -1,4 +1,4 @@
-// Window layer of smacx: the screen, the message pump and keyboard input, placeholder panes; the
+// Window layer of OpenSMAC: the screen, the message pump and keyboard input, placeholder panes; the
 // popups (popup.h) are drawn over the screen.
 //
 // The original builds its screen from Win/GraphicWin objects (gfx module) and dispatches Windows
@@ -7,7 +7,7 @@
 // keys reach the console as the original's Win_on_key / Win_key_down_event / WM_CHAR handling
 // delivers them: Console_on_key_click(character, virtual key | modifier bits).
 //
-// Original functions (ADDR_NATIVE, smacx's replacement of the headless "pump" and "popup" areas):
+// Original functions (ADDR_NATIVE, OpenSMAC's replacement of the headless "pump" and "popup" areas):
 // wait_task, do_all_non_input, do_non_input, flush_input, and the popups (win_popup.cpp,
 // popup_menus.cpp: the reconstructed BasePop / Popup of popup.h).
 #pragma once
@@ -75,14 +75,14 @@ void ui_set_message(const std::string& text);
 // GetKeyState for a virtual key: bit 15 held, bit 0 toggled (Scroll Lock etc. are never toggled).
 int32_t ui_key_state(int32_t vk);
 
-// Scripted input (smacx --keys): consumed before real input. A key is a virtual key with modifier
+// Scripted input (opensmac --keys): consumed before real input. A key is a virtual key with modifier
 // bits (0x10000 shift, 0x20000 ctrl, 0x40000 alt); commands are run by the pump.
 struct ScriptedKey {
     int32_t vk = 0;
     std::string command;  // "shot FILE", "save FILE", "quit"
 };
 void ui_script_keys(const std::vector<ScriptedKey>& keys);
-// SMACX_TRACE=1: logs the random generators and the logic clock (determinism checks).
+// OPENSMAC_TRACE=1: logs the random generators and the logic clock (determinism checks).
 void ui_trace(const char* what);
 // Called when the scripted keys run out with nothing left to do (no display): the game quits.
 extern bool g_ui_exit_when_script_done;
@@ -98,7 +98,7 @@ extern int32_t g_ui_shots;
 // Dispatches a key (virtual key with modifier bits) as Win_on_key / WM_CHAR deliver it.
 void ui_dispatch_key(int32_t key);
 // The window's close button where no game's main screen takes input (modal windows, the opening
-// screens, movies): before a game runs (GameNotStarted) smacx quits (true; the input loops then
+// screens, movies): before a game runs (GameNotStarted) OpenSMAC quits (true; the input loops then
 // return no more input), in a game the close is ignored (false). win.cpp close_requested.
 bool ui_window_close_modal();
 // Next key for a modal placeholder (popups): scripted or real; 0 when the input ended.

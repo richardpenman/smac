@@ -11,11 +11,11 @@
 // 0xB4C bytes each), the sprites, the clickable spots (+0x40EB4, +0x40EC0) and the hit mask
 // (+0x40ECC) are native (BaseWinNative). The window draws into two canvases: its own (758 x 490 at
 // 1024 x 768, above the console) and the main interface's (MainInfc 0x7AE820, the console at the
-// bottom: base name, citizens, queue, production, units). smacx keeps a native main interface
+// bottom: base name, citizens, queue, production, units). OpenSMAC keeps a native main interface
 // canvas for it (basewin_mi_canvas): the main interface itself (MainInterface_init / on_redraw) is
 // not reconstructed, only the frame art and the pane rectangles the base window uses.
 //
-// smacx replaces the headless "basewin" area (src/headless/ui_headless_basewin.cpp: the BaseWin
+// OpenSMAC replaces the headless "basewin" area (src/headless/ui_headless_basewin.cpp: the BaseWin
 // functions of engine/ui_bridge.h, Win_is_visible and GraphicWin_redraw) with these files.
 #pragma once
 #include <cstdint>
@@ -350,11 +350,11 @@ int32_t basewin_console_key(uint8_t* console, int32_t ch, int32_t vk, int32_t ke
 void basewin_compose(Buffer* screen);
 // Mouse input while the base window is open (screen coordinates); false when it is closed.
 bool basewin_mouse(int32_t type, int32_t x, int32_t y, bool double_click, bool right);
-// The canvases (for tests: smacx --keys BASEDUMP:FILE writes them in the oracle's basedump format).
+// The canvases (for tests: opensmac --keys BASEDUMP:FILE writes them in the oracle's basedump format).
 Buffer* basewin_canvas();
 Buffer* basewin_mi_canvas();
 bool basewin_dump(const char* path);
-// The open base's state on stderr ("basestate ..." lines; smacx --keys BASESTATE).
+// The open base's state on stderr ("basestate ..." lines; opensmac --keys BASESTATE).
 void basewin_log_state();
 
 // ---- the scenario editor's base menu (editor_base.cpp) ----

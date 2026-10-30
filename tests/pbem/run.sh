@@ -5,16 +5,16 @@
 # each handover, a wrong password on load, a save loaded twice (HOTNOTAMPER) and the other player
 # told (HOTTAMPER2), and the passworded save refused as a single-player load (PASSWORDEDLOADATTEMPT).
 #
-#   tests/pbem/run.sh [OUTDIR]        (SMACX=path/to/smacx, default build/net-native/smacx)
+#   tests/pbem/run.sh [OUTDIR]        (OPENSMAC=path/to/opensmac, default build/net-native/opensmac)
 #
-# Each step runs smacx with scripted keys (hidden, SDL dummy video) and checks its log. Exit status
+# Each step runs OpenSMAC with scripted keys (hidden, SDL dummy video) and checks its log. Exit status
 # 0 when every check passes.
 set -u
-# Animated by default (smacx --animate); TEST_FAST=1 runs unattended (skips the animations).
-if [ "${TEST_FAST:-0}" = 1 ]; then export SMACX_ANIMATE=0; else export SMACX_ANIMATE=1; fi
+# Animated by default (opensmac --animate); TEST_FAST=1 runs unattended (skips the animations).
+if [ "${TEST_FAST:-0}" = 1 ]; then export OPENSMAC_ANIMATE=0; else export OPENSMAC_ANIMATE=1; fi
 export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SMACX="$(realpath "${SMACX:-$ROOT/build/net-native/smacx}")"
+OPENSMAC="$(realpath "${OPENSMAC:-$ROOT/build/net-native/opensmac}")"
 OUT="$(realpath -m "${1:-$ROOT/work/pbem_test}")"
 rm -rf "$OUT"
 mkdir -p "$OUT/a/saves" "$OUT/b/saves"
@@ -28,7 +28,7 @@ FAIL=0
 
 run() {  # run STEP MACHINE ARGS... : the machine's outdir (a or b), log in OUT/STEP.log
     local name="$1" dir="$OUT/$2"; shift 2
-    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 900 "$SMACX" --hidden --ini "${INI:-$OUT/pbem.ini}" --outdir "$dir" \
+    (cd "$ROOT" && SDL_VIDEODRIVER=dummy timeout 900 "$OPENSMAC" --hidden --ini "${INI:-$OUT/pbem.ini}" --outdir "$dir" \
         "$@" > "$OUT/$name.log" 2>&1)
     echo "$?" > "$OUT/$name.rc"
 }
@@ -73,7 +73,7 @@ mail a b
 #    (cd); their turn 1; University's handover (SWITCHING2): SAVE AND EXIT. Mailed to A.
 run b1 b --keys "$LOAD,ENTER,c,d,ENTER,c,d,ENTER,FACTIONSTATE,$END,$SAVEEXIT"
 check b1 "loaded" "^filebox: saves.pb.SAV"
-check b1 "the save's setting: the original bugs" "^smacx: this game plays with the original bugs \(the save's setting\)"
+check b1 "the save's setting: the original bugs" "^opensmac: this game plays with the original bugs \(the save's setting\)"
 check b1 "first load of this save: a new tamper record" "^pbem: tamper record new \(turn 1 faction 2 save 1 loads 1\)"
 nocheck b1 "no tampering told" "^popup HOTNOTAMPER shown"
 check b1 "Pirates' password set" "^hotseat: faction 2 password set"
@@ -111,7 +111,7 @@ mail b a
 # 6. Machine A: University's turn 3: told of the Pirates' extra load (HOTTAMPER2).
 run a3 a --keys "$LOAD,ENTER,a,b,ENTER,ENTER,FACTIONSTATE,QUIT"
 check a3 "University's turn 3" "^hotseat: faction 1 takes the turn \(turn 3\)"
-check a3 "still the save's setting" "^smacx: this game plays with the original bugs \(the save's setting\)"
+check a3 "still the save's setting" "^opensmac: this game plays with the original bugs \(the save's setting\)"
 check a3 "the tampering told: HOTTAMPER2" "^popup HOTTAMPER2 shown"
 nocrash a3
 

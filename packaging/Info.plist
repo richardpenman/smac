@@ -5,15 +5,15 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>smacx</string>
+	<string>OpenSMAC</string>
 	<key>CFBundleExecutable</key>
-	<string>smacx</string>
+	<string>opensmac</string>
 	<key>CFBundleIdentifier</key>
-	<string>io.github.richardpenman.smacx</string>
+	<string>io.github.richardpenman.opensmac</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>smacx</string>
+	<string>OpenSMAC</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

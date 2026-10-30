@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# cmp.py ORIG SMACX OUT.png x0 y0 x1 y1 [SCALE]: the region of both screenshots stacked (original,
-# smacx, then the pixels differing by more than 24 in any channel in white); prints the fraction of
+# cmp.py ORIG OPENSMAC OUT.png x0 y0 x1 y1 [SCALE]: the region of both screenshots stacked (original,
+# OpenSMAC, then the pixels differing by more than 24 in any channel in white); prints the fraction of
 # matching pixels.
 import sys
 from PIL import Image, ImageChops

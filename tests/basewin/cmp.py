@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-# cmp.py ORACLE.smxbase SMACX.smxbase OUT.png: compares the base window canvases of the oracle's
-# basedump and smacx --basedump / BASEDUMP: (index exact). Prints the share of identical pixels of
-# each canvas and per pane rectangle; writes oracle | smacx | difference for both canvases.
+# cmp.py ORACLE.smxbase OPENSMAC.smxbase OUT.png: compares the base window canvases of the oracle's
+# basedump and opensmac --basedump / BASEDUMP: (index exact). Prints the share of identical pixels of
+# each canvas and per pane rectangle; writes oracle | OpenSMAC | difference for both canvases.
 import sys, struct
 from PIL import Image
 
