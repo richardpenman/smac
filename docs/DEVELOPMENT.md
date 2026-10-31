@@ -40,8 +40,10 @@ the three packages (Linux on Ubuntu 22.04, the SDL2 libraries built from source;
 cross-compiled with llvm-mingw against the official SDL2 mingw packages) and publishes them as a
 GitHub Release (a tag with a `-`, e.g. `v1.2.3-rc1`, makes a pre-release). The repository is
 private, so Actions minutes are billed: one release is roughly 65 billed minutes (macOS counts
-10x). Running the workflow by hand on a branch builds the packages as workflow artifacts without
-a release. `packaging/package.sh` assembles a package and refuses any file outside its
+10x). Every push to `main` also publishes a pre-release `build-N-SHA` (N the workflow's run
+number) with the commit's packages, its tag made on the commit; pushes changing only `docs/` or
+`*.md` files are skipped. Running the workflow by hand on a branch builds the packages as
+workflow artifacts without a release. `packaging/package.sh` assembles a package and refuses any file outside its
 allow-list, so no game data or anything derived from `terranx.exe` can ship.
 
 ## Layout

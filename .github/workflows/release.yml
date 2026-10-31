@@ -1,7 +1,9 @@
 # Builds the OpenSMAC release packages (Linux x86_64, macOS arm64, Windows x86_64) and publishes them
-# as a GitHub Release. Runs when a tag v* is pushed (git tag v1.2.3 && git push origin v1.2.3), or
-# by hand (Actions > release > Run workflow): on a tag it publishes the release, on a branch it only
-# keeps the packages as workflow artifacts.
+# as a GitHub Release. Runs:
+# - on every push to main: a pre-release build-N-SHA (N the run number), its tag made on the commit;
+#   pushes changing only documentation (docs/, *.md) are skipped, their packages would be the same;
+# - when a tag v* is pushed (git tag v1.2.3 && git push origin v1.2.3): the release v1.2.3;
+# - by hand (Actions > release > Run workflow): the packages only, kept as workflow artifacts.
 #
 # The packages contain OpenSMAC, the SDL2 libraries, the default ini, packaging/README.txt and the
 # licences: never game data or anything derived from terranx.exe (packaging/package.sh checks the
@@ -9,12 +11,15 @@
 #
 # Cost: the repository is private, so the minutes are billed (macOS counts 10x, Windows 2x; the
 # Windows package is cross-compiled on Linux). One release is about 65 billed minutes, less when
-# the SDL builds come from the cache.
+# the SDL builds come from the cache: with a release per commit, that is per push to main.
 name: release
 
 on:
   push:
+    branches: [main]
     tags: ['v*']
+    # (Path filters apply to the branch pushes only, never to tags.)
+    paths-ignore: ['docs/**', '**/*.md']
   workflow_dispatch:
 
 permissions:
@@ -38,7 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Version
-        run: echo "VERSION=$([[ $GITHUB_REF == refs/tags/v* ]] && echo "$GITHUB_REF_NAME" || echo "dev-${GITHUB_SHA::7}")" >> "$GITHUB_ENV"
+        run: echo "VERSION=$(.github/version.sh)" >> "$GITHUB_ENV"
       - name: SDL build dependencies
         # SDL loads these libraries at run time when present (X11, Wayland, ALSA, PulseAudio, ...).
         run: |
@@ -83,7 +88,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Version
-        run: echo "VERSION=$([[ $GITHUB_REF == refs/tags/v* ]] && echo "$GITHUB_REF_NAME" || echo "dev-${GITHUB_SHA::7}")" >> "$GITHUB_ENV"
+        run: echo "VERSION=$(.github/version.sh)" >> "$GITHUB_ENV"
       - name: SDL cache
         id: sdl-cache
         uses: actions/cache@v4
@@ -122,7 +127,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Version
-        run: echo "VERSION=$([[ $GITHUB_REF == refs/tags/v* ]] && echo "$GITHUB_REF_NAME" || echo "dev-${GITHUB_SHA::7}")" >> "$GITHUB_ENV"
+        run: echo "VERSION=$(.github/version.sh)" >> "$GITHUB_ENV"
       - name: Toolchain and SDL
         run: |
           mkdir -p tools deps
@@ -163,12 +168,15 @@ jobs:
   release:
     name: GitHub Release
     needs: [linux, macos, windows]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -176,14 +184,19 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
         run: |
           ls -l dist
+          TAG=$(.github/version.sh)
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"
-          else
+          elif [[ $GITHUB_REF == refs/tags/v* ]]; then
             pre=()
             [[ "$TAG" == *-* ]] && pre=(--prerelease)  # v1.0.0-rc1
             gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --title "OpenSMAC $TAG" \
               --generate-notes --verify-tag "${pre[@]}"
+          else
+            # A commit on main: a pre-release, so the latest v* release stays "Latest". The tag
+            # (made by GITHUB_TOKEN) starts no workflow.
+            gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --title "OpenSMAC $TAG" \
+              --target "$GITHUB_SHA" --prerelease --generate-notes
           fi
