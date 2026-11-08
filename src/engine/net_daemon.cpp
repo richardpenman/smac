@@ -1178,11 +1178,49 @@ void GAMEAPI synch_display(int32_t type, int32_t chunk, int32_t chunks, int32_t 
     do_all_draws();
 }
 
+namespace {
+// Whether a received synch block's faction, unit, base or map section (id, and a3: the second
+// faction of 0x16, the unit count of 0xF) lies in the game's tables. They come from the peer's
+// message (args 5 and 6) and the original indexes with them unchecked, so a malformed or
+// malicious message wrote outside the tables; no message of a real game is outside them.
+bool synch_target_valid(int32_t type, int32_t id, int32_t a3) {
+    auto in = [](int32_t v, int32_t n) { return v >= 0 && v < n; };
+    switch (type) {
+    case 6:
+    case 7:
+    case 8:
+    case 9:
+    case 10:
+    case 0xB:
+    case 0xC:
+    case 0xD:
+    case 0x17:
+    case 0x18: return in(id, MaxPlayerNum);
+    case 0x16: return in(id, MaxPlayerNum) && in(a3, MaxPlayerNum);
+    case 0xE:
+    case 0x10: return in(id, 512);  // Units
+    case 0xF: return in(id, 512) && a3 >= 0 && a3 <= 512 - id;
+    case 0x11: return in(id, MaxVehNum);
+    case 0x13:
+    case 0x23: return in(id, MaxBaseNum);
+    case 0x30: return in(id, 16);  // the map's sixteen sections
+    default: return true;  // a block of its own (id unused)
+    }
+}
+}  // namespace
+
 void THISCALL NetDaemon_synch(uint8_t* net, int32_t type, int32_t a2, int32_t a3, int32_t a4, int32_t* msg,
                               int32_t send, int32_t msg_type) {
     if (!MultiplayerActive) return;
     type = (int16_t)type;
     const int32_t id = a2;  // the faction, unit, base or section
+    if (!send && !synch_target_valid(type, id, a3)) {
+        // Dropped; the sender's pending block is done, as after its last chunk (the caller waits
+        // for that).
+        log_say_values("Dropped SYNCH outside the tables", type, id, a3);
+        fld(net, 0x1BBC) &= ~(1 << (msg[1] & 31));
+        return;
+    }
     auto progress = [&](uint32_t off, int32_t from, int32_t to, const char* label) {
         if (!send && fld(net, off) == from) {
             if (label) NetMsg_pop(&NetMsg, label, 0, 1, nullptr);
@@ -1402,6 +1440,12 @@ void THISCALL NetDaemon_synch(uint8_t* net, int32_t type, int32_t a2, int32_t a3
     int32_t rest = size % 0x800;
     for (int32_t chunk = 0; chunk < chunks; chunk++) {
         int32_t index = send ? chunk : *reinterpret_cast<int16_t*>(reinterpret_cast<uint8_t*>(msg) + 0x12);
+        // The received chunk's index is the peer's: one outside the block (the original copies its
+        // 0x800 bytes there) is dropped.
+        if (!send && (index < 0 || index >= chunks)) {
+            log_say_values("Dropped SYNCH chunk outside the block", type, index, chunks);
+            break;
+        }
         int32_t part = (index == chunks - 1 && rest) ? rest : 0x800;
         int32_t offset = index * 0x800;
         if (!send) {

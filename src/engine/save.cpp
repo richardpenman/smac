@@ -277,9 +277,7 @@ static void convert_base_v10(BASE* base, const uint8_t* src) {
 // Version 2 unit ids (32 prototypes per faction) to the current numbering (64 per faction).
 static int32_t convert_unit_id_v2(int32_t id) { return id / 32 * 64 + id % 32; }
 
-// PBEM message list: count, then id, length and text of each entry (plain fread/fwrite).
-// Returns 1 on failure.
-static int32_t save_io_stringlist(uint8_t* list, int32_t write, CrtFile* file) {
+int32_t save_io_stringlist(uint8_t* list, int32_t write, CrtFile* file) {
     int32_t count, id, len;
     if (!write) {
         ui_stringlist_clear(list);
@@ -287,6 +285,11 @@ static int32_t save_io_stringlist(uint8_t* list, int32_t write, CrtFile* file) {
         for (int32_t i = 0; i < count; i++) {
             if (!crt_fread(&id, 4, 1, file)) return 1;
             if (!crt_fread(&len, 4, 1, file)) return 1;
+            // The length is the file's: the original reads that many bytes into StrBuffer (256), so
+            // a damaged or crafted save (a PBEM turn comes from another player) wrote past it. A
+            // longer text than the buffer holds fails the load; the game never writes one (an
+            // entry is a leader's name and a chat line of at most 100 characters).
+            if (len < 0 || len >= (int32_t)sizeof(StrBuffer)) return 1;
             // BUG(original): fread of an empty text returns 0 and fails the load.
             if ((len || g_compat.empty_text_fails_load) && !crt_fread(StrBuffer, (uint32_t)len, 1, file)) return 1;
             StrBuffer[len] = 0;

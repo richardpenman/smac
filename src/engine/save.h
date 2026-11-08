@@ -54,6 +54,10 @@ ADDR(0x5A66E0) int32_t GAMEAPI encrypt_write(const void* buf, uint32_t size, uin
 ADDR(0x5A67B0) int32_t GAMEAPI encrypt_read(void* buf, uint32_t size, uint32_t count, CrtFile* file);
 // Reads/writes the saved view state of a map window (6 fields). Returns 1 on failure.
 ADDR(0x5A6890) int32_t GAMEAPI game_io(uint8_t* win, CrtFile* file);
+// Reads (write == 0) or writes a PBEM message list (a StringStruct of DiploTextLists /
+// DiploMessageLists): count, then id, length and text of each entry (plain fread/fwrite;
+// game_data's inline code in the original). Returns 0 on success, 1 on failure.
+int32_t save_io_stringlist(uint8_t* list, int32_t write, CrtFile* file);
 // Reads (write == 0) or writes the game state; also converts older savegame versions.
 // Returns 0 on success, 1 on failure (SaveFileStatus = 1: game in progress on another seat).
 ADDR(0x5A6AC0) int32_t GAMEAPI game_data(CrtFile* file, int32_t write);

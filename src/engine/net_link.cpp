@@ -121,7 +121,10 @@ uint8_t* THISCALL Net_get(uint8_t*, int32_t* from, int32_t* size) {
     // The buffer is reused: a message handler that waits for other messages loses its own (as
     // the original's single receive buffer).
     g_message.assign(e.data.begin(), e.data.end());
-    if (g_message.size() < 0x40) g_message.resize(0x40, 0);  // headers read past short messages
+    // Handlers read past short messages: the headers, and a synch block's chunk (NetDaemon_synch
+    // copies up to 0x800 bytes after its 0x24-byte header whatever the message's size). The
+    // original's receive buffer is large enough; here a short message is padded with zeros.
+    if (g_message.size() < 0x24 + 0x800) g_message.resize(0x24 + 0x800, 0);
     *from = e.from;
     if (size) *size = (int32_t)e.data.size();
     return g_message.data();
